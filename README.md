@@ -22,6 +22,8 @@ Implemented commands:
  - PING
  - GET
  - SET -- only the simple version, arguments are not supported
+ - HSET
+ - HGET
  - EXPIRE
  - TTL
  - PERSIST

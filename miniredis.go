@@ -15,8 +15,10 @@ type Miniredis struct {
 	closed     chan struct{}
 	listen     net.Listener
 	info       *redeo.ServerInfo
-	stringKeys map[string]string // GET/SET keys
-	expire     map[string]int    // EXPIRE values
+	keys       map[string]string            // Master map of keys with their type
+	stringKeys map[string]string            // GET/SET &c. keys
+	hashKeys   map[string]map[string]string // MGET/MSET &c. keys
+	expire     map[string]int               // EXPIRE values
 }
 
 var errUnimplemented = errors.New("unimplemented")
@@ -25,8 +27,10 @@ var errUnimplemented = errors.New("unimplemented")
 func NewMiniRedis() *Miniredis {
 	return &Miniredis{
 		closed:     make(chan struct{}),
-		stringKeys: make(map[string]string),
-		expire:     make(map[string]int),
+		keys:       map[string]string{},
+		stringKeys: map[string]string{},
+		hashKeys:   map[string]map[string]string{},
+		expire:     map[string]int{},
 	}
 }
 
@@ -68,6 +72,7 @@ func (m *Miniredis) Start() error {
 	commandsConnection(m, srv)
 	commandsGeneric(m, srv)
 	commandsString(m, srv)
+	commandsHash(m, srv)
 
 	go func() {
 		e := make(chan error)
@@ -109,17 +114,47 @@ func (m *Miniredis) TotalConnectionCount() int {
 // Get returns string keys added with SET.
 // This will return an empty string if the key is not set. Redis would return
 // a nil.
+// Returns empty string when the key is of a different type.
 func (m *Miniredis) Get(k string) string {
 	m.Lock()
 	defer m.Unlock()
 	return m.stringKeys[k]
 }
 
-// Set set a string key.
-func (m *Miniredis) Set(k string, v string) {
+// Set sets a string key.
+func (m *Miniredis) Set(k, v string) {
 	m.Lock()
 	defer m.Unlock()
+	m.keys[k] = "string"
 	m.stringKeys[k] = v
+}
+
+// HGet returns hash keys added with HSET.
+// This will return an empty string if the key is not set. Redis would return
+// a nil.
+// Returns empty string when the key is of a different type.
+func (m *Miniredis) HGet(k, f string) string {
+	m.Lock()
+	defer m.Unlock()
+	h, ok := m.hashKeys[k]
+	if !ok {
+		return ""
+	}
+	return h[f]
+}
+
+// HSet sets a hash key.
+// If there is another key by the same name it will be gone.
+func (m *Miniredis) HSet(k, f, v string) {
+	m.Lock()
+	defer m.Unlock()
+
+	m.keys[k] = "hash"
+	_, ok := m.hashKeys[k]
+	if !ok {
+		m.hashKeys[k] = map[string]string{}
+	}
+	m.hashKeys[k][f] = v
 }
 
 // Expire value. As set by the client. 0 if not set.

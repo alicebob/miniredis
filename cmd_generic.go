@@ -25,7 +25,7 @@ func commandsGeneric(m *Miniredis, srv *redeo.Server) {
 		m.Lock()
 		defer m.Unlock()
 		// Key must be present.
-		if _, ok := m.stringKeys[key]; !ok {
+		if _, ok := m.keys[key]; !ok {
 			out.WriteZero()
 			return nil
 		}
@@ -38,7 +38,7 @@ func commandsGeneric(m *Miniredis, srv *redeo.Server) {
 		key := r.Args[0]
 		m.Lock()
 		defer m.Unlock()
-		if _, ok := m.stringKeys[key]; !ok {
+		if _, ok := m.keys[key]; !ok {
 			// No such key
 			out.WriteInt(-2)
 			return nil
@@ -58,7 +58,7 @@ func commandsGeneric(m *Miniredis, srv *redeo.Server) {
 		key := r.Args[0]
 		m.Lock()
 		defer m.Unlock()
-		if _, ok := m.stringKeys[key]; !ok {
+		if _, ok := m.keys[key]; !ok {
 			// No such key
 			out.WriteInt(0)
 			return nil

@@ -22,6 +22,12 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 		m.Lock()
 		defer m.Unlock()
 
+		if t, ok := m.keys[key]; ok && t != "string" {
+			out.WriteErrorString("Wrong type of key")
+			return nil
+		}
+
+		m.keys[key] = "string"
 		m.stringKeys[key] = value
 		// a SET clears the expire
 		delete(m.expire, key)
@@ -30,9 +36,19 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 	})
 
 	srv.HandleFunc("GET", func(out *redeo.Responder, r *redeo.Request) error {
+		if len(r.Args) != 1 {
+			out.WriteErrorString("Usage error")
+			return nil
+		}
 		key := r.Args[0]
 		m.Lock()
 		defer m.Unlock()
+
+		if t, ok := m.keys[key]; ok && t != "string" {
+			out.WriteErrorString("Wrong type of key")
+			return nil
+		}
+
 		value, ok := m.stringKeys[key]
 		if !ok {
 			out.WriteNil()

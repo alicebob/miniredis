@@ -44,7 +44,7 @@ func TestMultipleServers(t *testing.T) {
 }
 
 // Test simple GET/SET keys
-func TestKeys(t *testing.T) {
+func TestString(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
@@ -80,6 +80,16 @@ func TestKeys(t *testing.T) {
 		b, err := c.Do("GET", "reallynosuchkey")
 		ok(t, err)
 		equals(t, nil, b)
+	}
+
+	// Wrong types.
+	{
+		_, err := c.Do("HSET", "wim", "zus", "jet")
+		ok(t, err)
+		_, err = c.Do("SET", "wim", "zus")
+		assert(t, err != nil, "no SET error")
+		_, err = c.Do("GET", "wim")
+		assert(t, err != nil, "no GET error")
 	}
 }
 
@@ -162,5 +172,79 @@ func TestExpire(t *testing.T) {
 		b, err := redis.Int(c.Do("TTL", "exkey"))
 		ok(t, err)
 		equals(t, -1, b)
+	}
+
+	// Hash key works fine, too
+	{
+		_, err := c.Do("HSET", "wim", "zus", "jet")
+		ok(t, err)
+		b, err := redis.Int(c.Do("EXPIRE", "wim", "1234"))
+		ok(t, err)
+		equals(t, 1, b)
+	}
+}
+
+// Test Hash.
+func TestHash(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	{
+		b, err := redis.Int(c.Do("HSET", "aap", "noot", "mies"))
+		ok(t, err)
+		equals(t, 1, b) // New field.
+	}
+
+	{
+		v, err := redis.String(c.Do("HGET", "aap", "noot"))
+		ok(t, err)
+		equals(t, "mies", v)
+		equals(t, "mies", s.HGet("aap", "noot"))
+	}
+
+	{
+		b, err := redis.Int(c.Do("HSET", "aap", "noot", "mies"))
+		ok(t, err)
+		equals(t, 0, b) // Existing field.
+	}
+
+	// Wrong type of key
+	{
+		_, err := redis.String(c.Do("SET", "foo", "bar"))
+		ok(t, err)
+		_, err = redis.Int(c.Do("HSET", "foo", "noot", "mies"))
+		assert(t, err != nil, "HSET error")
+	}
+
+	// hash exists, key doesn't.
+	{
+		b, err := c.Do("HGET", "aap", "nosuch")
+		ok(t, err)
+		equals(t, nil, b)
+	}
+
+	// hash doesn't exists.
+	{
+		b, err := c.Do("HGET", "nosuch", "nosuch")
+		ok(t, err)
+		equals(t, nil, b)
+		equals(t, "", s.HGet("nosuch", "nosuch"))
+	}
+
+	// HGET on wrong type
+	{
+		_, err := redis.Int(c.Do("HGET", "aap"))
+		assert(t, err != nil, "HGET error")
+	}
+
+	// Direct HSet()
+	{
+		s.HSet("wim", "zus", "jet")
+		v, err := redis.String(c.Do("HGET", "wim", "zus"))
+		ok(t, err)
+		equals(t, "jet", v)
 	}
 }
