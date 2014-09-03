@@ -24,6 +24,7 @@ Implemented commands:
  - SET -- only the simple version, arguments are not supported
  - HSET
  - HGET
+ - HDEL
  - EXPIRE
  - TTL
  - PERSIST

@@ -65,4 +65,37 @@ func commandsHash(m *Miniredis, srv *redeo.Server) {
 		out.WriteString(value)
 		return nil
 	})
+
+	srv.HandleFunc("HDEL", func(out *redeo.Responder, r *redeo.Request) error {
+		if len(r.Args) < 2 {
+			out.WriteErrorString("Usage error")
+			return nil
+		}
+		key := r.Args[0]
+		m.Lock()
+		defer m.Unlock()
+
+		t, ok := m.keys[key]
+		if !ok {
+			// No key is zero deleted
+			out.WriteInt(0)
+			return nil
+		}
+		if t != "hash" {
+			out.WriteErrorString("Wrong type of key")
+			return nil
+		}
+
+		deleted := 0
+		for _, f := range r.Args[1:] {
+			_, ok := m.hashKeys[key][f]
+			if !ok {
+				continue
+			}
+			delete(m.hashKeys[key], f)
+			deleted++
+		}
+		out.WriteInt(deleted)
+		return nil
+	})
 }

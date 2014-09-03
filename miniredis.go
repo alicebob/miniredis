@@ -157,6 +157,17 @@ func (m *Miniredis) HSet(k, f, v string) {
 	m.hashKeys[k][f] = v
 }
 
+// HDel deletes a hash key.
+func (m *Miniredis) HDel(k, f string) {
+	m.Lock()
+	defer m.Unlock()
+
+	if _, ok := m.hashKeys[k]; !ok {
+		return
+	}
+	delete(m.hashKeys[k], f)
+}
+
 // Expire value. As set by the client. 0 if not set.
 func (m *Miniredis) Expire(k string) int {
 	m.Lock()
