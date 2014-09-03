@@ -19,7 +19,9 @@ stack.
 
 Implemented commands:
 
+ - AUTH -- we accept every password
  - PING
+ - ECHO
  - GET
  - SET -- only the simple version, arguments are not supported
  - HDEL
