@@ -13,6 +13,7 @@ type miniredis struct {
 	sync.Mutex
 	closed     chan struct{}
 	listen     net.Listener
+	info       *redeo.ServerInfo
 	stringKeys map[string]string // GET/SET keys
 }
 
@@ -57,6 +58,8 @@ func (m *miniredis) Start() error {
 	m.listen = l
 	srv := redeo.NewServer(&redeo.Config{Addr: "localhost:0"})
 
+	m.info = srv.Info()
+
 	commandPing(m, srv)
 	commandGetSet(m, srv)
 
@@ -74,6 +77,20 @@ func (m *miniredis) Addr() string {
 	m.Lock()
 	defer m.Unlock()
 	return m.listen.Addr().String()
+}
+
+// TotalCommands returns the number of processed commands.
+func (m *miniredis) TotalCommands() int {
+	m.Lock()
+	defer m.Unlock()
+	return int(m.info.TotalProcessed())
+}
+
+// ClientsLen returns the number of connected clients.
+func (m *miniredis) ClientsLen() int {
+	m.Lock()
+	defer m.Unlock()
+	return m.info.ClientsLen()
 }
 
 // Get returns keys added with SET.

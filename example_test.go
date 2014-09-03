@@ -28,5 +28,11 @@ func Example() {
 	if s.Get("foo") != "bar" {
 		panic("Didn't get 'bar' back")
 	}
+
+	// See if there was only one connection.
+	if s.TotalConnectionCount() != 1 {
+		panic("Too many connections made")
+	}
+
 	// Output:
 }
