@@ -6,6 +6,45 @@ import (
 	"github.com/bsm/redeo"
 )
 
+// HGet returns hash keys added with HSET.
+// This will return an empty string if the key is not set. Redis would return
+// a nil.
+// Returns empty string when the key is of a different type.
+func (m *Miniredis) HGet(k, f string) string {
+	m.Lock()
+	defer m.Unlock()
+	h, ok := m.hashKeys[k]
+	if !ok {
+		return ""
+	}
+	return h[f]
+}
+
+// HSet sets a hash key.
+// If there is another key by the same name it will be gone.
+func (m *Miniredis) HSet(k, f, v string) {
+	m.Lock()
+	defer m.Unlock()
+
+	m.keys[k] = "hash"
+	_, ok := m.hashKeys[k]
+	if !ok {
+		m.hashKeys[k] = map[string]string{}
+	}
+	m.hashKeys[k][f] = v
+}
+
+// HDel deletes a hash key.
+func (m *Miniredis) HDel(k, f string) {
+	m.Lock()
+	defer m.Unlock()
+
+	if _, ok := m.hashKeys[k]; !ok {
+		return
+	}
+	delete(m.hashKeys[k], f)
+}
+
 // commandsHash handles all hash value operations.
 func commandsHash(m *Miniredis, srv *redeo.Server) {
 	srv.HandleFunc("HSET", func(out *redeo.Responder, r *redeo.Request) error {

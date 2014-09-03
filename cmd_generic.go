@@ -8,6 +8,13 @@ import (
 	"github.com/bsm/redeo"
 )
 
+// Expire value. As set by the client. 0 if not set.
+func (m *Miniredis) Expire(k string) int {
+	m.Lock()
+	defer m.Unlock()
+	return m.expire[k]
+}
+
 // commandsGeneric handles EXPIRE, TTL, PERSIST
 func commandsGeneric(m *Miniredis, srv *redeo.Server) {
 	srv.HandleFunc("EXPIRE", func(out *redeo.Responder, r *redeo.Request) error {
