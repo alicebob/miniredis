@@ -52,13 +52,33 @@ func TestKeys(t *testing.T) {
 	ok(t, err)
 
 	// SET command
-	_, err = c.Do("SET", "foo", "bar")
-	ok(t, err)
+	{
+		_, err = c.Do("SET", "foo", "bar")
+		ok(t, err)
+	}
 	// GET command
-	v, err := redis.String(c.Do("GET", "foo"))
-	ok(t, err)
-	equals(t, "bar", v)
+	{
+		v, err := redis.String(c.Do("GET", "foo"))
+		ok(t, err)
+		equals(t, "bar", v)
+	}
 
 	// Query server directly.
 	equals(t, "bar", s.Get("foo"))
+
+	// Use Set directly
+	{
+		s.Set("aap", "noot")
+		equals(t, "noot", s.Get("aap"))
+		v, err := redis.String(c.Do("GET", "aap"))
+		ok(t, err)
+		equals(t, "noot", v)
+	}
+
+	// GET a Non-existing key. Should be nil.
+	{
+		b, err := c.Do("GET", "reallynosuchkey")
+		ok(t, err)
+		equals(t, nil, b)
+	}
 }

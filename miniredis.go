@@ -18,7 +18,7 @@ type Miniredis struct {
 	stringKeys map[string]string // GET/SET keys
 }
 
-var errUnimplemented = errors.New("Unimplemented")
+var errUnimplemented = errors.New("unimplemented")
 
 // NewMiniRedis makes a new non-started Miniredis object.
 func NewMiniRedis() *Miniredis {
@@ -55,7 +55,7 @@ func (m *Miniredis) Start() error {
 	l, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		if l, err = net.Listen("tcp6", "[::1]:0"); err != nil {
-			return fmt.Errorf("Miniredis: failed to listen on a port: %v", err)
+			return fmt.Errorf("failed to listen on a port: %v", err)
 		}
 	}
 	m.listen = l
@@ -103,11 +103,20 @@ func (m *Miniredis) TotalConnectionCount() int {
 	return int(m.info.TotalConnections())
 }
 
-// Get returns keys added with SET.
+// Get returns string keys added with SET.
+// This will return an empty string if the key is not set. Redis would return
+// a nil.
 func (m *Miniredis) Get(k string) string {
 	m.Lock()
 	defer m.Unlock()
 	return m.stringKeys[k]
+}
+
+// Set set a string key.
+func (m *Miniredis) Set(k string, v string) {
+	m.Lock()
+	defer m.Unlock()
+	m.stringKeys[k] = v
 }
 
 func commandPing(r *Miniredis, srv *redeo.Server) {

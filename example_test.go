@@ -24,12 +24,12 @@ func Example() {
 		panic(err)
 	}
 
-	// You can ask miniredis about keys to test without going over the network.
+	// You can ask miniredis about keys directly, without going over the network.
 	if s.Get("foo") != "bar" {
 		panic("Didn't get 'bar' back")
 	}
 
-	// See if there was only one connection.
+	// Check if there really was only one connection.
 	if s.TotalConnectionCount() != 1 {
 		panic("Too many connections made")
 	}
