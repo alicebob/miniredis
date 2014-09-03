@@ -22,9 +22,16 @@ Implemented commands:
  - PING
  - GET
  - SET -- only the simple version, arguments are not supported
- - HSET
- - HGET
  - HDEL
+ - HEXISTS
+ - HGET
+ - HGETALL
+ - HKEYS
+ - HLEN
+ - HMGET
+ - HSET
+ - HSETNX
+ - HVALS
  - EXPIRE
  - TTL
  - PERSIST
