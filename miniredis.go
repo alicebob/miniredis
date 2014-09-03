@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"strconv"
 	"sync"
 
 	"github.com/bsm/redeo"
@@ -16,6 +17,7 @@ type Miniredis struct {
 	listen     net.Listener
 	info       *redeo.ServerInfo
 	stringKeys map[string]string // GET/SET keys
+	expire     map[string]int    // EXPIRE values
 }
 
 var errUnimplemented = errors.New("unimplemented")
@@ -25,6 +27,7 @@ func NewMiniRedis() *Miniredis {
 	return &Miniredis{
 		closed:     make(chan struct{}),
 		stringKeys: make(map[string]string),
+		expire:     make(map[string]int),
 	}
 }
 
@@ -65,6 +68,7 @@ func (m *Miniredis) Start() error {
 
 	commandPing(m, srv)
 	commandGetSet(m, srv)
+	commandExpire(m, srv)
 
 	go func() {
 		e := make(chan error)
@@ -119,13 +123,21 @@ func (m *Miniredis) Set(k string, v string) {
 	m.stringKeys[k] = v
 }
 
+// Expire value. As set by the client. 0 if not set.
+func (m *Miniredis) Expire(k string) int {
+	m.Lock()
+	defer m.Unlock()
+	return m.expire[k]
+}
+
 func commandPing(r *Miniredis, srv *redeo.Server) {
-	srv.HandleFunc("ping", func(out *redeo.Responder, _ *redeo.Request) error {
+	srv.HandleFunc("PING", func(out *redeo.Responder, _ *redeo.Request) error {
 		out.WriteInlineString("PONG")
 		return nil
 	})
 }
 
+// commandGetSet handles all string value operations.
 func commandGetSet(m *Miniredis, srv *redeo.Server) {
 	srv.HandleFunc("SET", func(out *redeo.Responder, r *redeo.Request) error {
 		if len(r.Args) < 2 {
@@ -140,7 +152,10 @@ func commandGetSet(m *Miniredis, srv *redeo.Server) {
 		value := r.Args[1]
 		m.Lock()
 		defer m.Unlock()
+
 		m.stringKeys[key] = value
+		// a SET clears the expire
+		delete(m.expire, key)
 		out.WriteOK()
 		return nil
 	})
@@ -155,6 +170,76 @@ func commandGetSet(m *Miniredis, srv *redeo.Server) {
 			return nil
 		}
 		out.WriteString(value)
+		return nil
+	})
+
+	// TODO: GETSET (clears expire!)
+}
+
+// commandExpire handles EXPIRE, TTL, PERSIST
+func commandExpire(m *Miniredis, srv *redeo.Server) {
+	srv.HandleFunc("EXPIRE", func(out *redeo.Responder, r *redeo.Request) error {
+		if len(r.Args) != 2 {
+			out.WriteErrorString("usage error")
+			return nil
+		}
+		key := r.Args[0]
+		value := r.Args[1]
+		i, err := strconv.Atoi(value)
+		if err != nil {
+			out.WriteErrorString("value error")
+			return nil
+		}
+		m.Lock()
+		defer m.Unlock()
+		// Key must be present.
+		if _, ok := m.stringKeys[key]; !ok {
+			out.WriteZero()
+			return nil
+		}
+		m.expire[key] = i
+		out.WriteOne()
+		return nil
+	})
+
+	srv.HandleFunc("TTL", func(out *redeo.Responder, r *redeo.Request) error {
+		key := r.Args[0]
+		m.Lock()
+		defer m.Unlock()
+		if _, ok := m.stringKeys[key]; !ok {
+			// No such key
+			out.WriteInt(-2)
+			return nil
+		}
+
+		value, ok := m.expire[key]
+		if !ok {
+			// No expire value
+			out.WriteInt(-1)
+			return nil
+		}
+		out.WriteInt(value)
+		return nil
+	})
+
+	srv.HandleFunc("PERSIST", func(out *redeo.Responder, r *redeo.Request) error {
+		key := r.Args[0]
+		m.Lock()
+		defer m.Unlock()
+		if _, ok := m.stringKeys[key]; !ok {
+			// No such key
+			out.WriteInt(0)
+			return nil
+		}
+
+		_, ok := m.expire[key]
+		if !ok {
+			// No expire value
+			out.WriteInt(0)
+			return nil
+		}
+		delete(m.expire, key)
+		out.WriteInt(1)
 		return nil
 	})
 }

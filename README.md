@@ -22,5 +22,11 @@ Implemented commands:
  - PING
  - GET
  - SET -- only the simple version, arguments are not supported
+ - EXPIRE
+ - TTL
+ - PERSIST
 
-Since this is intended to be used in unittests timeouts are not implemented. (but you should be able to check what their EXPIRE values are. One day).
+Since this is intended to be used in unittests timeouts are not implemented.
+You can use `Expire()` to see if an expiration is set. The value returned will
+be that what the client set, without any interpretation. This is to keep things
+testable.
