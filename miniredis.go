@@ -90,6 +90,22 @@ func (m *Miniredis) Addr() string {
 	return m.listen.Addr().String()
 }
 
+// Host returns the host and the (random) port used.
+func (m *Miniredis) Host() string {
+	m.Lock()
+	defer m.Unlock()
+	host, _, _ := net.SplitHostPort(m.listen.Addr().String())
+	return host
+}
+
+// Port returns the (random) port used.
+func (m *Miniredis) Port() string {
+	m.Lock()
+	defer m.Unlock()
+	_, port, _ := net.SplitHostPort(m.listen.Addr().String())
+	return port
+}
+
 // CommandCount returns the number of processed commands.
 func (m *Miniredis) CommandCount() int {
 	m.Lock()
