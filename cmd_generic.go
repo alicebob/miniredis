@@ -10,16 +10,24 @@ import (
 
 // Expire value. As set by the client. 0 if not set.
 func (m *Miniredis) Expire(k string) int {
-	m.Lock()
-	defer m.Unlock()
-	return m.expire[k]
+	return m.DB(m.clientDB).Expire(k)
+}
+
+func (db *redisDB) Expire(k string) int {
+	db.Lock()
+	defer db.Unlock()
+	return db.expire[k]
 }
 
 // SetExpire sets expiration of a key.
 func (m *Miniredis) SetExpire(k string, ex int) {
-	m.Lock()
-	defer m.Unlock()
-	m.expire[k] = ex
+	m.DB(m.clientDB).SetExpire(k, ex)
+}
+
+func (db *redisDB) SetExpire(k string, ex int) {
+	db.Lock()
+	defer db.Unlock()
+	db.expire[k] = ex
 }
 
 // commandsGeneric handles EXPIRE, TTL, PERSIST
@@ -36,29 +44,33 @@ func commandsGeneric(m *Miniredis, srv *redeo.Server) {
 			out.WriteErrorString("value error")
 			return nil
 		}
-		m.Lock()
-		defer m.Unlock()
+		db := m.dbFor(r.Client().ID)
+		db.Lock()
+		defer db.Unlock()
+
 		// Key must be present.
-		if _, ok := m.keys[key]; !ok {
+		if _, ok := db.keys[key]; !ok {
 			out.WriteZero()
 			return nil
 		}
-		m.expire[key] = i
+		db.expire[key] = i
 		out.WriteOne()
 		return nil
 	})
 
 	srv.HandleFunc("TTL", func(out *redeo.Responder, r *redeo.Request) error {
 		key := r.Args[0]
-		m.Lock()
-		defer m.Unlock()
-		if _, ok := m.keys[key]; !ok {
+		db := m.dbFor(r.Client().ID)
+		db.Lock()
+		defer db.Unlock()
+
+		if _, ok := db.keys[key]; !ok {
 			// No such key
 			out.WriteInt(-2)
 			return nil
 		}
 
-		value, ok := m.expire[key]
+		value, ok := db.expire[key]
 		if !ok {
 			// No expire value
 			out.WriteInt(-1)
@@ -70,21 +82,24 @@ func commandsGeneric(m *Miniredis, srv *redeo.Server) {
 
 	srv.HandleFunc("PERSIST", func(out *redeo.Responder, r *redeo.Request) error {
 		key := r.Args[0]
-		m.Lock()
-		defer m.Unlock()
-		if _, ok := m.keys[key]; !ok {
+
+		db := m.dbFor(r.Client().ID)
+		db.Lock()
+		defer db.Unlock()
+
+		if _, ok := db.keys[key]; !ok {
 			// No such key
 			out.WriteInt(0)
 			return nil
 		}
 
-		_, ok := m.expire[key]
+		_, ok := db.expire[key]
 		if !ok {
 			// No expire value
 			out.WriteInt(0)
 			return nil
 		}
-		delete(m.expire, key)
+		delete(db.expire, key)
 		out.WriteInt(1)
 		return nil
 	})
@@ -102,19 +117,20 @@ func commandsGeneric(m *Miniredis, srv *redeo.Server) {
 	})
 
 	srv.HandleFunc("DEL", func(out *redeo.Responder, r *redeo.Request) error {
-		m.Lock()
-		defer m.Unlock()
+		db := m.dbFor(r.Client().ID)
+		db.Lock()
+		defer db.Unlock()
 
 		count := 0
 		for _, key := range r.Args {
-			if _, ok := m.keys[key]; !ok {
+			if _, ok := db.keys[key]; !ok {
 				continue
 			}
-			delete(m.keys, key)
-			delete(m.expire, key)
+			delete(db.keys, key)
+			delete(db.expire, key)
 			// These are not strictly needed:
-			delete(m.stringKeys, key)
-			delete(m.hashKeys, key)
+			delete(db.stringKeys, key)
+			delete(db.hashKeys, key)
 			count++
 		}
 		out.WriteInt(count)

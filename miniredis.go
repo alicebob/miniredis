@@ -9,24 +9,38 @@ import (
 	"github.com/bsm/redeo"
 )
 
-// Miniredis is a Redis server implementation.
-type Miniredis struct {
+var errUnimplemented = errors.New("unimplemented")
+
+type redisDB struct {
 	sync.Mutex
-	closed     chan struct{}
-	listen     net.Listener
-	info       *redeo.ServerInfo
 	keys       map[string]string            // Master map of keys with their type
 	stringKeys map[string]string            // GET/SET &c. keys
 	hashKeys   map[string]map[string]string // MGET/MSET &c. keys
 	expire     map[string]int               // EXPIRE values
 }
 
-var errUnimplemented = errors.New("unimplemented")
+// Miniredis is a Redis server implementation.
+type Miniredis struct {
+	sync.Mutex
+	closed   chan struct{}
+	listen   net.Listener
+	info     *redeo.ServerInfo
+	dbs      map[int]*redisDB
+	clientDB int            // DB id used in the direct Get(), Set() &c.
+	selectDB map[uint64]int // Current DB per connection id
+}
 
-// NewMiniRedis makes a new non-started Miniredis object.
+// NewMiniRedis makes a new, non-started, Miniredis object.
 func NewMiniRedis() *Miniredis {
 	return &Miniredis{
-		closed:     make(chan struct{}),
+		closed:   make(chan struct{}),
+		dbs:      map[int]*redisDB{},
+		selectDB: map[uint64]int{},
+	}
+}
+
+func newRedisDB() redisDB {
+	return redisDB{
 		keys:       map[string]string{},
 		stringKeys: map[string]string{},
 		hashKeys:   map[string]map[string]string{},
@@ -38,20 +52,6 @@ func NewMiniRedis() *Miniredis {
 func Run() (*Miniredis, error) {
 	m := NewMiniRedis()
 	return m, m.Start()
-}
-
-// Close shuts down a Miniredis.
-func (m *Miniredis) Close() {
-	m.Lock()
-	defer m.Unlock()
-	if m.listen == nil {
-		return
-	}
-	if m.listen.Close() != nil {
-		return
-	}
-	<-m.closed
-	m.listen = nil
 }
 
 // Start starts a server. It listens on a random port on localhost. See also Addr().
@@ -81,6 +81,44 @@ func (m *Miniredis) Start() error {
 		m.closed <- struct{}{}
 	}()
 	return nil
+}
+
+// Close shuts down a Miniredis.
+func (m *Miniredis) Close() {
+	m.Lock()
+	defer m.Unlock()
+	if m.listen == nil {
+		return
+	}
+	if m.listen.Close() != nil {
+		return
+	}
+	<-m.closed
+	m.listen = nil
+}
+
+// DB returns a DB by ID.
+func (m *Miniredis) DB(i int) *redisDB {
+	m.Lock()
+	defer m.Unlock()
+	return m.db(i)
+}
+
+// get DB. No locks!
+func (m *Miniredis) db(i int) *redisDB {
+	if db, ok := m.dbs[i]; ok {
+		return db
+	}
+	db := newRedisDB()
+	m.dbs[i] = &db
+	return &db
+}
+
+// dbFor gets the DB for a connection id.
+func (m *Miniredis) dbFor(connID uint64) *redisDB {
+	m.Lock()
+	defer m.Unlock()
+	return m.db(m.selectDB[connID])
 }
 
 // Addr returns '127.0.0.1:12345'. Can be given to a Dial()

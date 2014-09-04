@@ -11,17 +11,27 @@ import (
 // a nil.
 // Returns empty string when the key is of a different type.
 func (m *Miniredis) Get(k string) string {
-	m.Lock()
-	defer m.Unlock()
-	return m.stringKeys[k]
+	return m.DB(m.clientDB).Get(k)
+}
+
+// Get returns a string key
+func (db *redisDB) Get(k string) string {
+	db.Lock()
+	defer db.Unlock()
+	return db.stringKeys[k]
 }
 
 // Set sets a string key.
 func (m *Miniredis) Set(k, v string) {
-	m.Lock()
-	defer m.Unlock()
-	m.keys[k] = "string"
-	m.stringKeys[k] = v
+	m.DB(m.clientDB).Set(k, v)
+}
+
+// Set sets a string key.
+func (db *redisDB) Set(k, v string) {
+	db.Lock()
+	defer db.Unlock()
+	db.keys[k] = "string"
+	db.stringKeys[k] = v
 }
 
 // commandsString handles all string value operations.
@@ -37,18 +47,19 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 		}
 		key := r.Args[0]
 		value := r.Args[1]
-		m.Lock()
-		defer m.Unlock()
+		db := m.dbFor(r.Client().ID)
+		db.Lock()
+		defer db.Unlock()
 
-		if t, ok := m.keys[key]; ok && t != "string" {
+		if t, ok := db.keys[key]; ok && t != "string" {
 			out.WriteErrorString("Wrong type of key")
 			return nil
 		}
 
-		m.keys[key] = "string"
-		m.stringKeys[key] = value
+		db.keys[key] = "string"
+		db.stringKeys[key] = value
 		// a SET clears the expire
-		delete(m.expire, key)
+		delete(db.expire, key)
 		out.WriteOK()
 		return nil
 	})
@@ -59,15 +70,16 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 			return nil
 		}
 		key := r.Args[0]
-		m.Lock()
-		defer m.Unlock()
+		db := m.dbFor(r.Client().ID)
+		db.Lock()
+		defer db.Unlock()
 
-		if t, ok := m.keys[key]; ok && t != "string" {
+		if t, ok := db.keys[key]; ok && t != "string" {
 			out.WriteErrorString("Wrong type of key")
 			return nil
 		}
 
-		value, ok := m.stringKeys[key]
+		value, ok := db.stringKeys[key]
 		if !ok {
 			out.WriteNil()
 			return nil

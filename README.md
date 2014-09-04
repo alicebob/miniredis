@@ -38,6 +38,7 @@ Implemented commands:
  - EXPIRE
  - TTL
  - PERSIST
+ - SELECT
 
 MULTI and EXEC are accepted but ignored (for now).
 

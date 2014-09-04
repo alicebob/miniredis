@@ -28,6 +28,10 @@ func Example() {
 	if s.Get("foo") != "bar" {
 		panic("Didn't get 'bar' back")
 	}
+	// Or with a DB id
+	if s.DB(42).Get("foo") != "" {
+		panic("Didn't use a different DB")
+	}
 
 	// Check if there really was only one connection.
 	if s.TotalConnectionCount() != 1 {
