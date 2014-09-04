@@ -82,13 +82,15 @@ func commandsGeneric(m *Miniredis, srv *redeo.Server) {
 		return nil
 	})
 
+	// MULTI is a no-op
 	srv.HandleFunc("MULTI", func(out *redeo.Responder, r *redeo.Request) error {
 		out.WriteOK()
 		return nil
 	})
 
+	// EXEC is a no-op
 	srv.HandleFunc("EXEC", func(out *redeo.Responder, r *redeo.Request) error {
-		out.WriteOK()
+		out.WriteNil()
 		return nil
 	})
 }

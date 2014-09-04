@@ -96,3 +96,29 @@ func TestExpire(t *testing.T) {
 		equals(t, 1, b)
 	}
 }
+
+func TestMulti(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	// Do accept MULTI, but use it as a no-op
+	r, err := redis.String(c.Do("MULTI"))
+	ok(t, err)
+	equals(t, "OK", r)
+}
+
+func TestExec(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	// Do accept Exec, but use it as a no-op and always return nil
+	r, err := c.Do("EXEC")
+	ok(t, err)
+	equals(t, nil, r)
+}
