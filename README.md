@@ -45,3 +45,23 @@ Since this is intended to be used in unittests timeouts are not implemented.
 You can use `Expire()` to see if an expiration is set. The value returned will
 be that what the client set, without any interpretation. This is to keep things
 testable.
+
+## Example
+
+``` Go
+func TestSomething(t *testing.T) {
+	s, err := miniredis.Run()
+	if err != nil {
+		panic(err)
+	}
+	defer s.Close()
+
+	// Connect with a redis client. For example using redigo from
+	// "github.com/garyburd/redigo/redis":
+	c, err := redis.Dial("tcp", s.Addr())
+	_, err = c.Do("SET", "foo", "bar")
+
+	// Ask the server about values directly:
+	s.Get("foo")
+}
+```
