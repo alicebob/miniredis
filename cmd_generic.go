@@ -15,6 +15,13 @@ func (m *Miniredis) Expire(k string) int {
 	return m.expire[k]
 }
 
+// SetExpire sets expiration of a key.
+func (m *Miniredis) SetExpire(k string, ex int) {
+	m.Lock()
+	defer m.Unlock()
+	m.expire[k] = ex
+}
+
 // commandsGeneric handles EXPIRE, TTL, PERSIST
 func commandsGeneric(m *Miniredis, srv *redeo.Server) {
 	srv.HandleFunc("EXPIRE", func(out *redeo.Responder, r *redeo.Request) error {
@@ -91,6 +98,26 @@ func commandsGeneric(m *Miniredis, srv *redeo.Server) {
 	// EXEC is a no-op
 	srv.HandleFunc("EXEC", func(out *redeo.Responder, r *redeo.Request) error {
 		out.WriteNil()
+		return nil
+	})
+
+	srv.HandleFunc("DEL", func(out *redeo.Responder, r *redeo.Request) error {
+		m.Lock()
+		defer m.Unlock()
+
+		count := 0
+		for _, key := range r.Args {
+			if _, ok := m.keys[key]; !ok {
+				continue
+			}
+			delete(m.keys, key)
+			delete(m.expire, key)
+			// These are not strictly needed:
+			delete(m.stringKeys, key)
+			delete(m.hashKeys, key)
+			count++
+		}
+		out.WriteInt(count)
 		return nil
 	})
 }

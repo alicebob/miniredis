@@ -22,6 +22,7 @@ Implemented commands:
  - AUTH -- we accept every password
  - PING
  - ECHO
+ - DEL
  - GET
  - SET -- only the simple version, arguments are not supported
  - HDEL

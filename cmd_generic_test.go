@@ -122,3 +122,21 @@ func TestExec(t *testing.T) {
 	ok(t, err)
 	equals(t, nil, r)
 }
+
+func TestDel(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	s.Set("foo", "bar")
+	s.HSet("aap", "noot", "mies")
+	s.Set("one", "two")
+	s.SetExpire("one", 1234)
+	s.Set("three", "four")
+	r, err := redis.Int(c.Do("DEL", "one", "aap", "nosuch"))
+	ok(t, err)
+	equals(t, 2, r)
+	equals(t, 0, s.Expire("one"))
+}
