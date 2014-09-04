@@ -81,4 +81,14 @@ func commandsGeneric(m *Miniredis, srv *redeo.Server) {
 		out.WriteInt(1)
 		return nil
 	})
+
+	srv.HandleFunc("MULTI", func(out *redeo.Responder, r *redeo.Request) error {
+		out.WriteOK()
+		return nil
+	})
+
+	srv.HandleFunc("EXEC", func(out *redeo.Responder, r *redeo.Request) error {
+		out.WriteOK()
+		return nil
+	})
 }

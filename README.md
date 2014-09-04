@@ -38,6 +38,8 @@ Implemented commands:
  - TTL
  - PERSIST
 
+MULTI and EXEC are accepted but ignored (for now).
+
 Since this is intended to be used in unittests timeouts are not implemented.
 You can use `Expire()` to see if an expiration is set. The value returned will
 be that what the client set, without any interpretation. This is to keep things
