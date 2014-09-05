@@ -3,6 +3,8 @@
 package miniredis
 
 import (
+	"strconv"
+
 	"github.com/bsm/redeo"
 )
 
@@ -26,10 +28,15 @@ func (m *Miniredis) Set(k, v string) {
 	m.DB(m.clientDB).Set(k, v)
 }
 
-// Set sets a string key.
+// Set sets a string key. Doesn't touch expire.
 func (db *redisDB) Set(k, v string) {
 	db.Lock()
 	defer db.Unlock()
+	db.set(k, v)
+}
+
+// internal not-locked version. Doesn't touch expire.
+func (db *redisDB) set(k, v string) {
 	db.keys[k] = "string"
 	db.stringKeys[k] = v
 }
@@ -56,11 +63,57 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 			return nil
 		}
 
-		db.keys[key] = "string"
-		db.stringKeys[key] = value
+		db.set(key, value)
 		// a SET clears the expire
 		delete(db.expire, key)
 		out.WriteOK()
+		return nil
+	})
+
+	srv.HandleFunc("SETEX", func(out *redeo.Responder, r *redeo.Request) error {
+		if len(r.Args) != 3 {
+			out.WriteErrorString("Usage error")
+			return nil
+		}
+		key := r.Args[0]
+		ttl, err := strconv.Atoi(r.Args[1])
+		if err != nil {
+			out.WriteErrorString("Expire value error")
+			return nil
+		}
+		value := r.Args[2]
+
+		db := m.dbFor(r.Client().ID)
+		db.Lock()
+		defer db.Unlock()
+
+		db.del(key) // Clear any existing keys.
+		db.keys[key] = "string"
+		db.stringKeys[key] = value
+		db.expire[key] = ttl
+		out.WriteOK()
+		return nil
+	})
+
+	srv.HandleFunc("SETNX", func(out *redeo.Responder, r *redeo.Request) error {
+		if len(r.Args) != 2 {
+			out.WriteErrorString("Usage error")
+			return nil
+		}
+		key := r.Args[0]
+		value := r.Args[1]
+
+		db := m.dbFor(r.Client().ID)
+		db.Lock()
+		defer db.Unlock()
+
+		if _, ok := db.keys[key]; ok {
+			out.WriteZero()
+			return nil
+		}
+
+		db.set(key, value)
+		out.WriteOne()
 		return nil
 	})
 

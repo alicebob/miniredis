@@ -25,6 +25,8 @@ Implemented commands:
  - DEL
  - GET
  - SET -- only the simple version, arguments are not supported
+ - SETEX
+ - SETNX
  - MGET
  - MSET
  - HDEL

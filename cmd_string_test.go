@@ -130,3 +130,67 @@ func TestMset(t *testing.T) {
 		equals(t, 0, s.Expire("foo"))
 	}
 }
+
+func TestSetex(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	// Usual case
+	{
+		v, err := redis.String(c.Do("SETEX", "aap", 1234, "noot"))
+		ok(t, err)
+		equals(t, "OK", v)
+		equals(t, "noot", s.Get("aap"))
+		equals(t, 1234, s.Expire("aap"))
+	}
+
+	// Same thing
+	{
+		_, err := redis.String(c.Do("SETEX", "aap", "1234", "noot"))
+		ok(t, err)
+	}
+
+	// Invalid TTL
+	{
+		_, err := redis.String(c.Do("SETEX", "aap", "nottl", "noot"))
+		assert(t, err != nil, "no SETEX error")
+	}
+}
+
+func TestSetnx(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	// Existing key
+	{
+		s.Set("foo", "bar")
+		v, err := redis.Int(c.Do("SETNX", "foo", "not bar"))
+		ok(t, err)
+		equals(t, 0, v)
+		equals(t, "bar", s.Get("foo"))
+	}
+
+	// New key
+	{
+		v, err := redis.Int(c.Do("SETNX", "notfoo", "also not bar"))
+		ok(t, err)
+		equals(t, 1, v)
+		equals(t, "also not bar", s.Get("notfoo"))
+	}
+
+	// Existing key of a different type
+	{
+		s.HSet("foo", "bar", "baz")
+		v, err := redis.Int(c.Do("SETNX", "foo", "not bar"))
+		ok(t, err)
+		equals(t, 0, v)
+		equals(t, "bar", s.Get("foo"))
+
+	}
+}
