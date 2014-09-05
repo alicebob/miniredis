@@ -118,14 +118,15 @@ func (m *Miniredis) dbFor(connID uint64) *redisDB {
 	return m.db(m.selectDB[connID])
 }
 
-// Addr returns '127.0.0.1:12345'. Can be given to a Dial()
+// Addr returns '127.0.0.1:12345'. Can be given to a Dial(). See also Host()
+// and Port(), which return the same things.
 func (m *Miniredis) Addr() string {
 	m.Lock()
 	defer m.Unlock()
 	return m.listen.Addr().String()
 }
 
-// Host returns the host and the (random) port used.
+// Host returns the host part of Addr()
 func (m *Miniredis) Host() string {
 	m.Lock()
 	defer m.Unlock()
@@ -133,7 +134,7 @@ func (m *Miniredis) Host() string {
 	return host
 }
 
-// Port returns the (random) port used.
+// Port returns the (random) port part of Addr().
 func (m *Miniredis) Port() string {
 	m.Lock()
 	defer m.Unlock()
