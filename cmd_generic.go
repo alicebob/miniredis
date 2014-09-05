@@ -8,6 +8,30 @@ import (
 	"github.com/bsm/redeo"
 )
 
+// Del deletes a key and any expiration value. Returns whether there was a key.
+func (m *Miniredis) Del(k string) bool {
+	return m.DB(m.clientDB).Del(k)
+}
+
+func (db *redisDB) Del(k string) bool {
+	db.Lock()
+	defer db.Unlock()
+	return db.del(k)
+}
+
+// internal, non-locked delete.
+func (db *redisDB) del(k string) bool {
+	if _, ok := db.keys[k]; !ok {
+		return false
+	}
+	delete(db.keys, k)
+	delete(db.expire, k)
+	// These are not strictly needed:
+	delete(db.stringKeys, k)
+	delete(db.hashKeys, k)
+	return true
+}
+
 // Expire value. As set by the client. 0 if not set.
 func (m *Miniredis) Expire(k string) int {
 	return m.DB(m.clientDB).Expire(k)
@@ -123,15 +147,9 @@ func commandsGeneric(m *Miniredis, srv *redeo.Server) {
 
 		count := 0
 		for _, key := range r.Args {
-			if _, ok := db.keys[key]; !ok {
-				continue
+			if db.del(key) {
+				count++
 			}
-			delete(db.keys, key)
-			delete(db.expire, key)
-			// These are not strictly needed:
-			delete(db.stringKeys, key)
-			delete(db.hashKeys, key)
-			count++
 		}
 		out.WriteInt(count)
 		return nil

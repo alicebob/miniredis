@@ -25,6 +25,8 @@ Implemented commands:
  - DEL
  - GET
  - SET -- only the simple version, arguments are not supported
+ - MGET
+ - MSET
  - HDEL
  - HEXISTS
  - HGET
@@ -57,12 +59,16 @@ func TestSomething(t *testing.T) {
 	}
 	defer s.Close()
 
-	// Connect with a redis client. For example using redigo from
+	// Optionally set keys your code expects:
+	s.Set("foo", "bar")
+
+	// Run your code and see if it behaves.
+	// A connect example using the redigo libary from 
 	// "github.com/garyburd/redigo/redis":
 	c, err := redis.Dial("tcp", s.Addr())
 	_, err = c.Do("SET", "foo", "bar")
 
-	// Ask the server about values directly:
+	// Optionally check the server values:
 	s.Get("foo")
 }
 ```

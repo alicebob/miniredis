@@ -64,6 +64,29 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 		return nil
 	})
 
+	srv.HandleFunc("MSET", func(out *redeo.Responder, r *redeo.Request) error {
+		if len(r.Args)%2 != 0 {
+			out.WriteErrorString("wrong number of arguments for 'mset' command")
+			return nil
+		}
+		db := m.dbFor(r.Client().ID)
+		db.Lock()
+		defer db.Unlock()
+
+		for len(r.Args) > 0 {
+			key := r.Args[0]
+			value := r.Args[1]
+			r.Args = r.Args[2:]
+
+			// The TTL is always cleared.
+			db.del(key)
+			db.keys[key] = "string"
+			db.stringKeys[key] = value
+		}
+		out.WriteOK()
+		return nil
+	})
+
 	srv.HandleFunc("GET", func(out *redeo.Responder, r *redeo.Request) error {
 		if len(r.Args) != 1 {
 			out.WriteErrorString("Usage error")
@@ -85,6 +108,33 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 			return nil
 		}
 		out.WriteString(value)
+		return nil
+	})
+
+	srv.HandleFunc("MGET", func(out *redeo.Responder, r *redeo.Request) error {
+		if len(r.Args) < 1 {
+			out.WriteErrorString("Usage error")
+			return nil
+		}
+
+		db := m.dbFor(r.Client().ID)
+		db.Lock()
+		defer db.Unlock()
+
+		out.WriteBulkLen(len(r.Args))
+		for _, k := range r.Args {
+			if t, ok := db.keys[k]; !ok || t != "string" {
+				out.WriteNil()
+				continue
+			}
+			v, ok := db.stringKeys[k]
+			if !ok {
+				// Should not happen, we just check keys[]
+				out.WriteNil()
+				continue
+			}
+			out.WriteString(v)
+		}
 		return nil
 	})
 

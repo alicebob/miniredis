@@ -139,4 +139,9 @@ func TestDel(t *testing.T) {
 	ok(t, err)
 	equals(t, 2, r)
 	equals(t, 0, s.Expire("one"))
+
+	// Direct also works:
+	s.Set("foo", "bar")
+	s.Del("foo")
+	equals(t, "", s.Get("foo"))
 }
