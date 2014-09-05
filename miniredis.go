@@ -1,15 +1,12 @@
 package miniredis
 
 import (
-	"errors"
 	"fmt"
 	"net"
 	"sync"
 
 	"github.com/bsm/redeo"
 )
-
-var errUnimplemented = errors.New("unimplemented")
 
 type redisDB struct {
 	sync.Mutex

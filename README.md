@@ -24,7 +24,7 @@ Implemented commands:
  - ECHO
  - DEL
  - GET
- - SET -- only the simple version, arguments are not supported
+ - SET
  - SETEX
  - SETNX
  - MGET

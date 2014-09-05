@@ -38,21 +38,108 @@ func TestString(t *testing.T) {
 		equals(t, "noot", v)
 	}
 
-	// GET a Non-existing key. Should be nil.
+	// GET a non-existing key. Should be nil.
 	{
 		b, err := c.Do("GET", "reallynosuchkey")
 		ok(t, err)
 		equals(t, nil, b)
 	}
 
-	// Wrong types.
+	// Wrong usage.
 	{
 		_, err := c.Do("HSET", "wim", "zus", "jet")
 		ok(t, err)
-		_, err = c.Do("SET", "wim", "zus")
-		assert(t, err != nil, "no SET error")
 		_, err = c.Do("GET", "wim")
 		assert(t, err != nil, "no GET error")
+	}
+}
+
+func TestSet(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	// Simple case
+	{
+		v, err := redis.String(c.Do("SET", "aap", "noot"))
+		ok(t, err)
+		equals(t, "OK", v)
+	}
+
+	// Overwrite other types.
+	{
+		s.HSet("wim", "teun", "vuur")
+		v, err := redis.String(c.Do("SET", "wim", "gijs"))
+		ok(t, err)
+		equals(t, "OK", v)
+		equals(t, "gijs", s.Get("wim"))
+	}
+
+	// NX argument
+	{
+		// new key
+		v, err := redis.String(c.Do("SET", "mies", "toon", "NX"))
+		ok(t, err)
+		equals(t, "OK", v)
+		// now existing key
+		nx, err := c.Do("SET", "mies", "toon", "NX")
+		ok(t, err)
+		equals(t, nil, nx)
+		// lowercase NX is no problem
+		nx, err = c.Do("SET", "mies", "toon", "nx")
+		ok(t, err)
+		equals(t, nil, nx)
+	}
+
+	// XX argument - only set if exists
+	{
+		// new key, no go
+		v, err := c.Do("SET", "one", "two", "XX")
+		ok(t, err)
+		equals(t, nil, v)
+
+		s.Set("one", "three")
+
+		v, err = c.Do("SET", "one", "two", "XX")
+		ok(t, err)
+		equals(t, "OK", v)
+		equals(t, "two", s.Get("one"))
+
+		// XX with another key type
+		s.HSet("eleven", "twelve", "thirteen")
+		h, err := redis.String(c.Do("SET", "eleven", "fourteen", "XX"))
+		ok(t, err)
+		equals(t, "OK", h)
+		equals(t, "fourteen", s.Get("eleven"))
+	}
+
+	// EX or PX argument. Expire values.
+	{
+		v, err := c.Do("SET", "one", "two", "EX", 1299)
+		ok(t, err)
+		equals(t, "OK", v)
+		equals(t, "two", s.Get("one"))
+		equals(t, 1299, s.Expire("one"))
+
+		v, err = c.Do("SET", "three", "four", "PX", 8888)
+		ok(t, err)
+		equals(t, "OK", v)
+		equals(t, "four", s.Get("three"))
+		equals(t, 8888, s.Expire("three"))
+
+		_, err = c.Do("SET", "one", "two", "EX", "notimestamp")
+		assert(t, err != nil, "no SET error on invalid EX")
+
+		_, err = c.Do("SET", "one", "two", "EX")
+		assert(t, err != nil, "no SET error on missing EX argument")
+	}
+
+	// Invalid argument
+	{
+		_, err := c.Do("SET", "one", "two", "FOO")
+		assert(t, err != nil, "no SET error")
 	}
 }
 

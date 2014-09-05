@@ -4,6 +4,7 @@ package miniredis
 
 import (
 	"strconv"
+	"strings"
 
 	"github.com/bsm/redeo"
 )
@@ -48,24 +49,65 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 			out.WriteErrorString("Usage error")
 			return nil
 		}
-		if len(r.Args) > 2 {
-			// EX/PX/NX/XX options.
-			return errUnimplemented
-		}
+		nx := false // set iff not exists
+		xx := false // set iff exists
+		expire := 0 // For seconds and milliseconds.
 		key := r.Args[0]
 		value := r.Args[1]
+		r.Args = r.Args[2:]
+		for len(r.Args) > 0 {
+			switch strings.ToUpper(r.Args[0]) {
+			case "NX":
+				nx = true
+				r.Args = r.Args[1:]
+				continue
+			case "XX":
+				xx = true
+				r.Args = r.Args[1:]
+				continue
+			case "EX", "PX":
+				if len(r.Args) < 2 {
+					out.WriteErrorString("Expire value error")
+					return nil
+				}
+				var err error
+				expire, err = strconv.Atoi(r.Args[1])
+				if err != nil {
+					out.WriteErrorString("Expire value error")
+					return nil
+				}
+				r.Args = r.Args[2:]
+				continue
+			default:
+				out.WriteErrorString("invalid SET flag")
+				return nil
+			}
+		}
+
 		db := m.dbFor(r.Client().ID)
 		db.Lock()
 		defer db.Unlock()
 
-		if t, ok := db.keys[key]; ok && t != "string" {
-			out.WriteErrorString("Wrong type of key")
-			return nil
+		if nx {
+			if _, ok := db.keys[key]; ok {
+				out.WriteNil()
+				return nil
+			}
+		}
+		if xx {
+			if _, ok := db.keys[key]; !ok {
+				out.WriteNil()
+				return nil
+			}
 		}
 
-		db.set(key, value)
+		db.del(key) // be sure to remove existing values of other type keys.
 		// a SET clears the expire
 		delete(db.expire, key)
+		db.set(key, value)
+		if expire != 0 {
+			db.expire[key] = expire
+		}
 		out.WriteOK()
 		return nil
 	})
