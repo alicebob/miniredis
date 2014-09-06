@@ -10,9 +10,12 @@ integration test.
 Miniredis implements (parts of) the Redis server, to be used in unittests. It
 enables a simple, cheap, in-memory, Redis replacement, with a real TCP interface. Think of it as the Redis version of `net/http/httptest`.
 
-It saves you from using mock code, and since the redis servers lives in the
+It saves you from using mock code, and since the redis server lives in the
 test process you can query for values directly, without going through the server
 stack.
+
+There are no dependencies on external binaries, so you can easily integrate it in automated build processes.
+
 
 
 ## Commands
@@ -72,16 +75,18 @@ func TestSomething(t *testing.T) {
 	}
 	defer s.Close()
 
-	// Optionally set keys your code expects:
+	// Optionally set some keys your code expects:
 	s.Set("foo", "bar")
+	s.HSet("some", "other", "key")
 
 	// Run your code and see if it behaves.
-	// A connect example using the redigo libary from 
-	// "github.com/garyburd/redigo/redis":
+	// An example using the redigo libary from "github.com/garyburd/redigo/redis":
 	c, err := redis.Dial("tcp", s.Addr())
 	_, err = c.Do("SET", "foo", "bar")
 
-	// Optionally check the server values:
-	s.Get("foo")
+	// Optionally check values in redis:
+	if s.Get("foo") != "bar" {
+        t.Error("'foo' has the wrong value")
+    }
 }
 ```
