@@ -78,7 +78,7 @@ func (db *redisDB) incr(k string, delta int) (int, error) {
 func commandsString(m *Miniredis, srv *redeo.Server) {
 	srv.HandleFunc("SET", func(out *redeo.Responder, r *redeo.Request) error {
 		if len(r.Args) < 2 {
-			out.WriteErrorString("usage error")
+			out.WriteErrorString("ERR wrong number of arguments for 'set' command")
 			return nil
 		}
 		nx := false // set iff not exists

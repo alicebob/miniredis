@@ -1,6 +1,6 @@
 # miniredis
 
-Pure Go Redis server implementation, used in Go unittests.
+Pure Go Redis test server, used in Go unittests.
 
 
 ##
@@ -15,7 +15,6 @@ test process you can query for values directly, without going through the server
 stack.
 
 There are no dependencies on external binaries, so you can easily integrate it in automated build processes.
-
 
 
 ## Commands
