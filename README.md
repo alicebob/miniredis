@@ -31,6 +31,7 @@ Implemented commands:
  - MSET
  - INCR
  - DECR
+ - GETSET
  - HDEL
  - HEXISTS
  - HGET

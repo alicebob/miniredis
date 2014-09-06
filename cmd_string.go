@@ -238,6 +238,35 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 		return nil
 	})
 
+	srv.HandleFunc("GETSET", func(out *redeo.Responder, r *redeo.Request) error {
+		if len(r.Args) != 2 {
+			out.WriteErrorString("usage error")
+			return nil
+		}
+		key := r.Args[0]
+		value := r.Args[1]
+		db := m.dbFor(r.Client().ID)
+		db.Lock()
+		defer db.Unlock()
+
+		if t, ok := db.keys[key]; ok && t != "string" {
+			out.WriteErrorString("wrong type of key")
+			return nil
+		}
+
+		old, ok := db.stringKeys[key]
+		db.stringKeys[key] = value
+		// a GETSET clears the expire
+		delete(db.expire, key)
+
+		if !ok {
+			out.WriteNil()
+			return nil
+		}
+		out.WriteString(old)
+		return nil
+	})
+
 	srv.HandleFunc("MGET", func(out *redeo.Responder, r *redeo.Request) error {
 		if len(r.Args) < 1 {
 			out.WriteErrorString("usage error")
@@ -314,6 +343,4 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 		out.WriteInt(v)
 		return nil
 	})
-
-	// TODO: GETSET (clears expire!)
 }

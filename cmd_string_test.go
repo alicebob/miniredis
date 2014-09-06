@@ -382,3 +382,54 @@ func TestDecr(t *testing.T) {
 		equals(t, "442", s.Get("aap"))
 	}
 }
+
+func TestGetSet(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	// Existing key
+	{
+		s.Set("foo", "bar")
+		v, err := redis.String(c.Do("GETSET", "foo", "baz"))
+		ok(t, err)
+		equals(t, "bar", v)
+		equals(t, "baz", s.Get("foo"))
+	}
+
+	// New key
+	{
+		v, err := c.Do("GETSET", "bar", "bak")
+		ok(t, err)
+		equals(t, nil, v)
+		equals(t, "bak", s.Get("bar"))
+	}
+
+	// TTL needs to be cleared
+	{
+		s.Set("one", "two")
+		s.SetExpire("one", 1234)
+		v, err := redis.String(c.Do("GETSET", "one", "three"))
+		ok(t, err)
+		equals(t, "two", v)
+		equals(t, "bak", s.Get("bar"))
+		equals(t, 0, s.Expire("one"))
+	}
+
+	// Wrong type of existing key
+	{
+		s.HSet("wrong", "aap", "noot")
+		_, err := redis.Int(c.Do("GETSET", "wrong", "key"))
+		assert(t, err != nil, "do GETSET error")
+	}
+
+	// Wrong usage
+	{
+		_, err := redis.Int(c.Do("GETSET"))
+		assert(t, err != nil, "do GETSET error")
+		_, err = redis.Int(c.Do("GETSET", "spurious", "arguments", "here"))
+		assert(t, err != nil, "do GETSET error")
+	}
+}
