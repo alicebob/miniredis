@@ -1,3 +1,14 @@
+// Miniredis is a pure Go Redis test server, for use in Go unittests. There are
+// no dependencies on system binaries, and every server you start will be empty.
+//
+// Start a server with `s, err := miniredis.Run()`.
+// Stop it with `defer s.Close()`.
+//
+// Point your Redis client to `s.Addr()` or `s.Host(), s.Port()`.
+//
+// Set keys directly via s.Set(...) and similar commands, or use a Redis client.
+//
+// For direct use you can select a Redis database with either `s.Select(12); s.Get("foo")` or `s.DB(12).Get("foo")`.
 package miniredis
 
 import (
