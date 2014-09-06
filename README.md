@@ -34,6 +34,7 @@ Implemented commands:
  - DECR
  - DECRBY
  - GETSET
+ - STRLEN
  - HDEL
  - HEXISTS
  - HGET

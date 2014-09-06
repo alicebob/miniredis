@@ -539,3 +539,41 @@ func TestGetSet(t *testing.T) {
 		assert(t, err != nil, "do GETSET error")
 	}
 }
+
+func TestStrlen(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	// Existing key
+	{
+		s.Set("foo", "bar!")
+		v, err := redis.Int(c.Do("STRLEN", "foo"))
+		ok(t, err)
+		equals(t, 4, v)
+	}
+
+	// New key
+	{
+		v, err := redis.Int(c.Do("STRLEN", "nosuch"))
+		ok(t, err)
+		equals(t, 0, v)
+	}
+
+	// Wrong type of existing key
+	{
+		s.HSet("wrong", "aap", "noot")
+		_, err := redis.Int(c.Do("STRLEN", "wrong"))
+		assert(t, err != nil, "do STRLEN error")
+	}
+
+	// Wrong usage
+	{
+		_, err := redis.Int(c.Do("STRLEN"))
+		assert(t, err != nil, "do STRLEN error")
+		_, err = redis.Int(c.Do("STRLEN", "spurious", "arguments"))
+		assert(t, err != nil, "do STRLEN error")
+	}
+}

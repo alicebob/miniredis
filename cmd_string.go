@@ -407,4 +407,25 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 		out.WriteInt(v)
 		return nil
 	})
+
+	srv.HandleFunc("STRLEN", func(out *redeo.Responder, r *redeo.Request) error {
+		if len(r.Args) != 1 {
+			out.WriteErrorString("usage error")
+			return nil
+		}
+
+		key := r.Args[0]
+
+		db := m.dbFor(r.Client().ID)
+		db.Lock()
+		defer db.Unlock()
+
+		if t, ok := db.keys[key]; ok && t != "string" {
+			out.WriteErrorString("wrong type of key")
+			return nil
+		}
+
+		out.WriteInt(len(db.stringKeys[key]))
+		return nil
+	})
 }
