@@ -3,10 +3,15 @@
 package miniredis
 
 import (
+	"errors"
 	"strconv"
 	"strings"
 
 	"github.com/bsm/redeo"
+)
+
+var (
+	errValueError = errors.New("key value error")
 )
 
 // Get returns string keys added with SET.
@@ -42,11 +47,38 @@ func (db *redisDB) set(k, v string) {
 	db.stringKeys[k] = v
 }
 
+// Incr changes a int string value by delta.
+func (m *Miniredis) Incr(k string, delta int) (int, error) {
+	return m.DB(m.clientDB).Incr(k, delta)
+}
+
+// Incr changes a int string value by delta.
+func (db *redisDB) Incr(k string, delta int) (int, error) {
+	db.Lock()
+	defer db.Unlock()
+	return db.incr(k, delta)
+}
+
+// change int key value
+func (db *redisDB) incr(k string, delta int) (int, error) {
+	v := 0
+	if sv, ok := db.stringKeys[k]; ok {
+		var err error
+		v, err = strconv.Atoi(sv)
+		if err != nil {
+			return 0, errValueError
+		}
+	}
+	v += delta
+	db.stringKeys[k] = strconv.Itoa(v)
+	return v, nil
+}
+
 // commandsString handles all string value operations.
 func commandsString(m *Miniredis, srv *redeo.Server) {
 	srv.HandleFunc("SET", func(out *redeo.Responder, r *redeo.Request) error {
 		if len(r.Args) < 2 {
-			out.WriteErrorString("Usage error")
+			out.WriteErrorString("usage error")
 			return nil
 		}
 		nx := false // set iff not exists
@@ -114,13 +146,13 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 
 	srv.HandleFunc("SETEX", func(out *redeo.Responder, r *redeo.Request) error {
 		if len(r.Args) != 3 {
-			out.WriteErrorString("Usage error")
+			out.WriteErrorString("usage error")
 			return nil
 		}
 		key := r.Args[0]
 		ttl, err := strconv.Atoi(r.Args[1])
 		if err != nil {
-			out.WriteErrorString("Expire value error")
+			out.WriteErrorString("expire value error")
 			return nil
 		}
 		value := r.Args[2]
@@ -139,7 +171,7 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 
 	srv.HandleFunc("SETNX", func(out *redeo.Responder, r *redeo.Request) error {
 		if len(r.Args) != 2 {
-			out.WriteErrorString("Usage error")
+			out.WriteErrorString("usage error")
 			return nil
 		}
 		key := r.Args[0]
@@ -184,7 +216,7 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 
 	srv.HandleFunc("GET", func(out *redeo.Responder, r *redeo.Request) error {
 		if len(r.Args) != 1 {
-			out.WriteErrorString("Usage error")
+			out.WriteErrorString("usage error")
 			return nil
 		}
 		key := r.Args[0]
@@ -193,7 +225,7 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 		defer db.Unlock()
 
 		if t, ok := db.keys[key]; ok && t != "string" {
-			out.WriteErrorString("Wrong type of key")
+			out.WriteErrorString("wrong type of key")
 			return nil
 		}
 
@@ -208,7 +240,7 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 
 	srv.HandleFunc("MGET", func(out *redeo.Responder, r *redeo.Request) error {
 		if len(r.Args) < 1 {
-			out.WriteErrorString("Usage error")
+			out.WriteErrorString("usage error")
 			return nil
 		}
 
@@ -230,6 +262,56 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 			}
 			out.WriteString(v)
 		}
+		return nil
+	})
+
+	srv.HandleFunc("INCR", func(out *redeo.Responder, r *redeo.Request) error {
+		if len(r.Args) != 1 {
+			out.WriteErrorString("usage error")
+			return nil
+		}
+
+		db := m.dbFor(r.Client().ID)
+		db.Lock()
+		defer db.Unlock()
+
+		key := r.Args[0]
+		if t, ok := db.keys[key]; ok && t != "string" {
+			out.WriteErrorString("wrong type of key")
+			return nil
+		}
+		v, err := db.incr(key, +1)
+		if err != nil {
+			out.WriteErrorString(err.Error())
+			return nil
+		}
+		// Don't touch TTL
+		out.WriteInt(v)
+		return nil
+	})
+
+	srv.HandleFunc("DECR", func(out *redeo.Responder, r *redeo.Request) error {
+		if len(r.Args) != 1 {
+			out.WriteErrorString("usage error")
+			return nil
+		}
+
+		db := m.dbFor(r.Client().ID)
+		db.Lock()
+		defer db.Unlock()
+
+		key := r.Args[0]
+		if t, ok := db.keys[key]; ok && t != "string" {
+			out.WriteErrorString("wrong type of key")
+			return nil
+		}
+		v, err := db.incr(key, -1)
+		if err != nil {
+			out.WriteErrorString(err.Error())
+			return nil
+		}
+		// Don't touch TTL
+		out.WriteInt(v)
 		return nil
 	})
 

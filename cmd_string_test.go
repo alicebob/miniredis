@@ -281,3 +281,104 @@ func TestSetnx(t *testing.T) {
 
 	}
 }
+
+func TestIncr(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	// Existing key
+	{
+		s.Set("foo", "12")
+		v, err := redis.Int(c.Do("INCR", "foo"))
+		ok(t, err)
+		equals(t, 13, v)
+		equals(t, "13", s.Get("foo"))
+	}
+
+	// Existing key, not an integer
+	{
+		s.Set("foo", "noint")
+		_, err := redis.Int(c.Do("INCR", "foo"))
+		assert(t, err != nil, "do INCR error")
+	}
+
+	// New key
+	{
+		v, err := redis.Int(c.Do("INCR", "bar"))
+		ok(t, err)
+		equals(t, 1, v)
+		equals(t, "1", s.Get("bar"))
+	}
+
+	// Wrong type of existing key
+	{
+		s.HSet("wrong", "aap", "noot")
+		_, err := redis.Int(c.Do("INCR", "wrong"))
+		assert(t, err != nil, "do INCR error")
+	}
+
+	// Wrong usage
+	{
+		_, err := redis.Int(c.Do("INCR"))
+		assert(t, err != nil, "do INCR error")
+		_, err = redis.Int(c.Do("INCR", "new", "key"))
+		assert(t, err != nil, "do INCR error")
+	}
+}
+
+func TestDecr(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	// Existing key
+	{
+		s.Set("foo", "12")
+		v, err := redis.Int(c.Do("DECR", "foo"))
+		ok(t, err)
+		equals(t, 11, v)
+		equals(t, "11", s.Get("foo"))
+	}
+
+	// Existing key, not an integer
+	{
+		s.Set("foo", "noint")
+		_, err := redis.Int(c.Do("DECR", "foo"))
+		assert(t, err != nil, "do DECR error")
+	}
+
+	// New key
+	{
+		v, err := redis.Int(c.Do("DECR", "bar"))
+		ok(t, err)
+		equals(t, -1, v)
+		equals(t, "-1", s.Get("bar"))
+	}
+
+	// Wrong type of existing key
+	{
+		s.HSet("wrong", "aap", "noot")
+		_, err := redis.Int(c.Do("DECR", "wrong"))
+		assert(t, err != nil, "do DECR error")
+	}
+
+	// Wrong usage
+	{
+		_, err := redis.Int(c.Do("DECR"))
+		assert(t, err != nil, "do DECR error")
+		_, err = redis.Int(c.Do("DECR", "new", "key"))
+		assert(t, err != nil, "do DECR error")
+	}
+
+	// Direct one works
+	{
+		s.Set("aap", "400")
+		s.Incr("aap", +42)
+		equals(t, "442", s.Get("aap"))
+	}
+}

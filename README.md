@@ -29,6 +29,8 @@ Implemented commands:
  - SETNX
  - MGET
  - MSET
+ - INCR
+ - DECR
  - HDEL
  - HEXISTS
  - HGET
