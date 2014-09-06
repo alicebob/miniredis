@@ -30,7 +30,9 @@ Implemented commands:
  - MGET
  - MSET
  - INCR
+ - INCRBY
  - DECR
+ - DECRBY
  - GETSET
  - HDEL
  - HEXISTS

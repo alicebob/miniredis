@@ -319,6 +319,38 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 		return nil
 	})
 
+	srv.HandleFunc("INCRBY", func(out *redeo.Responder, r *redeo.Request) error {
+		if len(r.Args) != 2 {
+			out.WriteErrorString("usage error")
+			return nil
+		}
+
+		key := r.Args[0]
+		delta, err := strconv.Atoi(r.Args[1])
+		if err != nil {
+			out.WriteErrorString("value error")
+			return nil
+		}
+
+		db := m.dbFor(r.Client().ID)
+		db.Lock()
+		defer db.Unlock()
+
+		if t, ok := db.keys[key]; ok && t != "string" {
+			out.WriteErrorString("wrong type of key")
+			return nil
+		}
+
+		v, err := db.incr(key, delta)
+		if err != nil {
+			out.WriteErrorString(err.Error())
+			return nil
+		}
+		// Don't touch TTL
+		out.WriteInt(v)
+		return nil
+	})
+
 	srv.HandleFunc("DECR", func(out *redeo.Responder, r *redeo.Request) error {
 		if len(r.Args) != 1 {
 			out.WriteErrorString("usage error")
@@ -335,6 +367,38 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 			return nil
 		}
 		v, err := db.incr(key, -1)
+		if err != nil {
+			out.WriteErrorString(err.Error())
+			return nil
+		}
+		// Don't touch TTL
+		out.WriteInt(v)
+		return nil
+	})
+
+	srv.HandleFunc("DECRBY", func(out *redeo.Responder, r *redeo.Request) error {
+		if len(r.Args) != 2 {
+			out.WriteErrorString("usage error")
+			return nil
+		}
+
+		key := r.Args[0]
+		delta, err := strconv.Atoi(r.Args[1])
+		if err != nil {
+			out.WriteErrorString("value error")
+			return nil
+		}
+
+		db := m.dbFor(r.Client().ID)
+		db.Lock()
+		defer db.Unlock()
+
+		if t, ok := db.keys[key]; ok && t != "string" {
+			out.WriteErrorString("wrong type of key")
+			return nil
+		}
+
+		v, err := db.incr(key, -delta)
 		if err != nil {
 			out.WriteErrorString(err.Error())
 			return nil

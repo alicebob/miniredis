@@ -329,6 +329,112 @@ func TestIncr(t *testing.T) {
 	}
 }
 
+func TestIncrBy(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	// Existing key
+	{
+		s.Set("foo", "12")
+		v, err := redis.Int(c.Do("INCRBY", "foo", "400"))
+		ok(t, err)
+		equals(t, 412, v)
+		equals(t, "412", s.Get("foo"))
+	}
+
+	// Existing key, not an integer
+	{
+		s.Set("foo", "noint")
+		_, err := redis.Int(c.Do("INCRBY", "foo", "400"))
+		assert(t, err != nil, "do INCRBY error")
+	}
+
+	// New key
+	{
+		v, err := redis.Int(c.Do("INCRBY", "bar", "4000"))
+		ok(t, err)
+		equals(t, 4000, v)
+		equals(t, "4000", s.Get("bar"))
+	}
+
+	// Wrong type of existing key
+	{
+		s.HSet("wrong", "aap", "noot")
+		_, err := redis.Int(c.Do("INCRBY", "wrong", "400"))
+		assert(t, err != nil, "do INCRBY error")
+	}
+
+	// Amount not an interger
+	{
+		_, err := redis.Int(c.Do("INCRBY", "key", "noint"))
+		assert(t, err != nil, "do INCRBY error")
+	}
+
+	// Wrong usage
+	{
+		_, err := redis.Int(c.Do("INCRBY"))
+		assert(t, err != nil, "do INCRBY error")
+		_, err = redis.Int(c.Do("INCRBY", "another", "new", "key"))
+		assert(t, err != nil, "do INCRBY error")
+	}
+}
+
+func TestDecrBy(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	// Existing key
+	{
+		s.Set("foo", "12")
+		v, err := redis.Int(c.Do("DECRBY", "foo", "400"))
+		ok(t, err)
+		equals(t, -388, v)
+		equals(t, "-388", s.Get("foo"))
+	}
+
+	// Existing key, not an integer
+	{
+		s.Set("foo", "noint")
+		_, err := redis.Int(c.Do("DECRBY", "foo", "400"))
+		assert(t, err != nil, "do DECRBY error")
+	}
+
+	// New key
+	{
+		v, err := redis.Int(c.Do("DECRBY", "bar", "4000"))
+		ok(t, err)
+		equals(t, -4000, v)
+		equals(t, "-4000", s.Get("bar"))
+	}
+
+	// Wrong type of existing key
+	{
+		s.HSet("wrong", "aap", "noot")
+		_, err := redis.Int(c.Do("DECRBY", "wrong", "400"))
+		assert(t, err != nil, "do DECRBY error")
+	}
+
+	// Amount not an interger
+	{
+		_, err := redis.Int(c.Do("DECRBY", "key", "noint"))
+		assert(t, err != nil, "do DECRBY error")
+	}
+
+	// Wrong usage
+	{
+		_, err := redis.Int(c.Do("DECRBY"))
+		assert(t, err != nil, "do DECRBY error")
+		_, err = redis.Int(c.Do("DECRBY", "another", "new", "key"))
+		assert(t, err != nil, "do DECRBY error")
+	}
+}
+
 func TestDecr(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
