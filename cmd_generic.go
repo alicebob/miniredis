@@ -54,6 +54,18 @@ func (db *redisDB) SetExpire(k string, ex int) {
 	db.expire[k] = ex
 }
 
+// Type gives the type of a key, or ""
+func (m *Miniredis) Type(k string) string {
+	return m.DB(m.clientDB).Type(k)
+}
+
+// Type gives the type of a key, or ""
+func (db *redisDB) Type(k string) string {
+	db.Lock()
+	defer db.Unlock()
+	return db.keys[k]
+}
+
 // commandsGeneric handles EXPIRE, TTL, PERSIST
 func commandsGeneric(m *Miniredis, srv *redeo.Server) {
 	srv.HandleFunc("EXPIRE", func(out *redeo.Responder, r *redeo.Request) error {
@@ -152,6 +164,28 @@ func commandsGeneric(m *Miniredis, srv *redeo.Server) {
 			}
 		}
 		out.WriteInt(count)
+		return nil
+	})
+
+	srv.HandleFunc("TYPE", func(out *redeo.Responder, r *redeo.Request) error {
+		if len(r.Args) != 1 {
+			out.WriteErrorString("usage error")
+			return nil
+		}
+
+		key := r.Args[0]
+
+		db := m.dbFor(r.Client().ID)
+		db.Lock()
+		defer db.Unlock()
+
+		t, ok := db.keys[key]
+		if !ok {
+			out.WriteString("none")
+			return nil
+		}
+
+		out.WriteString(t)
 		return nil
 	})
 }

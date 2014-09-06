@@ -145,3 +145,48 @@ func TestDel(t *testing.T) {
 	s.Del("foo")
 	equals(t, "", s.Get("foo"))
 }
+
+func TestType(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	// String key
+	{
+		s.Set("foo", "bar!")
+		v, err := redis.String(c.Do("TYPE", "foo"))
+		ok(t, err)
+		equals(t, "string", v)
+	}
+
+	// Hash key
+	{
+		s.HSet("aap", "noot", "mies")
+		v, err := redis.String(c.Do("TYPE", "aap"))
+		ok(t, err)
+		equals(t, "hash", v)
+	}
+
+	// New key
+	{
+		v, err := redis.String(c.Do("TYPE", "nosuch"))
+		ok(t, err)
+		equals(t, "none", v)
+	}
+
+	// Wrong usage
+	{
+		_, err := redis.Int(c.Do("TYPE"))
+		assert(t, err != nil, "do TYPE error")
+		_, err = redis.Int(c.Do("TYPE", "spurious", "arguments"))
+		assert(t, err != nil, "do TYPE error")
+	}
+
+	// Direct usage:
+	{
+		equals(t, "hash", s.Type("aap"))
+		equals(t, "", s.Type("nokey"))
+	}
+}

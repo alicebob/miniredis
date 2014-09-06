@@ -19,36 +19,41 @@ stack.
 
 Implemented commands:
 
- - AUTH -- we accept every password
- - PING
- - ECHO
- - DEL
- - GET
- - SET
- - SETEX
- - SETNX
- - MGET
- - MSET
- - INCR
- - INCRBY
- - DECR
- - DECRBY
- - GETSET
- - STRLEN
- - HDEL
- - HEXISTS
- - HGET
- - HGETALL
- - HKEYS
- - HLEN
- - HMGET
- - HSET
- - HSETNX
- - HVALS
- - EXPIRE
- - TTL
- - PERSIST
- - SELECT
+ - Connection
+     - AUTH -- we accept every password
+     - ECHO
+     - PING
+     - SELECT
+ - Key 
+     - DEL
+     - EXPIRE
+     - PERSIST
+     - TTL
+     - TYPE
+ - String keys
+     - DECR
+     - DECRBY
+     - GET
+     - GETSET
+     - INCR
+     - INCRBY
+     - MGET
+     - MSET
+     - SET
+     - SETEX
+     - SETNX
+     - STRLEN
+ - Hash keys
+     - HDEL
+     - HEXISTS
+     - HGET
+     - HGETALL
+     - HKEYS
+     - HLEN
+     - HMGET
+     - HSET
+     - HSETNX
+     - HVALS
 
 MULTI and EXEC are accepted but ignored (for now).
 
