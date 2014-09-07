@@ -750,3 +750,97 @@ func TestBitcount(t *testing.T) {
 		assert(t, err != nil, "do BITCOUNT error")
 	}
 }
+
+func TestBitop(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	{
+		and := func(a, b byte) byte { return a & b }
+		equals(t, []byte("`"), sliceBinOp(and, []byte("a"), []byte("b")))
+		equals(t, []byte("`\000\000"), sliceBinOp(and, []byte("aaa"), []byte("b")))
+		equals(t, []byte("`\000\000"), sliceBinOp(and, []byte("a"), []byte("bbb")))
+		equals(t, []byte("``\000"), sliceBinOp(and, []byte("aa"), []byte("bbb")))
+	}
+
+	// Single char AND
+	{
+		s.Set("a", "a") // 'a' is 0x1100001
+		s.Set("b", "b") // 'b' is 0x1100010
+		v, err := redis.Int(c.Do("BITOP", "AND", "bitand", "a", "b"))
+		ok(t, err)
+		equals(t, 1, v) // Length of the longest key
+		equals(t, "`", s.Get("bitand"))
+	}
+	// Multi char AND
+	{
+		s.Set("a", "aa")   // 'a' is 0x1100001
+		s.Set("b", "bbbb") // 'b' is 0x1100010
+		v, err := redis.Int(c.Do("BITOP", "AND", "bitand", "a", "b"))
+		ok(t, err)
+		equals(t, 4, v) // Length of the longest key
+		equals(t, "``\000\000", s.Get("bitand"))
+	}
+
+	// Multi char OR
+	{
+		s.Set("a", "aa")   // 'a' is 0x1100001
+		s.Set("b", "bbbb") // 'b' is 0x1100010
+		v, err := redis.Int(c.Do("BITOP", "OR", "bitor", "a", "b"))
+		ok(t, err)
+		equals(t, 4, v) // Length of the longest key
+		equals(t, "ccbb", s.Get("bitor"))
+	}
+
+	// Multi char XOR
+	{
+		s.Set("a", "aa")   // 'a' is 0x1100001
+		s.Set("b", "bbbb") // 'b' is 0x1100010
+		v, err := redis.Int(c.Do("BITOP", "XOR", "bitxor", "a", "b"))
+		ok(t, err)
+		equals(t, 4, v) // Length of the longest key
+		equals(t, "\x03\x03bb", s.Get("bitxor"))
+	}
+
+	// Guess who's NOT like the other ops?
+	{
+		s.Set("a", "aa") // 'a' is 0x1100001
+		v, err := redis.Int(c.Do("BITOP", "NOT", "not", "a"))
+		ok(t, err)
+		equals(t, 2, v) // Length of the key
+		equals(t, "\x9e\x9e", s.Get("not"))
+	}
+
+	// Single argument. Works, just an roundabout copy.
+	{
+		s.Set("a", "a") // 'a' is 0x1100001
+		v, err := redis.Int(c.Do("BITOP", "AND", "copy", "a"))
+		ok(t, err)
+		equals(t, 1, v) // Length of the longest key
+		equals(t, "a", s.Get("copy"))
+	}
+
+	// Wrong type of existing key
+	{
+		s.HSet("wrong", "aap", "noot")
+		_, err := redis.Int(c.Do("BITOP", "AND", "wrong"))
+		assert(t, err != nil, "do AND error")
+	}
+
+	// Wrong usage
+	{
+		_, err := redis.Int(c.Do("BITOP"))
+		assert(t, err != nil, "do BITOP error")
+		_, err = redis.Int(c.Do("BITOP", "AND"))
+		assert(t, err != nil, "do BITOP error")
+		_, err = redis.Int(c.Do("BITOP", "WHAT"))
+		assert(t, err != nil, "do BITOP error")
+		_, err = redis.Int(c.Do("BITOP", "NOT"))
+		assert(t, err != nil, "do BITOP error")
+		_, err = redis.Int(c.Do("BITOP", "NOT", "foo", "bar", "baz"))
+		assert(t, err != nil, "do BITOP error")
+	}
+}

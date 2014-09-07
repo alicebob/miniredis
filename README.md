@@ -35,6 +35,7 @@ Implemented commands:
  - String keys
      - APPEND
      - BITCOUNT
+     - BITOP
      - DECR
      - DECRBY
      - GET

@@ -527,6 +527,71 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 		out.WriteInt(countBits([]byte(v)))
 		return nil
 	})
+
+	srv.HandleFunc("BITOP", func(out *redeo.Responder, r *redeo.Request) error {
+		if len(r.Args) < 3 {
+			out.WriteErrorString("ERR wrong number of arguments for 'bitop' command")
+			return nil
+		}
+
+		op := strings.ToUpper(r.Args[0])
+		target := r.Args[1]
+		input := r.Args[2:]
+
+		db := m.dbFor(r.Client().ID)
+		db.Lock()
+		defer db.Unlock()
+
+		switch op {
+		case "AND", "OR", "XOR":
+			first := input[0]
+			if t, ok := db.keys[first]; ok && t != "string" {
+				out.WriteErrorString("WRONGTYPE Operation against a key holding the wrong kind of value")
+				return nil
+			}
+			res := []byte(db.stringKeys[first])
+			for _, vk := range input[1:] {
+				if t, ok := db.keys[vk]; ok && t != "string" {
+					out.WriteErrorString("WRONGTYPE Operation against a key holding the wrong kind of value")
+					return nil
+				}
+				v := db.stringKeys[vk]
+				cb := map[string]func(byte, byte) byte{
+					"AND": func(a, b byte) byte { return a & b },
+					"OR":  func(a, b byte) byte { return a | b },
+					"XOR": func(a, b byte) byte { return a ^ b },
+				}[op]
+				res = sliceBinOp(cb, res, []byte(v))
+			}
+			db.del(target) // Keep TTL
+			db.set(target, string(res))
+			out.WriteInt(len(res))
+			return nil
+		case "NOT":
+			// NOT only takes a single argument.
+			if len(input) != 1 {
+				out.WriteErrorString("ERR BITOP NOT must be called with a single source key.")
+				return nil
+			}
+			key := input[0]
+			if t, ok := db.keys[key]; ok && t != "string" {
+				out.WriteErrorString("WRONGTYPE Operation against a key holding the wrong kind of value")
+				return nil
+			}
+			value := []byte(db.stringKeys[key])
+			for i := range value {
+				value[i] = ^value[i]
+			}
+			db.del(target) // Keep TTL
+			db.set(target, string(value))
+			out.WriteInt(len(value))
+			return nil
+		default:
+			out.WriteErrorString("ERR syntax error")
+			return nil
+		}
+
+	})
 }
 
 // Redis range. both start and end can be negative.
@@ -567,4 +632,22 @@ func countBits(v []byte) int {
 		}
 	}
 	return count
+}
+
+// sliceBinOp applies an operator to all slice elements, with Redis string
+// padding logic.
+func sliceBinOp(f func(a, b byte) byte, a, b []byte) []byte {
+	maxl := len(a)
+	if len(b) > maxl {
+		maxl = len(b)
+	}
+	lA := make([]byte, maxl)
+	copy(lA, a)
+	lB := make([]byte, maxl)
+	copy(lB, b)
+	res := make([]byte, maxl)
+	for i := range res {
+		res[i] = f(lA[i], lB[i])
+	}
+	return res
 }
