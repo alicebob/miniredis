@@ -1,4 +1,4 @@
-# miniredis
+# Miniredis
 
 Pure Go Redis test server, used in Go unittests.
 
@@ -83,7 +83,7 @@ func TestSomething(t *testing.T) {
 	s.HSet("some", "other", "key")
 
 	// Run your code and see if it behaves.
-	// An example using the redigo libary from "github.com/garyburd/redigo/redis":
+	// An example using the redigo library from "github.com/garyburd/redigo/redis":
 	c, err := redis.Dial("tcp", s.Addr())
 	_, err = c.Do("SET", "foo", "bar")
 
@@ -94,7 +94,7 @@ func TestSomething(t *testing.T) {
 }
 ```
 
-## Prelude
+## &c.
 
 See https://github.com/alicebob/miniredis_vs_redis for tests comparing
 miniredis against the real thing.
