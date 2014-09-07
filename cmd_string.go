@@ -482,33 +482,89 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 		}
 
 		v := db.stringKeys[key]
-		if start < 0 {
-			start = len(v) + start
-			if start < 0 {
-				start = 0
-			}
-		}
-		if start > len(v) {
-			start = len(v)
-		}
+		out.WriteString(withRange(v, start, end))
+		return nil
+	})
 
-		if end < 0 {
-			end = len(v) + end
-			if end < 0 {
-				end = 0
-			}
-		}
-		end++ // end argument is inclusive in Redis.
-		if end > len(v) {
-			end = len(v)
-		}
-
-		if end < start {
-			out.WriteString("")
+	srv.HandleFunc("BITCOUNT", func(out *redeo.Responder, r *redeo.Request) error {
+		if len(r.Args) != 1 && len(r.Args) != 3 {
+			out.WriteErrorString("ERR syntax error")
 			return nil
 		}
 
-		out.WriteString(v[start:end])
+		key := r.Args[0]
+		useRange := false
+		start, end := 0, 0
+		if len(r.Args) == 3 {
+			useRange = true
+			var err error
+			start, err = strconv.Atoi(r.Args[1])
+			if err != nil {
+				out.WriteErrorString("ERR value is not an integer or out of range")
+				return nil
+			}
+			end, err = strconv.Atoi(r.Args[2])
+			if err != nil {
+				out.WriteErrorString("ERR value is not an integer or out of range")
+				return nil
+			}
+		}
+
+		db := m.dbFor(r.Client().ID)
+		db.Lock()
+		defer db.Unlock()
+
+		if t, ok := db.keys[key]; ok && t != "string" {
+			out.WriteErrorString("WRONGTYPE Operation against a key holding the wrong kind of value")
+			return nil
+		}
+
+		v := db.stringKeys[key]
+		if useRange {
+			v = withRange(v, start, end)
+		}
+
+		out.WriteInt(countBits([]byte(v)))
 		return nil
 	})
+}
+
+// Redis range. both start and end can be negative.
+func withRange(v string, start, end int) string {
+	if start < 0 {
+		start = len(v) + start
+		if start < 0 {
+			start = 0
+		}
+	}
+	if start > len(v) {
+		start = len(v)
+	}
+
+	if end < 0 {
+		end = len(v) + end
+		if end < 0 {
+			end = 0
+		}
+	}
+	end++ // end argument is inclusive in Redis.
+	if end > len(v) {
+		end = len(v)
+	}
+
+	if end < start {
+		return ""
+	}
+	return v[start:end]
+}
+
+func countBits(v []byte) int {
+	count := 0
+	for _, b := range []byte(v) {
+		for b > 0 {
+			count += int((b % uint8(2)))
+			b = b >> 1
+		}
+	}
+	return count
 }

@@ -681,3 +681,72 @@ func TestGetrange(t *testing.T) {
 		assert(t, err != nil, "do GETRANGE error")
 	}
 }
+
+func TestBitcount(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	{
+		s.Set("countme", "a") // 'a' is 0x1100001
+		v, err := redis.Int(c.Do("BITCOUNT", "countme"))
+		ok(t, err)
+		equals(t, 3, v)
+
+		s.Set("countme", "aaaaa") // 'a' is 0x1100001
+		v, err = redis.Int(c.Do("BITCOUNT", "countme"))
+		ok(t, err)
+		equals(t, 3*5, v)
+	}
+	// Non-existing
+	{
+		v, err := redis.Int(c.Do("BITCOUNT", "nosuch"))
+		ok(t, err)
+		equals(t, 0, v)
+	}
+
+	{
+		// a: 0x1100001 - 3
+		// b: 0x1100010 - 3
+		// c: 0x1100011 - 4
+		// d: 0x1100100 - 3
+		s.Set("foo", "abcd")
+		type tc struct {
+			s   int
+			e   int
+			res int
+		}
+		for _, p := range []tc{
+			{0, 0, 3},   // "a"
+			{0, 3, 13},  // "abcd"
+			{-2, -2, 4}, // "c"
+		} {
+			{
+				v, err := redis.Int(c.Do("BITCOUNT", "foo", p.s, p.e))
+				ok(t, err)
+				equals(t, p.res, v)
+			}
+		}
+	}
+
+	// Wrong type of existing key
+	{
+		s.HSet("wrong", "aap", "noot")
+		_, err := redis.Int(c.Do("BITCOUNT", "wrong"))
+		assert(t, err != nil, "do BITCOUNT error")
+	}
+
+	// Wrong usage
+	{
+		_, err := redis.Int(c.Do("BITCOUNT"))
+		assert(t, err != nil, "do BITCOUNT error")
+		_, err = redis.Int(c.Do("BITCOUNT", "many", "spurious", "arguments", "!"))
+		assert(t, err != nil, "do BITCOUNT error")
+		_, err = redis.Int(c.Do("BITCOUNT", "many", "noint", 12))
+		assert(t, err != nil, "do BITCOUNT error")
+		_, err = redis.Int(c.Do("BITCOUNT", "many", 12, "noint"))
+		assert(t, err != nil, "do BITCOUNT error")
+	}
+}

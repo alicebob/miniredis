@@ -34,6 +34,7 @@ Implemented commands:
      - TYPE
  - String keys
      - APPEND
+     - BITCOUNT
      - DECR
      - DECRBY
      - GET
@@ -91,3 +92,9 @@ func TestSomething(t *testing.T) {
     }
 }
 ```
+
+## Prelude
+
+See https://github.com/alicebob/miniredis_vs_redis for tests comparing
+miniredis against the real thing.
+
