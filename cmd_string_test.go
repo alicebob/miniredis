@@ -635,15 +635,17 @@ func TestGetrange(t *testing.T) {
 		for _, p := range []tc{
 			{0, 0, "a"},
 			{0, 3, "abcd"},
+			{0, 7, "abcdefg"},
 			{0, 100, "abcdefg"},
 			{1, 2, "bc"},
 			{1, 100, "bcdefg"},
+			{-4, -2, "def"},
 			{0, -1, "abcdefg"},
 			{0, -2, "abcdef"},
-			{0, -100, ""},
+			{0, -100, "a"}, // Redis is funny
+			{-2, 2, ""},
 		} {
 			{
-
 				v, err := redis.String(c.Do("GETRANGE", "foo", p.s, p.e))
 				ok(t, err)
 				equals(t, p.res, v)

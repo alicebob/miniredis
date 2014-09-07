@@ -99,19 +99,19 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 				continue
 			case "EX", "PX":
 				if len(r.Args) < 2 {
-					out.WriteErrorString("Expire value error")
+					out.WriteErrorString("ERR value is not an integer or out of range")
 					return nil
 				}
 				var err error
 				expire, err = strconv.Atoi(r.Args[1])
 				if err != nil {
-					out.WriteErrorString("Expire value error")
+					out.WriteErrorString("ERR value is not an integer or out of range")
 					return nil
 				}
 				r.Args = r.Args[2:]
 				continue
 			default:
-				out.WriteErrorString("invalid SET flag")
+				out.WriteErrorString("ERR syntax error")
 				return nil
 			}
 		}
@@ -443,7 +443,7 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 		defer db.Unlock()
 
 		if t, ok := db.keys[key]; ok && t != "string" {
-			out.WriteErrorString("wrong type of key")
+			out.WriteErrorString("WRONGTYPE Operation against a key holding the wrong kind of value")
 			return nil
 		}
 
@@ -456,19 +456,19 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 
 	srv.HandleFunc("GETRANGE", func(out *redeo.Responder, r *redeo.Request) error {
 		if len(r.Args) != 3 {
-			out.WriteErrorString("usage error")
+			out.WriteErrorString("ERR wrong number of arguments for 'getrange' command")
 			return nil
 		}
 
 		key := r.Args[0]
 		start, err := strconv.Atoi(r.Args[1])
 		if err != nil {
-			out.WriteErrorString("value error")
+			out.WriteErrorString("ERR value is not an integer or out of range")
 			return nil
 		}
 		end, err := strconv.Atoi(r.Args[2])
 		if err != nil {
-			out.WriteErrorString("value error")
+			out.WriteErrorString("ERR value is not an integer or out of range")
 			return nil
 		}
 
@@ -477,30 +477,38 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 		defer db.Unlock()
 
 		if t, ok := db.keys[key]; ok && t != "string" {
-			out.WriteErrorString("wrong type of key")
+			out.WriteErrorString("WRONGTYPE Operation against a key holding the wrong kind of value")
 			return nil
 		}
 
-		// Redis goes from [index, index], Go uses [index, length]
 		v := db.stringKeys[key]
+		if start < 0 {
+			start = len(v) + start
+			if start < 0 {
+				start = 0
+			}
+		}
 		if start > len(v) {
 			start = len(v)
 		}
-		v = v[start:]
-		if end >= 0 {
-			end = end - start
-		} else {
+
+		if end < 0 {
 			end = len(v) + end
+			if end < 0 {
+				end = 0
+			}
 		}
-		end++ // end argument is inclusive
+		end++ // end argument is inclusive in Redis.
 		if end > len(v) {
 			end = len(v)
 		}
-		if end < 0 {
-			end = 0
+
+		if end < start {
+			out.WriteString("")
+			return nil
 		}
 
-		out.WriteString(v[:end])
+		out.WriteString(v[start:end])
 		return nil
 	})
 }
