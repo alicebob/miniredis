@@ -577,3 +577,105 @@ func TestStrlen(t *testing.T) {
 		assert(t, err != nil, "do STRLEN error")
 	}
 }
+
+func TestAppend(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	// Existing key
+	{
+		s.Set("foo", "bar!")
+		v, err := redis.Int(c.Do("APPEND", "foo", "morebar"))
+		ok(t, err)
+		equals(t, 11, v)
+	}
+
+	// New key
+	{
+		v, err := redis.Int(c.Do("APPEND", "bar", "was empty"))
+		ok(t, err)
+		equals(t, 9, v)
+	}
+
+	// Wrong type of existing key
+	{
+		s.HSet("wrong", "aap", "noot")
+		_, err := redis.Int(c.Do("APPEND", "wrong", "type"))
+		assert(t, err != nil, "do APPEND error")
+	}
+
+	// Wrong usage
+	{
+		_, err := redis.Int(c.Do("APPEND"))
+		assert(t, err != nil, "do APPEND error")
+		_, err = redis.Int(c.Do("APPEND", "missing"))
+		assert(t, err != nil, "do APPEND error")
+		_, err = redis.Int(c.Do("APPEND", "spurious", "arguments", "!"))
+		assert(t, err != nil, "do APPEND error")
+	}
+}
+
+func TestGetrange(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	{
+		s.Set("foo", "abcdefg")
+		type tc struct {
+			s   int
+			e   int
+			res string
+		}
+		for _, p := range []tc{
+			{0, 0, "a"},
+			{0, 3, "abcd"},
+			{0, 100, "abcdefg"},
+			{1, 2, "bc"},
+			{1, 100, "bcdefg"},
+			{0, -1, "abcdefg"},
+			{0, -2, "abcdef"},
+			{0, -100, ""},
+		} {
+			{
+
+				v, err := redis.String(c.Do("GETRANGE", "foo", p.s, p.e))
+				ok(t, err)
+				equals(t, p.res, v)
+			}
+		}
+	}
+
+	// New key
+	{
+		v, err := redis.String(c.Do("GETRANGE", "bar", 0, 4))
+		ok(t, err)
+		equals(t, "", v)
+	}
+
+	// Wrong type of existing key
+	{
+		s.HSet("wrong", "aap", "noot")
+		_, err := redis.Int(c.Do("GETRANGE", "wrong", 0, 0))
+		assert(t, err != nil, "do APPEND error")
+	}
+
+	// Wrong usage
+	{
+		_, err := redis.Int(c.Do("GETRANGE"))
+		assert(t, err != nil, "do GETRANGE error")
+		_, err = redis.Int(c.Do("GETRANGE", "missing"))
+		assert(t, err != nil, "do GETRANGE error")
+		_, err = redis.Int(c.Do("GETRANGE", "many", "spurious", "arguments", "!"))
+		assert(t, err != nil, "do GETRANGE error")
+		_, err = redis.Int(c.Do("GETRANGE", "many", "noint", 12))
+		assert(t, err != nil, "do GETRANGE error")
+		_, err = redis.Int(c.Do("GETRANGE", "many", 12, "noint"))
+		assert(t, err != nil, "do GETRANGE error")
+	}
+}

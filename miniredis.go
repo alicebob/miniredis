@@ -1,5 +1,6 @@
-// Miniredis is a pure Go Redis test server, for use in Go unittests. There are
-// no dependencies on system binaries, and every server you start will be empty.
+// Package miniredis is a pure Go Redis test server, for use in Go unittests.
+// There are no dependencies on system binaries, and every server you start
+// will be empty.
 //
 // Start a server with `s, err := miniredis.Run()`.
 // Stop it with `defer s.Close()`.

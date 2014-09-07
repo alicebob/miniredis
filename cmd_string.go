@@ -428,4 +428,79 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 		out.WriteInt(len(db.stringKeys[key]))
 		return nil
 	})
+
+	srv.HandleFunc("APPEND", func(out *redeo.Responder, r *redeo.Request) error {
+		if len(r.Args) != 2 {
+			out.WriteErrorString("usage error")
+			return nil
+		}
+
+		key := r.Args[0]
+		value := r.Args[1]
+
+		db := m.dbFor(r.Client().ID)
+		db.Lock()
+		defer db.Unlock()
+
+		if t, ok := db.keys[key]; ok && t != "string" {
+			out.WriteErrorString("wrong type of key")
+			return nil
+		}
+
+		newValue := db.stringKeys[key] + value
+		db.stringKeys[key] = newValue
+
+		out.WriteInt(len(newValue))
+		return nil
+	})
+
+	srv.HandleFunc("GETRANGE", func(out *redeo.Responder, r *redeo.Request) error {
+		if len(r.Args) != 3 {
+			out.WriteErrorString("usage error")
+			return nil
+		}
+
+		key := r.Args[0]
+		start, err := strconv.Atoi(r.Args[1])
+		if err != nil {
+			out.WriteErrorString("value error")
+			return nil
+		}
+		end, err := strconv.Atoi(r.Args[2])
+		if err != nil {
+			out.WriteErrorString("value error")
+			return nil
+		}
+
+		db := m.dbFor(r.Client().ID)
+		db.Lock()
+		defer db.Unlock()
+
+		if t, ok := db.keys[key]; ok && t != "string" {
+			out.WriteErrorString("wrong type of key")
+			return nil
+		}
+
+		// Redis goes from [index, index], Go uses [index, length]
+		v := db.stringKeys[key]
+		if start > len(v) {
+			start = len(v)
+		}
+		v = v[start:]
+		if end >= 0 {
+			end = end - start
+		} else {
+			end = len(v) + end
+		}
+		end++ // end argument is inclusive
+		if end > len(v) {
+			end = len(v)
+		}
+		if end < 0 {
+			end = 0
+		}
+
+		out.WriteString(v[:end])
+		return nil
+	})
 }

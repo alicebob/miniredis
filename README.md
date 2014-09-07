@@ -33,9 +33,11 @@ Implemented commands:
      - TTL
      - TYPE
  - String keys
+     - APPEND
      - DECR
      - DECRBY
      - GET
+     - GETRANGE
      - GETSET
      - INCR
      - INCRBY
