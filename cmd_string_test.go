@@ -382,6 +382,59 @@ func TestIncrBy(t *testing.T) {
 	}
 }
 
+func TestIncrbyfloat(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	// Existing key
+	{
+		s.Set("foo", "12")
+		v, err := redis.Float64(c.Do("INCRBYFLOAT", "foo", "400.12"))
+		ok(t, err)
+		equals(t, 412.12, v)
+		equals(t, "412.12", s.Get("foo"))
+	}
+
+	// Existing key, not a number
+	{
+		s.Set("foo", "noint")
+		_, err := redis.Float64(c.Do("INCRBYFLOAT", "foo", "400"))
+		assert(t, err != nil, "do INCRBYFLOAT error")
+	}
+
+	// New key
+	{
+		v, err := redis.Float64(c.Do("INCRBYFLOAT", "bar", "40.33"))
+		ok(t, err)
+		equals(t, 40.33, v)
+		equals(t, "40.33", s.Get("bar"))
+	}
+
+	// Wrong type of existing key
+	{
+		s.HSet("wrong", "aap", "noot")
+		_, err := redis.Int(c.Do("INCRBYFLOAT", "wrong", "400"))
+		assert(t, err != nil, "do INCRBYFLOAT error")
+	}
+
+	// Amount not a number
+	{
+		_, err := redis.Int(c.Do("INCRBYFLOAT", "key", "noint"))
+		assert(t, err != nil, "do INCRBYFLOAT error")
+	}
+
+	// Wrong usage
+	{
+		_, err := redis.Int(c.Do("INCRBYFLOAT"))
+		assert(t, err != nil, "do INCRBYFLOAT error")
+		_, err = redis.Int(c.Do("INCRBYFLOAT", "another", "new", "key"))
+		assert(t, err != nil, "do INCRBYFLOAT error")
+	}
+}
+
 func TestDecrBy(t *testing.T) {
 	s, err := Run()
 	ok(t, err)

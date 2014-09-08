@@ -4,6 +4,7 @@ package miniredis
 
 import (
 	"errors"
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -72,6 +73,36 @@ func (db *redisDB) incr(k string, delta int) (int, error) {
 	v += delta
 	db.stringKeys[k] = strconv.Itoa(v)
 	return v, nil
+}
+
+// change float key value
+func (db *redisDB) incrfloat(k string, delta float64) (string, error) {
+	v := 0.0
+	if sv, ok := db.stringKeys[k]; ok {
+		var err error
+		v, err = strconv.ParseFloat(sv, 64)
+		if err != nil {
+			return "0", errValueError
+		}
+	}
+	v += delta
+	// Format with %f and strip trailing 0s. This is the most like Redis does
+	// it :(
+	sv := fmt.Sprintf("%.12f", v)
+	for strings.Contains(sv, ".") {
+		if sv[len(sv)-1] != '0' {
+			break
+		}
+		// Remove trailing 0s.
+		sv = sv[:len(sv)-1]
+		// Ends with a '.'.
+		if sv[len(sv)-1] == '.' {
+			sv = sv[:len(sv)-1]
+			break
+		}
+	}
+	db.stringKeys[k] = sv
+	return sv, nil
 }
 
 // commandsString handles all string value operations.
@@ -296,7 +327,7 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 
 	srv.HandleFunc("INCR", func(out *redeo.Responder, r *redeo.Request) error {
 		if len(r.Args) != 1 {
-			out.WriteErrorString("usage error")
+			out.WriteErrorString("ERR wrong number of arguments for 'incr' command")
 			return nil
 		}
 
@@ -306,7 +337,7 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 
 		key := r.Args[0]
 		if t, ok := db.keys[key]; ok && t != "string" {
-			out.WriteErrorString("wrong type of key")
+			out.WriteErrorString("WRONGTYPE Operation against a key holding the wrong kind of value")
 			return nil
 		}
 		v, err := db.incr(key, +1)
@@ -321,7 +352,7 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 
 	srv.HandleFunc("INCRBY", func(out *redeo.Responder, r *redeo.Request) error {
 		if len(r.Args) != 2 {
-			out.WriteErrorString("usage error")
+			out.WriteErrorString("ERR wrong number of arguments for 'incrby' command")
 			return nil
 		}
 
@@ -337,7 +368,7 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 		defer db.Unlock()
 
 		if t, ok := db.keys[key]; ok && t != "string" {
-			out.WriteErrorString("wrong type of key")
+			out.WriteErrorString("WRONGTYPE Operation against a key holding the wrong kind of value")
 			return nil
 		}
 
@@ -351,9 +382,41 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 		return nil
 	})
 
+	srv.HandleFunc("INCRBYFLOAT", func(out *redeo.Responder, r *redeo.Request) error {
+		if len(r.Args) != 2 {
+			out.WriteErrorString("ERR wrong number of arguments for 'incrbyfloat' command")
+			return nil
+		}
+
+		key := r.Args[0]
+		delta, err := strconv.ParseFloat(r.Args[1], 64)
+		if err != nil {
+			out.WriteErrorString("value error")
+			return nil
+		}
+
+		db := m.dbFor(r.Client().ID)
+		db.Lock()
+		defer db.Unlock()
+
+		if t, ok := db.keys[key]; ok && t != "string" {
+			out.WriteErrorString("WRONGTYPE Operation against a key holding the wrong kind of value")
+			return nil
+		}
+
+		v, err := db.incrfloat(key, delta)
+		if err != nil {
+			out.WriteErrorString(err.Error())
+			return nil
+		}
+		// Don't touch TTL
+		out.WriteString(v)
+		return nil
+	})
+
 	srv.HandleFunc("DECR", func(out *redeo.Responder, r *redeo.Request) error {
 		if len(r.Args) != 1 {
-			out.WriteErrorString("usage error")
+			out.WriteErrorString("ERR wrong number of arguments for 'decr' command")
 			return nil
 		}
 
@@ -363,7 +426,7 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 
 		key := r.Args[0]
 		if t, ok := db.keys[key]; ok && t != "string" {
-			out.WriteErrorString("wrong type of key")
+			out.WriteErrorString("WRONGTYPE Operation against a key holding the wrong kind of value")
 			return nil
 		}
 		v, err := db.incr(key, -1)
@@ -378,7 +441,7 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 
 	srv.HandleFunc("DECRBY", func(out *redeo.Responder, r *redeo.Request) error {
 		if len(r.Args) != 2 {
-			out.WriteErrorString("usage error")
+			out.WriteErrorString("ERR wrong number of arguments for 'decrby' command")
 			return nil
 		}
 

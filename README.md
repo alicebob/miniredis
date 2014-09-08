@@ -45,6 +45,7 @@ Implemented commands:
      - GETSET
      - INCR
      - INCRBY
+     - INCRBYFLOAT
      - MGET
      - MSET
      - SET
