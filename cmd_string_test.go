@@ -844,3 +844,117 @@ func TestBitop(t *testing.T) {
 		assert(t, err != nil, "do BITOP error")
 	}
 }
+
+func TestBitpos(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	{
+		s.Set("findme", "\xff\xf0\x00")
+		v, err := redis.Int(c.Do("BITPOS", "findme", 0))
+		ok(t, err)
+		equals(t, 12, v)
+		v, err = redis.Int(c.Do("BITPOS", "findme", 0, 1))
+		ok(t, err)
+		equals(t, 12, v)
+		v, err = redis.Int(c.Do("BITPOS", "findme", 0, 1, 1))
+		ok(t, err)
+		equals(t, 12, v)
+
+		v, err = redis.Int(c.Do("BITPOS", "findme", 1))
+		ok(t, err)
+		equals(t, 0, v)
+		v, err = redis.Int(c.Do("BITPOS", "findme", 1, 1))
+		ok(t, err)
+		equals(t, 8, v)
+		v, err = redis.Int(c.Do("BITPOS", "findme", 1, 1, 2))
+		ok(t, err)
+		equals(t, 8, v)
+
+		v, err = redis.Int(c.Do("BITPOS", "findme", 1, 10000))
+		ok(t, err)
+		equals(t, -1, v)
+	}
+
+	// Only zeros.
+	{
+		s.Set("zero", "\x00\x00")
+		v, err := redis.Int(c.Do("BITPOS", "zero", 1))
+		ok(t, err)
+		equals(t, -1, v)
+		v, err = redis.Int(c.Do("BITPOS", "zero", 0))
+		ok(t, err)
+		equals(t, 0, v)
+
+		// -end is ok
+		v, err = redis.Int(c.Do("BITPOS", "zero", 0, 0, -100))
+		ok(t, err)
+		equals(t, -1, v)
+	}
+
+	// Only ones.
+	{
+		s.Set("one", "\xff\xff")
+		v, err := redis.Int(c.Do("BITPOS", "one", 1))
+		ok(t, err)
+		equals(t, 0, v)
+		v, err = redis.Int(c.Do("BITPOS", "one", 1, 1))
+		ok(t, err)
+		equals(t, 8, v)
+		v, err = redis.Int(c.Do("BITPOS", "one", 1, 2))
+		ok(t, err)
+		equals(t, -1, v)
+		v, err = redis.Int(c.Do("BITPOS", "one", 0))
+		ok(t, err)
+		equals(t, 16, v) // Special case
+		v, err = redis.Int(c.Do("BITPOS", "one", 0, 1))
+		ok(t, err)
+		equals(t, 16, v) // Special case
+		v, err = redis.Int(c.Do("BITPOS", "one", 0, 0, 1))
+		ok(t, err)
+		equals(t, -1, v) // Counter the special case
+	}
+
+	// Non-existing
+	{
+		v, err := redis.Int(c.Do("BITPOS", "nosuch", 1))
+		ok(t, err)
+		equals(t, -1, v)
+		v, err = redis.Int(c.Do("BITPOS", "nosuch", 0))
+		ok(t, err)
+		equals(t, 0, v) // that makes no sense.
+	}
+
+	// Empty string
+	{
+		s.Set("empty", "")
+		v, err := redis.Int(c.Do("BITPOS", "empty", 1))
+		ok(t, err)
+		equals(t, -1, v)
+		v, err = redis.Int(c.Do("BITPOS", "empty", 0))
+		ok(t, err)
+		equals(t, 0, v)
+	}
+
+	// Wrong type of existing key
+	{
+		s.HSet("wrong", "aap", "noot")
+		_, err := redis.Int(c.Do("BITPOS", "wrong", 1))
+		assert(t, err != nil, "do BITPOS error")
+	}
+
+	// Wrong usage
+	{
+		_, err := redis.Int(c.Do("BITPOS"))
+		assert(t, err != nil, "do BITPOS error")
+		_, err = redis.Int(c.Do("BITPOS", "many", "spurious", "arguments", "!"))
+		assert(t, err != nil, "do BITPOS error")
+		_, err = redis.Int(c.Do("BITPOS", "many", "noint"))
+		assert(t, err != nil, "do BITPOS error")
+		_, err = redis.Int(c.Do("BITPOS", "many"))
+		assert(t, err != nil, "do BITPOS error")
+	}
+}

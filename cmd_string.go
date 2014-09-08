@@ -592,6 +592,81 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 		}
 
 	})
+
+	srv.HandleFunc("BITPOS", func(out *redeo.Responder, r *redeo.Request) error {
+		if len(r.Args) < 2 || len(r.Args) > 4 {
+			out.WriteErrorString("ERR wrong number of arguments for 'bitpos' command")
+			return nil
+		}
+
+		key := r.Args[0]
+		bit, err := strconv.Atoi(r.Args[1])
+		if err != nil {
+			out.WriteErrorString("ERR value is not an integer or out of range")
+			return nil
+		}
+		var start, end int
+		withEnd := false
+		if len(r.Args) > 2 {
+			start, err = strconv.Atoi(r.Args[2])
+			if err != nil {
+				out.WriteErrorString("ERR value is not an integer or out of range")
+				return nil
+			}
+		}
+		if len(r.Args) > 3 {
+			end, err = strconv.Atoi(r.Args[3])
+			if err != nil {
+				out.WriteErrorString("ERR value is not an integer or out of range")
+				return nil
+			}
+			withEnd = true
+		}
+
+		db := m.dbFor(r.Client().ID)
+		db.Lock()
+		defer db.Unlock()
+
+		if t, ok := db.keys[key]; ok && t != "string" {
+			out.WriteErrorString("WRONGTYPE Operation against a key holding the wrong kind of value")
+			return nil
+		}
+		value := db.stringKeys[key]
+		if start != 0 {
+			if start > len(value) {
+				start = len(value)
+			}
+		}
+		if withEnd {
+			end++ // redis end semantics.
+			if end < 0 {
+				end = len(value) + end
+			}
+			if end > len(value) {
+				end = len(value)
+			}
+		} else {
+			end = len(value)
+		}
+		if start != 0 || withEnd {
+			if end < start {
+				value = ""
+			} else {
+				value = value[start:end]
+			}
+		}
+		pos := bitPos([]byte(value), bit == 1)
+		if pos >= 0 {
+			pos += start * 8
+		}
+		// Special case when looking for 0, but not when start and end are
+		// given.
+		if bit == 0 && pos == -1 && !withEnd {
+			pos = start*8 + len(value)*8
+		}
+		out.WriteInt(pos)
+		return nil
+	})
 }
 
 // Redis range. both start and end can be negative.
@@ -650,4 +725,27 @@ func sliceBinOp(f func(a, b byte) byte, a, b []byte) []byte {
 		res[i] = f(lA[i], lB[i])
 	}
 	return res
+}
+
+// Return the number of the first bit set/unset.
+func bitPos(s []byte, bit bool) int {
+	for i, b := range s {
+		for j, set := range toBits(b) {
+			if set == bit {
+				return i*8 + j
+			}
+		}
+	}
+	return -1
+}
+
+// toBits changes a byte in 8 bools.
+func toBits(s byte) [8]bool {
+	r := [8]bool{}
+	for i := range r {
+		if s&(uint8(1)<<uint8(7-i)) != 0 {
+			r[i] = true
+		}
+	}
+	return r
 }

@@ -36,6 +36,7 @@ Implemented commands:
      - APPEND
      - BITCOUNT
      - BITOP
+     - BITPOS
      - DECR
      - DECRBY
      - GET
