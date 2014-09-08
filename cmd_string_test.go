@@ -1059,3 +1059,48 @@ func TestGetbit(t *testing.T) {
 		assert(t, err != nil, "do GETBIT error")
 	}
 }
+
+func TestMsetnx(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	{
+		v, err := redis.Int(c.Do("MSETNX", "aap", "noot", "mies", "vuur"))
+		ok(t, err)
+		equals(t, 1, v)
+		equals(t, "noot", s.Get("aap"))
+		equals(t, "vuur", s.Get("mies"))
+	}
+
+	// A key exists.
+	{
+		v, err := redis.Int(c.Do("MSETNX", "noaap", "noot", "mies", "vuur!"))
+		ok(t, err)
+		equals(t, 0, v)
+		equals(t, "", s.Get("noaap"))
+		equals(t, "noot", s.Get("aap"))
+		equals(t, "vuur", s.Get("mies"))
+	}
+
+	// Other type of existing key
+	{
+		s.HSet("one", "two", "three")
+		v, err := redis.Int(c.Do("MSETNX", "one", "two", "three", "four!"))
+		ok(t, err)
+		equals(t, 0, v)
+		equals(t, "", s.Get("three"))
+	}
+
+	// Wrong usage
+	{
+		_, err := redis.Int(c.Do("MSETNX", "foo"))
+		assert(t, err != nil, "do MSETNX error")
+		_, err = redis.Int(c.Do("MSETNX", "odd", "arguments", "!"))
+		assert(t, err != nil, "do MSETNX error")
+		_, err = redis.Int(c.Do("MSETNX"))
+		assert(t, err != nil, "do MSETNX error")
+	}
+}

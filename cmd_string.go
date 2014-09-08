@@ -223,8 +223,12 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 	})
 
 	srv.HandleFunc("MSET", func(out *redeo.Responder, r *redeo.Request) error {
+		if len(r.Args) < 2 {
+			out.WriteErrorString("ERR wrong number of arguments for 'mset' command")
+			return nil
+		}
 		if len(r.Args)%2 != 0 {
-			out.WriteErrorString("wrong number of arguments for 'mset' command")
+			out.WriteErrorString("ERR wrong number of arguments for MSET")
 			return nil
 		}
 		db := m.dbFor(r.Client().ID)
@@ -242,6 +246,43 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 			db.stringKeys[key] = value
 		}
 		out.WriteOK()
+		return nil
+	})
+
+	srv.HandleFunc("MSETNX", func(out *redeo.Responder, r *redeo.Request) error {
+		if len(r.Args) < 2 {
+			out.WriteErrorString("ERR wrong number of arguments for 'msetnx' command")
+			return nil
+		}
+		if len(r.Args)%2 != 0 {
+			out.WriteErrorString("ERR wrong number of arguments for MSET")
+			return nil
+		}
+		db := m.dbFor(r.Client().ID)
+		db.Lock()
+		defer db.Unlock()
+
+		keys := map[string]string{}
+		existing := false
+		for len(r.Args) > 0 {
+			key := r.Args[0]
+			value := r.Args[1]
+			r.Args = r.Args[2:]
+			keys[key] = value
+			if _, ok := db.keys[key]; ok {
+				existing = true
+			}
+		}
+
+		res := 0
+		if !existing {
+			res = 1
+			for k, v := range keys {
+				// Nothing to delete. That's the whole point.
+				db.set(k, v)
+			}
+		}
+		out.WriteInt(res)
 		return nil
 	})
 

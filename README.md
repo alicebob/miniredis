@@ -48,6 +48,7 @@ Implemented commands:
      - INCRBYFLOAT
      - MGET
      - MSET
+     - MSETNX
      - SET
      - SETEX
      - SETNX
