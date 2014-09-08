@@ -1,1 +1,5 @@
 language: go
+
+install: go get
+
+script: make test

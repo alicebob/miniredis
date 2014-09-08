@@ -99,3 +99,6 @@ func TestSomething(t *testing.T) {
 See https://github.com/alicebob/miniredis_vs_redis for tests comparing
 miniredis against the real thing.
 
+
+[![Build
+Status](https://travis-ci.org/alicebob/miniredis.svg?branch=master)](https://travis-ci.org/alicebob/miniredis)
