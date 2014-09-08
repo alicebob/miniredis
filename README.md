@@ -40,6 +40,7 @@ Implemented commands:
      - DECR
      - DECRBY
      - GET
+     - GETBIT
      - GETRANGE
      - GETSET
      - INCR

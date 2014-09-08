@@ -667,6 +667,44 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 		out.WriteInt(pos)
 		return nil
 	})
+
+	srv.HandleFunc("GETBIT", func(out *redeo.Responder, r *redeo.Request) error {
+		if len(r.Args) != 2 {
+			out.WriteErrorString("ERR wrong number of arguments for 'getbit' command")
+			return nil
+		}
+
+		key := r.Args[0]
+		bit, err := strconv.Atoi(r.Args[1])
+		if err != nil {
+			out.WriteErrorString("ERR bit offset is not an integer or out of range")
+			return nil
+		}
+
+		db := m.dbFor(r.Client().ID)
+		db.Lock()
+		defer db.Unlock()
+
+		if t, ok := db.keys[key]; ok && t != "string" {
+			out.WriteErrorString("WRONGTYPE Operation against a key holding the wrong kind of value")
+			return nil
+		}
+		value := db.stringKeys[key]
+
+		ourByteNr := bit / 8
+		var ourByte byte
+		if ourByteNr > len(value)-1 {
+			ourByte = '\x00'
+		} else {
+			ourByte = value[ourByteNr]
+		}
+		res := 0
+		if toBits(ourByte)[bit%8] {
+			res = 1
+		}
+		out.WriteInt(res)
+		return nil
+	})
 }
 
 // Redis range. both start and end can be negative.

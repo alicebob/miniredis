@@ -958,3 +958,51 @@ func TestBitpos(t *testing.T) {
 		assert(t, err != nil, "do BITPOS error")
 	}
 }
+
+func TestGetbit(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	{
+		s.Set("findme", "\x08")
+		v, err := redis.Int(c.Do("GETBIT", "findme", 0))
+		ok(t, err)
+		equals(t, 0, v)
+		v, err = redis.Int(c.Do("GETBIT", "findme", 4))
+		ok(t, err)
+		equals(t, 1, v)
+		v, err = redis.Int(c.Do("GETBIT", "findme", 5))
+		ok(t, err)
+		equals(t, 0, v)
+	}
+
+	// Non-existing
+	{
+		v, err := redis.Int(c.Do("GETBIT", "nosuch", 1))
+		ok(t, err)
+		equals(t, 0, v)
+		v, err = redis.Int(c.Do("GETBIT", "nosuch", 1000))
+		ok(t, err)
+		equals(t, 0, v)
+	}
+
+	// Wrong type of existing key
+	{
+		s.HSet("wrong", "aap", "noot")
+		_, err := redis.Int(c.Do("GETBIT", "wrong", 1))
+		assert(t, err != nil, "do GETBIT error")
+	}
+
+	// Wrong usage
+	{
+		_, err := redis.Int(c.Do("GETBIT", "foo"))
+		assert(t, err != nil, "do GETBIT error")
+		_, err = redis.Int(c.Do("GETBIT", "spurious", "arguments", "!"))
+		assert(t, err != nil, "do GETBIT error")
+		_, err = redis.Int(c.Do("GETBIT", "many", "noint"))
+		assert(t, err != nil, "do GETBIT error")
+	}
+}
