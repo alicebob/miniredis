@@ -97,6 +97,44 @@ func TestExpire(t *testing.T) {
 	}
 }
 
+func TestPexpire(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	// Key exists
+	{
+		s.Set("foo", "bar")
+		b, err := redis.Int(c.Do("PEXPIRE", "foo", 12))
+		ok(t, err)
+		equals(t, 1, b)
+
+		e, err := redis.Int(c.Do("PTTL", "foo"))
+		ok(t, err)
+		equals(t, 12, e)
+	}
+	// Key doesn't exist
+	{
+		b, err := redis.Int(c.Do("PEXPIRE", "nosuch", 12))
+		ok(t, err)
+		equals(t, 0, b)
+
+		e, err := redis.Int(c.Do("PTTL", "nosuch"))
+		ok(t, err)
+		equals(t, -2, e)
+	}
+
+	// No expire
+	{
+		s.Set("aap", "noot")
+		e, err := redis.Int(c.Do("PTTL", "aap"))
+		ok(t, err)
+		equals(t, -1, e)
+	}
+}
+
 func TestMulti(t *testing.T) {
 	s, err := Run()
 	ok(t, err)

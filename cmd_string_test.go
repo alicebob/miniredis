@@ -240,10 +240,51 @@ func TestSetex(t *testing.T) {
 		ok(t, err)
 	}
 
-	// Invalid TTL
+	// Error cases
 	{
 		_, err := redis.String(c.Do("SETEX", "aap", "nottl", "noot"))
 		assert(t, err != nil, "no SETEX error")
+		_, err = redis.String(c.Do("SETEX", "aap"))
+		assert(t, err != nil, "no SETEX error")
+		_, err = redis.String(c.Do("SETEX", "aap", 12))
+		assert(t, err != nil, "no SETEX error")
+		_, err = redis.String(c.Do("SETEX", "aap", 12, "noot", "toomuch"))
+		assert(t, err != nil, "no SETEX error")
+	}
+}
+
+func TestPsetex(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	// Usual case
+	{
+		v, err := redis.String(c.Do("PSETEX", "aap", 1234, "noot"))
+		ok(t, err)
+		equals(t, "OK", v)
+		equals(t, "noot", s.Get("aap"))
+		equals(t, 1234, s.Expire("aap")) // We set Milliseconds in Expire.
+	}
+
+	// Same thing
+	{
+		_, err := redis.String(c.Do("PSETEX", "aap", "1234", "noot"))
+		ok(t, err)
+	}
+
+	// Error cases
+	{
+		_, err := redis.String(c.Do("PSETEX", "aap", "nottl", "noot"))
+		assert(t, err != nil, "no PSETEX error")
+		_, err = redis.String(c.Do("PSETEX", "aap"))
+		assert(t, err != nil, "no PSETEX error")
+		_, err = redis.String(c.Do("PSETEX", "aap", 12))
+		assert(t, err != nil, "no PSETEX error")
+		_, err = redis.String(c.Do("PSETEX", "aap", 12, "noot", "toomuch"))
+		assert(t, err != nil, "no PSETEX error")
 	}
 }
 

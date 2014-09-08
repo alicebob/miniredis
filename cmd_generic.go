@@ -66,18 +66,18 @@ func (db *redisDB) Type(k string) string {
 	return db.keys[k]
 }
 
-// commandsGeneric handles EXPIRE, TTL, PERSIST
+// commandsGeneric handles EXPIRE, TTL, PERSIST, &c.
 func commandsGeneric(m *Miniredis, srv *redeo.Server) {
 	srv.HandleFunc("EXPIRE", func(out *redeo.Responder, r *redeo.Request) error {
 		if len(r.Args) != 2 {
-			out.WriteErrorString("usage error")
+			out.WriteErrorString("ERR wrong number of arguments for 'expire' command")
 			return nil
 		}
 		key := r.Args[0]
 		value := r.Args[1]
 		i, err := strconv.Atoi(value)
 		if err != nil {
-			out.WriteErrorString("value error")
+			out.WriteErrorString("ERR value is not an integer or out of range")
 			return nil
 		}
 		db := m.dbFor(r.Client().ID)
@@ -94,7 +94,64 @@ func commandsGeneric(m *Miniredis, srv *redeo.Server) {
 		return nil
 	})
 
+	srv.HandleFunc("PEXPIRE", func(out *redeo.Responder, r *redeo.Request) error {
+		if len(r.Args) != 2 {
+			out.WriteErrorString("ERR wrong number of arguments for 'pexpire' command")
+			return nil
+		}
+		key := r.Args[0]
+		value := r.Args[1]
+		i, err := strconv.Atoi(value)
+		if err != nil {
+			out.WriteErrorString("ERR value is not an integer or out of range")
+			return nil
+		}
+		db := m.dbFor(r.Client().ID)
+		db.Lock()
+		defer db.Unlock()
+
+		// Key must be present.
+		if _, ok := db.keys[key]; !ok {
+			out.WriteZero()
+			return nil
+		}
+		db.expire[key] = i // We put pexires in expire.
+		out.WriteOne()
+		return nil
+	})
+
 	srv.HandleFunc("TTL", func(out *redeo.Responder, r *redeo.Request) error {
+		if len(r.Args) != 1 {
+			out.WriteErrorString("ERR wrong number of arguments for 'ttl' command")
+			return nil
+		}
+		key := r.Args[0]
+		db := m.dbFor(r.Client().ID)
+		db.Lock()
+		defer db.Unlock()
+
+		if _, ok := db.keys[key]; !ok {
+			// No such key
+			out.WriteInt(-2)
+			return nil
+		}
+
+		value, ok := db.expire[key]
+		if !ok {
+			// No expire value
+			out.WriteInt(-1)
+			return nil
+		}
+		out.WriteInt(value)
+		return nil
+	})
+
+	// Same at `TTL'
+	srv.HandleFunc("PTTL", func(out *redeo.Responder, r *redeo.Request) error {
+		if len(r.Args) != 1 {
+			out.WriteErrorString("ERR wrong number of arguments for 'pttl' command")
+			return nil
+		}
 		key := r.Args[0]
 		db := m.dbFor(r.Client().ID)
 		db.Lock()

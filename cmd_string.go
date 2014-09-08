@@ -177,13 +177,13 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 
 	srv.HandleFunc("SETEX", func(out *redeo.Responder, r *redeo.Request) error {
 		if len(r.Args) != 3 {
-			out.WriteErrorString("usage error")
+			out.WriteErrorString("ERR wrong number of arguments for 'setex' command")
 			return nil
 		}
 		key := r.Args[0]
 		ttl, err := strconv.Atoi(r.Args[1])
 		if err != nil {
-			out.WriteErrorString("expire value error")
+			out.WriteErrorString("ERR value is not an integer or out of range")
 			return nil
 		}
 		value := r.Args[2]
@@ -196,6 +196,31 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 		db.keys[key] = "string"
 		db.stringKeys[key] = value
 		db.expire[key] = ttl
+		out.WriteOK()
+		return nil
+	})
+
+	srv.HandleFunc("PSETEX", func(out *redeo.Responder, r *redeo.Request) error {
+		if len(r.Args) != 3 {
+			out.WriteErrorString("ERR wrong number of arguments for 'psetex' command")
+			return nil
+		}
+		key := r.Args[0]
+		ttl, err := strconv.Atoi(r.Args[1])
+		if err != nil {
+			out.WriteErrorString("ERR value is not an integer or out of range")
+			return nil
+		}
+		value := r.Args[2]
+
+		db := m.dbFor(r.Client().ID)
+		db.Lock()
+		defer db.Unlock()
+
+		db.del(key) // Clear any existing keys.
+		db.keys[key] = "string"
+		db.stringKeys[key] = value
+		db.expire[key] = ttl // We put millisecond keys in with the second keys.
 		out.WriteOK()
 		return nil
 	})

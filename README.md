@@ -30,6 +30,8 @@ Implemented commands:
      - DEL
      - EXPIRE
      - PERSIST
+     - PEXPIRE
+     - PTTL
      - TTL
      - TYPE
  - String keys
@@ -49,6 +51,7 @@ Implemented commands:
      - MGET
      - MSET
      - MSETNX
+     - PSETEX
      - SET
      - SETEX
      - SETNX
