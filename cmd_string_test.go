@@ -1101,6 +1101,71 @@ func TestGetbit(t *testing.T) {
 	}
 }
 
+func TestSetbit(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	{
+		s.Set("findme", "\x08")
+		v, err := redis.Int(c.Do("SETBIT", "findme", 4, 0))
+		ok(t, err)
+		equals(t, 1, v)
+		equals(t, "\x00", s.Get("findme"))
+
+		v, err = redis.Int(c.Do("SETBIT", "findme", 4, 1))
+		ok(t, err)
+		equals(t, 0, v)
+		equals(t, "\x08", s.Get("findme"))
+	}
+
+	// Non-existing
+	{
+		v, err := redis.Int(c.Do("SETBIT", "nosuch", 0, 1))
+		ok(t, err)
+		equals(t, 0, v)
+		equals(t, "\x80", s.Get("nosuch"))
+	}
+
+	// Too short
+	{
+		s.Set("short", "\x00\x00")
+		v, err := redis.Int(c.Do("SETBIT", "short", 24, 0))
+		ok(t, err)
+		equals(t, 0, v)
+		equals(t, "\x00\x00\x00\x00", s.Get("short"))
+		v, err = redis.Int(c.Do("SETBIT", "short", 32, 1))
+		ok(t, err)
+		equals(t, 0, v)
+		equals(t, "\x00\x00\x00\x00\x80", s.Get("short"))
+	}
+
+	// Wrong type of existing key
+	{
+		s.HSet("wrong", "aap", "noot")
+		_, err := redis.Int(c.Do("SETBIT", "wrong", 0, 1))
+		assert(t, err != nil, "do SETBIT error")
+	}
+
+	// Wrong usage
+	{
+		_, err := redis.Int(c.Do("SETBIT", "foo"))
+		assert(t, err != nil, "do SETBIT error")
+		_, err = redis.Int(c.Do("SETBIT", "spurious", "arguments", "!"))
+		assert(t, err != nil, "do SETBIT error")
+		_, err = redis.Int(c.Do("SETBIT", "many", "noint", 1))
+		assert(t, err != nil, "do SETBIT error")
+		_, err = redis.Int(c.Do("SETBIT", "many", 1, "noint"))
+		assert(t, err != nil, "do SETBIT error")
+		_, err = redis.Int(c.Do("SETBIT", "many", -3, 0))
+		assert(t, err != nil, "do SETBIT error")
+		_, err = redis.Int(c.Do("SETBIT", "many", 3, 2))
+		assert(t, err != nil, "do SETBIT error")
+	}
+}
+
 func TestMsetnx(t *testing.T) {
 	s, err := Run()
 	ok(t, err)

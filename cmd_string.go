@@ -834,6 +834,57 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 		out.WriteInt(res)
 		return nil
 	})
+
+	srv.HandleFunc("SETBIT", func(out *redeo.Responder, r *redeo.Request) error {
+		if len(r.Args) != 3 {
+			out.WriteErrorString("ERR wrong number of arguments for 'setbit' command")
+			return nil
+		}
+
+		key := r.Args[0]
+		bit, err := strconv.Atoi(r.Args[1])
+		if err != nil || bit < 0 {
+			out.WriteErrorString("ERR bit offset is not an integer or out of range")
+			return nil
+		}
+		newBit, err := strconv.Atoi(r.Args[2])
+		if err != nil || (newBit != 0 && newBit != 1) {
+			out.WriteErrorString("ERR bit is not an integer or out of range")
+			return nil
+		}
+
+		db := m.dbFor(r.Client().ID)
+		db.Lock()
+		defer db.Unlock()
+
+		if t, ok := db.keys[key]; ok && t != "string" {
+			out.WriteErrorString("WRONGTYPE Operation against a key holding the wrong kind of value")
+			return nil
+		}
+		value := []byte(db.stringKeys[key])
+
+		ourByteNr := bit / 8
+		ourBitNr := bit % 8
+		if ourByteNr > len(value)-1 {
+			// Too short. Expand.
+			newValue := make([]byte, ourByteNr+1)
+			copy(newValue, value)
+			value = newValue
+		}
+		old := 0
+		if toBits(value[ourByteNr])[ourBitNr] {
+			old = 1
+		}
+		if newBit == 0 {
+			value[ourByteNr] &^= 1 << uint8(7-ourBitNr)
+		} else {
+			value[ourByteNr] |= 1 << uint8(7-ourBitNr)
+		}
+		db.stringKeys[key] = string(value)
+
+		out.WriteInt(old)
+		return nil
+	})
 }
 
 // Redis range. both start and end can be negative.

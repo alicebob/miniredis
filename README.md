@@ -53,6 +53,7 @@ Implemented commands:
      - MSETNX
      - PSETEX
      - SET
+     - SETBIT
      - SETEX
      - SETNX
      - STRLEN
