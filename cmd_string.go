@@ -615,6 +615,45 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 		return nil
 	})
 
+	srv.HandleFunc("SETRANGE", func(out *redeo.Responder, r *redeo.Request) error {
+		if len(r.Args) != 3 {
+			out.WriteErrorString("ERR wrong number of arguments for 'setrange' command")
+			return nil
+		}
+
+		key := r.Args[0]
+		pos, err := strconv.Atoi(r.Args[1])
+		if err != nil {
+			out.WriteErrorString("ERR value is not an integer or out of range")
+			return nil
+		}
+		if pos < 0 {
+			out.WriteErrorString("ERR offset is out of range")
+			return nil
+		}
+		subst := r.Args[2]
+
+		db := m.dbFor(r.Client().ID)
+		db.Lock()
+		defer db.Unlock()
+
+		if t, ok := db.keys[key]; ok && t != "string" {
+			out.WriteErrorString("WRONGTYPE Operation against a key holding the wrong kind of value")
+			return nil
+		}
+
+		v := []byte(db.stringKeys[key])
+		if len(v) < pos+len(subst) {
+			newV := make([]byte, pos+len(subst))
+			copy(newV, v)
+			v = newV
+		}
+		copy(v[pos:pos+len(subst)], subst)
+		db.stringKeys[key] = string(v)
+		out.WriteInt(len(v))
+		return nil
+	})
+
 	srv.HandleFunc("BITCOUNT", func(out *redeo.Responder, r *redeo.Request) error {
 		if len(r.Args) != 1 && len(r.Args) != 3 {
 			out.WriteErrorString("ERR syntax error")

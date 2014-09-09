@@ -776,6 +776,52 @@ func TestGetrange(t *testing.T) {
 	}
 }
 
+func TestSetrange(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	// Simple case
+	{
+		s.Set("foo", "abcdefg")
+		v, err := redis.Int(c.Do("SETRANGE", "foo", 1, "bar"))
+		ok(t, err)
+		equals(t, 7, v)
+		equals(t, "abarefg", s.Get("foo"))
+	}
+	// Non existing key
+	{
+		v, err := redis.Int(c.Do("SETRANGE", "nosuch", 3, "bar"))
+		ok(t, err)
+		equals(t, 6, v)
+		equals(t, "\x00\x00\x00bar", s.Get("nosuch"))
+	}
+
+	// Wrong type of existing key
+	{
+		s.HSet("wrong", "aap", "noot")
+		_, err := redis.Int(c.Do("SETRANGE", "wrong", 0, "aap"))
+		assert(t, err != nil, "do SETRANGE error")
+	}
+
+	// Wrong usage
+	{
+		_, err := redis.Int(c.Do("SETRANGE"))
+		assert(t, err != nil, "do SETRANGE error")
+		_, err = redis.Int(c.Do("SETRANGE", "missing"))
+		assert(t, err != nil, "do SETRANGE error")
+		_, err = redis.Int(c.Do("SETRANGE", "missing", 1))
+		assert(t, err != nil, "do SETRANGE error")
+		_, err = redis.Int(c.Do("SETRANGE", "key", "noint", ""))
+		assert(t, err != nil, "do SETRANGE error")
+		_, err = redis.Int(c.Do("SETRANGE", "key", -1, ""))
+		assert(t, err != nil, "do SETRANGE error")
+		_, err = redis.Int(c.Do("SETRANGE", "many", 12, "keys", "here"))
+	}
+}
+
 func TestBitcount(t *testing.T) {
 	s, err := Run()
 	ok(t, err)

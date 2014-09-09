@@ -34,7 +34,7 @@ Implemented commands:
      - PTTL
      - TTL
      - TYPE
- - String keys
+ - String keys (all)
      - APPEND
      - BITCOUNT
      - BITOP
@@ -56,6 +56,7 @@ Implemented commands:
      - SETBIT
      - SETEX
      - SETNX
+     - SETRANGE
      - STRLEN
  - Hash keys
      - HDEL
