@@ -8,7 +8,7 @@ import (
 
 // HKeys returns all keys ('fields') for a hash key.
 func (m *Miniredis) HKeys(k string) []string {
-	return m.DB(m.clientDB).HKeys(k)
+	return m.DB(m.selectedDB).HKeys(k)
 }
 
 func (db *redisDB) HKeys(k string) []string {
@@ -30,7 +30,7 @@ func (db *redisDB) HKeys(k string) []string {
 // a nil.
 // Returns empty string when the key is of a different type.
 func (m *Miniredis) HGet(k, f string) string {
-	return m.DB(m.clientDB).HGet(k, f)
+	return m.DB(m.selectedDB).HGet(k, f)
 }
 
 func (db *redisDB) HGet(k, f string) string {
@@ -46,7 +46,7 @@ func (db *redisDB) HGet(k, f string) string {
 // HSet sets a hash key.
 // If there is another key by the same name it will be gone.
 func (m *Miniredis) HSet(k, f, v string) {
-	m.DB(m.clientDB).HSet(k, f, v)
+	m.DB(m.selectedDB).HSet(k, f, v)
 }
 
 func (db *redisDB) HSet(k, f, v string) {
@@ -63,7 +63,7 @@ func (db *redisDB) HSet(k, f, v string) {
 
 // HDel deletes a hash key.
 func (m *Miniredis) HDel(k, f string) {
-	m.DB(m.clientDB).HDel(k, f)
+	m.DB(m.selectedDB).HDel(k, f)
 }
 
 func (db *redisDB) HDel(k, f string) {
@@ -87,7 +87,7 @@ func commandsHash(m *Miniredis, srv *redeo.Server) {
 		field := r.Args[1]
 		value := r.Args[2]
 
-		db := m.dbFor(r.Client().ID)
+		db := m.dbFor(r.Client().Ctx)
 		db.Lock()
 		defer db.Unlock()
 
@@ -119,7 +119,7 @@ func commandsHash(m *Miniredis, srv *redeo.Server) {
 		field := r.Args[1]
 		value := r.Args[2]
 
-		db := m.dbFor(r.Client().ID)
+		db := m.dbFor(r.Client().Ctx)
 		db.Lock()
 		defer db.Unlock()
 
@@ -150,7 +150,7 @@ func commandsHash(m *Miniredis, srv *redeo.Server) {
 		key := r.Args[0]
 		field := r.Args[1]
 
-		db := m.dbFor(r.Client().ID)
+		db := m.dbFor(r.Client().Ctx)
 		db.Lock()
 		defer db.Unlock()
 
@@ -179,7 +179,7 @@ func commandsHash(m *Miniredis, srv *redeo.Server) {
 		}
 		key := r.Args[0]
 
-		db := m.dbFor(r.Client().ID)
+		db := m.dbFor(r.Client().Ctx)
 		db.Lock()
 		defer db.Unlock()
 
@@ -215,7 +215,7 @@ func commandsHash(m *Miniredis, srv *redeo.Server) {
 		key := r.Args[0]
 		field := r.Args[1]
 
-		db := m.dbFor(r.Client().ID)
+		db := m.dbFor(r.Client().Ctx)
 		db.Lock()
 		defer db.Unlock()
 
@@ -244,7 +244,7 @@ func commandsHash(m *Miniredis, srv *redeo.Server) {
 		}
 		key := r.Args[0]
 
-		db := m.dbFor(r.Client().ID)
+		db := m.dbFor(r.Client().Ctx)
 		db.Lock()
 		defer db.Unlock()
 
@@ -273,7 +273,7 @@ func commandsHash(m *Miniredis, srv *redeo.Server) {
 		}
 		key := r.Args[0]
 
-		db := m.dbFor(r.Client().ID)
+		db := m.dbFor(r.Client().Ctx)
 		db.Lock()
 		defer db.Unlock()
 
@@ -301,7 +301,7 @@ func commandsHash(m *Miniredis, srv *redeo.Server) {
 		}
 		key := r.Args[0]
 
-		db := m.dbFor(r.Client().ID)
+		db := m.dbFor(r.Client().Ctx)
 		db.Lock()
 		defer db.Unlock()
 
@@ -329,7 +329,7 @@ func commandsHash(m *Miniredis, srv *redeo.Server) {
 		}
 		key := r.Args[0]
 
-		db := m.dbFor(r.Client().ID)
+		db := m.dbFor(r.Client().Ctx)
 		db.Lock()
 		defer db.Unlock()
 
@@ -354,7 +354,7 @@ func commandsHash(m *Miniredis, srv *redeo.Server) {
 		}
 		key := r.Args[0]
 
-		db := m.dbFor(r.Client().ID)
+		db := m.dbFor(r.Client().Ctx)
 		db.Lock()
 		defer db.Unlock()
 

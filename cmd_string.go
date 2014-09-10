@@ -20,7 +20,7 @@ var (
 // a nil.
 // Returns empty string when the key is of a different type.
 func (m *Miniredis) Get(k string) string {
-	return m.DB(m.clientDB).Get(k)
+	return m.DB(m.selectedDB).Get(k)
 }
 
 // Get returns a string key
@@ -32,7 +32,7 @@ func (db *redisDB) Get(k string) string {
 
 // Set sets a string key.
 func (m *Miniredis) Set(k, v string) {
-	m.DB(m.clientDB).Set(k, v)
+	m.DB(m.selectedDB).Set(k, v)
 }
 
 // Set sets a string key. Doesn't touch expire.
@@ -50,7 +50,7 @@ func (db *redisDB) set(k, v string) {
 
 // Incr changes a int string value by delta.
 func (m *Miniredis) Incr(k string, delta int) (int, error) {
-	return m.DB(m.clientDB).Incr(k, delta)
+	return m.DB(m.selectedDB).Incr(k, delta)
 }
 
 // Incr changes a int string value by delta.
@@ -147,7 +147,7 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 			}
 		}
 
-		db := m.dbFor(r.Client().ID)
+		db := m.dbFor(r.Client().Ctx)
 		db.Lock()
 		defer db.Unlock()
 
@@ -188,7 +188,7 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 		}
 		value := r.Args[2]
 
-		db := m.dbFor(r.Client().ID)
+		db := m.dbFor(r.Client().Ctx)
 		db.Lock()
 		defer db.Unlock()
 
@@ -213,7 +213,7 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 		}
 		value := r.Args[2]
 
-		db := m.dbFor(r.Client().ID)
+		db := m.dbFor(r.Client().Ctx)
 		db.Lock()
 		defer db.Unlock()
 
@@ -233,7 +233,7 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 		key := r.Args[0]
 		value := r.Args[1]
 
-		db := m.dbFor(r.Client().ID)
+		db := m.dbFor(r.Client().Ctx)
 		db.Lock()
 		defer db.Unlock()
 
@@ -256,7 +256,7 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 			out.WriteErrorString("ERR wrong number of arguments for MSET")
 			return nil
 		}
-		db := m.dbFor(r.Client().ID)
+		db := m.dbFor(r.Client().Ctx)
 		db.Lock()
 		defer db.Unlock()
 
@@ -283,7 +283,7 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 			out.WriteErrorString("ERR wrong number of arguments for MSET")
 			return nil
 		}
-		db := m.dbFor(r.Client().ID)
+		db := m.dbFor(r.Client().Ctx)
 		db.Lock()
 		defer db.Unlock()
 
@@ -317,7 +317,7 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 			return nil
 		}
 		key := r.Args[0]
-		db := m.dbFor(r.Client().ID)
+		db := m.dbFor(r.Client().Ctx)
 		db.Lock()
 		defer db.Unlock()
 
@@ -342,7 +342,7 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 		}
 		key := r.Args[0]
 		value := r.Args[1]
-		db := m.dbFor(r.Client().ID)
+		db := m.dbFor(r.Client().Ctx)
 		db.Lock()
 		defer db.Unlock()
 
@@ -370,7 +370,7 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 			return nil
 		}
 
-		db := m.dbFor(r.Client().ID)
+		db := m.dbFor(r.Client().Ctx)
 		db.Lock()
 		defer db.Unlock()
 
@@ -397,7 +397,7 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 			return nil
 		}
 
-		db := m.dbFor(r.Client().ID)
+		db := m.dbFor(r.Client().Ctx)
 		db.Lock()
 		defer db.Unlock()
 
@@ -429,7 +429,7 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 			return nil
 		}
 
-		db := m.dbFor(r.Client().ID)
+		db := m.dbFor(r.Client().Ctx)
 		db.Lock()
 		defer db.Unlock()
 
@@ -461,7 +461,7 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 			return nil
 		}
 
-		db := m.dbFor(r.Client().ID)
+		db := m.dbFor(r.Client().Ctx)
 		db.Lock()
 		defer db.Unlock()
 
@@ -486,7 +486,7 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 			return nil
 		}
 
-		db := m.dbFor(r.Client().ID)
+		db := m.dbFor(r.Client().Ctx)
 		db.Lock()
 		defer db.Unlock()
 
@@ -518,7 +518,7 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 			return nil
 		}
 
-		db := m.dbFor(r.Client().ID)
+		db := m.dbFor(r.Client().Ctx)
 		db.Lock()
 		defer db.Unlock()
 
@@ -545,7 +545,7 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 
 		key := r.Args[0]
 
-		db := m.dbFor(r.Client().ID)
+		db := m.dbFor(r.Client().Ctx)
 		db.Lock()
 		defer db.Unlock()
 
@@ -567,7 +567,7 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 		key := r.Args[0]
 		value := r.Args[1]
 
-		db := m.dbFor(r.Client().ID)
+		db := m.dbFor(r.Client().Ctx)
 		db.Lock()
 		defer db.Unlock()
 
@@ -601,7 +601,7 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 			return nil
 		}
 
-		db := m.dbFor(r.Client().ID)
+		db := m.dbFor(r.Client().Ctx)
 		db.Lock()
 		defer db.Unlock()
 
@@ -633,7 +633,7 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 		}
 		subst := r.Args[2]
 
-		db := m.dbFor(r.Client().ID)
+		db := m.dbFor(r.Client().Ctx)
 		db.Lock()
 		defer db.Unlock()
 
@@ -678,7 +678,7 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 			}
 		}
 
-		db := m.dbFor(r.Client().ID)
+		db := m.dbFor(r.Client().Ctx)
 		db.Lock()
 		defer db.Unlock()
 
@@ -706,7 +706,7 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 		target := r.Args[1]
 		input := r.Args[2:]
 
-		db := m.dbFor(r.Client().ID)
+		db := m.dbFor(r.Client().Ctx)
 		db.Lock()
 		defer db.Unlock()
 
@@ -791,7 +791,7 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 			withEnd = true
 		}
 
-		db := m.dbFor(r.Client().ID)
+		db := m.dbFor(r.Client().Ctx)
 		db.Lock()
 		defer db.Unlock()
 
@@ -849,7 +849,7 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 			return nil
 		}
 
-		db := m.dbFor(r.Client().ID)
+		db := m.dbFor(r.Client().Ctx)
 		db.Lock()
 		defer db.Unlock()
 
@@ -892,7 +892,7 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 			return nil
 		}
 
-		db := m.dbFor(r.Client().ID)
+		db := m.dbFor(r.Client().Ctx)
 		db.Lock()
 		defer db.Unlock()
 

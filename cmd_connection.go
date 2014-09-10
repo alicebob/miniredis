@@ -12,7 +12,7 @@ import (
 func (m *Miniredis) Select(i int) {
 	m.Lock()
 	defer m.Unlock()
-	m.clientDB = i
+	m.selectedDB = i
 }
 
 func commandsConnection(m *Miniredis, srv *redeo.Server) {
@@ -48,7 +48,14 @@ func commandsConnection(m *Miniredis, srv *redeo.Server) {
 
 		m.Lock()
 		defer m.Unlock()
-		m.selectDB[r.Client().ID] = id
+
+		c := r.Client()
+		if c.Ctx == nil {
+			c.Ctx = &connCtx{}
+		}
+		ctx := c.Ctx.(*connCtx)
+		ctx.selectedDB = id
+
 		out.WriteOK()
 		return nil
 	})

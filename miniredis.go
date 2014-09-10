@@ -31,20 +31,22 @@ type redisDB struct {
 // Miniredis is a Redis server implementation.
 type Miniredis struct {
 	sync.Mutex
-	closed   chan struct{}
-	listen   net.Listener
-	info     *redeo.ServerInfo
-	dbs      map[int]*redisDB
-	clientDB int            // DB id used in the direct Get(), Set() &c.
-	selectDB map[uint64]int // Current DB per connection id
+	closed     chan struct{}
+	listen     net.Listener
+	info       *redeo.ServerInfo
+	dbs        map[int]*redisDB
+	selectedDB int // DB id used in the direct Get(), Set() &c.
+}
+
+type connCtx struct {
+	selectedDB int // selected DB
 }
 
 // NewMiniRedis makes a new, non-started, Miniredis object.
 func NewMiniRedis() *Miniredis {
 	return &Miniredis{
-		closed:   make(chan struct{}),
-		dbs:      map[int]*redisDB{},
-		selectDB: map[uint64]int{},
+		closed: make(chan struct{}),
+		dbs:    map[int]*redisDB{},
 	}
 }
 
@@ -123,11 +125,11 @@ func (m *Miniredis) db(i int) *redisDB {
 	return &db
 }
 
-// dbFor gets the DB for a connection id.
-func (m *Miniredis) dbFor(connID uint64) *redisDB {
-	m.Lock()
-	defer m.Unlock()
-	return m.db(m.selectDB[connID])
+func (m *Miniredis) dbFor(ctx interface{}) *redisDB {
+	if ctx == nil {
+		return m.db(0)
+	}
+	return m.db(ctx.(*connCtx).selectedDB)
 }
 
 // Addr returns '127.0.0.1:12345'. Can be given to a Dial(). See also Host()

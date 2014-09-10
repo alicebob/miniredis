@@ -10,7 +10,7 @@ import (
 
 // Del deletes a key and any expiration value. Returns whether there was a key.
 func (m *Miniredis) Del(k string) bool {
-	return m.DB(m.clientDB).Del(k)
+	return m.DB(m.selectedDB).Del(k)
 }
 
 func (db *redisDB) Del(k string) bool {
@@ -34,7 +34,7 @@ func (db *redisDB) del(k string) bool {
 
 // Expire value. As set by the client. 0 if not set.
 func (m *Miniredis) Expire(k string) int {
-	return m.DB(m.clientDB).Expire(k)
+	return m.DB(m.selectedDB).Expire(k)
 }
 
 func (db *redisDB) Expire(k string) int {
@@ -45,7 +45,7 @@ func (db *redisDB) Expire(k string) int {
 
 // SetExpire sets expiration of a key.
 func (m *Miniredis) SetExpire(k string, ex int) {
-	m.DB(m.clientDB).SetExpire(k, ex)
+	m.DB(m.selectedDB).SetExpire(k, ex)
 }
 
 func (db *redisDB) SetExpire(k string, ex int) {
@@ -56,7 +56,7 @@ func (db *redisDB) SetExpire(k string, ex int) {
 
 // Type gives the type of a key, or ""
 func (m *Miniredis) Type(k string) string {
-	return m.DB(m.clientDB).Type(k)
+	return m.DB(m.selectedDB).Type(k)
 }
 
 // Type gives the type of a key, or ""
@@ -80,7 +80,7 @@ func commandsGeneric(m *Miniredis, srv *redeo.Server) {
 			out.WriteErrorString("ERR value is not an integer or out of range")
 			return nil
 		}
-		db := m.dbFor(r.Client().ID)
+		db := m.dbFor(r.Client().Ctx)
 		db.Lock()
 		defer db.Unlock()
 
@@ -106,7 +106,7 @@ func commandsGeneric(m *Miniredis, srv *redeo.Server) {
 			out.WriteErrorString("ERR value is not an integer or out of range")
 			return nil
 		}
-		db := m.dbFor(r.Client().ID)
+		db := m.dbFor(r.Client().Ctx)
 		db.Lock()
 		defer db.Unlock()
 
@@ -126,7 +126,7 @@ func commandsGeneric(m *Miniredis, srv *redeo.Server) {
 			return nil
 		}
 		key := r.Args[0]
-		db := m.dbFor(r.Client().ID)
+		db := m.dbFor(r.Client().Ctx)
 		db.Lock()
 		defer db.Unlock()
 
@@ -153,7 +153,7 @@ func commandsGeneric(m *Miniredis, srv *redeo.Server) {
 			return nil
 		}
 		key := r.Args[0]
-		db := m.dbFor(r.Client().ID)
+		db := m.dbFor(r.Client().Ctx)
 		db.Lock()
 		defer db.Unlock()
 
@@ -176,7 +176,7 @@ func commandsGeneric(m *Miniredis, srv *redeo.Server) {
 	srv.HandleFunc("PERSIST", func(out *redeo.Responder, r *redeo.Request) error {
 		key := r.Args[0]
 
-		db := m.dbFor(r.Client().ID)
+		db := m.dbFor(r.Client().Ctx)
 		db.Lock()
 		defer db.Unlock()
 
@@ -210,7 +210,7 @@ func commandsGeneric(m *Miniredis, srv *redeo.Server) {
 	})
 
 	srv.HandleFunc("DEL", func(out *redeo.Responder, r *redeo.Request) error {
-		db := m.dbFor(r.Client().ID)
+		db := m.dbFor(r.Client().Ctx)
 		db.Lock()
 		defer db.Unlock()
 
@@ -232,7 +232,7 @@ func commandsGeneric(m *Miniredis, srv *redeo.Server) {
 
 		key := r.Args[0]
 
-		db := m.dbFor(r.Client().ID)
+		db := m.dbFor(r.Client().Ctx)
 		db.Lock()
 		defer db.Unlock()
 
