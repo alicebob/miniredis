@@ -43,6 +43,27 @@ func TestDiscard(t *testing.T) {
 	assert(t, err != nil, "do DISCARD error")
 }
 
+func TestWatch(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	// Simple WATCH
+	r, err := redis.String(c.Do("WATCH", "foo"))
+	ok(t, err)
+	equals(t, "OK", r)
+
+	// Can't do WATCH in a MULTI
+	{
+		_, err = redis.String(c.Do("MULTI"))
+		ok(t, err)
+		r, err = redis.String(c.Do("WATCH", "foo"))
+		assert(t, err != nil, "do WATCH error")
+	}
+}
+
 // Test simple multi/exec block.
 func TestSimpleTransaction(t *testing.T) {
 	s, err := Run()
@@ -130,4 +151,111 @@ func TestTxQueueErr(t *testing.T) {
 
 	// Didn't get EXECed
 	equals(t, "", s.Get("aap"))
+}
+
+func TestTxWatch(t *testing.T) {
+	// Watch with no error.
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	s.Set("one", "two")
+	b, err := redis.String(c.Do("WATCH", "one"))
+	ok(t, err)
+	equals(t, "OK", b)
+
+	b, err = redis.String(c.Do("MULTI"))
+	ok(t, err)
+	equals(t, "OK", b)
+
+	b, err = redis.String(c.Do("GET", "one"))
+	ok(t, err)
+	equals(t, "QUEUED", b)
+
+	v, err := redis.Values(c.Do("EXEC"))
+	ok(t, err)
+	equals(t, 1, len(v))
+	equals(t, []byte("two"), v[0])
+}
+
+func TestTxWatchErr(t *testing.T) {
+	// Watch with en error.
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+	c2, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	s.Set("one", "two")
+	b, err := redis.String(c.Do("WATCH", "one"))
+	ok(t, err)
+	equals(t, "OK", b)
+
+	// Here comes client 2
+	b, err = redis.String(c2.Do("SET", "one", "three"))
+	ok(t, err)
+	equals(t, "OK", b)
+
+	b, err = redis.String(c.Do("MULTI"))
+	ok(t, err)
+	equals(t, "OK", b)
+
+	b, err = redis.String(c.Do("GET", "one"))
+	ok(t, err)
+	equals(t, "QUEUED", b)
+
+	v, err := redis.Values(c.Do("EXEC"))
+	ok(t, err)
+	equals(t, 0, len(v))
+
+	// It did get updated, and we're not in a transaction anymore.
+	b, err = redis.String(c.Do("GET", "one"))
+	ok(t, err)
+	equals(t, "three", b)
+}
+
+func TestUnwatch(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+	c2, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	s.Set("one", "two")
+	b, err := redis.String(c.Do("WATCH", "one"))
+	ok(t, err)
+	equals(t, "OK", b)
+
+	b, err = redis.String(c.Do("UNWATCH"))
+	ok(t, err)
+	equals(t, "OK", b)
+
+	// Here comes client 2
+	b, err = redis.String(c2.Do("SET", "one", "three"))
+	ok(t, err)
+	equals(t, "OK", b)
+
+	b, err = redis.String(c.Do("MULTI"))
+	ok(t, err)
+	equals(t, "OK", b)
+
+	b, err = redis.String(c.Do("SET", "one", "four"))
+	ok(t, err)
+	equals(t, "QUEUED", b)
+
+	v, err := redis.Values(c.Do("EXEC"))
+	ok(t, err)
+	equals(t, 1, len(v))
+	equals(t, "OK", v[0])
+
+	// It did get updated by our TX
+	b, err = redis.String(c.Do("GET", "one"))
+	ok(t, err)
+	equals(t, "four", b)
 }

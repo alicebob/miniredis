@@ -46,6 +46,7 @@ func (db *redisDB) Set(k, v string) {
 func (db *redisDB) set(k, v string) {
 	db.keys[k] = "string"
 	db.stringKeys[k] = v
+	db.keyVersion[k]++
 }
 
 // Incr changes a int string value by delta.

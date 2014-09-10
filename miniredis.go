@@ -21,11 +21,13 @@ import (
 )
 
 type redisDB struct {
-	master     *sync.Mutex                  // pointer to the lock in Miniredis
+	master     *sync.Mutex // pointer to the lock in Miniredis
+	id         int
 	keys       map[string]string            // Master map of keys with their type
 	stringKeys map[string]string            // GET/SET &c. keys
 	hashKeys   map[string]map[string]string // MGET/MSET &c. keys
 	expire     map[string]int               // EXPIRE values
+	keyVersion map[string]uint              // used to watch values
 }
 
 // Miniredis is a Redis server implementation.
@@ -39,10 +41,19 @@ type Miniredis struct {
 }
 
 type txCmd func(*redeo.Responder, *redeo.Client)
+
+// database id + key combo
+type dbKey struct {
+	db  int
+	key string
+}
+
+// connCtx has all state for a single connection.
 type connCtx struct {
-	selectedDB         int     // selected DB
-	transaction        []txCmd // transaction callbacks. Or nil.
-	transactionInvalid bool    // any error during QUEUEing.
+	selectedDB         int            // selected DB
+	transaction        []txCmd        // transaction callbacks. Or nil.
+	transactionInvalid bool           // any error during QUEUEing.
+	watch              map[dbKey]uint // WATCHed keys.
 }
 
 // NewMiniRedis makes a new, non-started, Miniredis object.
@@ -53,13 +64,15 @@ func NewMiniRedis() *Miniredis {
 	}
 }
 
-func newRedisDB(l *sync.Mutex) redisDB {
+func newRedisDB(id int, l *sync.Mutex) redisDB {
 	return redisDB{
+		id:         id,
 		master:     l,
 		keys:       map[string]string{},
 		stringKeys: map[string]string{},
 		hashKeys:   map[string]map[string]string{},
 		expire:     map[string]int{},
+		keyVersion: map[string]uint{},
 	}
 }
 
@@ -125,7 +138,7 @@ func (m *Miniredis) db(i int) *redisDB {
 	if db, ok := m.dbs[i]; ok {
 		return db
 	}
-	db := newRedisDB(&m.Mutex) // the DB has our lock.
+	db := newRedisDB(i, &m.Mutex) // the DB has our lock.
 	m.dbs[i] = &db
 	return &db
 }
