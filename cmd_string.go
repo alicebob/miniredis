@@ -25,8 +25,8 @@ func (m *Miniredis) Get(k string) string {
 
 // Get returns a string key
 func (db *redisDB) Get(k string) string {
-	db.Lock()
-	defer db.Unlock()
+	db.master.Lock()
+	defer db.master.Unlock()
 	return db.stringKeys[k]
 }
 
@@ -37,8 +37,8 @@ func (m *Miniredis) Set(k, v string) {
 
 // Set sets a string key. Doesn't touch expire.
 func (db *redisDB) Set(k, v string) {
-	db.Lock()
-	defer db.Unlock()
+	db.master.Lock()
+	defer db.master.Unlock()
 	db.set(k, v)
 }
 
@@ -55,8 +55,8 @@ func (m *Miniredis) Incr(k string, delta int) (int, error) {
 
 // Incr changes a int string value by delta.
 func (db *redisDB) Incr(k string, delta int) (int, error) {
-	db.Lock()
-	defer db.Unlock()
+	db.master.Lock()
+	defer db.master.Unlock()
 	return db.incr(k, delta)
 }
 
@@ -109,6 +109,7 @@ func (db *redisDB) incrfloat(k string, delta float64) (string, error) {
 func commandsString(m *Miniredis, srv *redeo.Server) {
 	srv.HandleFunc("SET", func(out *redeo.Responder, r *redeo.Request) error {
 		if len(r.Args) < 2 {
+			setTxInvalid(r.Client())
 			out.WriteErrorString("ERR wrong number of arguments for 'set' command")
 			return nil
 		}
@@ -130,48 +131,59 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 				continue
 			case "EX", "PX":
 				if len(r.Args) < 2 {
+					setTxInvalid(r.Client())
 					out.WriteErrorString("ERR value is not an integer or out of range")
 					return nil
 				}
 				var err error
 				expire, err = strconv.Atoi(r.Args[1])
 				if err != nil {
+					setTxInvalid(r.Client())
 					out.WriteErrorString("ERR value is not an integer or out of range")
 					return nil
 				}
 				r.Args = r.Args[2:]
 				continue
 			default:
+				setTxInvalid(r.Client())
 				out.WriteErrorString("ERR syntax error")
 				return nil
 			}
 		}
 
-		db := m.dbFor(r.Client().Ctx)
-		db.Lock()
-		defer db.Unlock()
+		cb := func(out *redeo.Responder, cl *redeo.Client) {
+			db := m.dbFor(cl.Ctx)
 
-		if nx {
-			if _, ok := db.keys[key]; ok {
-				out.WriteNil()
-				return nil
+			if nx {
+				if _, ok := db.keys[key]; ok {
+					out.WriteNil()
+					return
+				}
 			}
-		}
-		if xx {
-			if _, ok := db.keys[key]; !ok {
-				out.WriteNil()
-				return nil
+			if xx {
+				if _, ok := db.keys[key]; !ok {
+					out.WriteNil()
+					return
+				}
 			}
-		}
 
-		db.del(key) // be sure to remove existing values of other type keys.
-		// a SET clears the expire
-		delete(db.expire, key)
-		db.set(key, value)
-		if expire != 0 {
-			db.expire[key] = expire
+			db.del(key) // be sure to remove existing values of other type keys.
+			// a SET clears the expire
+			delete(db.expire, key)
+			db.set(key, value)
+			if expire != 0 {
+				db.expire[key] = expire
+			}
+			out.WriteOK()
 		}
-		out.WriteOK()
+		if inTx(r.Client()) {
+			addTxCmd(r.Client(), cb)
+			out.WriteInlineString("QUEUED")
+			return nil
+		}
+		m.Lock()
+		defer m.Unlock()
+		cb(out, r.Client())
 		return nil
 	})
 
@@ -189,8 +201,8 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 		value := r.Args[2]
 
 		db := m.dbFor(r.Client().Ctx)
-		db.Lock()
-		defer db.Unlock()
+		m.Lock()
+		defer m.Unlock()
 
 		db.del(key) // Clear any existing keys.
 		db.keys[key] = "string"
@@ -214,8 +226,8 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 		value := r.Args[2]
 
 		db := m.dbFor(r.Client().Ctx)
-		db.Lock()
-		defer db.Unlock()
+		m.Lock()
+		defer m.Unlock()
 
 		db.del(key) // Clear any existing keys.
 		db.keys[key] = "string"
@@ -234,8 +246,8 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 		value := r.Args[1]
 
 		db := m.dbFor(r.Client().Ctx)
-		db.Lock()
-		defer db.Unlock()
+		m.Lock()
+		defer m.Unlock()
 
 		if _, ok := db.keys[key]; ok {
 			out.WriteZero()
@@ -257,8 +269,8 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 			return nil
 		}
 		db := m.dbFor(r.Client().Ctx)
-		db.Lock()
-		defer db.Unlock()
+		m.Lock()
+		defer m.Unlock()
 
 		for len(r.Args) > 0 {
 			key := r.Args[0]
@@ -284,8 +296,8 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 			return nil
 		}
 		db := m.dbFor(r.Client().Ctx)
-		db.Lock()
-		defer db.Unlock()
+		m.Lock()
+		defer m.Unlock()
 
 		keys := map[string]string{}
 		existing := false
@@ -313,25 +325,36 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 
 	srv.HandleFunc("GET", func(out *redeo.Responder, r *redeo.Request) error {
 		if len(r.Args) != 1 {
+			setTxInvalid(r.Client())
 			out.WriteErrorString("usage error")
 			return nil
 		}
 		key := r.Args[0]
-		db := m.dbFor(r.Client().Ctx)
-		db.Lock()
-		defer db.Unlock()
 
-		if t, ok := db.keys[key]; ok && t != "string" {
-			out.WriteErrorString("wrong type of key")
+		cb := func(out *redeo.Responder, cl *redeo.Client) {
+			db := m.dbFor(cl.Ctx)
+
+			if t, ok := db.keys[key]; ok && t != "string" {
+				setTxInvalid(r.Client())
+				out.WriteErrorString("wrong type of key")
+				return
+			}
+
+			value, ok := db.stringKeys[key]
+			if !ok {
+				out.WriteNil()
+				return
+			}
+			out.WriteString(value)
+		}
+		if inTx(r.Client()) {
+			addTxCmd(r.Client(), cb)
+			out.WriteInlineString("QUEUED")
 			return nil
 		}
-
-		value, ok := db.stringKeys[key]
-		if !ok {
-			out.WriteNil()
-			return nil
-		}
-		out.WriteString(value)
+		m.Lock()
+		defer m.Unlock()
+		cb(out, r.Client())
 		return nil
 	})
 
@@ -343,8 +366,8 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 		key := r.Args[0]
 		value := r.Args[1]
 		db := m.dbFor(r.Client().Ctx)
-		db.Lock()
-		defer db.Unlock()
+		m.Lock()
+		defer m.Unlock()
 
 		if t, ok := db.keys[key]; ok && t != "string" {
 			out.WriteErrorString("wrong type of key")
@@ -371,8 +394,8 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 		}
 
 		db := m.dbFor(r.Client().Ctx)
-		db.Lock()
-		defer db.Unlock()
+		m.Lock()
+		defer m.Unlock()
 
 		out.WriteBulkLen(len(r.Args))
 		for _, k := range r.Args {
@@ -398,8 +421,8 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 		}
 
 		db := m.dbFor(r.Client().Ctx)
-		db.Lock()
-		defer db.Unlock()
+		m.Lock()
+		defer m.Unlock()
 
 		key := r.Args[0]
 		if t, ok := db.keys[key]; ok && t != "string" {
@@ -430,8 +453,8 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 		}
 
 		db := m.dbFor(r.Client().Ctx)
-		db.Lock()
-		defer db.Unlock()
+		m.Lock()
+		defer m.Unlock()
 
 		if t, ok := db.keys[key]; ok && t != "string" {
 			out.WriteErrorString("WRONGTYPE Operation against a key holding the wrong kind of value")
@@ -462,8 +485,8 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 		}
 
 		db := m.dbFor(r.Client().Ctx)
-		db.Lock()
-		defer db.Unlock()
+		m.Lock()
+		defer m.Unlock()
 
 		if t, ok := db.keys[key]; ok && t != "string" {
 			out.WriteErrorString("WRONGTYPE Operation against a key holding the wrong kind of value")
@@ -487,8 +510,8 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 		}
 
 		db := m.dbFor(r.Client().Ctx)
-		db.Lock()
-		defer db.Unlock()
+		m.Lock()
+		defer m.Unlock()
 
 		key := r.Args[0]
 		if t, ok := db.keys[key]; ok && t != "string" {
@@ -519,8 +542,8 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 		}
 
 		db := m.dbFor(r.Client().Ctx)
-		db.Lock()
-		defer db.Unlock()
+		m.Lock()
+		defer m.Unlock()
 
 		if t, ok := db.keys[key]; ok && t != "string" {
 			out.WriteErrorString("wrong type of key")
@@ -546,8 +569,8 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 		key := r.Args[0]
 
 		db := m.dbFor(r.Client().Ctx)
-		db.Lock()
-		defer db.Unlock()
+		m.Lock()
+		defer m.Unlock()
 
 		if t, ok := db.keys[key]; ok && t != "string" {
 			out.WriteErrorString("wrong type of key")
@@ -568,8 +591,8 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 		value := r.Args[1]
 
 		db := m.dbFor(r.Client().Ctx)
-		db.Lock()
-		defer db.Unlock()
+		m.Lock()
+		defer m.Unlock()
 
 		if t, ok := db.keys[key]; ok && t != "string" {
 			out.WriteErrorString("WRONGTYPE Operation against a key holding the wrong kind of value")
@@ -602,8 +625,8 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 		}
 
 		db := m.dbFor(r.Client().Ctx)
-		db.Lock()
-		defer db.Unlock()
+		m.Lock()
+		defer m.Unlock()
 
 		if t, ok := db.keys[key]; ok && t != "string" {
 			out.WriteErrorString("WRONGTYPE Operation against a key holding the wrong kind of value")
@@ -634,8 +657,8 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 		subst := r.Args[2]
 
 		db := m.dbFor(r.Client().Ctx)
-		db.Lock()
-		defer db.Unlock()
+		m.Lock()
+		defer m.Unlock()
 
 		if t, ok := db.keys[key]; ok && t != "string" {
 			out.WriteErrorString("WRONGTYPE Operation against a key holding the wrong kind of value")
@@ -679,8 +702,8 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 		}
 
 		db := m.dbFor(r.Client().Ctx)
-		db.Lock()
-		defer db.Unlock()
+		m.Lock()
+		defer m.Unlock()
 
 		if t, ok := db.keys[key]; ok && t != "string" {
 			out.WriteErrorString("WRONGTYPE Operation against a key holding the wrong kind of value")
@@ -707,8 +730,8 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 		input := r.Args[2:]
 
 		db := m.dbFor(r.Client().Ctx)
-		db.Lock()
-		defer db.Unlock()
+		m.Lock()
+		defer m.Unlock()
 
 		switch op {
 		case "AND", "OR", "XOR":
@@ -792,8 +815,8 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 		}
 
 		db := m.dbFor(r.Client().Ctx)
-		db.Lock()
-		defer db.Unlock()
+		m.Lock()
+		defer m.Unlock()
 
 		if t, ok := db.keys[key]; ok && t != "string" {
 			out.WriteErrorString("WRONGTYPE Operation against a key holding the wrong kind of value")
@@ -850,8 +873,8 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 		}
 
 		db := m.dbFor(r.Client().Ctx)
-		db.Lock()
-		defer db.Unlock()
+		m.Lock()
+		defer m.Unlock()
 
 		if t, ok := db.keys[key]; ok && t != "string" {
 			out.WriteErrorString("WRONGTYPE Operation against a key holding the wrong kind of value")
@@ -893,8 +916,8 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 		}
 
 		db := m.dbFor(r.Client().Ctx)
-		db.Lock()
-		defer db.Unlock()
+		m.Lock()
+		defer m.Unlock()
 
 		if t, ok := db.keys[key]; ok && t != "string" {
 			out.WriteErrorString("WRONGTYPE Operation against a key holding the wrong kind of value")

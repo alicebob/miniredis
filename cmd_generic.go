@@ -14,8 +14,8 @@ func (m *Miniredis) Del(k string) bool {
 }
 
 func (db *redisDB) Del(k string) bool {
-	db.Lock()
-	defer db.Unlock()
+	db.master.Lock()
+	defer db.master.Unlock()
 	return db.del(k)
 }
 
@@ -38,8 +38,8 @@ func (m *Miniredis) Expire(k string) int {
 }
 
 func (db *redisDB) Expire(k string) int {
-	db.Lock()
-	defer db.Unlock()
+	db.master.Lock()
+	defer db.master.Unlock()
 	return db.expire[k]
 }
 
@@ -49,8 +49,8 @@ func (m *Miniredis) SetExpire(k string, ex int) {
 }
 
 func (db *redisDB) SetExpire(k string, ex int) {
-	db.Lock()
-	defer db.Unlock()
+	db.master.Lock()
+	defer db.master.Unlock()
 	db.expire[k] = ex
 }
 
@@ -61,8 +61,8 @@ func (m *Miniredis) Type(k string) string {
 
 // Type gives the type of a key, or ""
 func (db *redisDB) Type(k string) string {
-	db.Lock()
-	defer db.Unlock()
+	db.master.Lock()
+	defer db.master.Unlock()
 	return db.keys[k]
 }
 
@@ -81,8 +81,8 @@ func commandsGeneric(m *Miniredis, srv *redeo.Server) {
 			return nil
 		}
 		db := m.dbFor(r.Client().Ctx)
-		db.Lock()
-		defer db.Unlock()
+		m.Lock()
+		defer m.Unlock()
 
 		// Key must be present.
 		if _, ok := db.keys[key]; !ok {
@@ -107,8 +107,8 @@ func commandsGeneric(m *Miniredis, srv *redeo.Server) {
 			return nil
 		}
 		db := m.dbFor(r.Client().Ctx)
-		db.Lock()
-		defer db.Unlock()
+		m.Lock()
+		defer m.Unlock()
 
 		// Key must be present.
 		if _, ok := db.keys[key]; !ok {
@@ -127,8 +127,8 @@ func commandsGeneric(m *Miniredis, srv *redeo.Server) {
 		}
 		key := r.Args[0]
 		db := m.dbFor(r.Client().Ctx)
-		db.Lock()
-		defer db.Unlock()
+		m.Lock()
+		defer m.Unlock()
 
 		if _, ok := db.keys[key]; !ok {
 			// No such key
@@ -154,8 +154,8 @@ func commandsGeneric(m *Miniredis, srv *redeo.Server) {
 		}
 		key := r.Args[0]
 		db := m.dbFor(r.Client().Ctx)
-		db.Lock()
-		defer db.Unlock()
+		m.Lock()
+		defer m.Unlock()
 
 		if _, ok := db.keys[key]; !ok {
 			// No such key
@@ -177,8 +177,8 @@ func commandsGeneric(m *Miniredis, srv *redeo.Server) {
 		key := r.Args[0]
 
 		db := m.dbFor(r.Client().Ctx)
-		db.Lock()
-		defer db.Unlock()
+		m.Lock()
+		defer m.Unlock()
 
 		if _, ok := db.keys[key]; !ok {
 			// No such key
@@ -197,22 +197,10 @@ func commandsGeneric(m *Miniredis, srv *redeo.Server) {
 		return nil
 	})
 
-	// MULTI is a no-op
-	srv.HandleFunc("MULTI", func(out *redeo.Responder, r *redeo.Request) error {
-		out.WriteOK()
-		return nil
-	})
-
-	// EXEC is a no-op
-	srv.HandleFunc("EXEC", func(out *redeo.Responder, r *redeo.Request) error {
-		out.WriteNil()
-		return nil
-	})
-
 	srv.HandleFunc("DEL", func(out *redeo.Responder, r *redeo.Request) error {
 		db := m.dbFor(r.Client().Ctx)
-		db.Lock()
-		defer db.Unlock()
+		m.Lock()
+		defer m.Unlock()
 
 		count := 0
 		for _, key := range r.Args {
@@ -233,8 +221,8 @@ func commandsGeneric(m *Miniredis, srv *redeo.Server) {
 		key := r.Args[0]
 
 		db := m.dbFor(r.Client().Ctx)
-		db.Lock()
-		defer db.Unlock()
+		m.Lock()
+		defer m.Unlock()
 
 		t, ok := db.keys[key]
 		if !ok {

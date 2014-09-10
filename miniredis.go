@@ -21,7 +21,7 @@ import (
 )
 
 type redisDB struct {
-	sync.Mutex
+	master     *sync.Mutex                  // pointer to the lock in Miniredis
 	keys       map[string]string            // Master map of keys with their type
 	stringKeys map[string]string            // GET/SET &c. keys
 	hashKeys   map[string]map[string]string // MGET/MSET &c. keys
@@ -38,8 +38,11 @@ type Miniredis struct {
 	selectedDB int // DB id used in the direct Get(), Set() &c.
 }
 
+type txCmd func(*redeo.Responder, *redeo.Client)
 type connCtx struct {
-	selectedDB int // selected DB
+	selectedDB         int     // selected DB
+	transaction        []txCmd // transaction callbacks. Or nil.
+	transactionInvalid bool    // any error during QUEUEing.
 }
 
 // NewMiniRedis makes a new, non-started, Miniredis object.
@@ -50,8 +53,9 @@ func NewMiniRedis() *Miniredis {
 	}
 }
 
-func newRedisDB() redisDB {
+func newRedisDB(l *sync.Mutex) redisDB {
 	return redisDB{
+		master:     l,
 		keys:       map[string]string{},
 		stringKeys: map[string]string{},
 		hashKeys:   map[string]map[string]string{},
@@ -84,6 +88,7 @@ func (m *Miniredis) Start() error {
 	commandsGeneric(m, srv)
 	commandsString(m, srv)
 	commandsHash(m, srv)
+	commandsTransaction(m, srv)
 
 	go func() {
 		e := make(chan error)
@@ -120,7 +125,7 @@ func (m *Miniredis) db(i int) *redisDB {
 	if db, ok := m.dbs[i]; ok {
 		return db
 	}
-	db := newRedisDB()
+	db := newRedisDB(&m.Mutex) // the DB has our lock.
 	m.dbs[i] = &db
 	return &db
 }

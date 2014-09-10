@@ -12,8 +12,8 @@ func (m *Miniredis) HKeys(k string) []string {
 }
 
 func (db *redisDB) HKeys(k string) []string {
-	db.Lock()
-	defer db.Unlock()
+	db.master.Lock()
+	defer db.master.Unlock()
 	v, ok := db.hashKeys[k]
 	if !ok {
 		return []string{}
@@ -34,8 +34,8 @@ func (m *Miniredis) HGet(k, f string) string {
 }
 
 func (db *redisDB) HGet(k, f string) string {
-	db.Lock()
-	defer db.Unlock()
+	db.master.Lock()
+	defer db.master.Unlock()
 	h, ok := db.hashKeys[k]
 	if !ok {
 		return ""
@@ -50,8 +50,8 @@ func (m *Miniredis) HSet(k, f, v string) {
 }
 
 func (db *redisDB) HSet(k, f, v string) {
-	db.Lock()
-	defer db.Unlock()
+	db.master.Lock()
+	defer db.master.Unlock()
 
 	db.keys[k] = "hash"
 	_, ok := db.hashKeys[k]
@@ -67,8 +67,8 @@ func (m *Miniredis) HDel(k, f string) {
 }
 
 func (db *redisDB) HDel(k, f string) {
-	db.Lock()
-	defer db.Unlock()
+	db.master.Lock()
+	defer db.master.Unlock()
 
 	if _, ok := db.hashKeys[k]; !ok {
 		return
@@ -88,8 +88,8 @@ func commandsHash(m *Miniredis, srv *redeo.Server) {
 		value := r.Args[2]
 
 		db := m.dbFor(r.Client().Ctx)
-		db.Lock()
-		defer db.Unlock()
+		m.Lock()
+		defer m.Unlock()
 
 		if t, ok := db.keys[key]; ok && t != "hash" {
 			out.WriteErrorString("wrong type of key")
@@ -120,8 +120,8 @@ func commandsHash(m *Miniredis, srv *redeo.Server) {
 		value := r.Args[2]
 
 		db := m.dbFor(r.Client().Ctx)
-		db.Lock()
-		defer db.Unlock()
+		m.Lock()
+		defer m.Unlock()
 
 		if t, ok := db.keys[key]; ok && t != "hash" {
 			out.WriteErrorString("wrong type of key")
@@ -151,8 +151,8 @@ func commandsHash(m *Miniredis, srv *redeo.Server) {
 		field := r.Args[1]
 
 		db := m.dbFor(r.Client().Ctx)
-		db.Lock()
-		defer db.Unlock()
+		m.Lock()
+		defer m.Unlock()
 
 		t, ok := db.keys[key]
 		if !ok {
@@ -180,8 +180,8 @@ func commandsHash(m *Miniredis, srv *redeo.Server) {
 		key := r.Args[0]
 
 		db := m.dbFor(r.Client().Ctx)
-		db.Lock()
-		defer db.Unlock()
+		m.Lock()
+		defer m.Unlock()
 
 		t, ok := db.keys[key]
 		if !ok {
@@ -216,8 +216,8 @@ func commandsHash(m *Miniredis, srv *redeo.Server) {
 		field := r.Args[1]
 
 		db := m.dbFor(r.Client().Ctx)
-		db.Lock()
-		defer db.Unlock()
+		m.Lock()
+		defer m.Unlock()
 
 		t, ok := db.keys[key]
 		if !ok {
@@ -245,8 +245,8 @@ func commandsHash(m *Miniredis, srv *redeo.Server) {
 		key := r.Args[0]
 
 		db := m.dbFor(r.Client().Ctx)
-		db.Lock()
-		defer db.Unlock()
+		m.Lock()
+		defer m.Unlock()
 
 		t, ok := db.keys[key]
 		if !ok {
@@ -274,8 +274,8 @@ func commandsHash(m *Miniredis, srv *redeo.Server) {
 		key := r.Args[0]
 
 		db := m.dbFor(r.Client().Ctx)
-		db.Lock()
-		defer db.Unlock()
+		m.Lock()
+		defer m.Unlock()
 
 		t, ok := db.keys[key]
 		if !ok {
@@ -302,8 +302,8 @@ func commandsHash(m *Miniredis, srv *redeo.Server) {
 		key := r.Args[0]
 
 		db := m.dbFor(r.Client().Ctx)
-		db.Lock()
-		defer db.Unlock()
+		m.Lock()
+		defer m.Unlock()
 
 		t, ok := db.keys[key]
 		if !ok {
@@ -330,8 +330,8 @@ func commandsHash(m *Miniredis, srv *redeo.Server) {
 		key := r.Args[0]
 
 		db := m.dbFor(r.Client().Ctx)
-		db.Lock()
-		defer db.Unlock()
+		m.Lock()
+		defer m.Unlock()
 
 		t, ok := db.keys[key]
 		if !ok {
@@ -355,8 +355,8 @@ func commandsHash(m *Miniredis, srv *redeo.Server) {
 		key := r.Args[0]
 
 		db := m.dbFor(r.Client().Ctx)
-		db.Lock()
-		defer db.Unlock()
+		m.Lock()
+		defer m.Unlock()
 
 		if t, ok := db.keys[key]; ok && t != "hash" {
 			out.WriteErrorString("wrong type of key")
