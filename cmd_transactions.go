@@ -6,68 +6,46 @@ import (
 	"github.com/bsm/redeo"
 )
 
-func startTx(cl *redeo.Client) {
-	if cl.Ctx == nil {
-		cl.Ctx = &connCtx{}
-	}
-	ctx := cl.Ctx.(*connCtx)
+func startTx(ctx *connCtx) {
 	ctx.transaction = []txCmd{}
-	ctx.transactionInvalid = false
-}
-func stopTx(cl *redeo.Client) {
-	if cl.Ctx == nil {
-		return
-	}
-	ctx := cl.Ctx.(*connCtx)
-	ctx.transaction = nil
-	unwatch(cl)
+	ctx.dirtyTransaction = false
 }
 
-func inTx(cl *redeo.Client) bool {
-	if cl.Ctx == nil {
-		return false
-	}
-	ctx := cl.Ctx.(*connCtx)
+func stopTx(ctx *connCtx) {
+	ctx.transaction = nil
+	unwatch(ctx)
+}
+
+func inTx(ctx *connCtx) bool {
 	return ctx.transaction != nil
 }
 
-func addTxCmd(cl *redeo.Client, cb txCmd) {
-	ctx := cl.Ctx.(*connCtx) // Will fail if we're not in a transaction.
+func addTxCmd(ctx *connCtx, cb txCmd) {
 	ctx.transaction = append(ctx.transaction, cb)
 }
 
-func invalidTx(cl *redeo.Client) bool {
-	ctx := cl.Ctx.(*connCtx) // Will fail if we're not in a transaction.
-	return ctx.transactionInvalid
+func dirtyTx(ctx *connCtx) bool {
+	return ctx.dirtyTransaction
 }
 
-func watch(db *redisDB, cl *redeo.Client, key string) {
-	if cl.Ctx == nil {
-		cl.Ctx = &connCtx{}
-	}
-	ctx := cl.Ctx.(*connCtx)
+func watch(db *redisDB, ctx *connCtx, key string) {
 	if ctx.watch == nil {
 		ctx.watch = map[dbKey]uint{}
 	}
 	ctx.watch[dbKey{db: db.id, key: key}] = db.keyVersion[key] // Can be 0.
 }
 
-func unwatch(cl *redeo.Client) {
-	if cl.Ctx == nil {
-		return
-	}
-	ctx := cl.Ctx.(*connCtx)
+func unwatch(ctx *connCtx) {
 	ctx.watch = nil
 }
 
-// setTxInvalid can be called even when not in an tx. Is an no-op then.
-func setTxInvalid(cl *redeo.Client) {
+// setDirty can be called even when not in an tx. Is an no-op then.
+func setDirty(cl *redeo.Client) {
 	if cl.Ctx == nil {
 		// No transaction. Not relevant.
 		return
 	}
-	ctx := cl.Ctx.(*connCtx)
-	ctx.transactionInvalid = true
+	getCtx(cl).dirtyTransaction = true
 }
 
 // commandsTransaction handles MULTI &c.
@@ -77,13 +55,14 @@ func commandsTransaction(m *Miniredis, srv *redeo.Server) {
 			out.WriteErrorString("ERR wrong number of arguments for 'multi' command")
 			return nil
 		}
+		ctx := getCtx(r.Client())
 
-		if inTx(r.Client()) {
+		if inTx(ctx) {
 			out.WriteErrorString("ERR MULTI calls can not be nested")
 			return nil
 		}
 
-		startTx(r.Client())
+		startTx(ctx)
 
 		out.WriteOK()
 		return nil
@@ -95,12 +74,14 @@ func commandsTransaction(m *Miniredis, srv *redeo.Server) {
 			return nil
 		}
 
-		if !inTx(r.Client()) {
+		ctx := getCtx(r.Client())
+
+		if !inTx(ctx) {
 			out.WriteErrorString("ERR EXEC without MULTI")
 			return nil
 		}
 
-		if invalidTx(r.Client()) {
+		if dirtyTx(ctx) {
 			out.WriteErrorString("EXECABORT Transaction discarded because of previous errors.")
 			return nil
 		}
@@ -108,13 +89,11 @@ func commandsTransaction(m *Miniredis, srv *redeo.Server) {
 		m.Lock()
 		defer m.Unlock()
 
-		ctx := r.Client().Ctx.(*connCtx)
-
 		// Check WATCHed keys.
 		for t, version := range ctx.watch {
 			if m.db(t.db).keyVersion[t.key] > version {
 				// Abort! Abort!
-				stopTx(r.Client())
+				stopTx(ctx)
 				out.WriteBulkLen(0)
 				return nil
 			}
@@ -122,10 +101,10 @@ func commandsTransaction(m *Miniredis, srv *redeo.Server) {
 
 		out.WriteBulkLen(len(ctx.transaction))
 		for _, cb := range ctx.transaction {
-			cb(out, r.Client())
+			cb(out, ctx)
 		}
 		// We're done
-		stopTx(r.Client())
+		stopTx(ctx)
 		return nil
 	})
 
@@ -135,12 +114,13 @@ func commandsTransaction(m *Miniredis, srv *redeo.Server) {
 			return nil
 		}
 
-		if !inTx(r.Client()) {
+		ctx := getCtx(r.Client())
+		if !inTx(ctx) {
 			out.WriteErrorString("ERR DISCARD without MULTI")
 			return nil
 		}
 
-		stopTx(r.Client())
+		stopTx(ctx)
 		out.WriteOK()
 		return nil
 	})
@@ -151,17 +131,18 @@ func commandsTransaction(m *Miniredis, srv *redeo.Server) {
 			return nil
 		}
 
-		if inTx(r.Client()) {
+		ctx := getCtx(r.Client())
+		if inTx(ctx) {
 			out.WriteErrorString("ERR WATCH in MULTI")
 			return nil
 		}
 
 		m.Lock()
 		defer m.Unlock()
-		db := m.dbFor(r.Client().Ctx)
+		db := m.db(ctx.selectedDB)
 
 		for _, key := range r.Args {
-			watch(db, r.Client(), key)
+			watch(db, ctx, key)
 		}
 		out.WriteOK()
 		return nil
@@ -174,21 +155,11 @@ func commandsTransaction(m *Miniredis, srv *redeo.Server) {
 		}
 
 		// Doesn't matter if UNWATCH is in a TX or not. Looks like a Redis bug to me.
+		unwatch(getCtx(r.Client()))
 
-		m.Lock()
-		defer m.Unlock()
-
-		cb := func(out *redeo.Responder, cl *redeo.Client) {
+		return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
 			// Do nothing if it's called in a transaction.
 			out.WriteOK()
-		}
-		if inTx(r.Client()) {
-			addTxCmd(r.Client(), cb)
-			out.WriteInlineString("QUEUED")
-			return nil
-		}
-		unwatch(r.Client())
-		out.WriteOK()
-		return nil
+		})
 	})
 }

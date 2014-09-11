@@ -52,13 +52,20 @@ func (m *Miniredis) HSet(k, f, v string) {
 func (db *redisDB) HSet(k, f, v string) {
 	db.master.Lock()
 	defer db.master.Unlock()
+	db.hset(k, f, v)
+}
 
+// hset returns whether the key already existed
+func (db *redisDB) hset(k, f, v string) bool {
 	db.keys[k] = "hash"
 	_, ok := db.hashKeys[k]
 	if !ok {
 		db.hashKeys[k] = map[string]string{}
 	}
+	_, ok = db.hashKeys[k][f]
 	db.hashKeys[k][f] = v
+	db.keyVersion[k]++
+	return ok
 }
 
 // HDel deletes a hash key.
@@ -69,11 +76,15 @@ func (m *Miniredis) HDel(k, f string) {
 func (db *redisDB) HDel(k, f string) {
 	db.master.Lock()
 	defer db.master.Unlock()
+	db.hdel(k, f)
+}
 
+func (db *redisDB) hdel(k, f string) {
 	if _, ok := db.hashKeys[k]; !ok {
 		return
 	}
 	delete(db.hashKeys[k], f)
+	db.keyVersion[k]++
 }
 
 // commandsHash handles all hash value operations.
@@ -87,27 +98,20 @@ func commandsHash(m *Miniredis, srv *redeo.Server) {
 		field := r.Args[1]
 		value := r.Args[2]
 
-		db := m.dbFor(r.Client().Ctx)
-		m.Lock()
-		defer m.Unlock()
+		return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+			db := m.db(ctx.selectedDB)
 
-		if t, ok := db.keys[key]; ok && t != "hash" {
-			out.WriteErrorString("wrong type of key")
-			return nil
-		}
+			if t, ok := db.keys[key]; ok && t != "hash" {
+				out.WriteErrorString("wrong type of key")
+				return
+			}
 
-		if _, ok := db.hashKeys[key]; !ok {
-			db.hashKeys[key] = map[string]string{}
-			db.keys[key] = "hash"
-		}
-		_, ok := db.hashKeys[key][field]
-		db.hashKeys[key][field] = value
-		if ok {
-			out.WriteZero()
-		} else {
-			out.WriteOne()
-		}
-		return nil
+			if db.hset(key, field, value) {
+				out.WriteZero()
+			} else {
+				out.WriteOne()
+			}
+		})
 	})
 
 	srv.HandleFunc("HSETNX", func(out *redeo.Responder, r *redeo.Request) error {
@@ -119,27 +123,27 @@ func commandsHash(m *Miniredis, srv *redeo.Server) {
 		field := r.Args[1]
 		value := r.Args[2]
 
-		db := m.dbFor(r.Client().Ctx)
-		m.Lock()
-		defer m.Unlock()
+		return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+			db := m.db(ctx.selectedDB)
 
-		if t, ok := db.keys[key]; ok && t != "hash" {
-			out.WriteErrorString("wrong type of key")
-			return nil
-		}
+			if t, ok := db.keys[key]; ok && t != "hash" {
+				out.WriteErrorString("wrong type of key")
+				return
+			}
 
-		if _, ok := db.hashKeys[key]; !ok {
-			db.hashKeys[key] = map[string]string{}
-			db.keys[key] = "hash"
-		}
-		_, ok := db.hashKeys[key][field]
-		if ok {
-			out.WriteZero()
-			return nil
-		}
-		db.hashKeys[key][field] = value
-		out.WriteOne()
-		return nil
+			if _, ok := db.hashKeys[key]; !ok {
+				db.hashKeys[key] = map[string]string{}
+				db.keys[key] = "hash"
+			}
+			_, ok := db.hashKeys[key][field]
+			if ok {
+				out.WriteZero()
+				return
+			}
+			db.hashKeys[key][field] = value
+			db.keyVersion[key]++
+			out.WriteOne()
+		})
 	})
 
 	srv.HandleFunc("HGET", func(out *redeo.Responder, r *redeo.Request) error {
@@ -150,26 +154,25 @@ func commandsHash(m *Miniredis, srv *redeo.Server) {
 		key := r.Args[0]
 		field := r.Args[1]
 
-		db := m.dbFor(r.Client().Ctx)
-		m.Lock()
-		defer m.Unlock()
+		return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+			db := m.db(ctx.selectedDB)
 
-		t, ok := db.keys[key]
-		if !ok {
-			out.WriteNil()
-			return nil
-		}
-		if t != "hash" {
-			out.WriteErrorString("wrong type of key")
-			return nil
-		}
-		value, ok := db.hashKeys[key][field]
-		if !ok {
-			out.WriteNil()
-			return nil
-		}
-		out.WriteString(value)
-		return nil
+			t, ok := db.keys[key]
+			if !ok {
+				out.WriteNil()
+				return
+			}
+			if t != "hash" {
+				out.WriteErrorString("wrong type of key")
+				return
+			}
+			value, ok := db.hashKeys[key][field]
+			if !ok {
+				out.WriteNil()
+				return
+			}
+			out.WriteString(value)
+		})
 	})
 
 	srv.HandleFunc("HDEL", func(out *redeo.Responder, r *redeo.Request) error {
@@ -179,32 +182,31 @@ func commandsHash(m *Miniredis, srv *redeo.Server) {
 		}
 		key := r.Args[0]
 
-		db := m.dbFor(r.Client().Ctx)
-		m.Lock()
-		defer m.Unlock()
+		return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+			db := m.db(ctx.selectedDB)
 
-		t, ok := db.keys[key]
-		if !ok {
-			// No key is zero deleted
-			out.WriteInt(0)
-			return nil
-		}
-		if t != "hash" {
-			out.WriteErrorString("wrong type of key")
-			return nil
-		}
-
-		deleted := 0
-		for _, f := range r.Args[1:] {
-			_, ok := db.hashKeys[key][f]
+			t, ok := db.keys[key]
 			if !ok {
-				continue
+				// No key is zero deleted
+				out.WriteInt(0)
+				return
 			}
-			delete(db.hashKeys[key], f)
-			deleted++
-		}
-		out.WriteInt(deleted)
-		return nil
+			if t != "hash" {
+				out.WriteErrorString("wrong type of key")
+				return
+			}
+
+			deleted := 0
+			for _, f := range r.Args[1:] {
+				_, ok := db.hashKeys[key][f]
+				if !ok {
+					continue
+				}
+				delete(db.hashKeys[key], f)
+				deleted++
+			}
+			out.WriteInt(deleted)
+		})
 	})
 
 	srv.HandleFunc("HEXISTS", func(out *redeo.Responder, r *redeo.Request) error {
@@ -215,26 +217,25 @@ func commandsHash(m *Miniredis, srv *redeo.Server) {
 		key := r.Args[0]
 		field := r.Args[1]
 
-		db := m.dbFor(r.Client().Ctx)
-		m.Lock()
-		defer m.Unlock()
+		return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+			db := m.db(ctx.selectedDB)
 
-		t, ok := db.keys[key]
-		if !ok {
-			out.WriteInt(0)
-			return nil
-		}
-		if t != "hash" {
-			out.WriteErrorString("wrong type of key")
-			return nil
-		}
+			t, ok := db.keys[key]
+			if !ok {
+				out.WriteInt(0)
+				return
+			}
+			if t != "hash" {
+				out.WriteErrorString("wrong type of key")
+				return
+			}
 
-		if _, ok := db.hashKeys[key][field]; !ok {
-			out.WriteInt(0)
-			return nil
-		}
-		out.WriteInt(1)
-		return nil
+			if _, ok := db.hashKeys[key][field]; !ok {
+				out.WriteInt(0)
+				return
+			}
+			out.WriteInt(1)
+		})
 	})
 
 	srv.HandleFunc("HGETALL", func(out *redeo.Responder, r *redeo.Request) error {
@@ -244,26 +245,25 @@ func commandsHash(m *Miniredis, srv *redeo.Server) {
 		}
 		key := r.Args[0]
 
-		db := m.dbFor(r.Client().Ctx)
-		m.Lock()
-		defer m.Unlock()
+		return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+			db := m.db(ctx.selectedDB)
 
-		t, ok := db.keys[key]
-		if !ok {
-			out.WriteBulkLen(0)
-			return nil
-		}
-		if t != "hash" {
-			out.WriteErrorString("wrong type of key")
-			return nil
-		}
+			t, ok := db.keys[key]
+			if !ok {
+				out.WriteBulkLen(0)
+				return
+			}
+			if t != "hash" {
+				out.WriteErrorString("wrong type of key")
+				return
+			}
 
-		out.WriteBulkLen(len(db.hashKeys[key]) * 2)
-		for f, v := range db.hashKeys[key] {
-			out.WriteString(f)
-			out.WriteString(v)
-		}
-		return nil
+			out.WriteBulkLen(len(db.hashKeys[key]) * 2)
+			for f, v := range db.hashKeys[key] {
+				out.WriteString(f)
+				out.WriteString(v)
+			}
+		})
 	})
 
 	srv.HandleFunc("HKEYS", func(out *redeo.Responder, r *redeo.Request) error {
@@ -273,25 +273,24 @@ func commandsHash(m *Miniredis, srv *redeo.Server) {
 		}
 		key := r.Args[0]
 
-		db := m.dbFor(r.Client().Ctx)
-		m.Lock()
-		defer m.Unlock()
+		return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+			db := m.db(ctx.selectedDB)
 
-		t, ok := db.keys[key]
-		if !ok {
-			out.WriteBulkLen(0)
-			return nil
-		}
-		if t != "hash" {
-			out.WriteErrorString("wrong type of key")
-			return nil
-		}
+			t, ok := db.keys[key]
+			if !ok {
+				out.WriteBulkLen(0)
+				return
+			}
+			if t != "hash" {
+				out.WriteErrorString("wrong type of key")
+				return
+			}
 
-		out.WriteBulkLen(len(db.hashKeys[key]))
-		for f := range db.hashKeys[key] {
-			out.WriteString(f)
-		}
-		return nil
+			out.WriteBulkLen(len(db.hashKeys[key]))
+			for f := range db.hashKeys[key] {
+				out.WriteString(f)
+			}
+		})
 	})
 
 	srv.HandleFunc("HVALS", func(out *redeo.Responder, r *redeo.Request) error {
@@ -301,25 +300,24 @@ func commandsHash(m *Miniredis, srv *redeo.Server) {
 		}
 		key := r.Args[0]
 
-		db := m.dbFor(r.Client().Ctx)
-		m.Lock()
-		defer m.Unlock()
+		return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+			db := m.db(ctx.selectedDB)
 
-		t, ok := db.keys[key]
-		if !ok {
-			out.WriteBulkLen(0)
-			return nil
-		}
-		if t != "hash" {
-			out.WriteErrorString("wrong type of key")
-			return nil
-		}
+			t, ok := db.keys[key]
+			if !ok {
+				out.WriteBulkLen(0)
+				return
+			}
+			if t != "hash" {
+				out.WriteErrorString("wrong type of key")
+				return
+			}
 
-		out.WriteBulkLen(len(db.hashKeys[key]))
-		for _, v := range db.hashKeys[key] {
-			out.WriteString(v)
-		}
-		return nil
+			out.WriteBulkLen(len(db.hashKeys[key]))
+			for _, v := range db.hashKeys[key] {
+				out.WriteString(v)
+			}
+		})
 	})
 
 	srv.HandleFunc("HLEN", func(out *redeo.Responder, r *redeo.Request) error {
@@ -329,22 +327,21 @@ func commandsHash(m *Miniredis, srv *redeo.Server) {
 		}
 		key := r.Args[0]
 
-		db := m.dbFor(r.Client().Ctx)
-		m.Lock()
-		defer m.Unlock()
+		return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+			db := m.db(ctx.selectedDB)
 
-		t, ok := db.keys[key]
-		if !ok {
-			out.WriteInt(0)
-			return nil
-		}
-		if t != "hash" {
-			out.WriteErrorString("wrong type of key")
-			return nil
-		}
+			t, ok := db.keys[key]
+			if !ok {
+				out.WriteInt(0)
+				return
+			}
+			if t != "hash" {
+				out.WriteErrorString("wrong type of key")
+				return
+			}
 
-		out.WriteInt(len(db.hashKeys[key]))
-		return nil
+			out.WriteInt(len(db.hashKeys[key]))
+		})
 	})
 
 	srv.HandleFunc("HMGET", func(out *redeo.Responder, r *redeo.Request) error {
@@ -354,29 +351,28 @@ func commandsHash(m *Miniredis, srv *redeo.Server) {
 		}
 		key := r.Args[0]
 
-		db := m.dbFor(r.Client().Ctx)
-		m.Lock()
-		defer m.Unlock()
+		return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+			db := m.db(ctx.selectedDB)
 
-		if t, ok := db.keys[key]; ok && t != "hash" {
-			out.WriteErrorString("wrong type of key")
-			return nil
-		}
-
-		f, ok := db.hashKeys[key]
-		if !ok {
-			f = map[string]string{}
-		}
-
-		out.WriteBulkLen(len(r.Args) - 1)
-		for _, k := range r.Args[1:] {
-			v, ok := f[k]
-			if !ok {
-				out.WriteNil()
-				continue
+			if t, ok := db.keys[key]; ok && t != "hash" {
+				out.WriteErrorString("wrong type of key")
+				return
 			}
-			out.WriteString(v)
-		}
-		return nil
+
+			f, ok := db.hashKeys[key]
+			if !ok {
+				f = map[string]string{}
+			}
+
+			out.WriteBulkLen(len(r.Args) - 1)
+			for _, k := range r.Args[1:] {
+				v, ok := f[k]
+				if !ok {
+					out.WriteNil()
+					continue
+				}
+				out.WriteString(v)
+			}
+		})
 	})
 }

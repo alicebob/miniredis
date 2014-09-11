@@ -12,7 +12,8 @@ import (
 )
 
 var (
-	errValueError = errors.New("key value error")
+	errIntValueError   = errors.New("ERR value is not an integer or out of range")
+	errFloatValueError = errors.New("ERR value is not a valid float")
 )
 
 // Get returns string keys added with SET.
@@ -68,11 +69,11 @@ func (db *redisDB) incr(k string, delta int) (int, error) {
 		var err error
 		v, err = strconv.Atoi(sv)
 		if err != nil {
-			return 0, errValueError
+			return 0, errIntValueError
 		}
 	}
 	v += delta
-	db.stringKeys[k] = strconv.Itoa(v)
+	db.set(k, strconv.Itoa(v))
 	return v, nil
 }
 
@@ -83,7 +84,7 @@ func (db *redisDB) incrfloat(k string, delta float64) (string, error) {
 		var err error
 		v, err = strconv.ParseFloat(sv, 64)
 		if err != nil {
-			return "0", errValueError
+			return "0", errFloatValueError
 		}
 	}
 	v += delta
@@ -102,7 +103,7 @@ func (db *redisDB) incrfloat(k string, delta float64) (string, error) {
 			break
 		}
 	}
-	db.stringKeys[k] = sv
+	db.set(k, sv)
 	return sv, nil
 }
 
@@ -110,7 +111,7 @@ func (db *redisDB) incrfloat(k string, delta float64) (string, error) {
 func commandsString(m *Miniredis, srv *redeo.Server) {
 	srv.HandleFunc("SET", func(out *redeo.Responder, r *redeo.Request) error {
 		if len(r.Args) < 2 {
-			setTxInvalid(r.Client())
+			setDirty(r.Client())
 			out.WriteErrorString("ERR wrong number of arguments for 'set' command")
 			return nil
 		}
@@ -132,28 +133,28 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 				continue
 			case "EX", "PX":
 				if len(r.Args) < 2 {
-					setTxInvalid(r.Client())
+					setDirty(r.Client())
 					out.WriteErrorString("ERR value is not an integer or out of range")
 					return nil
 				}
 				var err error
 				expire, err = strconv.Atoi(r.Args[1])
 				if err != nil {
-					setTxInvalid(r.Client())
+					setDirty(r.Client())
 					out.WriteErrorString("ERR value is not an integer or out of range")
 					return nil
 				}
 				r.Args = r.Args[2:]
 				continue
 			default:
-				setTxInvalid(r.Client())
+				setDirty(r.Client())
 				out.WriteErrorString("ERR syntax error")
 				return nil
 			}
 		}
 
-		cb := func(out *redeo.Responder, cl *redeo.Client) {
-			db := m.dbFor(cl.Ctx)
+		return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+			db := m.db(ctx.selectedDB)
 
 			if nx {
 				if _, ok := db.keys[key]; ok {
@@ -168,24 +169,14 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 				}
 			}
 
-			db.del(key) // be sure to remove existing values of other type keys.
-			// a SET clears the expire
-			delete(db.expire, key)
+			db.del(key, true) // be sure to remove existing values of other type keys.
+			// a vanilla SET clears the expire
 			db.set(key, value)
 			if expire != 0 {
 				db.expire[key] = expire
 			}
 			out.WriteOK()
-		}
-		if inTx(r.Client()) {
-			addTxCmd(r.Client(), cb)
-			out.WriteInlineString("QUEUED")
-			return nil
-		}
-		m.Lock()
-		defer m.Unlock()
-		cb(out, r.Client())
-		return nil
+		})
 	})
 
 	srv.HandleFunc("SETEX", func(out *redeo.Responder, r *redeo.Request) error {
@@ -201,16 +192,14 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 		}
 		value := r.Args[2]
 
-		db := m.dbFor(r.Client().Ctx)
-		m.Lock()
-		defer m.Unlock()
+		return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+			db := m.db(ctx.selectedDB)
 
-		db.del(key) // Clear any existing keys.
-		db.keys[key] = "string"
-		db.stringKeys[key] = value
-		db.expire[key] = ttl
-		out.WriteOK()
-		return nil
+			db.del(key, true) // Clear any existing keys.
+			db.set(key, value)
+			db.expire[key] = ttl
+			out.WriteOK()
+		})
 	})
 
 	srv.HandleFunc("PSETEX", func(out *redeo.Responder, r *redeo.Request) error {
@@ -226,16 +215,14 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 		}
 		value := r.Args[2]
 
-		db := m.dbFor(r.Client().Ctx)
-		m.Lock()
-		defer m.Unlock()
+		return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+			db := m.db(ctx.selectedDB)
 
-		db.del(key) // Clear any existing keys.
-		db.keys[key] = "string"
-		db.stringKeys[key] = value
-		db.expire[key] = ttl // We put millisecond keys in with the second keys.
-		out.WriteOK()
-		return nil
+			db.del(key, true) // Clear any existing keys.
+			db.set(key, value)
+			db.expire[key] = ttl // We put millisecond keys in with the second keys.
+			out.WriteOK()
+		})
 	})
 
 	srv.HandleFunc("SETNX", func(out *redeo.Responder, r *redeo.Request) error {
@@ -246,18 +233,17 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 		key := r.Args[0]
 		value := r.Args[1]
 
-		db := m.dbFor(r.Client().Ctx)
-		m.Lock()
-		defer m.Unlock()
+		return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+			db := m.db(ctx.selectedDB)
 
-		if _, ok := db.keys[key]; ok {
-			out.WriteZero()
-			return nil
-		}
+			if _, ok := db.keys[key]; ok {
+				out.WriteZero()
+				return
+			}
 
-		db.set(key, value)
-		out.WriteOne()
-		return nil
+			db.set(key, value)
+			out.WriteOne()
+		})
 	})
 
 	srv.HandleFunc("MSET", func(out *redeo.Responder, r *redeo.Request) error {
@@ -269,22 +255,19 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 			out.WriteErrorString("ERR wrong number of arguments for MSET")
 			return nil
 		}
-		db := m.dbFor(r.Client().Ctx)
-		m.Lock()
-		defer m.Unlock()
+		return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+			db := m.db(ctx.selectedDB)
 
-		for len(r.Args) > 0 {
-			key := r.Args[0]
-			value := r.Args[1]
-			r.Args = r.Args[2:]
+			for len(r.Args) > 0 {
+				key := r.Args[0]
+				value := r.Args[1]
+				r.Args = r.Args[2:]
 
-			// The TTL is always cleared.
-			db.del(key)
-			db.keys[key] = "string"
-			db.stringKeys[key] = value
-		}
-		out.WriteOK()
-		return nil
+				db.del(key, true) // clear TTL
+				db.set(key, value)
+			}
+			out.WriteOK()
+		})
 	})
 
 	srv.HandleFunc("MSETNX", func(out *redeo.Responder, r *redeo.Request) error {
@@ -296,49 +279,55 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 			out.WriteErrorString("ERR wrong number of arguments for MSET")
 			return nil
 		}
-		db := m.dbFor(r.Client().Ctx)
-		m.Lock()
-		defer m.Unlock()
+		return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+			db := m.db(ctx.selectedDB)
 
-		keys := map[string]string{}
-		existing := false
-		for len(r.Args) > 0 {
-			key := r.Args[0]
-			value := r.Args[1]
-			r.Args = r.Args[2:]
-			keys[key] = value
-			if _, ok := db.keys[key]; ok {
-				existing = true
+			keys := map[string]string{}
+			existing := false
+			for len(r.Args) > 0 {
+				key := r.Args[0]
+				value := r.Args[1]
+				r.Args = r.Args[2:]
+				keys[key] = value
+				if _, ok := db.keys[key]; ok {
+					existing = true
+				}
 			}
-		}
 
-		res := 0
-		if !existing {
-			res = 1
-			for k, v := range keys {
-				// Nothing to delete. That's the whole point.
-				db.set(k, v)
+			res := 0
+			if !existing {
+				res = 1
+				for k, v := range keys {
+					// Nothing to delete. That's the whole point.
+					db.set(k, v)
+				}
 			}
-		}
-		out.WriteInt(res)
-		return nil
+			out.WriteInt(res)
+		})
 	})
 
 	srv.HandleFunc("GET", func(out *redeo.Responder, r *redeo.Request) error {
 		if len(r.Args) != 1 {
-			setTxInvalid(r.Client())
+			setDirty(r.Client())
 			out.WriteErrorString("usage error")
 			return nil
 		}
 		key := r.Args[0]
 
-		cb := func(out *redeo.Responder, cl *redeo.Client) {
-			db := m.dbFor(cl.Ctx)
+		return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+			db := m.db(ctx.selectedDB)
 
-			if t, ok := db.keys[key]; ok && t != "string" {
-				setTxInvalid(r.Client())
-				out.WriteErrorString("wrong type of key")
-				return
+			{
+				t, ok := db.keys[key]
+				if !ok {
+					out.WriteNil()
+					return
+				}
+				if t != "string" {
+					setDirty(r.Client())
+					out.WriteErrorString("wrong type of key")
+					return
+				}
 			}
 
 			value, ok := db.stringKeys[key]
@@ -347,16 +336,7 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 				return
 			}
 			out.WriteString(value)
-		}
-		if inTx(r.Client()) {
-			addTxCmd(r.Client(), cb)
-			out.WriteInlineString("QUEUED")
-			return nil
-		}
-		m.Lock()
-		defer m.Unlock()
-		cb(out, r.Client())
-		return nil
+		})
 	})
 
 	srv.HandleFunc("GETSET", func(out *redeo.Responder, r *redeo.Request) error {
@@ -366,26 +346,27 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 		}
 		key := r.Args[0]
 		value := r.Args[1]
-		db := m.dbFor(r.Client().Ctx)
-		m.Lock()
-		defer m.Unlock()
 
-		if t, ok := db.keys[key]; ok && t != "string" {
-			out.WriteErrorString("wrong type of key")
-			return nil
-		}
+		return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+			db := m.db(ctx.selectedDB)
 
-		old, ok := db.stringKeys[key]
-		db.stringKeys[key] = value
-		// a GETSET clears the expire
-		delete(db.expire, key)
+			if t, ok := db.keys[key]; ok && t != "string" {
+				out.WriteErrorString("wrong type of key")
+				return
+			}
 
-		if !ok {
-			out.WriteNil()
-			return nil
-		}
-		out.WriteString(old)
-		return nil
+			old, ok := db.stringKeys[key]
+			db.set(key, value)
+			// a GETSET clears the expire
+			delete(db.expire, key)
+
+			if !ok {
+				out.WriteNil()
+				return
+			}
+			out.WriteString(old)
+			return
+		})
 	})
 
 	srv.HandleFunc("MGET", func(out *redeo.Responder, r *redeo.Request) error {
@@ -394,25 +375,24 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 			return nil
 		}
 
-		db := m.dbFor(r.Client().Ctx)
-		m.Lock()
-		defer m.Unlock()
+		return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+			db := m.db(ctx.selectedDB)
 
-		out.WriteBulkLen(len(r.Args))
-		for _, k := range r.Args {
-			if t, ok := db.keys[k]; !ok || t != "string" {
-				out.WriteNil()
-				continue
+			out.WriteBulkLen(len(r.Args))
+			for _, k := range r.Args {
+				if t, ok := db.keys[k]; !ok || t != "string" {
+					out.WriteNil()
+					continue
+				}
+				v, ok := db.stringKeys[k]
+				if !ok {
+					// Should not happen, we just check keys[]
+					out.WriteNil()
+					continue
+				}
+				out.WriteString(v)
 			}
-			v, ok := db.stringKeys[k]
-			if !ok {
-				// Should not happen, we just check keys[]
-				out.WriteNil()
-				continue
-			}
-			out.WriteString(v)
-		}
-		return nil
+		})
 	})
 
 	srv.HandleFunc("INCR", func(out *redeo.Responder, r *redeo.Request) error {
@@ -421,23 +401,22 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 			return nil
 		}
 
-		db := m.dbFor(r.Client().Ctx)
-		m.Lock()
-		defer m.Unlock()
+		return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+			db := m.db(ctx.selectedDB)
 
-		key := r.Args[0]
-		if t, ok := db.keys[key]; ok && t != "string" {
-			out.WriteErrorString("WRONGTYPE Operation against a key holding the wrong kind of value")
-			return nil
-		}
-		v, err := db.incr(key, +1)
-		if err != nil {
-			out.WriteErrorString(err.Error())
-			return nil
-		}
-		// Don't touch TTL
-		out.WriteInt(v)
-		return nil
+			key := r.Args[0]
+			if t, ok := db.keys[key]; ok && t != "string" {
+				out.WriteErrorString("WRONGTYPE Operation against a key holding the wrong kind of value")
+				return
+			}
+			v, err := db.incr(key, +1)
+			if err != nil {
+				out.WriteErrorString(err.Error())
+				return
+			}
+			// Don't touch TTL
+			out.WriteInt(v)
+		})
 	})
 
 	srv.HandleFunc("INCRBY", func(out *redeo.Responder, r *redeo.Request) error {
@@ -449,27 +428,26 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 		key := r.Args[0]
 		delta, err := strconv.Atoi(r.Args[1])
 		if err != nil {
-			out.WriteErrorString("value error")
+			out.WriteErrorString("ERR value is not an integer or out of range")
 			return nil
 		}
 
-		db := m.dbFor(r.Client().Ctx)
-		m.Lock()
-		defer m.Unlock()
+		return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+			db := m.db(ctx.selectedDB)
 
-		if t, ok := db.keys[key]; ok && t != "string" {
-			out.WriteErrorString("WRONGTYPE Operation against a key holding the wrong kind of value")
-			return nil
-		}
+			if t, ok := db.keys[key]; ok && t != "string" {
+				out.WriteErrorString("WRONGTYPE Operation against a key holding the wrong kind of value")
+				return
+			}
 
-		v, err := db.incr(key, delta)
-		if err != nil {
-			out.WriteErrorString(err.Error())
-			return nil
-		}
-		// Don't touch TTL
-		out.WriteInt(v)
-		return nil
+			v, err := db.incr(key, delta)
+			if err != nil {
+				out.WriteErrorString(err.Error())
+				return
+			}
+			// Don't touch TTL
+			out.WriteInt(v)
+		})
 	})
 
 	srv.HandleFunc("INCRBYFLOAT", func(out *redeo.Responder, r *redeo.Request) error {
@@ -481,27 +459,26 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 		key := r.Args[0]
 		delta, err := strconv.ParseFloat(r.Args[1], 64)
 		if err != nil {
-			out.WriteErrorString("value error")
+			out.WriteErrorString("ERR value is not an integer or out of range")
 			return nil
 		}
 
-		db := m.dbFor(r.Client().Ctx)
-		m.Lock()
-		defer m.Unlock()
+		return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+			db := m.db(ctx.selectedDB)
 
-		if t, ok := db.keys[key]; ok && t != "string" {
-			out.WriteErrorString("WRONGTYPE Operation against a key holding the wrong kind of value")
-			return nil
-		}
+			if t, ok := db.keys[key]; ok && t != "string" {
+				out.WriteErrorString("WRONGTYPE Operation against a key holding the wrong kind of value")
+				return
+			}
 
-		v, err := db.incrfloat(key, delta)
-		if err != nil {
-			out.WriteErrorString(err.Error())
-			return nil
-		}
-		// Don't touch TTL
-		out.WriteString(v)
-		return nil
+			v, err := db.incrfloat(key, delta)
+			if err != nil {
+				out.WriteErrorString(err.Error())
+				return
+			}
+			// Don't touch TTL
+			out.WriteString(v)
+		})
 	})
 
 	srv.HandleFunc("DECR", func(out *redeo.Responder, r *redeo.Request) error {
@@ -510,23 +487,22 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 			return nil
 		}
 
-		db := m.dbFor(r.Client().Ctx)
-		m.Lock()
-		defer m.Unlock()
+		return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+			db := m.db(ctx.selectedDB)
 
-		key := r.Args[0]
-		if t, ok := db.keys[key]; ok && t != "string" {
-			out.WriteErrorString("WRONGTYPE Operation against a key holding the wrong kind of value")
-			return nil
-		}
-		v, err := db.incr(key, -1)
-		if err != nil {
-			out.WriteErrorString(err.Error())
-			return nil
-		}
-		// Don't touch TTL
-		out.WriteInt(v)
-		return nil
+			key := r.Args[0]
+			if t, ok := db.keys[key]; ok && t != "string" {
+				out.WriteErrorString("WRONGTYPE Operation against a key holding the wrong kind of value")
+				return
+			}
+			v, err := db.incr(key, -1)
+			if err != nil {
+				out.WriteErrorString(err.Error())
+				return
+			}
+			// Don't touch TTL
+			out.WriteInt(v)
+		})
 	})
 
 	srv.HandleFunc("DECRBY", func(out *redeo.Responder, r *redeo.Request) error {
@@ -538,27 +514,26 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 		key := r.Args[0]
 		delta, err := strconv.Atoi(r.Args[1])
 		if err != nil {
-			out.WriteErrorString("value error")
+			out.WriteErrorString("ERR value is not an integer or out of range")
 			return nil
 		}
 
-		db := m.dbFor(r.Client().Ctx)
-		m.Lock()
-		defer m.Unlock()
+		return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+			db := m.db(ctx.selectedDB)
 
-		if t, ok := db.keys[key]; ok && t != "string" {
-			out.WriteErrorString("wrong type of key")
-			return nil
-		}
+			if t, ok := db.keys[key]; ok && t != "string" {
+				out.WriteErrorString("wrong type of key")
+				return
+			}
 
-		v, err := db.incr(key, -delta)
-		if err != nil {
-			out.WriteErrorString(err.Error())
-			return nil
-		}
-		// Don't touch TTL
-		out.WriteInt(v)
-		return nil
+			v, err := db.incr(key, -delta)
+			if err != nil {
+				out.WriteErrorString(err.Error())
+				return
+			}
+			// Don't touch TTL
+			out.WriteInt(v)
+		})
 	})
 
 	srv.HandleFunc("STRLEN", func(out *redeo.Responder, r *redeo.Request) error {
@@ -569,42 +544,40 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 
 		key := r.Args[0]
 
-		db := m.dbFor(r.Client().Ctx)
-		m.Lock()
-		defer m.Unlock()
+		return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+			db := m.db(ctx.selectedDB)
 
-		if t, ok := db.keys[key]; ok && t != "string" {
-			out.WriteErrorString("wrong type of key")
-			return nil
-		}
+			if t, ok := db.keys[key]; ok && t != "string" {
+				out.WriteErrorString("wrong type of key")
+				return
+			}
 
-		out.WriteInt(len(db.stringKeys[key]))
-		return nil
+			out.WriteInt(len(db.stringKeys[key]))
+		})
 	})
 
 	srv.HandleFunc("APPEND", func(out *redeo.Responder, r *redeo.Request) error {
 		if len(r.Args) != 2 {
-			out.WriteErrorString("usage error")
+			out.WriteErrorString("ERR wrong number of arguments for 'append' command")
 			return nil
 		}
 
 		key := r.Args[0]
 		value := r.Args[1]
 
-		db := m.dbFor(r.Client().Ctx)
-		m.Lock()
-		defer m.Unlock()
+		return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+			db := m.db(ctx.selectedDB)
 
-		if t, ok := db.keys[key]; ok && t != "string" {
-			out.WriteErrorString("WRONGTYPE Operation against a key holding the wrong kind of value")
-			return nil
-		}
+			if t, ok := db.keys[key]; ok && t != "string" {
+				out.WriteErrorString("WRONGTYPE Operation against a key holding the wrong kind of value")
+				return
+			}
 
-		newValue := db.stringKeys[key] + value
-		db.stringKeys[key] = newValue
+			newValue := db.stringKeys[key] + value
+			db.set(key, newValue)
 
-		out.WriteInt(len(newValue))
-		return nil
+			out.WriteInt(len(newValue))
+		})
 	})
 
 	srv.HandleFunc("GETRANGE", func(out *redeo.Responder, r *redeo.Request) error {
@@ -625,18 +598,17 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 			return nil
 		}
 
-		db := m.dbFor(r.Client().Ctx)
-		m.Lock()
-		defer m.Unlock()
+		return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+			db := m.db(ctx.selectedDB)
 
-		if t, ok := db.keys[key]; ok && t != "string" {
-			out.WriteErrorString("WRONGTYPE Operation against a key holding the wrong kind of value")
-			return nil
-		}
+			if t, ok := db.keys[key]; ok && t != "string" {
+				out.WriteErrorString("WRONGTYPE Operation against a key holding the wrong kind of value")
+				return
+			}
 
-		v := db.stringKeys[key]
-		out.WriteString(withRange(v, start, end))
-		return nil
+			v := db.stringKeys[key]
+			out.WriteString(withRange(v, start, end))
+		})
 	})
 
 	srv.HandleFunc("SETRANGE", func(out *redeo.Responder, r *redeo.Request) error {
@@ -657,25 +629,24 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 		}
 		subst := r.Args[2]
 
-		db := m.dbFor(r.Client().Ctx)
-		m.Lock()
-		defer m.Unlock()
+		return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+			db := m.db(ctx.selectedDB)
 
-		if t, ok := db.keys[key]; ok && t != "string" {
-			out.WriteErrorString("WRONGTYPE Operation against a key holding the wrong kind of value")
-			return nil
-		}
+			if t, ok := db.keys[key]; ok && t != "string" {
+				out.WriteErrorString("WRONGTYPE Operation against a key holding the wrong kind of value")
+				return
+			}
 
-		v := []byte(db.stringKeys[key])
-		if len(v) < pos+len(subst) {
-			newV := make([]byte, pos+len(subst))
-			copy(newV, v)
-			v = newV
-		}
-		copy(v[pos:pos+len(subst)], subst)
-		db.stringKeys[key] = string(v)
-		out.WriteInt(len(v))
-		return nil
+			v := []byte(db.stringKeys[key])
+			if len(v) < pos+len(subst) {
+				newV := make([]byte, pos+len(subst))
+				copy(newV, v)
+				v = newV
+			}
+			copy(v[pos:pos+len(subst)], subst)
+			db.set(key, string(v))
+			out.WriteInt(len(v))
+		})
 	})
 
 	srv.HandleFunc("BITCOUNT", func(out *redeo.Responder, r *redeo.Request) error {
@@ -702,22 +673,21 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 			}
 		}
 
-		db := m.dbFor(r.Client().Ctx)
-		m.Lock()
-		defer m.Unlock()
+		return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+			db := m.db(ctx.selectedDB)
 
-		if t, ok := db.keys[key]; ok && t != "string" {
-			out.WriteErrorString("WRONGTYPE Operation against a key holding the wrong kind of value")
-			return nil
-		}
+			if t, ok := db.keys[key]; ok && t != "string" {
+				out.WriteErrorString("WRONGTYPE Operation against a key holding the wrong kind of value")
+				return
+			}
 
-		v := db.stringKeys[key]
-		if useRange {
-			v = withRange(v, start, end)
-		}
+			v := db.stringKeys[key]
+			if useRange {
+				v = withRange(v, start, end)
+			}
 
-		out.WriteInt(countBits([]byte(v)))
-		return nil
+			out.WriteInt(countBits([]byte(v)))
+		})
 	})
 
 	srv.HandleFunc("BITOP", func(out *redeo.Responder, r *redeo.Request) error {
@@ -730,59 +700,64 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 		target := r.Args[1]
 		input := r.Args[2:]
 
-		db := m.dbFor(r.Client().Ctx)
-		m.Lock()
-		defer m.Unlock()
+		// 'op' is tested when the transaction is executed.
+		return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+			db := m.db(ctx.selectedDB)
 
-		switch op {
-		case "AND", "OR", "XOR":
-			first := input[0]
-			if t, ok := db.keys[first]; ok && t != "string" {
-				out.WriteErrorString("WRONGTYPE Operation against a key holding the wrong kind of value")
-				return nil
-			}
-			res := []byte(db.stringKeys[first])
-			for _, vk := range input[1:] {
-				if t, ok := db.keys[vk]; ok && t != "string" {
+			switch op {
+			case "AND", "OR", "XOR":
+				first := input[0]
+				if t, ok := db.keys[first]; ok && t != "string" {
 					out.WriteErrorString("WRONGTYPE Operation against a key holding the wrong kind of value")
-					return nil
+					return
 				}
-				v := db.stringKeys[vk]
-				cb := map[string]func(byte, byte) byte{
-					"AND": func(a, b byte) byte { return a & b },
-					"OR":  func(a, b byte) byte { return a | b },
-					"XOR": func(a, b byte) byte { return a ^ b },
-				}[op]
-				res = sliceBinOp(cb, res, []byte(v))
+				res := []byte(db.stringKeys[first])
+				for _, vk := range input[1:] {
+					if t, ok := db.keys[vk]; ok && t != "string" {
+						out.WriteErrorString("WRONGTYPE Operation against a key holding the wrong kind of value")
+						return
+					}
+					v := db.stringKeys[vk]
+					cb := map[string]func(byte, byte) byte{
+						"AND": func(a, b byte) byte { return a & b },
+						"OR":  func(a, b byte) byte { return a | b },
+						"XOR": func(a, b byte) byte { return a ^ b },
+					}[op]
+					res = sliceBinOp(cb, res, []byte(v))
+				}
+				db.del(target, false) // Keep TTL
+				if len(res) == 0 {
+					db.del(target, true)
+				} else {
+					db.set(target, string(res))
+				}
+				out.WriteInt(len(res))
+			case "NOT":
+				// NOT only takes a single argument.
+				if len(input) != 1 {
+					out.WriteErrorString("ERR BITOP NOT must be called with a single source key.")
+					return
+				}
+				key := input[0]
+				if t, ok := db.keys[key]; ok && t != "string" {
+					out.WriteErrorString("WRONGTYPE Operation against a key holding the wrong kind of value")
+					return
+				}
+				value := []byte(db.stringKeys[key])
+				for i := range value {
+					value[i] = ^value[i]
+				}
+				db.del(target, false) // Keep TTL
+				if len(value) == 0 {
+					db.del(target, true)
+				} else {
+					db.set(target, string(value))
+				}
+				out.WriteInt(len(value))
+			default:
+				out.WriteErrorString("ERR syntax error")
 			}
-			db.del(target) // Keep TTL
-			db.set(target, string(res))
-			out.WriteInt(len(res))
-			return nil
-		case "NOT":
-			// NOT only takes a single argument.
-			if len(input) != 1 {
-				out.WriteErrorString("ERR BITOP NOT must be called with a single source key.")
-				return nil
-			}
-			key := input[0]
-			if t, ok := db.keys[key]; ok && t != "string" {
-				out.WriteErrorString("WRONGTYPE Operation against a key holding the wrong kind of value")
-				return nil
-			}
-			value := []byte(db.stringKeys[key])
-			for i := range value {
-				value[i] = ^value[i]
-			}
-			db.del(target) // Keep TTL
-			db.set(target, string(value))
-			out.WriteInt(len(value))
-			return nil
-		default:
-			out.WriteErrorString("ERR syntax error")
-			return nil
-		}
-
+		})
 	})
 
 	srv.HandleFunc("BITPOS", func(out *redeo.Responder, r *redeo.Request) error {
@@ -815,49 +790,48 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 			withEnd = true
 		}
 
-		db := m.dbFor(r.Client().Ctx)
-		m.Lock()
-		defer m.Unlock()
+		return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+			db := m.db(ctx.selectedDB)
 
-		if t, ok := db.keys[key]; ok && t != "string" {
-			out.WriteErrorString("WRONGTYPE Operation against a key holding the wrong kind of value")
-			return nil
-		}
-		value := db.stringKeys[key]
-		if start != 0 {
-			if start > len(value) {
-				start = len(value)
+			if t, ok := db.keys[key]; ok && t != "string" {
+				out.WriteErrorString("WRONGTYPE Operation against a key holding the wrong kind of value")
+				return
 			}
-		}
-		if withEnd {
-			end++ // redis end semantics.
-			if end < 0 {
-				end = len(value) + end
+			value := db.stringKeys[key]
+			if start != 0 {
+				if start > len(value) {
+					start = len(value)
+				}
 			}
-			if end > len(value) {
+			if withEnd {
+				end++ // redis end semantics.
+				if end < 0 {
+					end = len(value) + end
+				}
+				if end > len(value) {
+					end = len(value)
+				}
+			} else {
 				end = len(value)
 			}
-		} else {
-			end = len(value)
-		}
-		if start != 0 || withEnd {
-			if end < start {
-				value = ""
-			} else {
-				value = value[start:end]
+			if start != 0 || withEnd {
+				if end < start {
+					value = ""
+				} else {
+					value = value[start:end]
+				}
 			}
-		}
-		pos := bitPos([]byte(value), bit == 1)
-		if pos >= 0 {
-			pos += start * 8
-		}
-		// Special case when looking for 0, but not when start and end are
-		// given.
-		if bit == 0 && pos == -1 && !withEnd {
-			pos = start*8 + len(value)*8
-		}
-		out.WriteInt(pos)
-		return nil
+			pos := bitPos([]byte(value), bit == 1)
+			if pos >= 0 {
+				pos += start * 8
+			}
+			// Special case when looking for 0, but not when start and end are
+			// given.
+			if bit == 0 && pos == -1 && !withEnd {
+				pos = start*8 + len(value)*8
+			}
+			out.WriteInt(pos)
+		})
 	})
 
 	srv.HandleFunc("GETBIT", func(out *redeo.Responder, r *redeo.Request) error {
@@ -873,29 +847,28 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 			return nil
 		}
 
-		db := m.dbFor(r.Client().Ctx)
-		m.Lock()
-		defer m.Unlock()
+		return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+			db := m.db(ctx.selectedDB)
 
-		if t, ok := db.keys[key]; ok && t != "string" {
-			out.WriteErrorString("WRONGTYPE Operation against a key holding the wrong kind of value")
-			return nil
-		}
-		value := db.stringKeys[key]
+			if t, ok := db.keys[key]; ok && t != "string" {
+				out.WriteErrorString("WRONGTYPE Operation against a key holding the wrong kind of value")
+				return
+			}
+			value := db.stringKeys[key]
 
-		ourByteNr := bit / 8
-		var ourByte byte
-		if ourByteNr > len(value)-1 {
-			ourByte = '\x00'
-		} else {
-			ourByte = value[ourByteNr]
-		}
-		res := 0
-		if toBits(ourByte)[bit%8] {
-			res = 1
-		}
-		out.WriteInt(res)
-		return nil
+			ourByteNr := bit / 8
+			var ourByte byte
+			if ourByteNr > len(value)-1 {
+				ourByte = '\x00'
+			} else {
+				ourByte = value[ourByteNr]
+			}
+			res := 0
+			if toBits(ourByte)[bit%8] {
+				res = 1
+			}
+			out.WriteInt(res)
+		})
 	})
 
 	srv.HandleFunc("SETBIT", func(out *redeo.Responder, r *redeo.Request) error {
@@ -916,37 +889,36 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 			return nil
 		}
 
-		db := m.dbFor(r.Client().Ctx)
-		m.Lock()
-		defer m.Unlock()
+		return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+			db := m.db(ctx.selectedDB)
 
-		if t, ok := db.keys[key]; ok && t != "string" {
-			out.WriteErrorString("WRONGTYPE Operation against a key holding the wrong kind of value")
-			return nil
-		}
-		value := []byte(db.stringKeys[key])
+			if t, ok := db.keys[key]; ok && t != "string" {
+				out.WriteErrorString("WRONGTYPE Operation against a key holding the wrong kind of value")
+				return
+			}
+			value := []byte(db.stringKeys[key])
 
-		ourByteNr := bit / 8
-		ourBitNr := bit % 8
-		if ourByteNr > len(value)-1 {
-			// Too short. Expand.
-			newValue := make([]byte, ourByteNr+1)
-			copy(newValue, value)
-			value = newValue
-		}
-		old := 0
-		if toBits(value[ourByteNr])[ourBitNr] {
-			old = 1
-		}
-		if newBit == 0 {
-			value[ourByteNr] &^= 1 << uint8(7-ourBitNr)
-		} else {
-			value[ourByteNr] |= 1 << uint8(7-ourBitNr)
-		}
-		db.stringKeys[key] = string(value)
+			ourByteNr := bit / 8
+			ourBitNr := bit % 8
+			if ourByteNr > len(value)-1 {
+				// Too short. Expand.
+				newValue := make([]byte, ourByteNr+1)
+				copy(newValue, value)
+				value = newValue
+			}
+			old := 0
+			if toBits(value[ourByteNr])[ourBitNr] {
+				old = 1
+			}
+			if newBit == 0 {
+				value[ourByteNr] &^= 1 << uint8(7-ourBitNr)
+			} else {
+				value[ourByteNr] |= 1 << uint8(7-ourBitNr)
+			}
+			db.set(key, string(value))
 
-		out.WriteInt(old)
-		return nil
+			out.WriteInt(old)
+		})
 	})
 }
 

@@ -40,7 +40,7 @@ type Miniredis struct {
 	selectedDB int // DB id used in the direct Get(), Set() &c.
 }
 
-type txCmd func(*redeo.Responder, *redeo.Client)
+type txCmd func(*redeo.Responder, *connCtx)
 
 // database id + key combo
 type dbKey struct {
@@ -50,10 +50,10 @@ type dbKey struct {
 
 // connCtx has all state for a single connection.
 type connCtx struct {
-	selectedDB         int            // selected DB
-	transaction        []txCmd        // transaction callbacks. Or nil.
-	transactionInvalid bool           // any error during QUEUEing.
-	watch              map[dbKey]uint // WATCHed keys.
+	selectedDB       int            // selected DB
+	transaction      []txCmd        // transaction callbacks. Or nil.
+	dirtyTransaction bool           // any error during QUEUEing.
+	watch            map[dbKey]uint // WATCHed keys.
 }
 
 // NewMiniRedis makes a new, non-started, Miniredis object.
@@ -143,13 +143,6 @@ func (m *Miniredis) db(i int) *redisDB {
 	return &db
 }
 
-func (m *Miniredis) dbFor(ctx interface{}) *redisDB {
-	if ctx == nil {
-		return m.db(0)
-	}
-	return m.db(ctx.(*connCtx).selectedDB)
-}
-
 // Addr returns '127.0.0.1:12345'. Can be given to a Dial(). See also Host()
 // and Port(), which return the same things.
 func (m *Miniredis) Addr() string {
@@ -193,4 +186,11 @@ func (m *Miniredis) TotalConnectionCount() int {
 	m.Lock()
 	defer m.Unlock()
 	return int(m.info.TotalConnections())
+}
+
+func getCtx(cl *redeo.Client) *connCtx {
+	if cl.Ctx == nil {
+		cl.Ctx = &connCtx{}
+	}
+	return cl.Ctx.(*connCtx)
 }

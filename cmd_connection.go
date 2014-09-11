@@ -49,11 +49,7 @@ func commandsConnection(m *Miniredis, srv *redeo.Server) {
 		m.Lock()
 		defer m.Unlock()
 
-		c := r.Client()
-		if c.Ctx == nil {
-			c.Ctx = &connCtx{}
-		}
-		ctx := c.Ctx.(*connCtx)
+		ctx := getCtx(r.Client())
 		ctx.selectedDB = id
 
 		out.WriteOK()

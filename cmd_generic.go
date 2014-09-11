@@ -16,16 +16,18 @@ func (m *Miniredis) Del(k string) bool {
 func (db *redisDB) Del(k string) bool {
 	db.master.Lock()
 	defer db.master.Unlock()
-	return db.del(k)
+	return db.del(k, false)
 }
 
 // internal, non-locked delete.
-func (db *redisDB) del(k string) bool {
+func (db *redisDB) del(k string, delTTL bool) bool {
 	if _, ok := db.keys[k]; !ok {
 		return false
 	}
 	delete(db.keys, k)
-	delete(db.expire, k)
+	if delTTL {
+		delete(db.expire, k)
+	}
 	// These are not strictly needed:
 	delete(db.stringKeys, k)
 	delete(db.hashKeys, k)
@@ -52,6 +54,7 @@ func (db *redisDB) SetExpire(k string, ex int) {
 	db.master.Lock()
 	defer db.master.Unlock()
 	db.expire[k] = ex
+	db.keyVersion[k]++
 }
 
 // Type gives the type of a key, or ""
@@ -80,18 +83,19 @@ func commandsGeneric(m *Miniredis, srv *redeo.Server) {
 			out.WriteErrorString("ERR value is not an integer or out of range")
 			return nil
 		}
-		db := m.dbFor(r.Client().Ctx)
-		m.Lock()
-		defer m.Unlock()
 
-		// Key must be present.
-		if _, ok := db.keys[key]; !ok {
-			out.WriteZero()
-			return nil
-		}
-		db.expire[key] = i
-		out.WriteOne()
-		return nil
+		return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+			db := m.db(ctx.selectedDB)
+
+			// Key must be present.
+			if _, ok := db.keys[key]; !ok {
+				out.WriteZero()
+				return
+			}
+			db.expire[key] = i
+			db.keyVersion[key]++
+			out.WriteOne()
+		})
 	})
 
 	srv.HandleFunc("PEXPIRE", func(out *redeo.Responder, r *redeo.Request) error {
@@ -106,18 +110,19 @@ func commandsGeneric(m *Miniredis, srv *redeo.Server) {
 			out.WriteErrorString("ERR value is not an integer or out of range")
 			return nil
 		}
-		db := m.dbFor(r.Client().Ctx)
-		m.Lock()
-		defer m.Unlock()
 
-		// Key must be present.
-		if _, ok := db.keys[key]; !ok {
-			out.WriteZero()
-			return nil
-		}
-		db.expire[key] = i // We put pexires in expire.
-		out.WriteOne()
-		return nil
+		return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+			db := m.db(ctx.selectedDB)
+
+			// Key must be present.
+			if _, ok := db.keys[key]; !ok {
+				out.WriteZero()
+				return
+			}
+			db.expire[key] = i // We put pexires in expire.
+			db.keyVersion[key]++
+			out.WriteOne()
+		})
 	})
 
 	srv.HandleFunc("TTL", func(out *redeo.Responder, r *redeo.Request) error {
@@ -126,24 +131,24 @@ func commandsGeneric(m *Miniredis, srv *redeo.Server) {
 			return nil
 		}
 		key := r.Args[0]
-		db := m.dbFor(r.Client().Ctx)
-		m.Lock()
-		defer m.Unlock()
 
-		if _, ok := db.keys[key]; !ok {
-			// No such key
-			out.WriteInt(-2)
-			return nil
-		}
+		return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+			db := m.db(ctx.selectedDB)
 
-		value, ok := db.expire[key]
-		if !ok {
-			// No expire value
-			out.WriteInt(-1)
-			return nil
-		}
-		out.WriteInt(value)
-		return nil
+			if _, ok := db.keys[key]; !ok {
+				// No such key
+				out.WriteInt(-2)
+				return
+			}
+
+			value, ok := db.expire[key]
+			if !ok {
+				// No expire value
+				out.WriteInt(-1)
+				return
+			}
+			out.WriteInt(value)
+		})
 	})
 
 	// Same at `TTL'
@@ -153,63 +158,62 @@ func commandsGeneric(m *Miniredis, srv *redeo.Server) {
 			return nil
 		}
 		key := r.Args[0]
-		db := m.dbFor(r.Client().Ctx)
-		m.Lock()
-		defer m.Unlock()
 
-		if _, ok := db.keys[key]; !ok {
-			// No such key
-			out.WriteInt(-2)
-			return nil
-		}
+		return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+			db := m.db(ctx.selectedDB)
 
-		value, ok := db.expire[key]
-		if !ok {
-			// No expire value
-			out.WriteInt(-1)
-			return nil
-		}
-		out.WriteInt(value)
-		return nil
+			if _, ok := db.keys[key]; !ok {
+				// No such key
+				out.WriteInt(-2)
+				return
+			}
+
+			value, ok := db.expire[key]
+			if !ok {
+				// No expire value
+				out.WriteInt(-1)
+				return
+			}
+			out.WriteInt(value)
+		})
 	})
 
 	srv.HandleFunc("PERSIST", func(out *redeo.Responder, r *redeo.Request) error {
 		key := r.Args[0]
 
-		db := m.dbFor(r.Client().Ctx)
-		m.Lock()
-		defer m.Unlock()
+		return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+			db := m.db(ctx.selectedDB)
 
-		if _, ok := db.keys[key]; !ok {
-			// No such key
-			out.WriteInt(0)
-			return nil
-		}
+			if _, ok := db.keys[key]; !ok {
+				// No such key
+				out.WriteInt(0)
+				return
+			}
 
-		_, ok := db.expire[key]
-		if !ok {
-			// No expire value
-			out.WriteInt(0)
-			return nil
-		}
-		delete(db.expire, key)
-		out.WriteInt(1)
-		return nil
+			_, ok := db.expire[key]
+			if !ok {
+				// No expire value
+				out.WriteInt(0)
+				return
+			}
+			delete(db.expire, key)
+			db.keyVersion[key]++
+			out.WriteInt(1)
+		})
 	})
 
 	srv.HandleFunc("DEL", func(out *redeo.Responder, r *redeo.Request) error {
-		db := m.dbFor(r.Client().Ctx)
-		m.Lock()
-		defer m.Unlock()
+		return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+			db := m.db(ctx.selectedDB)
 
-		count := 0
-		for _, key := range r.Args {
-			if db.del(key) {
-				count++
+			count := 0
+			for _, key := range r.Args {
+				if db.del(key, true) {
+					count++
+				}
 			}
-		}
-		out.WriteInt(count)
-		return nil
+			out.WriteInt(count)
+		})
 	})
 
 	srv.HandleFunc("TYPE", func(out *redeo.Responder, r *redeo.Request) error {
@@ -220,17 +224,16 @@ func commandsGeneric(m *Miniredis, srv *redeo.Server) {
 
 		key := r.Args[0]
 
-		db := m.dbFor(r.Client().Ctx)
-		m.Lock()
-		defer m.Unlock()
+		return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+			db := m.db(ctx.selectedDB)
 
-		t, ok := db.keys[key]
-		if !ok {
-			out.WriteString("none")
-			return nil
-		}
+			t, ok := db.keys[key]
+			if !ok {
+				out.WriteInlineString("none")
+				return
+			}
 
-		out.WriteString(t)
-		return nil
+			out.WriteString(t)
+		})
 	})
 }
