@@ -92,7 +92,7 @@ func commandsHash(m *Miniredis, srv *redeo.Server) {
 	srv.HandleFunc("HSET", func(out *redeo.Responder, r *redeo.Request) error {
 		if len(r.Args) != 3 {
 			setDirty(r.Client())
-			out.WriteErrorString("usage error")
+			out.WriteErrorString("ERR wrong number of arguments for 'hset' command")
 			return nil
 		}
 		key := r.Args[0]
@@ -103,7 +103,7 @@ func commandsHash(m *Miniredis, srv *redeo.Server) {
 			db := m.db(ctx.selectedDB)
 
 			if t, ok := db.keys[key]; ok && t != "hash" {
-				out.WriteErrorString("wrong type of key")
+				out.WriteErrorString(msgWrongType)
 				return
 			}
 
@@ -129,7 +129,7 @@ func commandsHash(m *Miniredis, srv *redeo.Server) {
 			db := m.db(ctx.selectedDB)
 
 			if t, ok := db.keys[key]; ok && t != "hash" {
-				out.WriteErrorString("wrong type of key")
+				out.WriteErrorString(msgWrongType)
 				return
 			}
 
@@ -151,7 +151,7 @@ func commandsHash(m *Miniredis, srv *redeo.Server) {
 	srv.HandleFunc("HGET", func(out *redeo.Responder, r *redeo.Request) error {
 		if len(r.Args) != 2 {
 			setDirty(r.Client())
-			out.WriteErrorString("usage error")
+			out.WriteErrorString("ERR wrong number of arguments for 'hget' command")
 			return nil
 		}
 		key := r.Args[0]
@@ -166,7 +166,7 @@ func commandsHash(m *Miniredis, srv *redeo.Server) {
 				return
 			}
 			if t != "hash" {
-				out.WriteErrorString("wrong type of key")
+				out.WriteErrorString(msgWrongType)
 				return
 			}
 			value, ok := db.hashKeys[key][field]
@@ -196,7 +196,7 @@ func commandsHash(m *Miniredis, srv *redeo.Server) {
 				return
 			}
 			if t != "hash" {
-				out.WriteErrorString("wrong type of key")
+				out.WriteErrorString(msgWrongType)
 				return
 			}
 
@@ -210,6 +210,11 @@ func commandsHash(m *Miniredis, srv *redeo.Server) {
 				deleted++
 			}
 			out.WriteInt(deleted)
+
+			// Nothing left. Remove the whole key.
+			if len(db.hashKeys[key]) == 0 {
+				db.del(key, true)
+			}
 		})
 	})
 
@@ -231,7 +236,7 @@ func commandsHash(m *Miniredis, srv *redeo.Server) {
 				return
 			}
 			if t != "hash" {
-				out.WriteErrorString("wrong type of key")
+				out.WriteErrorString(msgWrongType)
 				return
 			}
 
@@ -260,7 +265,7 @@ func commandsHash(m *Miniredis, srv *redeo.Server) {
 				return
 			}
 			if t != "hash" {
-				out.WriteErrorString("wrong type of key")
+				out.WriteErrorString(msgWrongType)
 				return
 			}
 
@@ -275,7 +280,7 @@ func commandsHash(m *Miniredis, srv *redeo.Server) {
 	srv.HandleFunc("HKEYS", func(out *redeo.Responder, r *redeo.Request) error {
 		if len(r.Args) != 1 {
 			setDirty(r.Client())
-			out.WriteErrorString("usage error")
+			out.WriteErrorString("ERR wrong number of arguments for 'hkeys' command")
 			return nil
 		}
 		key := r.Args[0]
@@ -289,7 +294,7 @@ func commandsHash(m *Miniredis, srv *redeo.Server) {
 				return
 			}
 			if t != "hash" {
-				out.WriteErrorString("wrong type of key")
+				out.WriteErrorString(msgWrongType)
 				return
 			}
 
@@ -303,7 +308,7 @@ func commandsHash(m *Miniredis, srv *redeo.Server) {
 	srv.HandleFunc("HVALS", func(out *redeo.Responder, r *redeo.Request) error {
 		if len(r.Args) != 1 {
 			setDirty(r.Client())
-			out.WriteErrorString("usage error")
+			out.WriteErrorString("ERR wrong number of arguments for 'hvals' command")
 			return nil
 		}
 		key := r.Args[0]
@@ -317,7 +322,7 @@ func commandsHash(m *Miniredis, srv *redeo.Server) {
 				return
 			}
 			if t != "hash" {
-				out.WriteErrorString("wrong type of key")
+				out.WriteErrorString(msgWrongType)
 				return
 			}
 
@@ -331,7 +336,7 @@ func commandsHash(m *Miniredis, srv *redeo.Server) {
 	srv.HandleFunc("HLEN", func(out *redeo.Responder, r *redeo.Request) error {
 		if len(r.Args) != 1 {
 			setDirty(r.Client())
-			out.WriteErrorString("usage error")
+			out.WriteErrorString("ERR wrong number of arguments for 'hlen' command")
 			return nil
 		}
 		key := r.Args[0]
@@ -345,7 +350,7 @@ func commandsHash(m *Miniredis, srv *redeo.Server) {
 				return
 			}
 			if t != "hash" {
-				out.WriteErrorString("wrong type of key")
+				out.WriteErrorString(msgWrongType)
 				return
 			}
 
@@ -354,9 +359,9 @@ func commandsHash(m *Miniredis, srv *redeo.Server) {
 	})
 
 	srv.HandleFunc("HMGET", func(out *redeo.Responder, r *redeo.Request) error {
-		if len(r.Args) < 1 {
+		if len(r.Args) < 2 {
 			setDirty(r.Client())
-			out.WriteErrorString("usage error")
+			out.WriteErrorString("ERR wrong number of arguments for 'hmget' command")
 			return nil
 		}
 		key := r.Args[0]
@@ -365,7 +370,7 @@ func commandsHash(m *Miniredis, srv *redeo.Server) {
 			db := m.db(ctx.selectedDB)
 
 			if t, ok := db.keys[key]; ok && t != "hash" {
-				out.WriteErrorString("wrong type of key")
+				out.WriteErrorString(msgWrongType)
 				return
 			}
 

@@ -28,6 +28,7 @@ Implemented commands:
      - SELECT
  - Key 
      - DEL
+     - EXISTS
      - EXPIRE
      - PERSIST
      - PEXPIRE

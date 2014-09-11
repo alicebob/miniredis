@@ -202,3 +202,48 @@ func TestType(t *testing.T) {
 		equals(t, "", s.Type("nokey"))
 	}
 }
+
+func TestExists(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	// String key
+	{
+		s.Set("foo", "bar!")
+		v, err := redis.Int(c.Do("EXISTS", "foo"))
+		ok(t, err)
+		equals(t, 1, v)
+	}
+
+	// Hash key
+	{
+		s.HSet("aap", "noot", "mies")
+		v, err := redis.Int(c.Do("EXISTS", "aap"))
+		ok(t, err)
+		equals(t, 1, v)
+	}
+
+	// New key
+	{
+		v, err := redis.Int(c.Do("EXISTS", "nosuch"))
+		ok(t, err)
+		equals(t, 0, v)
+	}
+
+	// Wrong usage
+	{
+		_, err := redis.Int(c.Do("EXISTS"))
+		assert(t, err != nil, "do EXISTS error")
+		_, err = redis.Int(c.Do("EXISTS", "spurious", "arguments"))
+		assert(t, err != nil, "do EXISTS error")
+	}
+
+	// Direct usage:
+	{
+		equals(t, true, s.Exists("aap"))
+		equals(t, false, s.Exists("nokey"))
+	}
+}

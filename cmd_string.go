@@ -334,7 +334,7 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 				}
 				if t != "string" {
 					setDirty(r.Client())
-					out.WriteErrorString("wrong type of key")
+					out.WriteErrorString(msgWrongType)
 					return
 				}
 			}
@@ -361,7 +361,7 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 			db := m.db(ctx.selectedDB)
 
 			if t, ok := db.keys[key]; ok && t != "string" {
-				out.WriteErrorString("wrong type of key")
+				out.WriteErrorString(msgWrongType)
 				return
 			}
 
@@ -418,7 +418,7 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 
 			key := r.Args[0]
 			if t, ok := db.keys[key]; ok && t != "string" {
-				out.WriteErrorString("WRONGTYPE Operation against a key holding the wrong kind of value")
+				out.WriteErrorString(msgWrongType)
 				return
 			}
 			v, err := db.incr(key, +1)
@@ -450,7 +450,7 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 			db := m.db(ctx.selectedDB)
 
 			if t, ok := db.keys[key]; ok && t != "string" {
-				out.WriteErrorString("WRONGTYPE Operation against a key holding the wrong kind of value")
+				out.WriteErrorString(msgWrongType)
 				return
 			}
 
@@ -475,7 +475,7 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 		delta, err := strconv.ParseFloat(r.Args[1], 64)
 		if err != nil {
 			setDirty(r.Client())
-			out.WriteErrorString("ERR value is not an integer or out of range")
+			out.WriteErrorString("ERR value is not a valid float")
 			return nil
 		}
 
@@ -483,7 +483,7 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 			db := m.db(ctx.selectedDB)
 
 			if t, ok := db.keys[key]; ok && t != "string" {
-				out.WriteErrorString("WRONGTYPE Operation against a key holding the wrong kind of value")
+				out.WriteErrorString(msgWrongType)
 				return
 			}
 
@@ -509,7 +509,7 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 
 			key := r.Args[0]
 			if t, ok := db.keys[key]; ok && t != "string" {
-				out.WriteErrorString("WRONGTYPE Operation against a key holding the wrong kind of value")
+				out.WriteErrorString(msgWrongType)
 				return
 			}
 			v, err := db.incr(key, -1)
@@ -541,7 +541,7 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 			db := m.db(ctx.selectedDB)
 
 			if t, ok := db.keys[key]; ok && t != "string" {
-				out.WriteErrorString("wrong type of key")
+				out.WriteErrorString(msgWrongType)
 				return
 			}
 
@@ -558,7 +558,7 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 	srv.HandleFunc("STRLEN", func(out *redeo.Responder, r *redeo.Request) error {
 		if len(r.Args) != 1 {
 			setDirty(r.Client())
-			out.WriteErrorString("usage error")
+			out.WriteErrorString("ERR wrong number of arguments for 'strlen' command")
 			return nil
 		}
 
@@ -568,7 +568,7 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 			db := m.db(ctx.selectedDB)
 
 			if t, ok := db.keys[key]; ok && t != "string" {
-				out.WriteErrorString("wrong type of key")
+				out.WriteErrorString(msgWrongType)
 				return
 			}
 
@@ -590,7 +590,7 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 			db := m.db(ctx.selectedDB)
 
 			if t, ok := db.keys[key]; ok && t != "string" {
-				out.WriteErrorString("WRONGTYPE Operation against a key holding the wrong kind of value")
+				out.WriteErrorString(msgWrongType)
 				return
 			}
 
@@ -626,7 +626,7 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 			db := m.db(ctx.selectedDB)
 
 			if t, ok := db.keys[key]; ok && t != "string" {
-				out.WriteErrorString("WRONGTYPE Operation against a key holding the wrong kind of value")
+				out.WriteErrorString(msgWrongType)
 				return
 			}
 
@@ -660,7 +660,7 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 			db := m.db(ctx.selectedDB)
 
 			if t, ok := db.keys[key]; ok && t != "string" {
-				out.WriteErrorString("WRONGTYPE Operation against a key holding the wrong kind of value")
+				out.WriteErrorString(msgWrongType)
 				return
 			}
 
@@ -707,7 +707,7 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 			db := m.db(ctx.selectedDB)
 
 			if t, ok := db.keys[key]; ok && t != "string" {
-				out.WriteErrorString("WRONGTYPE Operation against a key holding the wrong kind of value")
+				out.WriteErrorString(msgWrongType)
 				return
 			}
 
@@ -739,13 +739,13 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 			case "AND", "OR", "XOR":
 				first := input[0]
 				if t, ok := db.keys[first]; ok && t != "string" {
-					out.WriteErrorString("WRONGTYPE Operation against a key holding the wrong kind of value")
+					out.WriteErrorString(msgWrongType)
 					return
 				}
 				res := []byte(db.stringKeys[first])
 				for _, vk := range input[1:] {
 					if t, ok := db.keys[vk]; ok && t != "string" {
-						out.WriteErrorString("WRONGTYPE Operation against a key holding the wrong kind of value")
+						out.WriteErrorString(msgWrongType)
 						return
 					}
 					v := db.stringKeys[vk]
@@ -771,7 +771,7 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 				}
 				key := input[0]
 				if t, ok := db.keys[key]; ok && t != "string" {
-					out.WriteErrorString("WRONGTYPE Operation against a key holding the wrong kind of value")
+					out.WriteErrorString(msgWrongType)
 					return
 				}
 				value := []byte(db.stringKeys[key])
@@ -829,7 +829,7 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 			db := m.db(ctx.selectedDB)
 
 			if t, ok := db.keys[key]; ok && t != "string" {
-				out.WriteErrorString("WRONGTYPE Operation against a key holding the wrong kind of value")
+				out.WriteErrorString(msgWrongType)
 				return
 			}
 			value := db.stringKeys[key]
@@ -888,7 +888,7 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 			db := m.db(ctx.selectedDB)
 
 			if t, ok := db.keys[key]; ok && t != "string" {
-				out.WriteErrorString("WRONGTYPE Operation against a key holding the wrong kind of value")
+				out.WriteErrorString(msgWrongType)
 				return
 			}
 			value := db.stringKeys[key]
@@ -933,7 +933,7 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 			db := m.db(ctx.selectedDB)
 
 			if t, ok := db.keys[key]; ok && t != "string" {
-				out.WriteErrorString("WRONGTYPE Operation against a key holding the wrong kind of value")
+				out.WriteErrorString(msgWrongType)
 				return
 			}
 			value := []byte(db.stringKeys[key])

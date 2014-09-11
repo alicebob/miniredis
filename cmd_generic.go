@@ -69,6 +69,19 @@ func (db *redisDB) Type(k string) string {
 	return db.keys[k]
 }
 
+// Exists tells if a key exists.
+func (m *Miniredis) Exists(k string) bool {
+	return m.DB(m.selectedDB).Exists(k)
+}
+
+// Exists tells if a key exists.
+func (db *redisDB) Exists(k string) bool {
+	db.master.Lock()
+	defer db.master.Unlock()
+	_, ok := db.keys[k]
+	return ok
+}
+
 // commandsGeneric handles EXPIRE, TTL, PERSIST, &c.
 func commandsGeneric(m *Miniredis, srv *redeo.Server) {
 	srv.HandleFunc("EXPIRE", func(out *redeo.Responder, r *redeo.Request) error {
@@ -241,6 +254,26 @@ func commandsGeneric(m *Miniredis, srv *redeo.Server) {
 			}
 
 			out.WriteString(t)
+		})
+	})
+
+	srv.HandleFunc("EXISTS", func(out *redeo.Responder, r *redeo.Request) error {
+		if len(r.Args) != 1 {
+			setDirty(r.Client())
+			out.WriteErrorString("ERR wrong number of arguments for 'exists' command")
+			return nil
+		}
+
+		key := r.Args[0]
+
+		return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+			db := m.db(ctx.selectedDB)
+
+			if _, ok := db.keys[key]; !ok {
+				out.WriteZero()
+				return
+			}
+			out.WriteOne()
 		})
 	})
 }

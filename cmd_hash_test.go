@@ -118,6 +118,12 @@ func TestHashDel(t *testing.T) {
 	ok(t, err)
 	equals(t, 0, v)
 
+	// Deleting all makes the key disappear
+	v, err = redis.Int(c.Do("HDEL", "wim", "teun", "kees"))
+	ok(t, err)
+	equals(t, 2, v)
+	assert(t, !s.Exists("wim"), "no more wim key")
+
 	// Key doesn't exists.
 	v, err = redis.Int(c.Do("HDEL", "nosuch", "nosuch"))
 	ok(t, err)

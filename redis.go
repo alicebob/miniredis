@@ -4,6 +4,10 @@ import (
 	"github.com/bsm/redeo"
 )
 
+const (
+	msgWrongType = "WRONGTYPE Operation against a key holding the wrong kind of value"
+)
+
 // withTx wraps the non-argument-checking part of command handling code in
 // transaction logic.
 func withTx(
