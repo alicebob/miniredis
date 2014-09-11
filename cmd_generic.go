@@ -73,6 +73,7 @@ func (db *redisDB) Type(k string) string {
 func commandsGeneric(m *Miniredis, srv *redeo.Server) {
 	srv.HandleFunc("EXPIRE", func(out *redeo.Responder, r *redeo.Request) error {
 		if len(r.Args) != 2 {
+			setDirty(r.Client())
 			out.WriteErrorString("ERR wrong number of arguments for 'expire' command")
 			return nil
 		}
@@ -80,6 +81,7 @@ func commandsGeneric(m *Miniredis, srv *redeo.Server) {
 		value := r.Args[1]
 		i, err := strconv.Atoi(value)
 		if err != nil {
+			setDirty(r.Client())
 			out.WriteErrorString("ERR value is not an integer or out of range")
 			return nil
 		}
@@ -100,6 +102,7 @@ func commandsGeneric(m *Miniredis, srv *redeo.Server) {
 
 	srv.HandleFunc("PEXPIRE", func(out *redeo.Responder, r *redeo.Request) error {
 		if len(r.Args) != 2 {
+			setDirty(r.Client())
 			out.WriteErrorString("ERR wrong number of arguments for 'pexpire' command")
 			return nil
 		}
@@ -107,6 +110,7 @@ func commandsGeneric(m *Miniredis, srv *redeo.Server) {
 		value := r.Args[1]
 		i, err := strconv.Atoi(value)
 		if err != nil {
+			setDirty(r.Client())
 			out.WriteErrorString("ERR value is not an integer or out of range")
 			return nil
 		}
@@ -127,6 +131,7 @@ func commandsGeneric(m *Miniredis, srv *redeo.Server) {
 
 	srv.HandleFunc("TTL", func(out *redeo.Responder, r *redeo.Request) error {
 		if len(r.Args) != 1 {
+			setDirty(r.Client())
 			out.WriteErrorString("ERR wrong number of arguments for 'ttl' command")
 			return nil
 		}
@@ -154,6 +159,7 @@ func commandsGeneric(m *Miniredis, srv *redeo.Server) {
 	// Same at `TTL'
 	srv.HandleFunc("PTTL", func(out *redeo.Responder, r *redeo.Request) error {
 		if len(r.Args) != 1 {
+			setDirty(r.Client())
 			out.WriteErrorString("ERR wrong number of arguments for 'pttl' command")
 			return nil
 		}
@@ -218,6 +224,7 @@ func commandsGeneric(m *Miniredis, srv *redeo.Server) {
 
 	srv.HandleFunc("TYPE", func(out *redeo.Responder, r *redeo.Request) error {
 		if len(r.Args) != 1 {
+			setDirty(r.Client())
 			out.WriteErrorString("usage error")
 			return nil
 		}

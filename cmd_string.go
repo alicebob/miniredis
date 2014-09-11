@@ -181,12 +181,14 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 
 	srv.HandleFunc("SETEX", func(out *redeo.Responder, r *redeo.Request) error {
 		if len(r.Args) != 3 {
+			setDirty(r.Client())
 			out.WriteErrorString("ERR wrong number of arguments for 'setex' command")
 			return nil
 		}
 		key := r.Args[0]
 		ttl, err := strconv.Atoi(r.Args[1])
 		if err != nil {
+			setDirty(r.Client())
 			out.WriteErrorString("ERR value is not an integer or out of range")
 			return nil
 		}
@@ -204,12 +206,14 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 
 	srv.HandleFunc("PSETEX", func(out *redeo.Responder, r *redeo.Request) error {
 		if len(r.Args) != 3 {
+			setDirty(r.Client())
 			out.WriteErrorString("ERR wrong number of arguments for 'psetex' command")
 			return nil
 		}
 		key := r.Args[0]
 		ttl, err := strconv.Atoi(r.Args[1])
 		if err != nil {
+			setDirty(r.Client())
 			out.WriteErrorString("ERR value is not an integer or out of range")
 			return nil
 		}
@@ -227,6 +231,7 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 
 	srv.HandleFunc("SETNX", func(out *redeo.Responder, r *redeo.Request) error {
 		if len(r.Args) != 2 {
+			setDirty(r.Client())
 			out.WriteErrorString("usage error")
 			return nil
 		}
@@ -248,10 +253,12 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 
 	srv.HandleFunc("MSET", func(out *redeo.Responder, r *redeo.Request) error {
 		if len(r.Args) < 2 {
+			setDirty(r.Client())
 			out.WriteErrorString("ERR wrong number of arguments for 'mset' command")
 			return nil
 		}
 		if len(r.Args)%2 != 0 {
+			setDirty(r.Client())
 			out.WriteErrorString("ERR wrong number of arguments for MSET")
 			return nil
 		}
@@ -272,10 +279,12 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 
 	srv.HandleFunc("MSETNX", func(out *redeo.Responder, r *redeo.Request) error {
 		if len(r.Args) < 2 {
+			setDirty(r.Client())
 			out.WriteErrorString("ERR wrong number of arguments for 'msetnx' command")
 			return nil
 		}
 		if len(r.Args)%2 != 0 {
+			setDirty(r.Client())
 			out.WriteErrorString("ERR wrong number of arguments for MSET")
 			return nil
 		}
@@ -341,6 +350,7 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 
 	srv.HandleFunc("GETSET", func(out *redeo.Responder, r *redeo.Request) error {
 		if len(r.Args) != 2 {
+			setDirty(r.Client())
 			out.WriteErrorString("usage error")
 			return nil
 		}
@@ -371,6 +381,7 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 
 	srv.HandleFunc("MGET", func(out *redeo.Responder, r *redeo.Request) error {
 		if len(r.Args) < 1 {
+			setDirty(r.Client())
 			out.WriteErrorString("usage error")
 			return nil
 		}
@@ -397,6 +408,7 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 
 	srv.HandleFunc("INCR", func(out *redeo.Responder, r *redeo.Request) error {
 		if len(r.Args) != 1 {
+			setDirty(r.Client())
 			out.WriteErrorString("ERR wrong number of arguments for 'incr' command")
 			return nil
 		}
@@ -421,6 +433,7 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 
 	srv.HandleFunc("INCRBY", func(out *redeo.Responder, r *redeo.Request) error {
 		if len(r.Args) != 2 {
+			setDirty(r.Client())
 			out.WriteErrorString("ERR wrong number of arguments for 'incrby' command")
 			return nil
 		}
@@ -428,6 +441,7 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 		key := r.Args[0]
 		delta, err := strconv.Atoi(r.Args[1])
 		if err != nil {
+			setDirty(r.Client())
 			out.WriteErrorString("ERR value is not an integer or out of range")
 			return nil
 		}
@@ -452,6 +466,7 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 
 	srv.HandleFunc("INCRBYFLOAT", func(out *redeo.Responder, r *redeo.Request) error {
 		if len(r.Args) != 2 {
+			setDirty(r.Client())
 			out.WriteErrorString("ERR wrong number of arguments for 'incrbyfloat' command")
 			return nil
 		}
@@ -459,6 +474,7 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 		key := r.Args[0]
 		delta, err := strconv.ParseFloat(r.Args[1], 64)
 		if err != nil {
+			setDirty(r.Client())
 			out.WriteErrorString("ERR value is not an integer or out of range")
 			return nil
 		}
@@ -483,6 +499,7 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 
 	srv.HandleFunc("DECR", func(out *redeo.Responder, r *redeo.Request) error {
 		if len(r.Args) != 1 {
+			setDirty(r.Client())
 			out.WriteErrorString("ERR wrong number of arguments for 'decr' command")
 			return nil
 		}
@@ -507,6 +524,7 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 
 	srv.HandleFunc("DECRBY", func(out *redeo.Responder, r *redeo.Request) error {
 		if len(r.Args) != 2 {
+			setDirty(r.Client())
 			out.WriteErrorString("ERR wrong number of arguments for 'decrby' command")
 			return nil
 		}
@@ -514,6 +532,7 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 		key := r.Args[0]
 		delta, err := strconv.Atoi(r.Args[1])
 		if err != nil {
+			setDirty(r.Client())
 			out.WriteErrorString("ERR value is not an integer or out of range")
 			return nil
 		}
@@ -538,6 +557,7 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 
 	srv.HandleFunc("STRLEN", func(out *redeo.Responder, r *redeo.Request) error {
 		if len(r.Args) != 1 {
+			setDirty(r.Client())
 			out.WriteErrorString("usage error")
 			return nil
 		}
@@ -558,6 +578,7 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 
 	srv.HandleFunc("APPEND", func(out *redeo.Responder, r *redeo.Request) error {
 		if len(r.Args) != 2 {
+			setDirty(r.Client())
 			out.WriteErrorString("ERR wrong number of arguments for 'append' command")
 			return nil
 		}
@@ -582,6 +603,7 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 
 	srv.HandleFunc("GETRANGE", func(out *redeo.Responder, r *redeo.Request) error {
 		if len(r.Args) != 3 {
+			setDirty(r.Client())
 			out.WriteErrorString("ERR wrong number of arguments for 'getrange' command")
 			return nil
 		}
@@ -589,11 +611,13 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 		key := r.Args[0]
 		start, err := strconv.Atoi(r.Args[1])
 		if err != nil {
+			setDirty(r.Client())
 			out.WriteErrorString("ERR value is not an integer or out of range")
 			return nil
 		}
 		end, err := strconv.Atoi(r.Args[2])
 		if err != nil {
+			setDirty(r.Client())
 			out.WriteErrorString("ERR value is not an integer or out of range")
 			return nil
 		}
@@ -613,6 +637,7 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 
 	srv.HandleFunc("SETRANGE", func(out *redeo.Responder, r *redeo.Request) error {
 		if len(r.Args) != 3 {
+			setDirty(r.Client())
 			out.WriteErrorString("ERR wrong number of arguments for 'setrange' command")
 			return nil
 		}
@@ -620,10 +645,12 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 		key := r.Args[0]
 		pos, err := strconv.Atoi(r.Args[1])
 		if err != nil {
+			setDirty(r.Client())
 			out.WriteErrorString("ERR value is not an integer or out of range")
 			return nil
 		}
 		if pos < 0 {
+			setDirty(r.Client())
 			out.WriteErrorString("ERR offset is out of range")
 			return nil
 		}
@@ -651,6 +678,7 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 
 	srv.HandleFunc("BITCOUNT", func(out *redeo.Responder, r *redeo.Request) error {
 		if len(r.Args) != 1 && len(r.Args) != 3 {
+			setDirty(r.Client())
 			out.WriteErrorString("ERR syntax error")
 			return nil
 		}
@@ -663,11 +691,13 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 			var err error
 			start, err = strconv.Atoi(r.Args[1])
 			if err != nil {
+				setDirty(r.Client())
 				out.WriteErrorString("ERR value is not an integer or out of range")
 				return nil
 			}
 			end, err = strconv.Atoi(r.Args[2])
 			if err != nil {
+				setDirty(r.Client())
 				out.WriteErrorString("ERR value is not an integer or out of range")
 				return nil
 			}
@@ -692,6 +722,7 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 
 	srv.HandleFunc("BITOP", func(out *redeo.Responder, r *redeo.Request) error {
 		if len(r.Args) < 3 {
+			setDirty(r.Client())
 			out.WriteErrorString("ERR wrong number of arguments for 'bitop' command")
 			return nil
 		}
@@ -762,6 +793,7 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 
 	srv.HandleFunc("BITPOS", func(out *redeo.Responder, r *redeo.Request) error {
 		if len(r.Args) < 2 || len(r.Args) > 4 {
+			setDirty(r.Client())
 			out.WriteErrorString("ERR wrong number of arguments for 'bitpos' command")
 			return nil
 		}
@@ -769,6 +801,7 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 		key := r.Args[0]
 		bit, err := strconv.Atoi(r.Args[1])
 		if err != nil {
+			setDirty(r.Client())
 			out.WriteErrorString("ERR value is not an integer or out of range")
 			return nil
 		}
@@ -777,6 +810,7 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 		if len(r.Args) > 2 {
 			start, err = strconv.Atoi(r.Args[2])
 			if err != nil {
+				setDirty(r.Client())
 				out.WriteErrorString("ERR value is not an integer or out of range")
 				return nil
 			}
@@ -784,6 +818,7 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 		if len(r.Args) > 3 {
 			end, err = strconv.Atoi(r.Args[3])
 			if err != nil {
+				setDirty(r.Client())
 				out.WriteErrorString("ERR value is not an integer or out of range")
 				return nil
 			}
@@ -836,6 +871,7 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 
 	srv.HandleFunc("GETBIT", func(out *redeo.Responder, r *redeo.Request) error {
 		if len(r.Args) != 2 {
+			setDirty(r.Client())
 			out.WriteErrorString("ERR wrong number of arguments for 'getbit' command")
 			return nil
 		}
@@ -843,6 +879,7 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 		key := r.Args[0]
 		bit, err := strconv.Atoi(r.Args[1])
 		if err != nil {
+			setDirty(r.Client())
 			out.WriteErrorString("ERR bit offset is not an integer or out of range")
 			return nil
 		}
@@ -873,6 +910,7 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 
 	srv.HandleFunc("SETBIT", func(out *redeo.Responder, r *redeo.Request) error {
 		if len(r.Args) != 3 {
+			setDirty(r.Client())
 			out.WriteErrorString("ERR wrong number of arguments for 'setbit' command")
 			return nil
 		}
@@ -880,11 +918,13 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 		key := r.Args[0]
 		bit, err := strconv.Atoi(r.Args[1])
 		if err != nil || bit < 0 {
+			setDirty(r.Client())
 			out.WriteErrorString("ERR bit offset is not an integer or out of range")
 			return nil
 		}
 		newBit, err := strconv.Atoi(r.Args[2])
 		if err != nil || (newBit != 0 && newBit != 1) {
+			setDirty(r.Client())
 			out.WriteErrorString("ERR bit is not an integer or out of range")
 			return nil
 		}

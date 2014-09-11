@@ -28,6 +28,7 @@ func commandsConnection(m *Miniredis, srv *redeo.Server) {
 
 	srv.HandleFunc("ECHO", func(out *redeo.Responder, r *redeo.Request) error {
 		if len(r.Args) != 1 {
+			setDirty(r.Client())
 			out.WriteErrorString("usage error")
 			return nil
 		}
@@ -38,6 +39,7 @@ func commandsConnection(m *Miniredis, srv *redeo.Server) {
 
 	srv.HandleFunc("SELECT", func(out *redeo.Responder, r *redeo.Request) error {
 		if len(r.Args) != 1 {
+			setDirty(r.Client())
 			out.WriteErrorString("usage error")
 			return nil
 		}

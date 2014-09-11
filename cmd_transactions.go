@@ -70,6 +70,7 @@ func commandsTransaction(m *Miniredis, srv *redeo.Server) {
 
 	srv.HandleFunc("EXEC", func(out *redeo.Responder, r *redeo.Request) error {
 		if len(r.Args) != 0 {
+			setDirty(r.Client())
 			out.WriteErrorString("ERR wrong number of arguments for 'exec' command")
 			return nil
 		}
@@ -110,7 +111,8 @@ func commandsTransaction(m *Miniredis, srv *redeo.Server) {
 
 	srv.HandleFunc("DISCARD", func(out *redeo.Responder, r *redeo.Request) error {
 		if len(r.Args) != 0 {
-			out.WriteErrorString("ERR wrong number of arguments for 'exec' command")
+			setDirty(r.Client())
+			out.WriteErrorString("ERR wrong number of arguments for 'discard' command")
 			return nil
 		}
 
@@ -127,6 +129,7 @@ func commandsTransaction(m *Miniredis, srv *redeo.Server) {
 
 	srv.HandleFunc("WATCH", func(out *redeo.Responder, r *redeo.Request) error {
 		if len(r.Args) == 0 {
+			setDirty(r.Client())
 			out.WriteErrorString("ERR wrong number of arguments for 'watch' command")
 			return nil
 		}
@@ -150,6 +153,7 @@ func commandsTransaction(m *Miniredis, srv *redeo.Server) {
 
 	srv.HandleFunc("UNWATCH", func(out *redeo.Responder, r *redeo.Request) error {
 		if len(r.Args) != 0 {
+			setDirty(r.Client())
 			out.WriteErrorString("ERR wrong number of arguments for 'unwatch' command")
 			return nil
 		}

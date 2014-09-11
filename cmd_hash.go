@@ -91,6 +91,7 @@ func (db *redisDB) hdel(k, f string) {
 func commandsHash(m *Miniredis, srv *redeo.Server) {
 	srv.HandleFunc("HSET", func(out *redeo.Responder, r *redeo.Request) error {
 		if len(r.Args) != 3 {
+			setDirty(r.Client())
 			out.WriteErrorString("usage error")
 			return nil
 		}
@@ -116,6 +117,7 @@ func commandsHash(m *Miniredis, srv *redeo.Server) {
 
 	srv.HandleFunc("HSETNX", func(out *redeo.Responder, r *redeo.Request) error {
 		if len(r.Args) != 3 {
+			setDirty(r.Client())
 			out.WriteErrorString("usage error")
 			return nil
 		}
@@ -148,6 +150,7 @@ func commandsHash(m *Miniredis, srv *redeo.Server) {
 
 	srv.HandleFunc("HGET", func(out *redeo.Responder, r *redeo.Request) error {
 		if len(r.Args) != 2 {
+			setDirty(r.Client())
 			out.WriteErrorString("usage error")
 			return nil
 		}
@@ -177,6 +180,7 @@ func commandsHash(m *Miniredis, srv *redeo.Server) {
 
 	srv.HandleFunc("HDEL", func(out *redeo.Responder, r *redeo.Request) error {
 		if len(r.Args) < 2 {
+			setDirty(r.Client())
 			out.WriteErrorString("usage error")
 			return nil
 		}
@@ -211,6 +215,7 @@ func commandsHash(m *Miniredis, srv *redeo.Server) {
 
 	srv.HandleFunc("HEXISTS", func(out *redeo.Responder, r *redeo.Request) error {
 		if len(r.Args) < 2 {
+			setDirty(r.Client())
 			out.WriteErrorString("usage error")
 			return nil
 		}
@@ -240,6 +245,7 @@ func commandsHash(m *Miniredis, srv *redeo.Server) {
 
 	srv.HandleFunc("HGETALL", func(out *redeo.Responder, r *redeo.Request) error {
 		if len(r.Args) != 1 {
+			setDirty(r.Client())
 			out.WriteErrorString("usage error")
 			return nil
 		}
@@ -268,6 +274,7 @@ func commandsHash(m *Miniredis, srv *redeo.Server) {
 
 	srv.HandleFunc("HKEYS", func(out *redeo.Responder, r *redeo.Request) error {
 		if len(r.Args) != 1 {
+			setDirty(r.Client())
 			out.WriteErrorString("usage error")
 			return nil
 		}
@@ -295,6 +302,7 @@ func commandsHash(m *Miniredis, srv *redeo.Server) {
 
 	srv.HandleFunc("HVALS", func(out *redeo.Responder, r *redeo.Request) error {
 		if len(r.Args) != 1 {
+			setDirty(r.Client())
 			out.WriteErrorString("usage error")
 			return nil
 		}
@@ -322,6 +330,7 @@ func commandsHash(m *Miniredis, srv *redeo.Server) {
 
 	srv.HandleFunc("HLEN", func(out *redeo.Responder, r *redeo.Request) error {
 		if len(r.Args) != 1 {
+			setDirty(r.Client())
 			out.WriteErrorString("usage error")
 			return nil
 		}
@@ -346,6 +355,7 @@ func commandsHash(m *Miniredis, srv *redeo.Server) {
 
 	srv.HandleFunc("HMGET", func(out *redeo.Responder, r *redeo.Request) error {
 		if len(r.Args) < 1 {
+			setDirty(r.Client())
 			out.WriteErrorString("usage error")
 			return nil
 		}
