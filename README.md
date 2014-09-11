@@ -109,6 +109,26 @@ func TestSomething(t *testing.T) {
 }
 ```
 
+## Not supported
+
+Commands which will probably not be implemented:
+
+ - Key
+      - ~~DUMP~~
+      - ~~MIGRATE~~
+      - ~~OBJECT~~
+      - ~~RESTORE~~
+ - Scripting (all)
+      - ~~EVAL~~
+      - ~~EVALSHA~~
+      - ~~SCRIPT *~~
+ - Server
+      - ~~CLIENT *~~
+      - ~~COMMAND *~~
+      - ~~CONFIG *~~
+      - ~~DEBUG *~~
+
+
 ## &c.
 
 See https://github.com/alicebob/miniredis_vs_redis for tests comparing
