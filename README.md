@@ -34,7 +34,13 @@ Implemented commands:
      - PTTL
      - TTL
      - TYPE
- - String keys (all)
+ - Transactions (complete)
+     - DISCARD
+     - EXEC
+     - MULTI
+     - UNWATCH
+     - WATCH
+ - String keys (complete)
      - APPEND
      - BITCOUNT
      - BITOP
@@ -70,7 +76,6 @@ Implemented commands:
      - HSETNX
      - HVALS
 
-MULTI and EXEC are accepted but ignored (for now).
 
 Since this is intended to be used in unittests timeouts are not implemented.
 You can use `Expire()` to see if an expiration is set. The value returned will
