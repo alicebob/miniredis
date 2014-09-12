@@ -57,4 +57,10 @@ func commandsConnection(m *Miniredis, srv *redeo.Server) {
 		out.WriteOK()
 		return nil
 	})
+
+	srv.HandleFunc("QUIT", func(out *redeo.Responder, r *redeo.Request) error {
+		out.WriteOK()
+		r.Client().Close()
+		return nil
+	})
 }
