@@ -28,7 +28,7 @@ func dirtyTx(ctx *connCtx) bool {
 	return ctx.dirtyTransaction
 }
 
-func watch(db *redisDB, ctx *connCtx, key string) {
+func watch(db *RedisDB, ctx *connCtx, key string) {
 	if ctx.watch == nil {
 		ctx.watch = map[dbKey]uint{}
 	}

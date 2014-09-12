@@ -25,7 +25,7 @@ func (m *Miniredis) Get(k string) string {
 }
 
 // Get returns a string key
-func (db *redisDB) Get(k string) string {
+func (db *RedisDB) Get(k string) string {
 	db.master.Lock()
 	defer db.master.Unlock()
 	return db.stringKeys[k]
@@ -37,14 +37,14 @@ func (m *Miniredis) Set(k, v string) {
 }
 
 // Set sets a string key. Doesn't touch expire.
-func (db *redisDB) Set(k, v string) {
+func (db *RedisDB) Set(k, v string) {
 	db.master.Lock()
 	defer db.master.Unlock()
 	db.set(k, v)
 }
 
 // internal not-locked version. Doesn't touch expire.
-func (db *redisDB) set(k, v string) {
+func (db *RedisDB) set(k, v string) {
 	db.keys[k] = "string"
 	db.stringKeys[k] = v
 	db.keyVersion[k]++
@@ -56,14 +56,14 @@ func (m *Miniredis) Incr(k string, delta int) (int, error) {
 }
 
 // Incr changes a int string value by delta.
-func (db *redisDB) Incr(k string, delta int) (int, error) {
+func (db *RedisDB) Incr(k string, delta int) (int, error) {
 	db.master.Lock()
 	defer db.master.Unlock()
 	return db.incr(k, delta)
 }
 
 // change int key value
-func (db *redisDB) incr(k string, delta int) (int, error) {
+func (db *RedisDB) incr(k string, delta int) (int, error) {
 	v := 0
 	if sv, ok := db.stringKeys[k]; ok {
 		var err error
@@ -78,7 +78,7 @@ func (db *redisDB) incr(k string, delta int) (int, error) {
 }
 
 // change float key value
-func (db *redisDB) incrfloat(k string, delta float64) (string, error) {
+func (db *RedisDB) incrfloat(k string, delta float64) (string, error) {
 	v := 0.0
 	if sv, ok := db.stringKeys[k]; ok {
 		var err error

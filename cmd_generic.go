@@ -13,14 +13,15 @@ func (m *Miniredis) Del(k string) bool {
 	return m.DB(m.selectedDB).Del(k)
 }
 
-func (db *redisDB) Del(k string) bool {
+// Del deletes a key and any expiration value. Returns whether there was a key.
+func (db *RedisDB) Del(k string) bool {
 	db.master.Lock()
 	defer db.master.Unlock()
 	return db.del(k, false)
 }
 
 // internal, non-locked delete.
-func (db *redisDB) del(k string, delTTL bool) bool {
+func (db *RedisDB) del(k string, delTTL bool) bool {
 	if _, ok := db.keys[k]; !ok {
 		return false
 	}
@@ -34,12 +35,15 @@ func (db *redisDB) del(k string, delTTL bool) bool {
 	return true
 }
 
-// Expire value. As set by the client. 0 if not set.
+// Expire value. As set by the client (via EXPIRE, PEXPIRE, EXPIREAT, PEXPIREAT and
+// similar commands). 0 if not set.
 func (m *Miniredis) Expire(k string) int {
 	return m.DB(m.selectedDB).Expire(k)
 }
 
-func (db *redisDB) Expire(k string) int {
+// Expire value. As set by the client (via EXPIRE, PEXPIRE, EXPIREAT, PEXPIREAT and
+// similar commands). 0 if not set.
+func (db *RedisDB) Expire(k string) int {
 	db.master.Lock()
 	defer db.master.Unlock()
 	return db.expire[k]
@@ -50,7 +54,8 @@ func (m *Miniredis) SetExpire(k string, ex int) {
 	m.DB(m.selectedDB).SetExpire(k, ex)
 }
 
-func (db *redisDB) SetExpire(k string, ex int) {
+// SetExpire sets expiration of a key.
+func (db *RedisDB) SetExpire(k string, ex int) {
 	db.master.Lock()
 	defer db.master.Unlock()
 	db.expire[k] = ex
@@ -63,19 +68,19 @@ func (m *Miniredis) Type(k string) string {
 }
 
 // Type gives the type of a key, or ""
-func (db *redisDB) Type(k string) string {
+func (db *RedisDB) Type(k string) string {
 	db.master.Lock()
 	defer db.master.Unlock()
 	return db.keys[k]
 }
 
-// Exists tells if a key exists.
+// Exists tells whether a key exists.
 func (m *Miniredis) Exists(k string) bool {
 	return m.DB(m.selectedDB).Exists(k)
 }
 
-// Exists tells if a key exists.
-func (db *redisDB) Exists(k string) bool {
+// Exists tells whether a key exists.
+func (db *RedisDB) Exists(k string) bool {
 	db.master.Lock()
 	defer db.master.Unlock()
 	_, ok := db.keys[k]

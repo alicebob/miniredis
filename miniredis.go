@@ -20,9 +20,10 @@ import (
 	"github.com/bsm/redeo"
 )
 
-type redisDB struct {
-	master     *sync.Mutex // pointer to the lock in Miniredis
-	id         int
+// RedisDB holds a single (numbered) Redis database.
+type RedisDB struct {
+	master     *sync.Mutex                  // pointer to the lock in Miniredis
+	id         int                          // db id
 	keys       map[string]string            // Master map of keys with their type
 	stringKeys map[string]string            // GET/SET &c. keys
 	hashKeys   map[string]map[string]string // MGET/MSET &c. keys
@@ -36,7 +37,7 @@ type Miniredis struct {
 	closed     chan struct{}
 	listen     net.Listener
 	info       *redeo.ServerInfo
-	dbs        map[int]*redisDB
+	dbs        map[int]*RedisDB
 	selectedDB int // DB id used in the direct Get(), Set() &c.
 }
 
@@ -60,12 +61,12 @@ type connCtx struct {
 func NewMiniRedis() *Miniredis {
 	return &Miniredis{
 		closed: make(chan struct{}),
-		dbs:    map[int]*redisDB{},
+		dbs:    map[int]*RedisDB{},
 	}
 }
 
-func newRedisDB(id int, l *sync.Mutex) redisDB {
-	return redisDB{
+func newRedisDB(id int, l *sync.Mutex) RedisDB {
+	return RedisDB{
 		id:         id,
 		master:     l,
 		keys:       map[string]string{},
@@ -127,14 +128,14 @@ func (m *Miniredis) Close() {
 }
 
 // DB returns a DB by ID.
-func (m *Miniredis) DB(i int) *redisDB {
+func (m *Miniredis) DB(i int) *RedisDB {
 	m.Lock()
 	defer m.Unlock()
 	return m.db(i)
 }
 
 // get DB. No locks!
-func (m *Miniredis) db(i int) *redisDB {
+func (m *Miniredis) db(i int) *RedisDB {
 	if db, ok := m.dbs[i]; ok {
 		return db
 	}

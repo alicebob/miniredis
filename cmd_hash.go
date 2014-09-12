@@ -11,7 +11,8 @@ func (m *Miniredis) HKeys(k string) []string {
 	return m.DB(m.selectedDB).HKeys(k)
 }
 
-func (db *redisDB) HKeys(k string) []string {
+// HKeys returns all keys ('fields') for a hash key.
+func (db *RedisDB) HKeys(k string) []string {
 	db.master.Lock()
 	defer db.master.Unlock()
 	v, ok := db.hashKeys[k]
@@ -33,7 +34,9 @@ func (m *Miniredis) HGet(k, f string) string {
 	return m.DB(m.selectedDB).HGet(k, f)
 }
 
-func (db *redisDB) HGet(k, f string) string {
+// HGet returns hash keys added with HSET.
+// Returns empty string when the key is of a different type.
+func (db *RedisDB) HGet(k, f string) string {
 	db.master.Lock()
 	defer db.master.Unlock()
 	h, ok := db.hashKeys[k]
@@ -49,14 +52,16 @@ func (m *Miniredis) HSet(k, f, v string) {
 	m.DB(m.selectedDB).HSet(k, f, v)
 }
 
-func (db *redisDB) HSet(k, f, v string) {
+// HSet sets a hash key.
+// If there is another key by the same name it will be gone.
+func (db *RedisDB) HSet(k, f, v string) {
 	db.master.Lock()
 	defer db.master.Unlock()
 	db.hset(k, f, v)
 }
 
 // hset returns whether the key already existed
-func (db *redisDB) hset(k, f, v string) bool {
+func (db *RedisDB) hset(k, f, v string) bool {
 	if t, ok := db.keys[k]; ok && t != "hash" {
 		db.del(k, true)
 	}
@@ -75,13 +80,14 @@ func (m *Miniredis) HDel(k, f string) {
 	m.DB(m.selectedDB).HDel(k, f)
 }
 
-func (db *redisDB) HDel(k, f string) {
+// HDel deletes a hash key.
+func (db *RedisDB) HDel(k, f string) {
 	db.master.Lock()
 	defer db.master.Unlock()
 	db.hdel(k, f)
 }
 
-func (db *redisDB) hdel(k, f string) {
+func (db *RedisDB) hdel(k, f string) {
 	if _, ok := db.hashKeys[k]; !ok {
 		return
 	}
