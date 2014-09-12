@@ -124,14 +124,13 @@ Commands which will probably not be implemented:
  - Scripting (all)
     - ~~EVAL~~
     - ~~EVALSHA~~
-    - ~~SCRIPT * ~~
+    - ~~SCRIPT *~~
  - Server
-    - ~~CLIENT * ~~
-    - ~~COMMAND * ~~
-    - ~~CONFIG * ~~
-    - ~~DEBUG * ~~
+    - ~~CLIENT *~~
+    - ~~COMMAND *~~
+    - ~~CONFIG *~~
+    - ~~DEBUG *~~
     
-
 
 ## &c.
 
