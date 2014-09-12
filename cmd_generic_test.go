@@ -283,3 +283,48 @@ func TestExists(t *testing.T) {
 		equals(t, false, s.Exists("nokey"))
 	}
 }
+
+func TestMove(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	// No problem.
+	{
+		s.Set("foo", "bar!")
+		v, err := redis.Int(c.Do("MOVE", "foo", 1))
+		ok(t, err)
+		equals(t, 1, v)
+	}
+
+	// Src key doesn't exists.
+	{
+		v, err := redis.Int(c.Do("MOVE", "nosuch", 1))
+		ok(t, err)
+		equals(t, 0, v)
+	}
+
+	// Target key already exists.
+	{
+		s.DB(0).Set("two", "orig")
+		s.DB(1).Set("two", "taken")
+		v, err := redis.Int(c.Do("MOVE", "two", 1))
+		ok(t, err)
+		equals(t, 0, v)
+		equals(t, "orig", s.Get("two"))
+	}
+
+	// Wrong usage
+	{
+		_, err := redis.Int(c.Do("MOVE"))
+		assert(t, err != nil, "do MOVE error")
+		_, err = redis.Int(c.Do("MOVE", "foo"))
+		assert(t, err != nil, "do MOVE error")
+		_, err = redis.Int(c.Do("MOVE", "foo", "noint"))
+		assert(t, err != nil, "do TYPE error")
+		_, err = redis.Int(c.Do("MOVE", "foo", 2, "toomany"))
+		assert(t, err != nil, "do TYPE error")
+	}
+}

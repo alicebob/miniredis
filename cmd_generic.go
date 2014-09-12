@@ -255,4 +255,42 @@ func commandsGeneric(m *Miniredis, srv *redeo.Server) {
 			out.WriteOne()
 		})
 	})
+
+	srv.HandleFunc("MOVE", func(out *redeo.Responder, r *redeo.Request) error {
+		if len(r.Args) != 2 {
+			setDirty(r.Client())
+			out.WriteErrorString("ERR wrong number of arguments for 'move' command")
+			return nil
+		}
+
+		key := r.Args[0]
+		targetDB, err := strconv.Atoi(r.Args[1])
+		if err != nil {
+			targetDB = 0
+		}
+
+		return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+			if ctx.selectedDB == targetDB {
+				out.WriteErrorString("ERR source and destination objects are the same")
+				return
+			}
+			db := m.db(ctx.selectedDB)
+			targetDB := m.db(targetDB)
+
+			if _, ok := db.keys[key]; !ok {
+				out.WriteZero()
+				return
+			}
+			if _, ok := targetDB.keys[key]; ok {
+				out.WriteZero()
+				return
+			}
+			targetDB.keys[key] = db.keys[key]
+			targetDB.stringKeys[key] = db.stringKeys[key]
+			targetDB.hashKeys[key] = db.hashKeys[key]
+			targetDB.keyVersion[key]++
+			db.del(key, true)
+			out.WriteOne()
+		})
+	})
 }

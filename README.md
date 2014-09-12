@@ -22,62 +22,63 @@ There are no dependencies on external binaries, so you can easily integrate it i
 Implemented commands:
 
  - Connection
-     - AUTH -- we accept every password
-     - ECHO
-     - PING
-     - SELECT
+   - AUTH -- we accept every password
+   - ECHO
+   - PING
+   - SELECT
  - Key 
-     - DEL
-     - EXISTS
-     - EXPIRE
-     - EXPIREAT
-     - PERSIST
-     - PEXPIRE
-     - PEXPIREAT
-     - PTTL
-     - TTL
-     - TYPE
+   - DEL
+   - EXISTS
+   - EXPIRE
+   - EXPIREAT
+   - MOVE
+   - PERSIST
+   - PEXPIRE
+   - PEXPIREAT
+   - PTTL
+   - TTL
+   - TYPE
  - Transactions (complete)
-     - DISCARD
-     - EXEC
-     - MULTI
-     - UNWATCH
-     - WATCH
+   - DISCARD
+   - EXEC
+   - MULTI
+   - UNWATCH
+   - WATCH
  - String keys (complete)
-     - APPEND
-     - BITCOUNT
-     - BITOP
-     - BITPOS
-     - DECR
-     - DECRBY
-     - GET
-     - GETBIT
-     - GETRANGE
-     - GETSET
-     - INCR
-     - INCRBY
-     - INCRBYFLOAT
-     - MGET
-     - MSET
-     - MSETNX
-     - PSETEX
-     - SET
-     - SETBIT
-     - SETEX
-     - SETNX
-     - SETRANGE
-     - STRLEN
+   - APPEND
+   - BITCOUNT
+   - BITOP
+   - BITPOS
+   - DECR
+   - DECRBY
+   - GET
+   - GETBIT
+   - GETRANGE
+   - GETSET
+   - INCR
+   - INCRBY
+   - INCRBYFLOAT
+   - MGET
+   - MSET
+   - MSETNX
+   - PSETEX
+   - SET
+   - SETBIT
+   - SETEX
+   - SETNX
+   - SETRANGE
+   - STRLEN
  - Hash keys
-     - HDEL
-     - HEXISTS
-     - HGET
-     - HGETALL
-     - HKEYS
-     - HLEN
-     - HMGET
-     - HSET
-     - HSETNX
-     - HVALS
+   - HDEL
+   - HEXISTS
+   - HGET
+   - HGETALL
+   - HKEYS
+   - HLEN
+   - HMGET
+   - HSET
+   - HSETNX
+   - HVALS
 
 
 Since this is intended to be used in unittests timeouts are not implemented.
@@ -116,19 +117,20 @@ func TestSomething(t *testing.T) {
 Commands which will probably not be implemented:
 
  - Key
-      - ~~DUMP~~
-      - ~~MIGRATE~~
-      - ~~OBJECT~~
-      - ~~RESTORE~~
+    - ~~DUMP~~
+    - ~~MIGRATE~~
+    - ~~OBJECT~~
+    - ~~RESTORE~~
  - Scripting (all)
-      - ~~EVAL~~
-      - ~~EVALSHA~~
-      - ~~SCRIPT *~~
+    - ~~EVAL~~
+    - ~~EVALSHA~~
+    - ~~SCRIPT * ~~
  - Server
-      - ~~CLIENT *~~
-      - ~~COMMAND *~~
-      - ~~CONFIG *~~
-      - ~~DEBUG *~~
+    - ~~CLIENT * ~~
+    - ~~COMMAND * ~~
+    - ~~CONFIG * ~~
+    - ~~DEBUG * ~~
+    
 
 
 ## &c.
