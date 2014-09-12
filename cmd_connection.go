@@ -16,45 +16,54 @@ func (m *Miniredis) Select(i int) {
 }
 
 func commandsConnection(m *Miniredis, srv *redeo.Server) {
-	srv.HandleFunc("PING", func(out *redeo.Responder, _ *redeo.Request) error {
-		out.WriteInlineString("PONG")
+	srv.HandleFunc("AUTH", m.cmdAuth)
+	srv.HandleFunc("ECHO", m.cmdEcho)
+	srv.HandleFunc("PING", m.cmdPing)
+	srv.HandleFunc("SELECT", m.cmdSelect)
+}
+
+// PING
+func (m *Miniredis) cmdPing(out *redeo.Responder, r *redeo.Request) error {
+	out.WriteInlineString("PONG")
+	return nil
+}
+
+// AUTH
+func (m *Miniredis) cmdAuth(out *redeo.Responder, r *redeo.Request) error {
+	out.WriteOK()
+	return nil
+}
+
+// ECHO
+func (m *Miniredis) cmdEcho(out *redeo.Responder, r *redeo.Request) error {
+	if len(r.Args) != 1 {
+		setDirty(r.Client())
+		out.WriteErrorString("usage error")
 		return nil
-	})
+	}
+	msg := r.Args[0]
+	out.WriteString(msg)
+	return nil
+}
 
-	srv.HandleFunc("AUTH", func(out *redeo.Responder, _ *redeo.Request) error {
-		out.WriteOK()
+// SELECT
+func (m *Miniredis) cmdSelect(out *redeo.Responder, r *redeo.Request) error {
+	if len(r.Args) != 1 {
+		setDirty(r.Client())
+		out.WriteErrorString("usage error")
 		return nil
-	})
+	}
+	id, err := strconv.Atoi(r.Args[0])
+	if err != nil {
+		id = 0
+	}
 
-	srv.HandleFunc("ECHO", func(out *redeo.Responder, r *redeo.Request) error {
-		if len(r.Args) != 1 {
-			setDirty(r.Client())
-			out.WriteErrorString("usage error")
-			return nil
-		}
-		msg := r.Args[0]
-		out.WriteString(msg)
-		return nil
-	})
+	m.Lock()
+	defer m.Unlock()
 
-	srv.HandleFunc("SELECT", func(out *redeo.Responder, r *redeo.Request) error {
-		if len(r.Args) != 1 {
-			setDirty(r.Client())
-			out.WriteErrorString("usage error")
-			return nil
-		}
-		id, err := strconv.Atoi(r.Args[0])
-		if err != nil {
-			id = 0
-		}
+	ctx := getCtx(r.Client())
+	ctx.selectedDB = id
 
-		m.Lock()
-		defer m.Unlock()
-
-		ctx := getCtx(r.Client())
-		ctx.selectedDB = id
-
-		out.WriteOK()
-		return nil
-	})
+	out.WriteOK()
+	return nil
 }

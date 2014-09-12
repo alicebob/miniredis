@@ -87,8 +87,23 @@ func (db *RedisDB) Exists(k string) bool {
 	return ok
 }
 
+// commandsGeneric handles EXPIRE, TTL, PERSIST, &c.
+func commandsGeneric(m *Miniredis, srv *redeo.Server) {
+	srv.HandleFunc("DEL", m.cmdDel)
+	srv.HandleFunc("EXISTS", m.cmdExists)
+	srv.HandleFunc("EXPIREAT", makeCmdExpire(m, "expireat"))
+	srv.HandleFunc("EXPIRE", makeCmdExpire(m, "expire"))
+	srv.HandleFunc("MOVE", m.cmdMove)
+	srv.HandleFunc("PERSIST", m.cmdPersist)
+	srv.HandleFunc("PEXPIREAT", makeCmdExpire(m, "pexpireat"))
+	srv.HandleFunc("PEXPIRE", makeCmdExpire(m, "pexpire"))
+	srv.HandleFunc("PTTL", m.cmdPTTL)
+	srv.HandleFunc("TTL", m.cmdTTL)
+	srv.HandleFunc("TYPE", m.cmdType)
+}
+
 // generic expire command for EXPIRE, PEXPIRE, EXPIREAT, PEXPIREAT
-func makeExpirefunc(m *Miniredis, cmd string) func(*redeo.Responder, *redeo.Request) error {
+func makeCmdExpire(m *Miniredis, cmd string) func(*redeo.Responder, *redeo.Request) error {
 	return func(out *redeo.Responder, r *redeo.Request) error {
 		if len(r.Args) != 2 {
 			setDirty(r.Client())
@@ -119,183 +134,181 @@ func makeExpirefunc(m *Miniredis, cmd string) func(*redeo.Responder, *redeo.Requ
 	}
 }
 
-// commandsGeneric handles EXPIRE, TTL, PERSIST, &c.
-func commandsGeneric(m *Miniredis, srv *redeo.Server) {
-	srv.HandleFunc("EXPIRE", makeExpirefunc(m, "expire"))
-	srv.HandleFunc("PEXPIRE", makeExpirefunc(m, "pexpire"))
-	srv.HandleFunc("EXPIREAT", makeExpirefunc(m, "expireat"))
-	srv.HandleFunc("PEXPIREAT", makeExpirefunc(m, "pexpireat"))
+// TTL
+func (m *Miniredis) cmdTTL(out *redeo.Responder, r *redeo.Request) error {
+	if len(r.Args) != 1 {
+		setDirty(r.Client())
+		out.WriteErrorString("ERR wrong number of arguments for 'ttl' command")
+		return nil
+	}
+	key := r.Args[0]
 
-	srv.HandleFunc("TTL", func(out *redeo.Responder, r *redeo.Request) error {
-		if len(r.Args) != 1 {
-			setDirty(r.Client())
-			out.WriteErrorString("ERR wrong number of arguments for 'ttl' command")
-			return nil
-		}
-		key := r.Args[0]
+	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+		db := m.db(ctx.selectedDB)
 
-		return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
-			db := m.db(ctx.selectedDB)
-
-			if _, ok := db.keys[key]; !ok {
-				// No such key
-				out.WriteInt(-2)
-				return
-			}
-
-			value, ok := db.expire[key]
-			if !ok {
-				// No expire value
-				out.WriteInt(-1)
-				return
-			}
-			out.WriteInt(value)
-		})
-	})
-
-	// Same at `TTL'
-	srv.HandleFunc("PTTL", func(out *redeo.Responder, r *redeo.Request) error {
-		if len(r.Args) != 1 {
-			setDirty(r.Client())
-			out.WriteErrorString("ERR wrong number of arguments for 'pttl' command")
-			return nil
-		}
-		key := r.Args[0]
-
-		return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
-			db := m.db(ctx.selectedDB)
-
-			if _, ok := db.keys[key]; !ok {
-				// No such key
-				out.WriteInt(-2)
-				return
-			}
-
-			value, ok := db.expire[key]
-			if !ok {
-				// No expire value
-				out.WriteInt(-1)
-				return
-			}
-			out.WriteInt(value)
-		})
-	})
-
-	srv.HandleFunc("PERSIST", func(out *redeo.Responder, r *redeo.Request) error {
-		key := r.Args[0]
-
-		return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
-			db := m.db(ctx.selectedDB)
-
-			if _, ok := db.keys[key]; !ok {
-				// No such key
-				out.WriteInt(0)
-				return
-			}
-
-			_, ok := db.expire[key]
-			if !ok {
-				// No expire value
-				out.WriteInt(0)
-				return
-			}
-			delete(db.expire, key)
-			db.keyVersion[key]++
-			out.WriteInt(1)
-		})
-	})
-
-	srv.HandleFunc("DEL", func(out *redeo.Responder, r *redeo.Request) error {
-		return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
-			db := m.db(ctx.selectedDB)
-
-			count := 0
-			for _, key := range r.Args {
-				if db.del(key, true) {
-					count++
-				}
-			}
-			out.WriteInt(count)
-		})
-	})
-
-	srv.HandleFunc("TYPE", func(out *redeo.Responder, r *redeo.Request) error {
-		if len(r.Args) != 1 {
-			setDirty(r.Client())
-			out.WriteErrorString("usage error")
-			return nil
+		if _, ok := db.keys[key]; !ok {
+			// No such key
+			out.WriteInt(-2)
+			return
 		}
 
-		key := r.Args[0]
-
-		return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
-			db := m.db(ctx.selectedDB)
-
-			t, ok := db.keys[key]
-			if !ok {
-				out.WriteInlineString("none")
-				return
-			}
-
-			out.WriteString(t)
-		})
+		value, ok := db.expire[key]
+		if !ok {
+			// No expire value
+			out.WriteInt(-1)
+			return
+		}
+		out.WriteInt(value)
 	})
+}
 
-	srv.HandleFunc("EXISTS", func(out *redeo.Responder, r *redeo.Request) error {
-		if len(r.Args) != 1 {
-			setDirty(r.Client())
-			out.WriteErrorString("ERR wrong number of arguments for 'exists' command")
-			return nil
+// PTTL
+func (m *Miniredis) cmdPTTL(out *redeo.Responder, r *redeo.Request) error {
+	if len(r.Args) != 1 {
+		setDirty(r.Client())
+		out.WriteErrorString("ERR wrong number of arguments for 'pttl' command")
+		return nil
+	}
+	key := r.Args[0]
+
+	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+		db := m.db(ctx.selectedDB)
+
+		if _, ok := db.keys[key]; !ok {
+			// No such key
+			out.WriteInt(-2)
+			return
 		}
 
-		key := r.Args[0]
-
-		return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
-			db := m.db(ctx.selectedDB)
-
-			if _, ok := db.keys[key]; !ok {
-				out.WriteZero()
-				return
-			}
-			out.WriteOne()
-		})
+		value, ok := db.expire[key]
+		if !ok {
+			// No expire value
+			out.WriteInt(-1)
+			return
+		}
+		out.WriteInt(value)
 	})
+}
 
-	srv.HandleFunc("MOVE", func(out *redeo.Responder, r *redeo.Request) error {
-		if len(r.Args) != 2 {
-			setDirty(r.Client())
-			out.WriteErrorString("ERR wrong number of arguments for 'move' command")
-			return nil
+// PERSIST
+func (m *Miniredis) cmdPersist(out *redeo.Responder, r *redeo.Request) error {
+	key := r.Args[0]
+
+	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+		db := m.db(ctx.selectedDB)
+
+		if _, ok := db.keys[key]; !ok {
+			// No such key
+			out.WriteInt(0)
+			return
 		}
 
-		key := r.Args[0]
-		targetDB, err := strconv.Atoi(r.Args[1])
-		if err != nil {
-			targetDB = 0
+		_, ok := db.expire[key]
+		if !ok {
+			// No expire value
+			out.WriteInt(0)
+			return
+		}
+		delete(db.expire, key)
+		db.keyVersion[key]++
+		out.WriteInt(1)
+	})
+}
+
+// DEL
+func (m *Miniredis) cmdDel(out *redeo.Responder, r *redeo.Request) error {
+	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+		db := m.db(ctx.selectedDB)
+
+		count := 0
+		for _, key := range r.Args {
+			if db.del(key, true) {
+				count++
+			}
+		}
+		out.WriteInt(count)
+	})
+}
+
+// TYPE
+func (m *Miniredis) cmdType(out *redeo.Responder, r *redeo.Request) error {
+	if len(r.Args) != 1 {
+		setDirty(r.Client())
+		out.WriteErrorString("usage error")
+		return nil
+	}
+
+	key := r.Args[0]
+
+	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+		db := m.db(ctx.selectedDB)
+
+		t, ok := db.keys[key]
+		if !ok {
+			out.WriteInlineString("none")
+			return
 		}
 
-		return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
-			if ctx.selectedDB == targetDB {
-				out.WriteErrorString("ERR source and destination objects are the same")
-				return
-			}
-			db := m.db(ctx.selectedDB)
-			targetDB := m.db(targetDB)
+		out.WriteString(t)
+	})
+}
 
-			if _, ok := db.keys[key]; !ok {
-				out.WriteZero()
-				return
-			}
-			if _, ok := targetDB.keys[key]; ok {
-				out.WriteZero()
-				return
-			}
-			targetDB.keys[key] = db.keys[key]
-			targetDB.stringKeys[key] = db.stringKeys[key]
-			targetDB.hashKeys[key] = db.hashKeys[key]
-			targetDB.keyVersion[key]++
-			db.del(key, true)
-			out.WriteOne()
-		})
+// EXISTS
+func (m *Miniredis) cmdExists(out *redeo.Responder, r *redeo.Request) error {
+	if len(r.Args) != 1 {
+		setDirty(r.Client())
+		out.WriteErrorString("ERR wrong number of arguments for 'exists' command")
+		return nil
+	}
+
+	key := r.Args[0]
+
+	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+		db := m.db(ctx.selectedDB)
+
+		if _, ok := db.keys[key]; !ok {
+			out.WriteZero()
+			return
+		}
+		out.WriteOne()
+	})
+}
+
+// MOVE
+func (m *Miniredis) cmdMove(out *redeo.Responder, r *redeo.Request) error {
+	if len(r.Args) != 2 {
+		setDirty(r.Client())
+		out.WriteErrorString("ERR wrong number of arguments for 'move' command")
+		return nil
+	}
+
+	key := r.Args[0]
+	targetDB, err := strconv.Atoi(r.Args[1])
+	if err != nil {
+		targetDB = 0
+	}
+
+	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+		if ctx.selectedDB == targetDB {
+			out.WriteErrorString("ERR source and destination objects are the same")
+			return
+		}
+		db := m.db(ctx.selectedDB)
+		targetDB := m.db(targetDB)
+
+		if _, ok := db.keys[key]; !ok {
+			out.WriteZero()
+			return
+		}
+		if _, ok := targetDB.keys[key]; ok {
+			out.WriteZero()
+			return
+		}
+		targetDB.keys[key] = db.keys[key]
+		targetDB.stringKeys[key] = db.stringKeys[key]
+		targetDB.hashKeys[key] = db.hashKeys[key]
+		targetDB.keyVersion[key]++
+		db.del(key, true)
+		out.WriteOne()
 	})
 }
