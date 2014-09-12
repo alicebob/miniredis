@@ -82,12 +82,12 @@ func (db *redisDB) Exists(k string) bool {
 	return ok
 }
 
-// commandsGeneric handles EXPIRE, TTL, PERSIST, &c.
-func commandsGeneric(m *Miniredis, srv *redeo.Server) {
-	srv.HandleFunc("EXPIRE", func(out *redeo.Responder, r *redeo.Request) error {
+// generic expire command for EXPIRE, PEXPIRE, EXPIREAT, PEXPIREAT
+func makeExpirefunc(m *Miniredis, cmd string) func(*redeo.Responder, *redeo.Request) error {
+	return func(out *redeo.Responder, r *redeo.Request) error {
 		if len(r.Args) != 2 {
 			setDirty(r.Client())
-			out.WriteErrorString("ERR wrong number of arguments for 'expire' command")
+			out.WriteErrorString("ERR wrong number of arguments for '" + cmd + "' command")
 			return nil
 		}
 		key := r.Args[0]
@@ -111,36 +111,15 @@ func commandsGeneric(m *Miniredis, srv *redeo.Server) {
 			db.keyVersion[key]++
 			out.WriteOne()
 		})
-	})
+	}
+}
 
-	srv.HandleFunc("PEXPIRE", func(out *redeo.Responder, r *redeo.Request) error {
-		if len(r.Args) != 2 {
-			setDirty(r.Client())
-			out.WriteErrorString("ERR wrong number of arguments for 'pexpire' command")
-			return nil
-		}
-		key := r.Args[0]
-		value := r.Args[1]
-		i, err := strconv.Atoi(value)
-		if err != nil {
-			setDirty(r.Client())
-			out.WriteErrorString("ERR value is not an integer or out of range")
-			return nil
-		}
-
-		return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
-			db := m.db(ctx.selectedDB)
-
-			// Key must be present.
-			if _, ok := db.keys[key]; !ok {
-				out.WriteZero()
-				return
-			}
-			db.expire[key] = i // We put pexires in expire.
-			db.keyVersion[key]++
-			out.WriteOne()
-		})
-	})
+// commandsGeneric handles EXPIRE, TTL, PERSIST, &c.
+func commandsGeneric(m *Miniredis, srv *redeo.Server) {
+	srv.HandleFunc("EXPIRE", makeExpirefunc(m, "expire"))
+	srv.HandleFunc("PEXPIRE", makeExpirefunc(m, "pexpire"))
+	srv.HandleFunc("EXPIREAT", makeExpirefunc(m, "expireat"))
+	srv.HandleFunc("PEXPIREAT", makeExpirefunc(m, "pexpireat"))
 
 	srv.HandleFunc("TTL", func(out *redeo.Responder, r *redeo.Request) error {
 		if len(r.Args) != 1 {

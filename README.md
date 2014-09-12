@@ -30,8 +30,10 @@ Implemented commands:
      - DEL
      - EXISTS
      - EXPIRE
+     - EXPIREAT
      - PERSIST
      - PEXPIRE
+     - PEXPIREAT
      - PTTL
      - TTL
      - TYPE

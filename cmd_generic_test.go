@@ -97,6 +97,42 @@ func TestExpire(t *testing.T) {
 	}
 }
 
+func TestExpireat(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	// Not volatile yet
+	{
+		equals(t, 0, s.Expire("foo"))
+		b, err := redis.Int(c.Do("TTL", "foo"))
+		ok(t, err)
+		equals(t, -2, b)
+	}
+
+	// Set something
+	{
+		_, err := c.Do("SET", "foo", "bar")
+		ok(t, err)
+		// Key exists, but no Expire set yet.
+		b, err := redis.Int(c.Do("TTL", "foo"))
+		ok(t, err)
+		equals(t, -1, b)
+
+		n, err := redis.Int(c.Do("EXPIREAT", "foo", 1234567890))
+		ok(t, err)
+		equals(t, 1, n) // EXPIREAT returns 1 on success.
+
+		equals(t, 1234567890, s.Expire("foo"))
+		b, err = redis.Int(c.Do("TTL", "foo"))
+		ok(t, err)
+		equals(t, 1234567890, b)
+		equals(t, 1234567890, s.Expire("foo"))
+	}
+}
+
 func TestPexpire(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
