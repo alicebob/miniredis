@@ -318,8 +318,9 @@ func TestSetnx(t *testing.T) {
 		v, err := redis.Int(c.Do("SETNX", "foo", "not bar"))
 		ok(t, err)
 		equals(t, 0, v)
-		equals(t, "bar", s.Get("foo"))
-
+		equals(t, "hash", s.Type("foo"))
+		equals(t, "", s.Get("foo"))
+		equals(t, "baz", s.HGet("foo", "bar"))
 	}
 }
 

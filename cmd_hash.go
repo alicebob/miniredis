@@ -57,12 +57,14 @@ func (db *redisDB) HSet(k, f, v string) {
 
 // hset returns whether the key already existed
 func (db *redisDB) hset(k, f, v string) bool {
+	if t, ok := db.keys[k]; ok && t != "hash" {
+		db.del(k, true)
+	}
 	db.keys[k] = "hash"
-	_, ok := db.hashKeys[k]
-	if !ok {
+	if _, ok := db.hashKeys[k]; !ok {
 		db.hashKeys[k] = map[string]string{}
 	}
-	_, ok = db.hashKeys[k][f]
+	_, ok := db.hashKeys[k][f]
 	db.hashKeys[k][f] = v
 	db.keyVersion[k]++
 	return ok
