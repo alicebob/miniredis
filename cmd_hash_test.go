@@ -332,3 +332,112 @@ func TestHashMget(t *testing.T) {
 	_, err = redis.Int(c.Do("HMGET", "foo", "bar"))
 	assert(t, err != nil, "no HMGET error")
 }
+
+func TestHashIncrby(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	// New key
+	{
+		v, err := redis.Int(c.Do("HINCRBY", "hash", "field", 1))
+		ok(t, err)
+		equals(t, 1, v)
+	}
+
+	// Existing key
+	{
+		v, err := redis.Int(c.Do("HINCRBY", "hash", "field", 100))
+		ok(t, err)
+		equals(t, 101, v)
+	}
+
+	// Minus works.
+	{
+		v, err := redis.Int(c.Do("HINCRBY", "hash", "field", -12))
+		ok(t, err)
+		equals(t, 101-12, v)
+	}
+
+	// Direct usage
+	s.HIncr("hash", "field", -3)
+	equals(t, "86", s.HGet("hash", "field"))
+
+	// Error cases.
+	{
+		// Wrong key type
+		s.Set("str", "cake")
+		_, err = redis.Values(c.Do("HINCRBY", "str", "case", 4))
+		assert(t, err != nil, "no HINCRBY error")
+
+		_, err = redis.Values(c.Do("HINCRBY", "str", "case", "foo"))
+		assert(t, err != nil, "no HINCRBY error")
+
+		_, err = redis.Values(c.Do("HINCRBY", "str"))
+		assert(t, err != nil, "no HINCRBY error")
+	}
+}
+
+func TestHashIncrbyfloat(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	// Existing key
+	{
+		s.HSet("hash", "field", "12")
+		v, err := redis.Float64(c.Do("HINCRBYFLOAT", "hash", "field", "400.12"))
+		ok(t, err)
+		equals(t, 412.12, v)
+		equals(t, "412.12", s.HGet("hash", "field"))
+	}
+
+	// Existing key, not a number
+	{
+		s.HSet("hash", "field", "noint")
+		_, err := redis.Float64(c.Do("HINCRBYFLOAT", "hash", "field", "400"))
+		assert(t, err != nil, "do HINCRBYFLOAT error")
+	}
+
+	// New key
+	{
+		v, err := redis.Float64(c.Do("HINCRBYFLOAT", "hash", "newfield", "40.33"))
+		ok(t, err)
+		equals(t, 40.33, v)
+		equals(t, "40.33", s.HGet("hash", "newfield"))
+	}
+
+	// Direct usage
+	{
+		s.HSet("hash", "field", "500.1")
+		f, err := s.HIncrfloat("hash", "field", 12)
+		ok(t, err)
+		equals(t, 512.1, f)
+		equals(t, "512.1", s.HGet("hash", "field"))
+	}
+
+	// Wrong type of existing key
+	{
+		s.Set("wrong", "type")
+		_, err := redis.Int(c.Do("HINCRBYFLOAT", "wrong", "type", "400"))
+		assert(t, err != nil, "do HINCRBYFLOAT error")
+	}
+
+	// Wrong usage
+	{
+		_, err := redis.Int(c.Do("HINCRBYFLOAT"))
+		assert(t, err != nil, "do HINCRBYFLOAT error")
+		_, err = redis.Int(c.Do("HINCRBYFLOAT", "wrong"))
+		assert(t, err != nil, "do HINCRBYFLOAT error")
+		_, err = redis.Int(c.Do("HINCRBYFLOAT", "wrong", "value"))
+		assert(t, err != nil, "do HINCRBYFLOAT error")
+		_, err = redis.Int(c.Do("HINCRBYFLOAT", "wrong", "value", "noint"))
+		assert(t, err != nil, "do HINCRBYFLOAT error")
+		_, err = redis.Int(c.Do("HINCRBYFLOAT", "foo", "bar", 12, "tomanye"))
+		assert(t, err != nil, "do HINCRBYFLOAT error")
+	}
+}

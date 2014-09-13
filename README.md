@@ -75,6 +75,8 @@ Implemented commands:
    - HEXISTS
    - HGET
    - HGETALL
+   - HINCRBY
+   - HINCRBYFLOAT
    - HKEYS
    - HLEN
    - HMGET

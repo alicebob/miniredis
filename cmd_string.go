@@ -4,7 +4,6 @@ package miniredis
 
 import (
 	"errors"
-	"fmt"
 	"strconv"
 	"strings"
 
@@ -77,34 +76,31 @@ func (db *RedisDB) incr(k string, delta int) (int, error) {
 	return v, nil
 }
 
+// Incrfloat changes a float string value by delta.
+func (m *Miniredis) Incrfloat(k string, delta float64) (float64, error) {
+	return m.DB(m.selectedDB).Incrfloat(k, delta)
+}
+
+// Incrfloat changes a float string value by delta.
+func (db *RedisDB) Incrfloat(k string, delta float64) (float64, error) {
+	db.master.Lock()
+	defer db.master.Unlock()
+	return db.incrfloat(k, delta)
+}
+
 // change float key value
-func (db *RedisDB) incrfloat(k string, delta float64) (string, error) {
+func (db *RedisDB) incrfloat(k string, delta float64) (float64, error) {
 	v := 0.0
 	if sv, ok := db.stringKeys[k]; ok {
 		var err error
 		v, err = strconv.ParseFloat(sv, 64)
 		if err != nil {
-			return "0", errFloatValueError
+			return 0, errFloatValueError
 		}
 	}
 	v += delta
-	// Format with %f and strip trailing 0s. This is the most like Redis does
-	// it :(
-	sv := fmt.Sprintf("%.12f", v)
-	for strings.Contains(sv, ".") {
-		if sv[len(sv)-1] != '0' {
-			break
-		}
-		// Remove trailing 0s.
-		sv = sv[:len(sv)-1]
-		// Ends with a '.'.
-		if sv[len(sv)-1] == '.' {
-			sv = sv[:len(sv)-1]
-			break
-		}
-	}
-	db.set(k, sv)
-	return sv, nil
+	db.set(k, formatFloat(v))
+	return v, nil
 }
 
 // commandsString handles all string value operations.
@@ -530,7 +526,7 @@ func (m *Miniredis) cmdIncrbyfloat(out *redeo.Responder, r *redeo.Request) error
 			return
 		}
 		// Don't touch TTL
-		out.WriteString(v)
+		out.WriteString(formatFloat(v))
 	})
 }
 

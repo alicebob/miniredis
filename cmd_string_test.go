@@ -455,6 +455,15 @@ func TestIncrbyfloat(t *testing.T) {
 		equals(t, "40.33", s.Get("bar"))
 	}
 
+	// Direct usage
+	{
+		s.Set("foo", "500.1")
+		f, err := s.Incrfloat("foo", 12)
+		ok(t, err)
+		equals(t, 512.1, f)
+		equals(t, "512.1", s.Get("foo"))
+	}
+
 	// Wrong type of existing key
 	{
 		s.HSet("wrong", "aap", "noot")

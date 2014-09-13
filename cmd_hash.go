@@ -3,6 +3,8 @@
 package miniredis
 
 import (
+	"strconv"
+
 	"github.com/bsm/redeo"
 )
 
@@ -95,18 +97,80 @@ func (db *RedisDB) hdel(k, f string) {
 	db.keyVersion[k]++
 }
 
+// HIncr increases a key/field by delta (int).
+func (m *Miniredis) HIncr(k, f string, delta int) (int, error) {
+	return m.DB(m.selectedDB).HIncr(k, f, delta)
+}
+
+// HIncr increases a key/field by delta (int).
+func (db *RedisDB) HIncr(k, f string, delta int) (int, error) {
+	db.master.Lock()
+	defer db.master.Unlock()
+	return db.hincr(k, f, delta)
+}
+
+// change int key value
+func (db *RedisDB) hincr(key, field string, delta int) (int, error) {
+	v := 0
+	if h, ok := db.hashKeys[key]; ok {
+		if f, ok := h[field]; ok {
+			var err error
+			v, err = strconv.Atoi(f)
+			if err != nil {
+				return 0, errIntValueError
+			}
+		}
+	}
+	v += delta
+	db.hset(key, field, strconv.Itoa(v))
+	return v, nil
+}
+
+// HIncrfloat increases a key/field by delta (float).
+func (m *Miniredis) HIncrfloat(k, f string, delta float64) (float64, error) {
+	return m.DB(m.selectedDB).HIncrfloat(k, f, delta)
+}
+
+// HIncrfloat increases a key/field by delta (float).
+func (db *RedisDB) HIncrfloat(k, f string, delta float64) (float64, error) {
+	db.master.Lock()
+	defer db.master.Unlock()
+	return db.hincrfloat(k, f, delta)
+}
+
+// change float key value
+func (db *RedisDB) hincrfloat(key, field string, delta float64) (float64, error) {
+	v := 0.0
+	if h, ok := db.hashKeys[key]; ok {
+		if f, ok := h[field]; ok {
+			var err error
+			v, err = strconv.ParseFloat(f, 64)
+			if err != nil {
+				return 0, errFloatValueError
+			}
+		}
+	}
+	v += delta
+	db.hset(key, field, formatFloat(v))
+	return v, nil
+}
+
 // commandsHash handles all hash value operations.
 func commandsHash(m *Miniredis, srv *redeo.Server) {
 	srv.HandleFunc("HDEL", m.cmdHdel)
 	srv.HandleFunc("HEXISTS", m.cmdHexists)
-	srv.HandleFunc("HGETALL", m.cmdHgetall)
 	srv.HandleFunc("HGET", m.cmdHget)
+	srv.HandleFunc("HGETALL", m.cmdHgetall)
+	srv.HandleFunc("HINCRBY", m.cmdHincrby)
+	srv.HandleFunc("HINCRBYFLOAT", m.cmdHincrbyfloat)
 	srv.HandleFunc("HKEYS", m.cmdHkeys)
 	srv.HandleFunc("HLEN", m.cmdHlen)
 	srv.HandleFunc("HMGET", m.cmdHmget)
+	// HMSET
 	srv.HandleFunc("HSET", m.cmdHset)
 	srv.HandleFunc("HSETNX", m.cmdHsetnx)
 	srv.HandleFunc("HVALS", m.cmdHvals)
+	// HSCAN skipped
 }
 
 // HSET
@@ -418,5 +482,71 @@ func (m *Miniredis) cmdHmget(out *redeo.Responder, r *redeo.Request) error {
 			}
 			out.WriteString(v)
 		}
+	})
+}
+
+// HINCRBY
+func (m *Miniredis) cmdHincrby(out *redeo.Responder, r *redeo.Request) error {
+	if len(r.Args) != 3 {
+		setDirty(r.Client())
+		out.WriteErrorString("ERR wrong number of arguments for 'hincrby' command")
+		return nil
+	}
+	key := r.Args[0]
+	field := r.Args[1]
+	delta, err := strconv.Atoi(r.Args[2])
+	if err != nil {
+		setDirty(r.Client())
+		out.WriteErrorString("ERR value is not an integer or out of range")
+		return nil
+	}
+
+	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+		db := m.db(ctx.selectedDB)
+
+		if t, ok := db.keys[key]; ok && t != "hash" {
+			out.WriteErrorString(msgWrongType)
+			return
+		}
+
+		v, err := db.hincr(key, field, delta)
+		if err != nil {
+			out.WriteErrorString(err.Error())
+			return
+		}
+		out.WriteInt(v)
+	})
+}
+
+// HINCRBYFLOAT
+func (m *Miniredis) cmdHincrbyfloat(out *redeo.Responder, r *redeo.Request) error {
+	if len(r.Args) != 3 {
+		setDirty(r.Client())
+		out.WriteErrorString("ERR wrong number of arguments for 'hincrbyfloat' command")
+		return nil
+	}
+	key := r.Args[0]
+	field := r.Args[1]
+	delta, err := strconv.ParseFloat(r.Args[2], 64)
+	if err != nil {
+		setDirty(r.Client())
+		out.WriteErrorString("ERR value is not a valid float")
+		return nil
+	}
+
+	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+		db := m.db(ctx.selectedDB)
+
+		if t, ok := db.keys[key]; ok && t != "hash" {
+			out.WriteErrorString(msgWrongType)
+			return
+		}
+
+		v, err := db.hincrfloat(key, field, delta)
+		if err != nil {
+			out.WriteErrorString(err.Error())
+			return
+		}
+		out.WriteString(formatFloat(v))
 	})
 }
