@@ -328,3 +328,50 @@ func TestMove(t *testing.T) {
 		assert(t, err != nil, "do TYPE error")
 	}
 }
+
+func TestKeys(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	s.Set("foo", "bar!")
+	s.Set("foobar", "bar!")
+	s.Set("barfoo", "bar!")
+	s.Set("fooooo", "bar!")
+
+	{
+		v, err := redis.Strings(c.Do("KEYS", "foo"))
+		ok(t, err)
+		equals(t, []string{"foo"}, v)
+	}
+
+	// simple '*'
+	{
+		v, err := redis.Strings(c.Do("KEYS", "foo*"))
+		ok(t, err)
+		equals(t, []string{"foo", "foobar", "fooooo"}, v)
+	}
+	// simple '?'
+	{
+		v, err := redis.Strings(c.Do("KEYS", "fo?"))
+		ok(t, err)
+		equals(t, []string{"foo"}, v)
+	}
+
+	// Don't die on never-matching pattern.
+	{
+		v, err := redis.Strings(c.Do("KEYS", `f\`))
+		ok(t, err)
+		equals(t, []string{}, v)
+	}
+
+	// Wrong usage
+	{
+		_, err := redis.Int(c.Do("KEYS"))
+		assert(t, err != nil, "do KEYS error")
+		_, err = redis.Int(c.Do("MOVE", "foo", "noint"))
+		assert(t, err != nil, "do KEYS error")
+	}
+}

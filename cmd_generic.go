@@ -3,6 +3,7 @@
 package miniredis
 
 import (
+	"sort"
 	"strconv"
 
 	"github.com/bsm/redeo"
@@ -93,6 +94,7 @@ func commandsGeneric(m *Miniredis, srv *redeo.Server) {
 	srv.HandleFunc("EXISTS", m.cmdExists)
 	srv.HandleFunc("EXPIREAT", makeCmdExpire(m, "expireat"))
 	srv.HandleFunc("EXPIRE", makeCmdExpire(m, "expire"))
+	srv.HandleFunc("KEYS", m.cmdKeys)
 	srv.HandleFunc("MOVE", m.cmdMove)
 	srv.HandleFunc("PERSIST", m.cmdPersist)
 	srv.HandleFunc("PEXPIREAT", makeCmdExpire(m, "pexpireat"))
@@ -310,5 +312,41 @@ func (m *Miniredis) cmdMove(out *redeo.Responder, r *redeo.Request) error {
 		targetDB.keyVersion[key]++
 		db.del(key, true)
 		out.WriteOne()
+	})
+}
+
+// KEYS
+func (m *Miniredis) cmdKeys(out *redeo.Responder, r *redeo.Request) error {
+	if len(r.Args) != 1 {
+		setDirty(r.Client())
+		out.WriteErrorString("ERR wrong number of arguments for 'keys' command")
+		return nil
+	}
+
+	key := r.Args[0]
+
+	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+		db := m.db(ctx.selectedDB)
+
+		var res []string
+		re := patternRE(key)
+		if re == nil {
+			// Special case, the given pattern won't match anything / is
+			// invalid.
+			out.WriteBulkLen(0)
+			return
+		}
+		for k := range db.keys {
+			if !re.MatchString(k) {
+				continue
+			}
+			res = append(res, k)
+		}
+
+		out.WriteBulkLen(len(res))
+		sort.Strings(res) // To make things deterministic.
+		for _, s := range res {
+			out.WriteString(s)
+		}
 	})
 }

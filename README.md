@@ -31,6 +31,7 @@ Implemented commands:
    - EXISTS
    - EXPIRE
    - EXPIREAT
+   - KEYS
    - MOVE
    - PERSIST
    - PEXPIRE
