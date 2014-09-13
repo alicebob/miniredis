@@ -3,6 +3,7 @@
 package miniredis
 
 import (
+	"math/rand"
 	"sort"
 	"strconv"
 
@@ -100,6 +101,7 @@ func commandsGeneric(m *Miniredis, srv *redeo.Server) {
 	srv.HandleFunc("PEXPIREAT", makeCmdExpire(m, "pexpireat"))
 	srv.HandleFunc("PEXPIRE", makeCmdExpire(m, "pexpire"))
 	srv.HandleFunc("PTTL", m.cmdPTTL)
+	srv.HandleFunc("RANDOMKEY", m.cmdRandomkey)
 	srv.HandleFunc("TTL", m.cmdTTL)
 	srv.HandleFunc("TYPE", m.cmdType)
 }
@@ -347,6 +349,32 @@ func (m *Miniredis) cmdKeys(out *redeo.Responder, r *redeo.Request) error {
 		sort.Strings(res) // To make things deterministic.
 		for _, s := range res {
 			out.WriteString(s)
+		}
+	})
+}
+
+// RANDOMKEY
+func (m *Miniredis) cmdRandomkey(out *redeo.Responder, r *redeo.Request) error {
+	if len(r.Args) != 0 {
+		setDirty(r.Client())
+		out.WriteErrorString("ERR wrong number of arguments for 'randomkey' command")
+		return nil
+	}
+
+	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+		db := m.db(ctx.selectedDB)
+
+		if len(db.keys) == 0 {
+			out.WriteNil()
+			return
+		}
+		nr := rand.Intn(len(db.keys))
+		for k := range db.keys {
+			if nr == 0 {
+				out.WriteString(k)
+				return
+			}
+			nr--
 		}
 	})
 }

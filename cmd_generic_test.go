@@ -375,3 +375,35 @@ func TestKeys(t *testing.T) {
 		assert(t, err != nil, "do KEYS error")
 	}
 }
+
+func TestRandom(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	// Empty db.
+	{
+		v, err := c.Do("RANDOMKEY")
+		ok(t, err)
+		equals(t, nil, v)
+	}
+
+	s.Set("one", "bar!")
+	s.Set("two", "bar!")
+	s.Set("three", "bar!")
+
+	// No idea which key will be returned.
+	{
+		v, err := redis.String(c.Do("RANDOMKEY"))
+		ok(t, err)
+		assert(t, v == "one" || v == "two" || v == "three", "RANDOMKEY looks sane")
+	}
+
+	// Wrong usage
+	{
+		_, err = redis.Int(c.Do("RANDOMKEY", "spurious"))
+		assert(t, err != nil, "do RANDOMKEY error")
+	}
+}

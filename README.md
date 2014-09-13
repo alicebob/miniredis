@@ -37,6 +37,7 @@ Implemented commands:
    - PEXPIRE
    - PEXPIREAT
    - PTTL
+   - RANDOMKEY -- call math.rand.Seed(...) before using.
    - TTL
    - TYPE
  - Transactions (complete)
