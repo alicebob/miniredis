@@ -85,9 +85,11 @@ Implemented commands:
    - HSETNX
    - HVALS
  - List keys
+   - LPOP
    - LPUSH
    - LRANGE
-   - LPOP
+   - RPOP
+   - RPUSH
 
 
 Since this is intended to be used in unittests timeouts are not implemented.

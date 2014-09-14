@@ -23,9 +23,9 @@ func commandsList(m *Miniredis, srv *redeo.Server) {
 	// LREM key count value
 	// LSET key index value
 	// LTRIM key start stop
-	// RPOP key
+	srv.HandleFunc("RPOP", m.cmdRpop)
 	// RPOPLPUSH source destination
-	// RPUSH key value [value ...]
+	srv.HandleFunc("RPUSH", m.cmdRpush)
 	// RPUSHX key value
 }
 
@@ -121,5 +121,57 @@ func (m *Miniredis) cmdLrange(out *redeo.Responder, r *redeo.Request) error {
 		for _, el := range l[rs:re] {
 			out.WriteString(el)
 		}
+	})
+}
+
+// RPOP
+func (m *Miniredis) cmdRpop(out *redeo.Responder, r *redeo.Request) error {
+	if len(r.Args) != 1 {
+		setDirty(r.Client())
+		out.WriteErrorString("ERR wrong number of arguments for 'rpop' command")
+		return nil
+	}
+	key := r.Args[0]
+
+	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+		db := m.db(ctx.selectedDB)
+
+		elem, err := db.pop(key)
+		if err != nil {
+			if err == ErrKeyNotFound {
+				// Non-existing key is fine.
+				out.WriteNil()
+				return
+			}
+			out.WriteErrorString(err.Error())
+			return
+		}
+		out.WriteString(elem)
+	})
+}
+
+// RPUSH
+func (m *Miniredis) cmdRpush(out *redeo.Responder, r *redeo.Request) error {
+	if len(r.Args) < 2 {
+		setDirty(r.Client())
+		out.WriteErrorString("ERR wrong number of arguments for 'rpush' command")
+		return nil
+	}
+	key := r.Args[0]
+	args := r.Args[1:]
+
+	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+		db := m.db(ctx.selectedDB)
+
+		var newLen int
+		var err error
+		for _, value := range args {
+			newLen, err = db.push(key, value)
+			if err != nil {
+				out.WriteErrorString(err.Error())
+				return
+			}
+		}
+		out.WriteInt(newLen)
 	})
 }
