@@ -16,7 +16,7 @@ func commandsList(m *Miniredis, srv *redeo.Server) {
 	// LINDEX key index
 	// LINSERT key BEFORE|AFTER pivot value
 	// LLEN key
-	// LPOP key
+	srv.HandleFunc("LPOP", m.cmdLpop)
 	srv.HandleFunc("LPUSH", m.cmdLpush)
 	// LPUSHX key value
 	srv.HandleFunc("LRANGE", m.cmdLrange)
@@ -27,6 +27,32 @@ func commandsList(m *Miniredis, srv *redeo.Server) {
 	// RPOPLPUSH source destination
 	// RPUSH key value [value ...]
 	// RPUSHX key value
+}
+
+// LPOP
+func (m *Miniredis) cmdLpop(out *redeo.Responder, r *redeo.Request) error {
+	if len(r.Args) != 1 {
+		setDirty(r.Client())
+		out.WriteErrorString("ERR wrong number of arguments for 'lpop' command")
+		return nil
+	}
+	key := r.Args[0]
+
+	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+		db := m.db(ctx.selectedDB)
+
+		elem, err := db.lpop(key)
+		if err != nil {
+			if err == ErrKeyNotFound {
+				// Non-existing key is fine.
+				out.WriteNil()
+				return
+			}
+			out.WriteErrorString(err.Error())
+			return
+		}
+		out.WriteString(elem)
+	})
 }
 
 // LPUSH

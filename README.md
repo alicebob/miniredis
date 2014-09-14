@@ -87,6 +87,7 @@ Implemented commands:
  - List keys
    - LPUSH
    - LRANGE
+   - LPOP
 
 
 Since this is intended to be used in unittests timeouts are not implemented.

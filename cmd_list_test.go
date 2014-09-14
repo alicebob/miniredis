@@ -53,6 +53,15 @@ func TestLpush(t *testing.T) {
 		list, err := s.List("l2")
 		ok(t, err)
 		equals(t, []string{"b", "a"}, list)
+
+		el, err := s.Lpop("l2")
+		ok(t, err)
+		equals(t, "b", el)
+		el, err = s.Lpop("l2")
+		ok(t, err)
+		equals(t, "a", el)
+		// Key is removed on pop-empty.
+		equals(t, false, s.Exists("l2"))
 	}
 
 	// Wrong type of key
@@ -63,4 +72,41 @@ func TestLpush(t *testing.T) {
 		assert(t, err != nil, "LPUSH error")
 	}
 
+}
+
+func TestLpop(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	b, err := redis.Int(c.Do("LPUSH", "l", "aap", "noot", "mies"))
+	ok(t, err)
+	equals(t, 3, b) // New length.
+
+	// Simple pops.
+	{
+		el, err := redis.String(c.Do("LPOP", "l"))
+		ok(t, err)
+		equals(t, "mies", el)
+
+		el, err = redis.String(c.Do("LPOP", "l"))
+		ok(t, err)
+		equals(t, "noot", el)
+
+		el, err = redis.String(c.Do("LPOP", "l"))
+		ok(t, err)
+		equals(t, "aap", el)
+
+		// Last element has been popped. Key is gone.
+		i, err := redis.Int(c.Do("EXISTS", "l"))
+		ok(t, err)
+		equals(t, 0, i)
+
+		// Can pop non-existing keys just fine.
+		v, err := c.Do("LPOP", "l")
+		ok(t, err)
+		equals(t, nil, v)
+	}
 }

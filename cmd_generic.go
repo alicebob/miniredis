@@ -29,6 +29,7 @@ func (db *RedisDB) del(k string, delTTL bool) bool {
 		return false
 	}
 	delete(db.keys, k)
+	db.keyVersion[k]++
 	if delTTL {
 		delete(db.expire, k)
 	}

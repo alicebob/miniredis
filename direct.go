@@ -7,8 +7,8 @@ import (
 )
 
 var (
-	// ErrNotFound is returned when a key doesn't exist.
-	ErrNotFound = errors.New("key not found")
+	// ErrKeyNotFound is returned when a key doesn't exist.
+	ErrKeyNotFound = errors.New("key not found")
 	// ErrWrongType when a key is not the right type.
 	ErrWrongType = errors.New(msgWrongType)
 )
@@ -29,7 +29,7 @@ func (db *RedisDB) List(k string) ([]string, error) {
 
 	t, ok := db.keys[k]
 	if !ok {
-		return nil, ErrNotFound
+		return nil, ErrKeyNotFound
 	}
 	if t != "list" {
 		return nil, ErrWrongType
@@ -47,4 +47,16 @@ func (db *RedisDB) Lpush(k, v string) (int, error) {
 	db.master.Lock()
 	defer db.master.Unlock()
 	return db.lpush(k, v)
+}
+
+// Lpop is a shift. Returns the popped element.
+func (m *Miniredis) Lpop(k string) (string, error) {
+	return m.DB(m.selectedDB).Lpop(k)
+}
+
+// Lpop is a shift. Returns the popped element.
+func (db *RedisDB) Lpop(k string) (string, error) {
+	db.master.Lock()
+	defer db.master.Unlock()
+	return db.lpop(k)
 }
