@@ -1,17 +1,9 @@
 package miniredis
 
-import (
-	"errors"
-)
-
-var (
-	errWrongType = errors.New(msgWrongType)
-)
-
 // internal, non-locked lpush.
 func (db *RedisDB) lpush(k, v string) (int, error) {
 	if t, ok := db.keys[k]; ok && t != "list" {
-		return 0, errWrongType
+		return 0, ErrWrongType
 	}
 	l, ok := db.listKeys[k]
 	if !ok {

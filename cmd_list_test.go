@@ -42,6 +42,19 @@ func TestLpush(t *testing.T) {
 		equals(t, []string{"aap"}, r)
 	}
 
+	// Direct usage
+	{
+		l, err := s.Lpush("l2", "a")
+		ok(t, err)
+		equals(t, 1, l)
+		l, err = s.Lpush("l2", "b")
+		ok(t, err)
+		equals(t, 2, l)
+		list, err := s.List("l2")
+		ok(t, err)
+		equals(t, []string{"b", "a"}, list)
+	}
+
 	// Wrong type of key
 	{
 		_, err := redis.String(c.Do("SET", "str", "value"))
