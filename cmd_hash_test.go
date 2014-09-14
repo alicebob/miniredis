@@ -99,6 +99,47 @@ func TestHashSetNX(t *testing.T) {
 	assert(t, err != nil, "no HSETNX error")
 }
 
+func TestHashMSet(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	// New Hash
+	{
+		v, err := redis.String(c.Do("HMSET", "hash", "wim", "zus", "jet", "vuur"))
+		ok(t, err)
+		equals(t, "OK", v)
+
+		equals(t, "zus", s.HGet("hash", "wim"))
+		equals(t, "vuur", s.HGet("hash", "jet"))
+	}
+
+	// Doesn't touch ttl.
+	{
+		s.SetExpire("hash", 999)
+		v, err := redis.String(c.Do("HMSET", "hash", "gijs", "lam"))
+		ok(t, err)
+		equals(t, "OK", v)
+		equals(t, 999, s.Expire("hash"))
+	}
+
+	{
+		// Wrong key type
+		s.Set("str", "value")
+		_, err = redis.Int(c.Do("HMSET", "str", "key", "value"))
+		assert(t, err != nil, "no HSETerror")
+		// Usage error
+		_, err = redis.Int(c.Do("HMSET", "str"))
+		assert(t, err != nil, "no HSETerror")
+		_, err = redis.Int(c.Do("HMSET", "str", "odd"))
+		assert(t, err != nil, "no HSETerror")
+		_, err = redis.Int(c.Do("HMSET", "str", "key", "value", "odd"))
+		assert(t, err != nil, "no HSETerror")
+	}
+}
+
 func TestHashDel(t *testing.T) {
 	s, err := Run()
 	ok(t, err)

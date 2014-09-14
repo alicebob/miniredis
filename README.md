@@ -80,6 +80,7 @@ Implemented commands:
    - HKEYS
    - HLEN
    - HMGET
+   - HMSET
    - HSET
    - HSETNX
    - HVALS

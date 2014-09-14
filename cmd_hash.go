@@ -166,7 +166,7 @@ func commandsHash(m *Miniredis, srv *redeo.Server) {
 	srv.HandleFunc("HKEYS", m.cmdHkeys)
 	srv.HandleFunc("HLEN", m.cmdHlen)
 	srv.HandleFunc("HMGET", m.cmdHmget)
-	// HMSET
+	srv.HandleFunc("HMSET", m.cmdHmset)
 	srv.HandleFunc("HSET", m.cmdHset)
 	srv.HandleFunc("HSETNX", m.cmdHsetnx)
 	srv.HandleFunc("HVALS", m.cmdHvals)
@@ -231,6 +231,39 @@ func (m *Miniredis) cmdHsetnx(out *redeo.Responder, r *redeo.Request) error {
 		db.hashKeys[key][field] = value
 		db.keyVersion[key]++
 		out.WriteOne()
+	})
+}
+
+// MMSET
+func (m *Miniredis) cmdHmset(out *redeo.Responder, r *redeo.Request) error {
+	if len(r.Args) < 3 {
+		setDirty(r.Client())
+		out.WriteErrorString("ERR wrong number of arguments for 'hmset' command")
+		return nil
+	}
+	key := r.Args[0]
+	args := r.Args[1:]
+	if len(args)%2 != 0 {
+		setDirty(r.Client())
+		out.WriteErrorString("ERR wrong number of arguments for HMSET")
+		return nil
+	}
+	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+		db := m.db(ctx.selectedDB)
+
+		if t, ok := db.keys[key]; ok && t != "hash" {
+			out.WriteErrorString(msgWrongType)
+			return
+		}
+
+		for len(args) > 0 {
+			field := args[0]
+			value := args[1]
+			args = args[2:]
+
+			db.hset(key, field, value)
+		}
+		out.WriteOK()
 	})
 }
 
