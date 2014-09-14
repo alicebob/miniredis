@@ -361,7 +361,6 @@ func (m *Miniredis) cmdGet(out *redeo.Responder, r *redeo.Request) error {
 				return
 			}
 			if t != "string" {
-				setDirty(r.Client())
 				out.WriteErrorString(msgWrongType)
 				return
 			}
@@ -1007,31 +1006,8 @@ func (m *Miniredis) cmdSetbit(out *redeo.Responder, r *redeo.Request) error {
 
 // Redis range. both start and end can be negative.
 func withRange(v string, start, end int) string {
-	if start < 0 {
-		start = len(v) + start
-		if start < 0 {
-			start = 0
-		}
-	}
-	if start > len(v) {
-		start = len(v)
-	}
-
-	if end < 0 {
-		end = len(v) + end
-		if end < 0 {
-			end = 0
-		}
-	}
-	end++ // end argument is inclusive in Redis.
-	if end > len(v) {
-		end = len(v)
-	}
-
-	if end < start {
-		return ""
-	}
-	return v[start:end]
+	s, e := redisRange(len(v), start, end)
+	return v[s:e]
 }
 
 func countBits(v []byte) int {

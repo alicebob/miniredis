@@ -84,6 +84,9 @@ Implemented commands:
    - HSET
    - HSETNX
    - HVALS
+ - List keys
+   - LPUSH
+   - LRANGE
 
 
 Since this is intended to be used in unittests timeouts are not implemented.

@@ -8,7 +8,8 @@ import (
 )
 
 const (
-	msgWrongType = "WRONGTYPE Operation against a key holding the wrong kind of value"
+	msgWrongType  = "WRONGTYPE Operation against a key holding the wrong kind of value"
+	msgInvalidInt = "ERR value is not an integer or out of range"
 )
 
 // withTx wraps the non-argument-checking part of command handling code in
@@ -50,4 +51,36 @@ func formatFloat(v float64) string {
 		}
 	}
 	return sv
+}
+
+// redisRange gives Go offsets for something l long with start/end in
+// Redis semantics. Both start and end can be negative.
+// Used for string range and list range things.
+// The results can be used as: v[start:end]
+func redisRange(l, start, end int) (int, int) {
+	if start < 0 {
+		start = l + start
+		if start < 0 {
+			start = 0
+		}
+	}
+	if start > l {
+		start = l
+	}
+
+	if end < 0 {
+		end = l + end
+		if end < 0 {
+			end = 0
+		}
+	}
+	end++ // end argument is inclusive in Redis.
+	if end > l {
+		end = l
+	}
+
+	if end < start {
+		return 0, 0
+	}
+	return start, end
 }

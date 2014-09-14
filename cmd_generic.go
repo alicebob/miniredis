@@ -24,16 +24,24 @@ func (db *RedisDB) Del(k string) bool {
 
 // internal, non-locked delete.
 func (db *RedisDB) del(k string, delTTL bool) bool {
-	if _, ok := db.keys[k]; !ok {
+	t, ok := db.keys[k]
+	if !ok {
 		return false
 	}
 	delete(db.keys, k)
 	if delTTL {
 		delete(db.expire, k)
 	}
-	// These are not strictly needed:
-	delete(db.stringKeys, k)
-	delete(db.hashKeys, k)
+	switch t {
+	case "string":
+		delete(db.stringKeys, k)
+	case "hash":
+		delete(db.hashKeys, k)
+	case "list":
+		delete(db.listKeys, k)
+	default:
+		panic("Unknown key type: " + t)
+	}
 	return true
 }
 
@@ -253,7 +261,7 @@ func (m *Miniredis) cmdType(out *redeo.Responder, r *redeo.Request) error {
 			return
 		}
 
-		out.WriteString(t)
+		out.WriteInlineString(t)
 	})
 }
 
@@ -311,6 +319,7 @@ func (m *Miniredis) cmdMove(out *redeo.Responder, r *redeo.Request) error {
 		targetDB.keys[key] = db.keys[key]
 		targetDB.stringKeys[key] = db.stringKeys[key]
 		targetDB.hashKeys[key] = db.hashKeys[key]
+		targetDB.listKeys[key] = db.listKeys[key]
 		targetDB.keyVersion[key]++
 		db.del(key, true)
 		out.WriteOne()

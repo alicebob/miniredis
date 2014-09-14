@@ -20,15 +20,19 @@ import (
 	"github.com/bsm/redeo"
 )
 
+type hashKey map[string]string
+type listKey []string
+
 // RedisDB holds a single (numbered) Redis database.
 type RedisDB struct {
-	master     *sync.Mutex                  // pointer to the lock in Miniredis
-	id         int                          // db id
-	keys       map[string]string            // Master map of keys with their type
-	stringKeys map[string]string            // GET/SET &c. keys
-	hashKeys   map[string]map[string]string // MGET/MSET &c. keys
-	expire     map[string]int               // EXPIRE values
-	keyVersion map[string]uint              // used to watch values
+	master     *sync.Mutex        // pointer to the lock in Miniredis
+	id         int                // db id
+	keys       map[string]string  // Master map of keys with their type
+	stringKeys map[string]string  // GET/SET &c. keys
+	hashKeys   map[string]hashKey // MGET/MSET &c. keys
+	listKeys   map[string]listKey // LPUSH &c. keys
+	expire     map[string]int     // EXPIRE values
+	keyVersion map[string]uint    // used to watch values
 }
 
 // Miniredis is a Redis server implementation.
@@ -71,7 +75,8 @@ func newRedisDB(id int, l *sync.Mutex) RedisDB {
 		master:     l,
 		keys:       map[string]string{},
 		stringKeys: map[string]string{},
-		hashKeys:   map[string]map[string]string{},
+		hashKeys:   map[string]hashKey{},
+		listKeys:   map[string]listKey{},
 		expire:     map[string]int{},
 		keyVersion: map[string]uint{},
 	}
@@ -102,6 +107,7 @@ func (m *Miniredis) Start() error {
 	commandsGeneric(m, srv)
 	commandsString(m, srv)
 	commandsHash(m, srv)
+	commandsList(m, srv)
 	commandsTransaction(m, srv)
 
 	go func() {
