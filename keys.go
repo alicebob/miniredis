@@ -1,24 +1,27 @@
 package miniredis
 
-// helper for the KEYS command
+// Translate the 'KEYS' argument ('foo*', 'f??', &c.) into a regexp.
 
 import (
+	"bytes"
 	"regexp"
 )
 
 // patternRE compiles a KEYS argument to a regexp. Returns nil if the given
 // pattern will never match anything.
+// The general strategy is to all non-meta characters between \Q...\E.
 func patternRE(k string) *regexp.Regexp {
-	re := []byte(`^\Q`)
+	re := bytes.Buffer{}
+	re.WriteString(`^\Q`)
 	for i := 0; i < len(k); i++ {
 		p := k[i]
 		switch p {
 		case '*':
-			re = append(re, []byte(`\E.*\Q`)...)
+			re.WriteString(`\E.*\Q`)
 		case '?':
-			re = append(re, []byte(`\E.\Q`)...)
+			re.WriteString(`\E.\Q`)
 		case '[':
-			charClass := []byte{}
+			charClass := bytes.Buffer{}
 			i++
 			for ; i < len(k); i++ {
 				if k[i] == ']' {
@@ -29,20 +32,20 @@ func patternRE(k string) *regexp.Regexp {
 						// Ends with a '\'. U-huh.
 						return nil
 					}
-					charClass = append(charClass, k[i])
+					charClass.WriteByte(k[i])
 					i++
-					charClass = append(charClass, k[i])
+					charClass.WriteByte(k[i])
 					continue
 				}
-				charClass = append(charClass, k[i])
+				charClass.WriteByte(k[i])
 			}
-			if len(charClass) == 0 {
+			if charClass.Len() == 0 {
 				// '[]' is valid in Redis, but matches nothing.
 				return nil
 			}
-			re = append(re, []byte(`\E[`)...)
-			re = append(re, charClass...)
-			re = append(re, []byte(`]\Q`)...)
+			re.WriteString(`\E[`)
+			re.Write(charClass.Bytes())
+			re.WriteString(`]\Q`)
 
 		case '\\':
 			if i == len(k)-1 {
@@ -51,12 +54,12 @@ func patternRE(k string) *regexp.Regexp {
 			}
 			// Forget the \, keep the next char.
 			i++
-			re = append(re, k[i])
+			re.WriteByte(k[i])
 			continue
 		default:
-			re = append(re, p)
+			re.WriteByte(p)
 		}
 	}
-	re = append(re, []byte(`\E$`)...)
-	return regexp.MustCompile(string(re))
+	re.WriteString(`\E$`)
+	return regexp.MustCompile(re.String())
 }
