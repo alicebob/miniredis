@@ -85,6 +85,7 @@ Implemented commands:
    - HSETNX
    - HVALS
  - List keys
+   - LINDEX
    - LPOP
    - LPUSH
    - LRANGE

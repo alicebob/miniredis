@@ -13,7 +13,7 @@ func commandsList(m *Miniredis, srv *redeo.Server) {
 	// BLPOP key [key ...] timeout
 	// BRPOP key [key ...] timeout
 	// BRPOPLPUSH source destination timeout
-	// LINDEX key index
+	srv.HandleFunc("LINDEX", m.cmdLindex)
 	// LINSERT key BEFORE|AFTER pivot value
 	// LLEN key
 	srv.HandleFunc("LPOP", m.cmdLpop)
@@ -27,6 +27,47 @@ func commandsList(m *Miniredis, srv *redeo.Server) {
 	// RPOPLPUSH source destination
 	srv.HandleFunc("RPUSH", m.cmdRpush)
 	// RPUSHX key value
+}
+
+// LINDEX
+func (m *Miniredis) cmdLindex(out *redeo.Responder, r *redeo.Request) error {
+	if len(r.Args) != 2 {
+		setDirty(r.Client())
+		out.WriteErrorString("ERR wrong number of arguments for 'lindex' command")
+		return nil
+	}
+	key := r.Args[0]
+	offset, err := strconv.Atoi(r.Args[1])
+	if err != nil {
+		setDirty(r.Client())
+		out.WriteErrorString(msgInvalidInt)
+		return nil
+	}
+
+	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+		db := m.db(ctx.selectedDB)
+
+		t, ok := db.keys[key]
+		if !ok {
+			// No such key
+			out.WriteNil()
+			return
+		}
+		if t != "list" {
+			out.WriteErrorString(msgWrongType)
+			return
+		}
+
+		l := db.listKeys[key]
+		if offset < 0 {
+			offset = len(l) + offset
+		}
+		if offset < 0 || offset > len(l)-1 {
+			out.WriteNil()
+			return
+		}
+		out.WriteString(l[offset])
+	})
 }
 
 // LPOP

@@ -215,3 +215,73 @@ func TestRpop(t *testing.T) {
 		equals(t, nil, v)
 	}
 }
+
+func TestLindex(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	b, err := redis.Int(c.Do("RPUSH", "l", "aap", "noot", "mies", "vuur"))
+	ok(t, err)
+	equals(t, 4, b) // New length.
+
+	{
+		el, err := redis.String(c.Do("LINDEX", "l", "0"))
+		ok(t, err)
+		equals(t, "aap", el)
+	}
+	{
+		el, err := redis.String(c.Do("LINDEX", "l", "1"))
+		ok(t, err)
+		equals(t, "noot", el)
+	}
+	{
+		el, err := redis.String(c.Do("LINDEX", "l", "3"))
+		ok(t, err)
+		equals(t, "vuur", el)
+	}
+	// Too many
+	{
+		el, err := c.Do("LINDEX", "l", "3000")
+		ok(t, err)
+		equals(t, nil, el)
+	}
+	{
+		el, err := redis.String(c.Do("LINDEX", "l", "-1"))
+		ok(t, err)
+		equals(t, "vuur", el)
+	}
+	{
+		el, err := redis.String(c.Do("LINDEX", "l", "-2"))
+		ok(t, err)
+		equals(t, "mies", el)
+	}
+	// Too big
+	{
+		el, err := c.Do("LINDEX", "l", "-400")
+		ok(t, err)
+		equals(t, nil, el)
+	}
+	// Non exising key
+	{
+		el, err := c.Do("LINDEX", "nonexisting", "400")
+		ok(t, err)
+		equals(t, nil, el)
+	}
+
+	// Wrong type of key
+	{
+		_, err := redis.String(c.Do("SET", "str", "value"))
+		ok(t, err)
+		_, err = redis.Int(c.Do("LINDEX", "str", "1"))
+		assert(t, err != nil, "LINDEX error")
+		// Not an integer
+		_, err = redis.String(c.Do("LINDEX", "l", "noint"))
+		assert(t, err != nil, "LINDEX error")
+		// Too many arguments
+		_, err = redis.String(c.Do("LINDEX", "str", "l", "foo"))
+		assert(t, err != nil, "LINDEX error")
+	}
+}
