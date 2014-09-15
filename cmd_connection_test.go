@@ -57,3 +57,18 @@ func TestSelect(t *testing.T) {
 	ok(t, err)
 	equals(t, "bar", v)
 }
+
+func TestQuit(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	v, err := redis.String(c.Do("QUIT"))
+	ok(t, err)
+	equals(t, "OK", v)
+
+	v, err = redis.String(c.Do("PING"))
+	assert(t, err != nil, "QUIT closed the client")
+}

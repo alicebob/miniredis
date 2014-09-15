@@ -20,6 +20,7 @@ func commandsConnection(m *Miniredis, srv *redeo.Server) {
 	srv.HandleFunc("ECHO", m.cmdEcho)
 	srv.HandleFunc("PING", m.cmdPing)
 	srv.HandleFunc("SELECT", m.cmdSelect)
+	srv.HandleFunc("QUIT", m.cmdQuit)
 }
 
 // PING
@@ -65,5 +66,13 @@ func (m *Miniredis) cmdSelect(out *redeo.Responder, r *redeo.Request) error {
 	ctx.selectedDB = id
 
 	out.WriteOK()
+	return nil
+}
+
+// QUIT
+func (m *Miniredis) cmdQuit(out *redeo.Responder, r *redeo.Request) error {
+	// QUIT isn't transactionfied and accepts any arguments.
+	out.WriteOK()
+	r.Client().Close()
 	return nil
 }
