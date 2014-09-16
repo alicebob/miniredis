@@ -36,6 +36,7 @@ func TestString(t *testing.T) {
 		v, err := redis.String(c.Do("GET", "aap"))
 		ok(t, err)
 		equals(t, "noot", v)
+		s.CheckStr(t, "aap", "noot")
 	}
 
 	// GET a non-existing key. Should be nil.
