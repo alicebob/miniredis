@@ -86,9 +86,11 @@ Implemented commands:
    - HVALS
  - List keys
    - LINDEX
+   - LLEN
    - LPOP
    - LPUSH
    - LRANGE
+   - LTRIM
    - RPOP
    - RPUSH
 

@@ -62,15 +62,15 @@ func (db *RedisDB) Lpop(k string) (string, error) {
 }
 
 // Push add element at the end. Is called RPUSH in redis. Returns the new length.
-func (m *Miniredis) Push(k, v string) (int, error) {
-	return m.DB(m.selectedDB).Push(k, v)
+func (m *Miniredis) Push(k string, v ...string) (int, error) {
+	return m.DB(m.selectedDB).Push(k, v...)
 }
 
 // Push add element at the end. Is called RPUSH in redis. Returns the new length.
-func (db *RedisDB) Push(k, v string) (int, error) {
+func (db *RedisDB) Push(k string, v ...string) (int, error) {
 	db.master.Lock()
 	defer db.master.Unlock()
-	return db.push(k, v)
+	return db.push(k, v...)
 }
 
 // Pop removes and returns the last element. Is called RPOP in Redis.

@@ -34,7 +34,7 @@ func (db *RedisDB) lpop(k string) (string, error) {
 	return el, nil
 }
 
-func (db *RedisDB) push(k, v string) (int, error) {
+func (db *RedisDB) push(k string, v ...string) (int, error) {
 	if t, ok := db.keys[k]; ok && t != "list" {
 		return 0, ErrWrongType
 	}
@@ -43,7 +43,7 @@ func (db *RedisDB) push(k, v string) (int, error) {
 		db.keys[k] = "list"
 		l = []string{}
 	}
-	l = append(l, v)
+	l = append(l, v...)
 	db.listKeys[k] = l
 	db.keyVersion[k]++
 	return len(l), nil

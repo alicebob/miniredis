@@ -186,9 +186,7 @@ func TestRpop(t *testing.T) {
 	c, err := redis.Dial("tcp", s.Addr())
 	ok(t, err)
 
-	b, err := redis.Int(c.Do("RPUSH", "l", "aap", "noot", "mies"))
-	ok(t, err)
-	equals(t, 3, b) // New length.
+	s.Push("l", "aap", "noot", "mies")
 
 	// Simple pops.
 	{
@@ -223,9 +221,7 @@ func TestLindex(t *testing.T) {
 	c, err := redis.Dial("tcp", s.Addr())
 	ok(t, err)
 
-	b, err := redis.Int(c.Do("RPUSH", "l", "aap", "noot", "mies", "vuur"))
-	ok(t, err)
-	equals(t, 4, b) // New length.
+	s.Push("l", "aap", "noot", "mies", "vuur")
 
 	{
 		el, err := redis.String(c.Do("LINDEX", "l", "0"))
@@ -283,5 +279,85 @@ func TestLindex(t *testing.T) {
 		// Too many arguments
 		_, err = redis.String(c.Do("LINDEX", "str", "l", "foo"))
 		assert(t, err != nil, "LINDEX error")
+	}
+}
+
+func TestLlen(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	s.Push("l", "aap", "noot", "mies", "vuur")
+
+	{
+		el, err := redis.Int(c.Do("LLEN", "l"))
+		ok(t, err)
+		equals(t, 4, el)
+	}
+
+	// Non exising key
+	{
+		el, err := redis.Int(c.Do("LLEN", "nonexisting"))
+		ok(t, err)
+		equals(t, 0, el)
+	}
+
+	// Wrong type of key
+	{
+		_, err := redis.String(c.Do("SET", "str", "value"))
+		ok(t, err)
+		_, err = redis.Int(c.Do("LLEN", "str"))
+		assert(t, err != nil, "LLEN error")
+		// Too many arguments
+		_, err = redis.String(c.Do("LLEN", "too", "many"))
+		assert(t, err != nil, "LLEN error")
+	}
+}
+
+func TestLtrim(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	s.Push("l", "aap", "noot", "mies", "vuur")
+
+	{
+		el, err := redis.String(c.Do("LTRIM", "l", 0, 2))
+		ok(t, err)
+		equals(t, "OK", el)
+		l, err := s.List("l")
+		ok(t, err)
+		equals(t, []string{"aap", "noot", "mies"}, l)
+	}
+
+	// Non exising key
+	{
+		el, err := redis.String(c.Do("LTRIM", "nonexisting", 0, 1))
+		ok(t, err)
+		equals(t, "OK", el)
+	}
+
+	// Wrong type of key
+	{
+		s.Set("str", "string!")
+		_, err = redis.Int(c.Do("LTRIM", "str", 0, 1))
+		assert(t, err != nil, "LTRIM error")
+		// Too many/little/wrong arguments
+		_, err = redis.String(c.Do("LTRIM", "l", 1, 2, "toomany"))
+		assert(t, err != nil, "LTRIM error")
+		_, err = redis.String(c.Do("LTRIM", "l", 1, "noint"))
+		assert(t, err != nil, "LTRIM error")
+		_, err = redis.String(c.Do("LTRIM", "l", "noint", 1))
+		assert(t, err != nil, "LTRIM error")
+		_, err = redis.String(c.Do("LTRIM", "l", 1))
+		assert(t, err != nil, "LTRIM error")
+		_, err = redis.String(c.Do("LTRIM", "l"))
+		assert(t, err != nil, "LTRIM error")
+		_, err = redis.String(c.Do("LTRIM"))
+		assert(t, err != nil, "LTRIM error")
 	}
 }

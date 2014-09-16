@@ -15,14 +15,14 @@ func commandsList(m *Miniredis, srv *redeo.Server) {
 	// BRPOPLPUSH source destination timeout
 	srv.HandleFunc("LINDEX", m.cmdLindex)
 	// LINSERT key BEFORE|AFTER pivot value
-	// LLEN key
+	srv.HandleFunc("LLEN", m.cmdLlen)
 	srv.HandleFunc("LPOP", m.cmdLpop)
 	srv.HandleFunc("LPUSH", m.cmdLpush)
 	// LPUSHX key value
 	srv.HandleFunc("LRANGE", m.cmdLrange)
 	// LREM key count value
 	// LSET key index value
-	// LTRIM key start stop
+	srv.HandleFunc("LTRIM", m.cmdLtrim)
 	srv.HandleFunc("RPOP", m.cmdRpop)
 	// RPOPLPUSH source destination
 	srv.HandleFunc("RPUSH", m.cmdRpush)
@@ -67,6 +67,33 @@ func (m *Miniredis) cmdLindex(out *redeo.Responder, r *redeo.Request) error {
 			return
 		}
 		out.WriteString(l[offset])
+	})
+}
+
+// LLEN
+func (m *Miniredis) cmdLlen(out *redeo.Responder, r *redeo.Request) error {
+	if len(r.Args) != 1 {
+		setDirty(r.Client())
+		out.WriteErrorString("ERR wrong number of arguments for 'llen' command")
+		return nil
+	}
+	key := r.Args[0]
+
+	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+		db := m.db(ctx.selectedDB)
+
+		t, ok := db.keys[key]
+		if !ok {
+			// No such key. That's zero length.
+			out.WriteZero()
+			return
+		}
+		if t != "list" {
+			out.WriteErrorString(msgWrongType)
+			return
+		}
+
+		out.WriteInt(len(db.listKeys[key]))
 	})
 }
 
@@ -162,6 +189,48 @@ func (m *Miniredis) cmdLrange(out *redeo.Responder, r *redeo.Request) error {
 		for _, el := range l[rs:re] {
 			out.WriteString(el)
 		}
+	})
+}
+
+// LTRIM
+func (m *Miniredis) cmdLtrim(out *redeo.Responder, r *redeo.Request) error {
+	if len(r.Args) != 3 {
+		setDirty(r.Client())
+		out.WriteErrorString("ERR wrong number of arguments for 'ltrim' command")
+		return nil
+	}
+	key := r.Args[0]
+	start, err := strconv.Atoi(r.Args[1])
+	if err != nil {
+		setDirty(r.Client())
+		out.WriteErrorString(msgInvalidInt)
+		return nil
+	}
+	end, err := strconv.Atoi(r.Args[2])
+	if err != nil {
+		setDirty(r.Client())
+		out.WriteErrorString(msgInvalidInt)
+		return nil
+	}
+
+	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+		db := m.db(ctx.selectedDB)
+
+		t, ok := db.keys[key]
+		if !ok {
+			out.WriteOK()
+			return
+		}
+		if t != "list" {
+			out.WriteErrorString(msgWrongType)
+			return
+		}
+
+		l := db.listKeys[key]
+		rs, re := redisRange(len(l), start, end)
+		db.listKeys[key] = l[rs:re]
+		db.keyVersion[key]++
+		out.WriteOK()
 	})
 }
 
