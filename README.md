@@ -37,6 +37,7 @@ Implemented commands:
    - PEXPIRE
    - PEXPIREAT
    - PTTL
+   - RENAME
    - RANDOMKEY -- call math.rand.Seed(...) before using.
    - TTL
    - TYPE
@@ -93,6 +94,9 @@ Implemented commands:
    - LTRIM
    - RPOP
    - RPUSH
+ - Set keys
+   - SADD
+   - SMEMBERS
 
 
 Since this is intended to be used in unittests timeouts are not implemented.

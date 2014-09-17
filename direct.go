@@ -84,3 +84,27 @@ func (db *RedisDB) Pop(k string) (string, error) {
 	defer db.master.Unlock()
 	return db.pop(k)
 }
+
+// SetAdd adds keys to a set. Returns the number of new keys.
+func (m *Miniredis) SetAdd(k string, elems ...string) (int, error) {
+	return m.DB(m.selectedDB).SetAdd(k, elems...)
+}
+
+// SetAdd adds keys to a set. Returns the number of new keys.
+func (db *RedisDB) SetAdd(k string, elems ...string) (int, error) {
+	db.master.Lock()
+	defer db.master.Unlock()
+	return db.setadd(k, elems...)
+}
+
+// Members gives all set keys. Sorted.
+func (m *Miniredis) Members(k string) ([]string, error) {
+	return m.DB(m.selectedDB).Members(k)
+}
+
+// Members gives all set keys. Sorted.
+func (db *RedisDB) Members(k string) ([]string, error) {
+	db.master.Lock()
+	defer db.master.Unlock()
+	return db.members(k)
+}

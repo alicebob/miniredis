@@ -40,6 +40,8 @@ func (db *RedisDB) del(k string, delTTL bool) bool {
 		delete(db.hashKeys, k)
 	case "list":
 		delete(db.listKeys, k)
+	case "set":
+		delete(db.setKeys, k)
 	default:
 		panic("Unknown key type: " + t)
 	}
@@ -94,25 +96,32 @@ func (m *Miniredis) Exists(k string) bool {
 func (db *RedisDB) Exists(k string) bool {
 	db.master.Lock()
 	defer db.master.Unlock()
-	_, ok := db.keys[k]
-	return ok
+	return db.exists(k)
 }
 
 // commandsGeneric handles EXPIRE, TTL, PERSIST, &c.
 func commandsGeneric(m *Miniredis, srv *redeo.Server) {
 	srv.HandleFunc("DEL", m.cmdDel)
+	// DUMP
 	srv.HandleFunc("EXISTS", m.cmdExists)
-	srv.HandleFunc("EXPIREAT", makeCmdExpire(m, "expireat"))
 	srv.HandleFunc("EXPIRE", makeCmdExpire(m, "expire"))
+	srv.HandleFunc("EXPIREAT", makeCmdExpire(m, "expireat"))
 	srv.HandleFunc("KEYS", m.cmdKeys)
+	// MIGRATE
 	srv.HandleFunc("MOVE", m.cmdMove)
+	// OBJECT
 	srv.HandleFunc("PERSIST", m.cmdPersist)
-	srv.HandleFunc("PEXPIREAT", makeCmdExpire(m, "pexpireat"))
 	srv.HandleFunc("PEXPIRE", makeCmdExpire(m, "pexpire"))
+	srv.HandleFunc("PEXPIREAT", makeCmdExpire(m, "pexpireat"))
 	srv.HandleFunc("PTTL", m.cmdPTTL)
 	srv.HandleFunc("RANDOMKEY", m.cmdRandomkey)
+	srv.HandleFunc("RENAME", m.cmdRename)
+	// RENAMENX
+	// RESTORE
+	// SORT
 	srv.HandleFunc("TTL", m.cmdTTL)
 	srv.HandleFunc("TYPE", m.cmdType)
+	// SCAN
 }
 
 // generic expire command for EXPIRE, PEXPIRE, EXPIREAT, PEXPIREAT
@@ -309,20 +318,10 @@ func (m *Miniredis) cmdMove(out *redeo.Responder, r *redeo.Request) error {
 		db := m.db(ctx.selectedDB)
 		targetDB := m.db(targetDB)
 
-		if _, ok := db.keys[key]; !ok {
+		if !db.move(key, targetDB) {
 			out.WriteZero()
 			return
 		}
-		if _, ok := targetDB.keys[key]; ok {
-			out.WriteZero()
-			return
-		}
-		targetDB.keys[key] = db.keys[key]
-		targetDB.stringKeys[key] = db.stringKeys[key]
-		targetDB.hashKeys[key] = db.hashKeys[key]
-		targetDB.listKeys[key] = db.listKeys[key]
-		targetDB.keyVersion[key]++
-		db.del(key, true)
 		out.WriteOne()
 	})
 }
@@ -386,5 +385,28 @@ func (m *Miniredis) cmdRandomkey(out *redeo.Responder, r *redeo.Request) error {
 			}
 			nr--
 		}
+	})
+}
+
+// RENAME
+func (m *Miniredis) cmdRename(out *redeo.Responder, r *redeo.Request) error {
+	if len(r.Args) != 2 {
+		setDirty(r.Client())
+		out.WriteErrorString("ERR wrong number of arguments for 'rename' command")
+		return nil
+	}
+
+	from := r.Args[0]
+	to := r.Args[1]
+
+	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+		db := m.db(ctx.selectedDB)
+
+		if err := db.rename(from, to); err != nil {
+			out.WriteErrorString(err.Error())
+			return
+		}
+
+		out.WriteOK()
 	})
 }

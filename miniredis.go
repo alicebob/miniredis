@@ -22,6 +22,7 @@ import (
 
 type hashKey map[string]string
 type listKey []string
+type setKey map[string]struct{}
 
 // RedisDB holds a single (numbered) Redis database.
 type RedisDB struct {
@@ -31,6 +32,7 @@ type RedisDB struct {
 	stringKeys map[string]string  // GET/SET &c. keys
 	hashKeys   map[string]hashKey // MGET/MSET &c. keys
 	listKeys   map[string]listKey // LPUSH &c. keys
+	setKeys    map[string]setKey  // SADD &c. keys
 	expire     map[string]int     // EXPIRE values
 	keyVersion map[string]uint    // used to watch values
 }
@@ -77,6 +79,7 @@ func newRedisDB(id int, l *sync.Mutex) RedisDB {
 		stringKeys: map[string]string{},
 		hashKeys:   map[string]hashKey{},
 		listKeys:   map[string]listKey{},
+		setKeys:    map[string]setKey{},
 		expire:     map[string]int{},
 		keyVersion: map[string]uint{},
 	}
@@ -108,6 +111,7 @@ func (m *Miniredis) Start() error {
 	commandsString(m, srv)
 	commandsHash(m, srv)
 	commandsList(m, srv)
+	commandsSet(m, srv)
 	commandsTransaction(m, srv)
 
 	go func() {

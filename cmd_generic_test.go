@@ -323,9 +323,9 @@ func TestMove(t *testing.T) {
 		_, err = redis.Int(c.Do("MOVE", "foo"))
 		assert(t, err != nil, "do MOVE error")
 		_, err = redis.Int(c.Do("MOVE", "foo", "noint"))
-		assert(t, err != nil, "do TYPE error")
+		assert(t, err != nil, "do MOVE error")
 		_, err = redis.Int(c.Do("MOVE", "foo", 2, "toomany"))
-		assert(t, err != nil, "do TYPE error")
+		assert(t, err != nil, "do MOVE error")
 	}
 }
 
@@ -371,7 +371,7 @@ func TestKeys(t *testing.T) {
 	{
 		_, err := redis.Int(c.Do("KEYS"))
 		assert(t, err != nil, "do KEYS error")
-		_, err = redis.Int(c.Do("MOVE", "foo", "noint"))
+		_, err = redis.Int(c.Do("KEYS", "foo", "noint"))
 		assert(t, err != nil, "do KEYS error")
 	}
 }
@@ -405,5 +405,73 @@ func TestRandom(t *testing.T) {
 	{
 		_, err = redis.Int(c.Do("RANDOMKEY", "spurious"))
 		assert(t, err != nil, "do RANDOMKEY error")
+	}
+}
+
+func TestRename(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	// Non-existing key
+	{
+		_, err := redis.Int(c.Do("RENAME", "nosuch", "to"))
+		assert(t, err != nil, "do RENAME error")
+	}
+
+	// Same key
+	{
+		_, err := redis.Int(c.Do("RENAME", "from", "from"))
+		assert(t, err != nil, "do RENAME error")
+	}
+
+	// Move a string key
+	{
+		s.Set("from", "value")
+		str, err := redis.String(c.Do("RENAME", "from", "to"))
+		ok(t, err)
+		equals(t, "OK", str)
+		equals(t, false, s.Exists("from"))
+		equals(t, true, s.Exists("to"))
+		equals(t, "value", s.Get("to"))
+	}
+
+	// Move a hash key
+	{
+		s.HSet("from", "key", "value")
+		str, err := redis.String(c.Do("RENAME", "from", "to"))
+		ok(t, err)
+		equals(t, "OK", str)
+		equals(t, false, s.Exists("from"))
+		equals(t, true, s.Exists("to"))
+		equals(t, "value", s.HGet("to", "key"))
+	}
+
+	// Move over something which exists
+	{
+		s.Set("from", "string value")
+		s.HSet("to", "key", "value")
+		s.SetExpire("to", 999999)
+
+		str, err := redis.String(c.Do("RENAME", "from", "to"))
+		ok(t, err)
+		equals(t, "OK", str)
+		equals(t, false, s.Exists("from"))
+		equals(t, true, s.Exists("to"))
+		equals(t, "string value", s.Get("to"))
+		equals(t, 0, s.Expire("from"))
+		equals(t, 999999, s.Expire("to"))
+	}
+
+	// Wrong usage
+	{
+		_, err := redis.Int(c.Do("MOVE"))
+		assert(t, err != nil, "do MOVE error")
+		_, err = redis.Int(c.Do("MOVE", "too few"))
+		assert(t, err != nil, "do MOVE error")
+		_, err = redis.Int(c.Do("MOVE", "some", "spurious", "arguments"))
+		assert(t, err != nil, "do MOVE error")
 	}
 }
