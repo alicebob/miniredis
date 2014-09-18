@@ -108,3 +108,15 @@ func (db *RedisDB) Members(k string) ([]string, error) {
 	defer db.master.Unlock()
 	return db.members(k)
 }
+
+// IsMember tells if value is in the set.
+func (m *Miniredis) IsMember(k, v string) (bool, error) {
+	return m.DB(m.selectedDB).IsMember(k, v)
+}
+
+// IsMember tells if value is in the set.
+func (db *RedisDB) IsMember(k, v string) (bool, error) {
+	db.master.Lock()
+	defer db.master.Unlock()
+	return db.isMember(k, v)
+}

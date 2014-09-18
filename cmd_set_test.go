@@ -82,3 +82,54 @@ func TestSadd(t *testing.T) {
 	}
 
 }
+
+// Test SISMEMBER
+func TestSismember(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	s.SetAdd("s", "aap", "noot", "mies")
+
+	{
+		b, err := redis.Int(c.Do("SISMEMBER", "s", "aap"))
+		ok(t, err)
+		equals(t, 1, b)
+
+		b, err = redis.Int(c.Do("SISMEMBER", "s", "nosuch"))
+		ok(t, err)
+		equals(t, 0, b)
+	}
+
+	// a nonexisting key
+	{
+		b, err := redis.Int(c.Do("SISMEMBER", "nosuch", "nosuch"))
+		ok(t, err)
+		equals(t, 0, b)
+	}
+
+	// Direct usage
+	{
+		isMember, err := s.IsMember("s", "noot")
+		ok(t, err)
+		equals(t, true, isMember)
+	}
+
+	// Wrong type of key
+	{
+		_, err := redis.Int(c.Do("SET", "str", "value"))
+		ok(t, err)
+		_, err = redis.Int(c.Do("SISMEMBER", "str"))
+		assert(t, err != nil, "SISMEMBER error")
+		// Wrong argument counts
+		_, err = redis.String(c.Do("SISMEMBER"))
+		assert(t, err != nil, "SISMEMBER error")
+		_, err = redis.String(c.Do("SISMEMBER", "set"))
+		assert(t, err != nil, "SISMEMBER error")
+		_, err = redis.String(c.Do("SISMEMBER", "set", "spurious", "args"))
+		assert(t, err != nil, "SISMEMBER error")
+	}
+
+}

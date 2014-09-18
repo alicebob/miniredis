@@ -168,3 +168,16 @@ func (db *RedisDB) members(k string) ([]string, error) {
 	sort.Strings(members)
 	return members, nil
 }
+
+// Is a value present?
+func (db *RedisDB) isMember(k, v string) (bool, error) {
+	if t, ok := db.keys[k]; ok && t != "set" {
+		return false, ErrWrongType
+	}
+	set, ok := db.setKeys[k]
+	if !ok {
+		return false, ErrKeyNotFound
+	}
+	_, ok = set[v]
+	return ok, nil
+}

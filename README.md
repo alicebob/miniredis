@@ -96,6 +96,8 @@ Implemented commands:
    - RPUSH
  - Set keys
    - SADD
+   - SCARD
+   - SISMEMBER
    - SMEMBERS
 
 
