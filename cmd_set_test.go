@@ -119,7 +119,7 @@ func TestSismember(t *testing.T) {
 
 	// Wrong type of key
 	{
-		_, err := redis.Int(c.Do("SET", "str", "value"))
+		_, err := redis.String(c.Do("SET", "str", "value"))
 		ok(t, err)
 		_, err = redis.Int(c.Do("SISMEMBER", "str"))
 		assert(t, err != nil, "SISMEMBER error")
