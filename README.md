@@ -125,10 +125,12 @@ func TestSomething(t *testing.T) {
 	c, err := redis.Dial("tcp", s.Addr())
 	_, err = c.Do("SET", "foo", "bar")
 
-	// Optionally check values in redis:
-	if s.Get("foo") != "bar" {
+	// Optionally check values in redis...
+	if got, err := s.Get("foo"); err != nil || got != "bar" {
         t.Error("'foo' has the wrong value")
     }
+    // ... or use a helper for that:
+    s.CheckGet(t, "foo", "bar")
 }
 ```
 

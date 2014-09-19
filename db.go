@@ -9,6 +9,27 @@ func (db *RedisDB) exists(k string) bool {
 	return ok
 }
 
+// t gives the type of a key, or ""
+func (db *RedisDB) t(k string) string {
+	return db.keys[k]
+}
+
+// get returns the string key or "" on error/nonexists.
+func (db *RedisDB) get(k string) string {
+	if t, ok := db.keys[k]; !ok || t != "string" {
+		return ""
+	}
+	return db.stringKeys[k]
+}
+
+// force set() a key. Does not touch expire.
+func (db *RedisDB) set(k, v string) {
+	db.del(k, false)
+	db.keys[k] = "string"
+	db.stringKeys[k] = v
+	db.keyVersion[k]++
+}
+
 // move something to another db. Will return ok. Or not.
 func (db *RedisDB) move(key string, to *RedisDB) bool {
 	if _, ok := to.keys[key]; ok {

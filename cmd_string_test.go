@@ -16,9 +16,11 @@ func TestString(t *testing.T) {
 
 	// SET command
 	{
-		_, err = c.Do("SET", "foo", "bar")
+		v, err := redis.String(c.Do("SET", "foo", "bar"))
 		ok(t, err)
+		equals(t, "OK", v)
 	}
+
 	// GET command
 	{
 		v, err := redis.String(c.Do("GET", "foo"))
@@ -27,16 +29,22 @@ func TestString(t *testing.T) {
 	}
 
 	// Query server directly.
-	equals(t, "bar", s.Get("foo"))
+	{
+		got, err := s.Get("foo")
+		ok(t, err)
+		equals(t, "bar", got)
+	}
 
 	// Use Set directly
 	{
-		s.Set("aap", "noot")
-		equals(t, "noot", s.Get("aap"))
+		ok(t, s.Set("aap", "noot"))
+		s.CheckGet(t, "aap", "noot")
 		v, err := redis.String(c.Do("GET", "aap"))
 		ok(t, err)
 		equals(t, "noot", v)
-		s.CheckStr(t, "aap", "noot")
+		s.CheckGet(t, "aap", "noot")
+		// Re-set.
+		ok(t, s.Set("aap", "noot2"))
 	}
 
 	// GET a non-existing key. Should be nil.
@@ -75,7 +83,7 @@ func TestSet(t *testing.T) {
 		v, err := redis.String(c.Do("SET", "wim", "gijs"))
 		ok(t, err)
 		equals(t, "OK", v)
-		equals(t, "gijs", s.Get("wim"))
+		s.CheckGet(t, "wim", "gijs")
 	}
 
 	// NX argument
@@ -106,14 +114,14 @@ func TestSet(t *testing.T) {
 		v, err = c.Do("SET", "one", "two", "XX")
 		ok(t, err)
 		equals(t, "OK", v)
-		equals(t, "two", s.Get("one"))
+		s.CheckGet(t, "one", "two")
 
 		// XX with another key type
 		s.HSet("eleven", "twelve", "thirteen")
 		h, err := redis.String(c.Do("SET", "eleven", "fourteen", "XX"))
 		ok(t, err)
 		equals(t, "OK", h)
-		equals(t, "fourteen", s.Get("eleven"))
+		s.CheckGet(t, "eleven", "fourteen")
 	}
 
 	// EX or PX argument. Expire values.
@@ -121,13 +129,13 @@ func TestSet(t *testing.T) {
 		v, err := c.Do("SET", "one", "two", "EX", 1299)
 		ok(t, err)
 		equals(t, "OK", v)
-		equals(t, "two", s.Get("one"))
+		s.CheckGet(t, "one", "two")
 		equals(t, 1299, s.Expire("one"))
 
 		v, err = c.Do("SET", "three", "four", "PX", 8888)
 		ok(t, err)
 		equals(t, "OK", v)
-		equals(t, "four", s.Get("three"))
+		s.CheckGet(t, "three", "four")
 		equals(t, 8888, s.Expire("three"))
 
 		_, err = c.Do("SET", "one", "two", "EX", "notimestamp")
@@ -185,9 +193,9 @@ func TestMset(t *testing.T) {
 		v, err := redis.String(c.Do("MSET", "zus", "jet", "teun", "vuur", "gijs", "lam"))
 		ok(t, err)
 		equals(t, "OK", v)
-		equals(t, "jet", s.Get("zus"))
-		equals(t, "vuur", s.Get("teun"))
-		equals(t, "lam", s.Get("gijs"))
+		s.CheckGet(t, "zus", "jet")
+		s.CheckGet(t, "teun", "vuur")
+		s.CheckGet(t, "gijs", "lam")
 	}
 
 	// Other types are overwritten
@@ -196,7 +204,7 @@ func TestMset(t *testing.T) {
 		v, err := redis.String(c.Do("MSET", "aap", "jet"))
 		ok(t, err)
 		equals(t, "OK", v)
-		equals(t, "jet", s.Get("aap"))
+		s.CheckGet(t, "aap", "jet")
 	}
 
 	// Odd argument list is not OK
@@ -231,7 +239,7 @@ func TestSetex(t *testing.T) {
 		v, err := redis.String(c.Do("SETEX", "aap", 1234, "noot"))
 		ok(t, err)
 		equals(t, "OK", v)
-		equals(t, "noot", s.Get("aap"))
+		s.CheckGet(t, "aap", "noot")
 		equals(t, 1234, s.Expire("aap"))
 	}
 
@@ -266,7 +274,7 @@ func TestPsetex(t *testing.T) {
 		v, err := redis.String(c.Do("PSETEX", "aap", 1234, "noot"))
 		ok(t, err)
 		equals(t, "OK", v)
-		equals(t, "noot", s.Get("aap"))
+		s.CheckGet(t, "aap", "noot")
 		equals(t, 1234, s.Expire("aap")) // We set Milliseconds in Expire.
 	}
 
@@ -302,7 +310,7 @@ func TestSetnx(t *testing.T) {
 		v, err := redis.Int(c.Do("SETNX", "foo", "not bar"))
 		ok(t, err)
 		equals(t, 0, v)
-		equals(t, "bar", s.Get("foo"))
+		s.CheckGet(t, "foo", "bar")
 	}
 
 	// New key
@@ -310,7 +318,7 @@ func TestSetnx(t *testing.T) {
 		v, err := redis.Int(c.Do("SETNX", "notfoo", "also not bar"))
 		ok(t, err)
 		equals(t, 1, v)
-		equals(t, "also not bar", s.Get("notfoo"))
+		s.CheckGet(t, "notfoo", "also not bar")
 	}
 
 	// Existing key of a different type
@@ -320,7 +328,8 @@ func TestSetnx(t *testing.T) {
 		ok(t, err)
 		equals(t, 0, v)
 		equals(t, "hash", s.Type("foo"))
-		equals(t, "", s.Get("foo"))
+		_, err = s.Get("foo")
+		equals(t, ErrWrongType, err)
 		equals(t, "baz", s.HGet("foo", "bar"))
 	}
 }
@@ -338,7 +347,7 @@ func TestIncr(t *testing.T) {
 		v, err := redis.Int(c.Do("INCR", "foo"))
 		ok(t, err)
 		equals(t, 13, v)
-		equals(t, "13", s.Get("foo"))
+		s.CheckGet(t, "foo", "13")
 	}
 
 	// Existing key, not an integer
@@ -353,7 +362,7 @@ func TestIncr(t *testing.T) {
 		v, err := redis.Int(c.Do("INCR", "bar"))
 		ok(t, err)
 		equals(t, 1, v)
-		equals(t, "1", s.Get("bar"))
+		s.CheckGet(t, "bar", "1")
 	}
 
 	// Wrong type of existing key
@@ -385,7 +394,7 @@ func TestIncrBy(t *testing.T) {
 		v, err := redis.Int(c.Do("INCRBY", "foo", "400"))
 		ok(t, err)
 		equals(t, 412, v)
-		equals(t, "412", s.Get("foo"))
+		s.CheckGet(t, "foo", "412")
 	}
 
 	// Existing key, not an integer
@@ -400,7 +409,7 @@ func TestIncrBy(t *testing.T) {
 		v, err := redis.Int(c.Do("INCRBY", "bar", "4000"))
 		ok(t, err)
 		equals(t, 4000, v)
-		equals(t, "4000", s.Get("bar"))
+		s.CheckGet(t, "bar", "4000")
 	}
 
 	// Wrong type of existing key
@@ -438,7 +447,7 @@ func TestIncrbyfloat(t *testing.T) {
 		v, err := redis.Float64(c.Do("INCRBYFLOAT", "foo", "400.12"))
 		ok(t, err)
 		equals(t, 412.12, v)
-		equals(t, "412.12", s.Get("foo"))
+		s.CheckGet(t, "foo", "412.12")
 	}
 
 	// Existing key, not a number
@@ -453,7 +462,7 @@ func TestIncrbyfloat(t *testing.T) {
 		v, err := redis.Float64(c.Do("INCRBYFLOAT", "bar", "40.33"))
 		ok(t, err)
 		equals(t, 40.33, v)
-		equals(t, "40.33", s.Get("bar"))
+		s.CheckGet(t, "bar", "40.33")
 	}
 
 	// Direct usage
@@ -462,7 +471,7 @@ func TestIncrbyfloat(t *testing.T) {
 		f, err := s.Incrfloat("foo", 12)
 		ok(t, err)
 		equals(t, 512.1, f)
-		equals(t, "512.1", s.Get("foo"))
+		s.CheckGet(t, "foo", "512.1")
 	}
 
 	// Wrong type of existing key
@@ -500,7 +509,7 @@ func TestDecrBy(t *testing.T) {
 		v, err := redis.Int(c.Do("DECRBY", "foo", "400"))
 		ok(t, err)
 		equals(t, -388, v)
-		equals(t, "-388", s.Get("foo"))
+		s.CheckGet(t, "foo", "-388")
 	}
 
 	// Existing key, not an integer
@@ -515,7 +524,7 @@ func TestDecrBy(t *testing.T) {
 		v, err := redis.Int(c.Do("DECRBY", "bar", "4000"))
 		ok(t, err)
 		equals(t, -4000, v)
-		equals(t, "-4000", s.Get("bar"))
+		s.CheckGet(t, "bar", "-4000")
 	}
 
 	// Wrong type of existing key
@@ -553,7 +562,7 @@ func TestDecr(t *testing.T) {
 		v, err := redis.Int(c.Do("DECR", "foo"))
 		ok(t, err)
 		equals(t, 11, v)
-		equals(t, "11", s.Get("foo"))
+		s.CheckGet(t, "foo", "11")
 	}
 
 	// Existing key, not an integer
@@ -568,7 +577,7 @@ func TestDecr(t *testing.T) {
 		v, err := redis.Int(c.Do("DECR", "bar"))
 		ok(t, err)
 		equals(t, -1, v)
-		equals(t, "-1", s.Get("bar"))
+		s.CheckGet(t, "bar", "-1")
 	}
 
 	// Wrong type of existing key
@@ -590,7 +599,7 @@ func TestDecr(t *testing.T) {
 	{
 		s.Set("aap", "400")
 		s.Incr("aap", +42)
-		equals(t, "442", s.Get("aap"))
+		s.CheckGet(t, "aap", "442")
 	}
 }
 
@@ -607,7 +616,7 @@ func TestGetSet(t *testing.T) {
 		v, err := redis.String(c.Do("GETSET", "foo", "baz"))
 		ok(t, err)
 		equals(t, "bar", v)
-		equals(t, "baz", s.Get("foo"))
+		s.CheckGet(t, "foo", "baz")
 	}
 
 	// New key
@@ -615,7 +624,7 @@ func TestGetSet(t *testing.T) {
 		v, err := c.Do("GETSET", "bar", "bak")
 		ok(t, err)
 		equals(t, nil, v)
-		equals(t, "bak", s.Get("bar"))
+		s.CheckGet(t, "bar", "bak")
 	}
 
 	// TTL needs to be cleared
@@ -625,7 +634,7 @@ func TestGetSet(t *testing.T) {
 		v, err := redis.String(c.Do("GETSET", "one", "three"))
 		ok(t, err)
 		equals(t, "two", v)
-		equals(t, "bak", s.Get("bar"))
+		s.CheckGet(t, "bar", "bak")
 		equals(t, 0, s.Expire("one"))
 	}
 
@@ -800,14 +809,14 @@ func TestSetrange(t *testing.T) {
 		v, err := redis.Int(c.Do("SETRANGE", "foo", 1, "bar"))
 		ok(t, err)
 		equals(t, 7, v)
-		equals(t, "abarefg", s.Get("foo"))
+		s.CheckGet(t, "foo", "abarefg")
 	}
 	// Non existing key
 	{
 		v, err := redis.Int(c.Do("SETRANGE", "nosuch", 3, "bar"))
 		ok(t, err)
 		equals(t, 6, v)
-		equals(t, "\x00\x00\x00bar", s.Get("nosuch"))
+		s.CheckGet(t, "nosuch", "\x00\x00\x00bar")
 	}
 
 	// Wrong type of existing key
@@ -924,7 +933,7 @@ func TestBitop(t *testing.T) {
 		v, err := redis.Int(c.Do("BITOP", "AND", "bitand", "a", "b"))
 		ok(t, err)
 		equals(t, 1, v) // Length of the longest key
-		equals(t, "`", s.Get("bitand"))
+		s.CheckGet(t, "bitand", "`")
 	}
 	// Multi char AND
 	{
@@ -933,7 +942,7 @@ func TestBitop(t *testing.T) {
 		v, err := redis.Int(c.Do("BITOP", "AND", "bitand", "a", "b"))
 		ok(t, err)
 		equals(t, 4, v) // Length of the longest key
-		equals(t, "``\000\000", s.Get("bitand"))
+		s.CheckGet(t, "bitand", "``\000\000")
 	}
 
 	// Multi char OR
@@ -943,7 +952,7 @@ func TestBitop(t *testing.T) {
 		v, err := redis.Int(c.Do("BITOP", "OR", "bitor", "a", "b"))
 		ok(t, err)
 		equals(t, 4, v) // Length of the longest key
-		equals(t, "ccbb", s.Get("bitor"))
+		s.CheckGet(t, "bitor", "ccbb")
 	}
 
 	// Multi char XOR
@@ -953,7 +962,7 @@ func TestBitop(t *testing.T) {
 		v, err := redis.Int(c.Do("BITOP", "XOR", "bitxor", "a", "b"))
 		ok(t, err)
 		equals(t, 4, v) // Length of the longest key
-		equals(t, "\x03\x03bb", s.Get("bitxor"))
+		s.CheckGet(t, "bitxor", "\x03\x03bb")
 	}
 
 	// Guess who's NOT like the other ops?
@@ -962,7 +971,7 @@ func TestBitop(t *testing.T) {
 		v, err := redis.Int(c.Do("BITOP", "NOT", "not", "a"))
 		ok(t, err)
 		equals(t, 2, v) // Length of the key
-		equals(t, "\x9e\x9e", s.Get("not"))
+		s.CheckGet(t, "not", "\x9e\x9e")
 	}
 
 	// Single argument. Works, just an roundabout copy.
@@ -971,7 +980,7 @@ func TestBitop(t *testing.T) {
 		v, err := redis.Int(c.Do("BITOP", "AND", "copy", "a"))
 		ok(t, err)
 		equals(t, 1, v) // Length of the longest key
-		equals(t, "a", s.Get("copy"))
+		s.CheckGet(t, "copy", "a")
 	}
 
 	// Wrong type of existing key
@@ -1170,12 +1179,12 @@ func TestSetbit(t *testing.T) {
 		v, err := redis.Int(c.Do("SETBIT", "findme", 4, 0))
 		ok(t, err)
 		equals(t, 1, v)
-		equals(t, "\x00", s.Get("findme"))
+		s.CheckGet(t, "findme", "\x00")
 
 		v, err = redis.Int(c.Do("SETBIT", "findme", 4, 1))
 		ok(t, err)
 		equals(t, 0, v)
-		equals(t, "\x08", s.Get("findme"))
+		s.CheckGet(t, "findme", "\x08")
 	}
 
 	// Non-existing
@@ -1183,7 +1192,7 @@ func TestSetbit(t *testing.T) {
 		v, err := redis.Int(c.Do("SETBIT", "nosuch", 0, 1))
 		ok(t, err)
 		equals(t, 0, v)
-		equals(t, "\x80", s.Get("nosuch"))
+		s.CheckGet(t, "nosuch", "\x80")
 	}
 
 	// Too short
@@ -1192,11 +1201,11 @@ func TestSetbit(t *testing.T) {
 		v, err := redis.Int(c.Do("SETBIT", "short", 24, 0))
 		ok(t, err)
 		equals(t, 0, v)
-		equals(t, "\x00\x00\x00\x00", s.Get("short"))
+		s.CheckGet(t, "short", "\x00\x00\x00\x00")
 		v, err = redis.Int(c.Do("SETBIT", "short", 32, 1))
 		ok(t, err)
 		equals(t, 0, v)
-		equals(t, "\x00\x00\x00\x00\x80", s.Get("short"))
+		s.CheckGet(t, "short", "\x00\x00\x00\x00\x80")
 	}
 
 	// Wrong type of existing key
@@ -1234,8 +1243,8 @@ func TestMsetnx(t *testing.T) {
 		v, err := redis.Int(c.Do("MSETNX", "aap", "noot", "mies", "vuur"))
 		ok(t, err)
 		equals(t, 1, v)
-		equals(t, "noot", s.Get("aap"))
-		equals(t, "vuur", s.Get("mies"))
+		s.CheckGet(t, "aap", "noot")
+		s.CheckGet(t, "mies", "vuur")
 	}
 
 	// A key exists.
@@ -1243,9 +1252,9 @@ func TestMsetnx(t *testing.T) {
 		v, err := redis.Int(c.Do("MSETNX", "noaap", "noot", "mies", "vuur!"))
 		ok(t, err)
 		equals(t, 0, v)
-		equals(t, "", s.Get("noaap"))
-		equals(t, "noot", s.Get("aap"))
-		equals(t, "vuur", s.Get("mies"))
+		equals(t, false, s.Exists("noaap"))
+		s.CheckGet(t, "aap", "noot")
+		s.CheckGet(t, "mies", "vuur")
 	}
 
 	// Other type of existing key
@@ -1254,7 +1263,7 @@ func TestMsetnx(t *testing.T) {
 		v, err := redis.Int(c.Do("MSETNX", "one", "two", "three", "four!"))
 		ok(t, err)
 		equals(t, 0, v)
-		equals(t, "", s.Get("three"))
+		equals(t, false, s.Exists("three"))
 	}
 
 	// Wrong usage

@@ -46,9 +46,14 @@ func TestSelect(t *testing.T) {
 	_, err = redis.String(c.Do("SET", "foo", "baz"))
 	ok(t, err)
 
-	equals(t, "bar", s.Get("foo"))
+	// Direct access.
+	got, err := s.Get("foo")
+	ok(t, err)
+	equals(t, "bar", got)
 	s.Select(5)
-	equals(t, "baz", s.Get("foo"))
+	got, err = s.Get("foo")
+	ok(t, err)
+	equals(t, "baz", got)
 
 	// Another connection should have its own idea of the db:
 	c2, err := redis.Dial("tcp", s.Addr())

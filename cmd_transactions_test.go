@@ -81,7 +81,7 @@ func TestSimpleTransaction(t *testing.T) {
 	equals(t, "QUEUED", b)
 
 	// Not set yet.
-	equals(t, "", s.Get("aap"))
+	equals(t, false, s.Exists("aap"))
 
 	v, err := redis.Values(c.Do("EXEC"))
 	ok(t, err)
@@ -112,14 +112,14 @@ func TestDiscardTransaction(t *testing.T) {
 	equals(t, "QUEUED", b)
 
 	// Not committed
-	equals(t, "noot", s.Get("aap"))
+	s.CheckGet(t, "aap", "noot")
 
 	v, err := redis.String(c.Do("DISCARD"))
 	ok(t, err)
 	equals(t, "OK", v)
 
 	// TX didn't get executed
-	equals(t, "noot", s.Get("aap"))
+	s.CheckGet(t, "aap", "noot")
 }
 
 func TestTxQueueErr(t *testing.T) {
@@ -150,7 +150,7 @@ func TestTxQueueErr(t *testing.T) {
 	assert(t, err != nil, "do EXEC error")
 
 	// Didn't get EXECed
-	equals(t, "", s.Get("aap"))
+	equals(t, false, s.Exists("aap"))
 }
 
 func TestTxWatch(t *testing.T) {

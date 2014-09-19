@@ -15,40 +15,6 @@ var (
 	errFloatValueError = errors.New("ERR value is not a valid float")
 )
 
-// Get returns string keys added with SET.
-// This will return an empty string if the key is not set. Redis would return
-// a nil.
-// Returns empty string when the key is of a different type.
-func (m *Miniredis) Get(k string) string {
-	return m.DB(m.selectedDB).Get(k)
-}
-
-// Get returns a string key
-func (db *RedisDB) Get(k string) string {
-	db.master.Lock()
-	defer db.master.Unlock()
-	return db.stringKeys[k]
-}
-
-// Set sets a string key.
-func (m *Miniredis) Set(k, v string) {
-	m.DB(m.selectedDB).Set(k, v)
-}
-
-// Set sets a string key. Doesn't touch expire.
-func (db *RedisDB) Set(k, v string) {
-	db.master.Lock()
-	defer db.master.Unlock()
-	db.set(k, v)
-}
-
-// internal not-locked version. Doesn't touch expire.
-func (db *RedisDB) set(k, v string) {
-	db.keys[k] = "string"
-	db.stringKeys[k] = v
-	db.keyVersion[k]++
-}
-
 // Incr changes a int string value by delta.
 func (m *Miniredis) Incr(k string, delta int) (int, error) {
 	return m.DB(m.selectedDB).Incr(k, delta)
@@ -179,13 +145,13 @@ func (m *Miniredis) cmdSet(out *redeo.Responder, r *redeo.Request) error {
 		db := m.db(ctx.selectedDB)
 
 		if nx {
-			if _, ok := db.keys[key]; ok {
+			if db.exists(key) {
 				out.WriteNil()
 				return
 			}
 		}
 		if xx {
-			if _, ok := db.keys[key]; !ok {
+			if !db.exists(key) {
 				out.WriteNil()
 				return
 			}
@@ -346,7 +312,7 @@ func (m *Miniredis) cmdMsetnx(out *redeo.Responder, r *redeo.Request) error {
 func (m *Miniredis) cmdGet(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) != 1 {
 		setDirty(r.Client())
-		out.WriteErrorString("usage error")
+		out.WriteErrorString("ERR wrong number of arguments for 'get' command")
 		return nil
 	}
 	key := r.Args[0]
@@ -354,24 +320,16 @@ func (m *Miniredis) cmdGet(out *redeo.Responder, r *redeo.Request) error {
 	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
-		{
-			t, ok := db.keys[key]
-			if !ok {
-				out.WriteNil()
-				return
-			}
-			if t != "string" {
-				out.WriteErrorString(msgWrongType)
-				return
-			}
-		}
-
-		value, ok := db.stringKeys[key]
-		if !ok {
+		if !db.exists(key) {
 			out.WriteNil()
 			return
 		}
-		out.WriteString(value)
+		if db.t(key) != "string" {
+			out.WriteErrorString(msgWrongType)
+			return
+		}
+
+		out.WriteString(db.get(key))
 	})
 }
 
@@ -426,7 +384,7 @@ func (m *Miniredis) cmdMget(out *redeo.Responder, r *redeo.Request) error {
 			}
 			v, ok := db.stringKeys[k]
 			if !ok {
-				// Should not happen, we just check keys[]
+				// Should not happen, we just checked keys[]
 				out.WriteNil()
 				continue
 			}

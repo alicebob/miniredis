@@ -1,41 +1,33 @@
 package miniredis
 
-// 'Error' methods.
+// 'Fail' methods.
 
 import (
 	"fmt"
 	"path/filepath"
 	"runtime"
-	"testing"
 )
 
-// CheckStr does not call Errorf() only when there is a string key with the
-// expected value. Normal use case is `m.CheckStr(t, "username", "theking")`.
-func (m *Miniredis) CheckStr(t *testing.T, key, expected string) {
-	m.Lock()
-	defer m.Unlock()
+// T is implemented by Testing.T
+type T interface {
+	Fail()
+}
 
-	db := m.db(m.selectedDB)
-	v, ok := db.keys[key]
-	if !ok {
-		lError(t, "string key %#v not found", key)
+// CheckGet does not call Errorf() iff there is a string key with the
+// expected value. Normal use case is `m.CheckGet(t, "username", "theking")`.
+func (m *Miniredis) CheckGet(t T, key, expected string) {
+	found, err := m.Get(key)
+	if err != nil {
+		lError(t, "GET error, key %#v: %v", key, err)
 		return
-	}
-	if v != "string" {
-		lError(t, "key %#v is not a string key, but a %s", key, v)
-		return
-	}
-	found, ok := db.stringKeys[key]
-	if !ok {
-		panic("internal: stringKeys not found, but should be there")
 	}
 	if found != expected {
-		lError(t, "string key %#v: Expected %#v, got %#v", key, expected, found)
+		lError(t, "GET error, key %#v: Expected %#v, got %#v", key, expected, found)
 		return
 	}
 }
 
-func lError(t *testing.T, format string, args ...interface{}) {
+func lError(t T, format string, args ...interface{}) {
 	_, file, line, _ := runtime.Caller(2)
 	prefix := fmt.Sprintf("%s:%d: ", filepath.Base(file), line)
 	fmt.Printf(prefix+format+"\n", args...)

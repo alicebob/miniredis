@@ -13,6 +13,43 @@ var (
 	ErrWrongType = errors.New(msgWrongType)
 )
 
+// Get returns string keys added with SET.
+func (m *Miniredis) Get(k string) (string, error) {
+	return m.DB(m.selectedDB).Get(k)
+}
+
+// Get returns a string key
+func (db *RedisDB) Get(k string) (string, error) {
+	db.master.Lock()
+	defer db.master.Unlock()
+	if !db.exists(k) {
+		return "", ErrKeyNotFound
+	}
+	if db.t(k) != "string" {
+		return "", ErrWrongType
+	}
+	return db.get(k), nil
+}
+
+// Set sets a string key. Removes expire.
+func (m *Miniredis) Set(k, v string) error {
+	return m.DB(m.selectedDB).Set(k, v)
+}
+
+// Set sets a string key. Removes expire.
+// Unlike redis the key can't be an existing non-string key.
+func (db *RedisDB) Set(k, v string) error {
+	db.master.Lock()
+	defer db.master.Unlock()
+
+	if db.exists(k) && db.t(k) != "string" {
+		return ErrWrongType
+	}
+	db.del(k, true) // Remove expire
+	db.set(k, v)
+	return nil
+}
+
 // List returns the list k, or an error if it's not there or something else.
 // This is the same as the Redis command `LRANGE 0 -1`, but you can do your own
 // range-ing.

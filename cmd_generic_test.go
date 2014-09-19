@@ -142,7 +142,7 @@ func TestPexpire(t *testing.T) {
 
 	// Key exists
 	{
-		s.Set("foo", "bar")
+		ok(t, s.Set("foo", "bar"))
 		b, err := redis.Int(c.Do("PEXPIRE", "foo", 12))
 		ok(t, err)
 		equals(t, 1, b)
@@ -191,7 +191,9 @@ func TestDel(t *testing.T) {
 	// Direct also works:
 	s.Set("foo", "bar")
 	s.Del("foo")
-	equals(t, "", s.Get("foo"))
+	got, err := s.Get("foo")
+	equals(t, ErrKeyNotFound, err)
+	equals(t, "", got)
 }
 
 func TestType(t *testing.T) {
@@ -313,7 +315,7 @@ func TestMove(t *testing.T) {
 		v, err := redis.Int(c.Do("MOVE", "two", 1))
 		ok(t, err)
 		equals(t, 0, v)
-		equals(t, "orig", s.Get("two"))
+		s.CheckGet(t, "two", "orig")
 	}
 
 	// Wrong usage
@@ -435,7 +437,7 @@ func TestRename(t *testing.T) {
 		equals(t, "OK", str)
 		equals(t, false, s.Exists("from"))
 		equals(t, true, s.Exists("to"))
-		equals(t, "value", s.Get("to"))
+		s.CheckGet(t, "to", "value")
 	}
 
 	// Move a hash key
@@ -460,7 +462,7 @@ func TestRename(t *testing.T) {
 		equals(t, "OK", str)
 		equals(t, false, s.Exists("from"))
 		equals(t, true, s.Exists("to"))
-		equals(t, "string value", s.Get("to"))
+		s.CheckGet(t, "to", "string value")
 		equals(t, 0, s.Expire("from"))
 		equals(t, 999999, s.Expire("to"))
 	}
