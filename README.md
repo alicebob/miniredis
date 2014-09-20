@@ -21,11 +21,12 @@ There are no dependencies on external binaries, so you can easily integrate it i
 
 Implemented commands:
 
- - Connection
+ - Connection (complete)
    - AUTH -- we accept every password
    - ECHO
    - PING
    - SELECT
+   - QUIT
  - Key 
    - DEL
    - EXISTS
