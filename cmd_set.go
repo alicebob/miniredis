@@ -19,7 +19,7 @@ func commandsSet(m *Miniredis, srv *redeo.Server) {
 	// SMOVE source destination member
 	// SPOP key
 	// SRANDMEMBER key [count]
-	// SREM key member [member ...]
+	srv.HandleFunc("SREM", m.cmdSrem)
 	// SUNION key [key ...]
 	// SUNIONSTORE destination key [key ...]
 	// SSCAN key cursor [MATCH pattern] [COUNT count]
@@ -138,5 +138,33 @@ func (m *Miniredis) cmdSmembers(out *redeo.Responder, r *redeo.Request) error {
 		for _, elem := range members {
 			out.WriteString(elem)
 		}
+	})
+}
+
+// SREM
+func (m *Miniredis) cmdSrem(out *redeo.Responder, r *redeo.Request) error {
+	if len(r.Args) < 2 {
+		setDirty(r.Client())
+		out.WriteErrorString("ERR wrong number of arguments for 'srem' command")
+		return nil
+	}
+
+	key := r.Args[0]
+	fields := r.Args[1:]
+
+	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+		db := m.db(ctx.selectedDB)
+
+		if !db.exists(key) {
+			out.WriteInt(0)
+			return
+		}
+
+		if db.t(key) != "set" {
+			out.WriteErrorString(ErrWrongType.Error())
+			return
+		}
+
+		out.WriteInt(db.setrem(key, fields...))
 	})
 }

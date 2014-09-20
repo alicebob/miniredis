@@ -99,6 +99,7 @@ Implemented commands:
    - SCARD
    - SISMEMBER
    - SMEMBERS
+   - SREM
 
 
 Since this is intended to be used in unittests timeouts are not implemented.

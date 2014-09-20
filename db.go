@@ -200,6 +200,24 @@ func (db *RedisDB) setadd(k string, elems ...string) int {
 	return added
 }
 
+// setrem removes members from a set. Returns nr of deleted keys.
+func (db *RedisDB) setrem(k string, fields ...string) int {
+	s, ok := db.setKeys[k]
+	if !ok {
+		return 0
+	}
+	removed := 0
+	for _, f := range fields {
+		if _, ok := s[f]; ok {
+			removed++
+			delete(s, f)
+		}
+	}
+	db.setKeys[k] = s
+	db.keyVersion[k]++
+	return removed
+}
+
 // All members of a set.
 func (db *RedisDB) members(k string) []string {
 	set := db.setKeys[k]

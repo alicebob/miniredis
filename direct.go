@@ -370,3 +370,21 @@ func (db *RedisDB) HIncrfloat(k, f string, delta float64) (float64, error) {
 	defer db.master.Unlock()
 	return db.hincrfloat(k, f, delta)
 }
+
+// SRem removes fields from a set. Returns number of deleted fields.
+func (m *Miniredis) SRem(k string, fields ...string) (int, error) {
+	return m.DB(m.selectedDB).SRem(k, fields...)
+}
+
+// SRem removes fields from a set. Returns number of deleted fields.
+func (db *RedisDB) SRem(k string, fields ...string) (int, error) {
+	db.master.Lock()
+	defer db.master.Unlock()
+	if !db.exists(k) {
+		return 0, ErrKeyNotFound
+	}
+	if db.t(k) != "set" {
+		return 0, ErrWrongType
+	}
+	return db.setrem(k, fields...), nil
+}

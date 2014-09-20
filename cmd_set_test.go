@@ -133,3 +133,64 @@ func TestSismember(t *testing.T) {
 	}
 
 }
+
+// Test SREM
+func TestSrem(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	s.SetAdd("s", "aap", "noot", "mies", "vuur")
+
+	{
+		b, err := redis.Int(c.Do("SREM", "s", "aap", "noot"))
+		ok(t, err)
+		equals(t, 2, b)
+
+		members, err := s.Members("s")
+		ok(t, err)
+		equals(t, []string{"mies", "vuur"}, members)
+	}
+
+	// a nonexisting field
+	{
+		b, err := redis.Int(c.Do("SREM", "s", "nosuch"))
+		ok(t, err)
+		equals(t, 0, b)
+	}
+
+	// a nonexisting key
+	{
+		b, err := redis.Int(c.Do("SREM", "nosuch", "nosuch"))
+		ok(t, err)
+		equals(t, 0, b)
+	}
+
+	// Direct usage
+	{
+		b, err := s.SRem("s", "mies")
+		ok(t, err)
+		equals(t, 1, b)
+
+		members, err := s.Members("s")
+		ok(t, err)
+		equals(t, []string{"vuur"}, members)
+	}
+
+	// Wrong type of key
+	{
+		_, err := redis.String(c.Do("SET", "str", "value"))
+		ok(t, err)
+		_, err = redis.Int(c.Do("SREM", "str", "value"))
+		assert(t, err != nil, "SREM error")
+		// Wrong argument counts
+		_, err = redis.String(c.Do("SREM"))
+		assert(t, err != nil, "SREM error")
+		_, err = redis.String(c.Do("SREM", "set"))
+		assert(t, err != nil, "SREM error")
+		_, err = redis.String(c.Do("SREM", "set", "spurious", "args"))
+		assert(t, err != nil, "SREM error")
+	}
+}
