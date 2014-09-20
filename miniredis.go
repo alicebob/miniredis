@@ -26,15 +26,16 @@ type setKey map[string]struct{}
 
 // RedisDB holds a single (numbered) Redis database.
 type RedisDB struct {
-	master     *sync.Mutex        // pointer to the lock in Miniredis
-	id         int                // db id
-	keys       map[string]string  // Master map of keys with their type
-	stringKeys map[string]string  // GET/SET &c. keys
-	hashKeys   map[string]hashKey // MGET/MSET &c. keys
-	listKeys   map[string]listKey // LPUSH &c. keys
-	setKeys    map[string]setKey  // SADD &c. keys
-	expire     map[string]int     // EXPIRE values
-	keyVersion map[string]uint    // used to watch values
+	master        *sync.Mutex          // pointer to the lock in Miniredis
+	id            int                  // db id
+	keys          map[string]string    // Master map of keys with their type
+	stringKeys    map[string]string    // GET/SET &c. keys
+	hashKeys      map[string]hashKey   // MGET/MSET &c. keys
+	listKeys      map[string]listKey   // LPUSH &c. keys
+	setKeys       map[string]setKey    // SADD &c. keys
+	sortedsetKeys map[string]sortedSet // ZADD &c. keys
+	expire        map[string]int       // EXPIRE values
+	keyVersion    map[string]uint      // used to watch values
 }
 
 // Miniredis is a Redis server implementation.
@@ -73,15 +74,16 @@ func NewMiniRedis() *Miniredis {
 
 func newRedisDB(id int, l *sync.Mutex) RedisDB {
 	return RedisDB{
-		id:         id,
-		master:     l,
-		keys:       map[string]string{},
-		stringKeys: map[string]string{},
-		hashKeys:   map[string]hashKey{},
-		listKeys:   map[string]listKey{},
-		setKeys:    map[string]setKey{},
-		expire:     map[string]int{},
-		keyVersion: map[string]uint{},
+		id:            id,
+		master:        l,
+		keys:          map[string]string{},
+		stringKeys:    map[string]string{},
+		hashKeys:      map[string]hashKey{},
+		listKeys:      map[string]listKey{},
+		setKeys:       map[string]setKey{},
+		sortedsetKeys: map[string]sortedSet{},
+		expire:        map[string]int{},
+		keyVersion:    map[string]uint{},
 	}
 }
 
@@ -112,6 +114,7 @@ func (m *Miniredis) Start() error {
 	commandsHash(m, srv)
 	commandsList(m, srv)
 	commandsSet(m, srv)
+	commandsSortedSet(m, srv)
 	commandsTransaction(m, srv)
 
 	go func() {

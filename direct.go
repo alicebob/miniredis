@@ -388,3 +388,54 @@ func (db *RedisDB) SRem(k string, fields ...string) (int, error) {
 	}
 	return db.setrem(k, fields...), nil
 }
+
+// ZAdd adds a score,member to a sorted set.
+func (m *Miniredis) ZAdd(k string, score float64, member string) (bool, error) {
+	return m.DB(m.selectedDB).ZAdd(k, score, member)
+}
+
+// ZAdd adds a score,member to a sorted set.
+func (db *RedisDB) ZAdd(k string, score float64, member string) (bool, error) {
+	db.master.Lock()
+	defer db.master.Unlock()
+	if db.exists(k) && !db.exists(k) && db.t(k) != "zset" {
+		return false, ErrWrongType
+	}
+	return db.zadd(k, score, member), nil
+}
+
+// ZMembers returns all members by score
+func (m *Miniredis) ZMembers(k string) ([]string, error) {
+	return m.DB(m.selectedDB).ZMembers(k)
+}
+
+// ZMembers returns all members by score
+func (db *RedisDB) ZMembers(k string) ([]string, error) {
+	db.master.Lock()
+	defer db.master.Unlock()
+	if !db.exists(k) {
+		return nil, ErrKeyNotFound
+	}
+	if db.t(k) != "zset" {
+		return nil, ErrWrongType
+	}
+	return db.zmembers(k), nil
+}
+
+// SortedSet returns a raw string->float64 map.
+func (m *Miniredis) SortedSet(k string) (map[string]float64, error) {
+	return m.DB(m.selectedDB).SortedSet(k)
+}
+
+// SortedSet returns a raw string->float64 map.
+func (db *RedisDB) SortedSet(k string) (map[string]float64, error) {
+	db.master.Lock()
+	defer db.master.Unlock()
+	if !db.exists(k) {
+		return nil, ErrKeyNotFound
+	}
+	if db.t(k) != "zset" {
+		return nil, ErrWrongType
+	}
+	return db.sortedSet(k), nil
+}

@@ -100,6 +100,10 @@ Implemented commands:
    - SISMEMBER
    - SMEMBERS
    - SREM
+ - Sorted Set keys
+   - ZADD
+   - ZCARD
+   - ZRANK
 
 
 Since this is intended to be used in unittests timeouts are not implemented.

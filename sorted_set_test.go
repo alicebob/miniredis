@@ -4,7 +4,7 @@ import (
 	"testing"
 )
 
-func TestSortedSet(t *testing.T) {
+func TestSortedSetImpl(t *testing.T) {
 	s := newSortedSet()
 	equals(t, 0, s.card())
 	s.set(3.1415, "pi")

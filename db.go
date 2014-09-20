@@ -321,3 +321,49 @@ func (db *RedisDB) hincrfloat(key, field string, delta float64) (float64, error)
 	db.hset(key, field, formatFloat(v))
 	return v, nil
 }
+
+// sortedSet set returns a sortedSet as map
+func (db *RedisDB) sortedSet(key string) map[string]float64 {
+	ss := db.sortedsetKeys[key]
+	return map[string]float64(ss)
+}
+
+// Add member to a sorted set. Returns whether this was a new member.
+func (db *RedisDB) zadd(key string, score float64, member string) bool {
+	ss, ok := db.sortedsetKeys[key]
+	if !ok {
+		ss = newSortedSet()
+		db.keys[key] = "zset"
+	}
+	_, ok = ss[member]
+	ss[member] = score
+	db.sortedsetKeys[key] = ss
+	db.keyVersion[key]++
+	return !ok
+}
+
+// All members from a sorted set, ordered by score.
+func (db *RedisDB) zmembers(key string) []string {
+	ss, ok := db.sortedsetKeys[key]
+	if !ok {
+		return nil
+	}
+	elems := ss.byScore()
+	members := make([]string, 0, len(elems))
+	for _, e := range elems {
+		members = append(members, e.member)
+	}
+	return members
+}
+
+// sorted set cardinality
+func (db *RedisDB) zcard(key string) int {
+	ss := db.sortedsetKeys[key]
+	return ss.card()
+}
+
+// sorted set rank
+func (db *RedisDB) zrank(key, member string) (int, bool) {
+	ss := db.sortedsetKeys[key]
+	return ss.rankByScore(member)
+}
