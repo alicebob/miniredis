@@ -6,48 +6,6 @@ import (
 	"github.com/bsm/redeo"
 )
 
-func startTx(ctx *connCtx) {
-	ctx.transaction = []txCmd{}
-	ctx.dirtyTransaction = false
-}
-
-func stopTx(ctx *connCtx) {
-	ctx.transaction = nil
-	unwatch(ctx)
-}
-
-func inTx(ctx *connCtx) bool {
-	return ctx.transaction != nil
-}
-
-func addTxCmd(ctx *connCtx, cb txCmd) {
-	ctx.transaction = append(ctx.transaction, cb)
-}
-
-func dirtyTx(ctx *connCtx) bool {
-	return ctx.dirtyTransaction
-}
-
-func watch(db *RedisDB, ctx *connCtx, key string) {
-	if ctx.watch == nil {
-		ctx.watch = map[dbKey]uint{}
-	}
-	ctx.watch[dbKey{db: db.id, key: key}] = db.keyVersion[key] // Can be 0.
-}
-
-func unwatch(ctx *connCtx) {
-	ctx.watch = nil
-}
-
-// setDirty can be called even when not in an tx. Is an no-op then.
-func setDirty(cl *redeo.Client) {
-	if cl.Ctx == nil {
-		// No transaction. Not relevant.
-		return
-	}
-	getCtx(cl).dirtyTransaction = true
-}
-
 // commandsTransaction handles MULTI &c.
 func commandsTransaction(m *Miniredis, srv *redeo.Server) {
 	srv.HandleFunc("DISCARD", m.cmdDiscard)

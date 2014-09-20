@@ -39,12 +39,12 @@ func (m *Miniredis) cmdSadd(out *redeo.Responder, r *redeo.Request) error {
 	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
-		added, err := db.setadd(key, elems...)
-		if err != nil {
-			out.WriteErrorString(err.Error())
+		if db.exists(key) && db.t(key) != "set" {
+			out.WriteErrorString(ErrWrongType.Error())
 			return
 		}
 
+		added := db.setadd(key, elems...)
 		out.WriteInt(added)
 	})
 }
@@ -62,16 +62,17 @@ func (m *Miniredis) cmdScard(out *redeo.Responder, r *redeo.Request) error {
 	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
-		members, err := db.members(key)
-		if err != nil {
-			if err == ErrKeyNotFound {
-				out.WriteInt(0)
-				return
-			}
-			out.WriteErrorString(err.Error())
+		if !db.exists(key) {
+			out.WriteZero()
 			return
 		}
 
+		if db.t(key) != "set" {
+			out.WriteErrorString(ErrWrongType.Error())
+			return
+		}
+
+		members := db.members(key)
 		out.WriteInt(len(members))
 	})
 }
@@ -90,17 +91,17 @@ func (m *Miniredis) cmdSismember(out *redeo.Responder, r *redeo.Request) error {
 	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
-		isMember, err := db.isMember(key, value)
-		if err != nil {
-			if err == ErrKeyNotFound {
-				out.WriteZero()
-				return
-			}
-			out.WriteErrorString(err.Error())
+		if !db.exists(key) {
+			out.WriteZero()
 			return
 		}
 
-		if isMember {
+		if db.t(key) != "set" {
+			out.WriteErrorString(ErrWrongType.Error())
+			return
+		}
+
+		if db.isMember(key, value) {
 			out.WriteOne()
 			return
 		}
@@ -121,15 +122,17 @@ func (m *Miniredis) cmdSmembers(out *redeo.Responder, r *redeo.Request) error {
 	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
-		members, err := db.members(key)
-		if err != nil {
-			if err == ErrKeyNotFound {
-				out.WriteBulkLen(0)
-				return
-			}
-			out.WriteErrorString(err.Error())
+		if !db.exists(key) {
+			out.WriteBulkLen(0)
 			return
 		}
+
+		if db.t(key) != "set" {
+			out.WriteErrorString(ErrWrongType.Error())
+			return
+		}
+
+		members := db.members(key)
 
 		out.WriteBulkLen(len(members))
 		for _, elem := range members {

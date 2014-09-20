@@ -3,71 +3,11 @@
 package miniredis
 
 import (
-	"errors"
 	"strconv"
 	"strings"
 
 	"github.com/bsm/redeo"
 )
-
-var (
-	errIntValueError   = errors.New("ERR value is not an integer or out of range")
-	errFloatValueError = errors.New("ERR value is not a valid float")
-)
-
-// Incr changes a int string value by delta.
-func (m *Miniredis) Incr(k string, delta int) (int, error) {
-	return m.DB(m.selectedDB).Incr(k, delta)
-}
-
-// Incr changes a int string value by delta.
-func (db *RedisDB) Incr(k string, delta int) (int, error) {
-	db.master.Lock()
-	defer db.master.Unlock()
-	return db.incr(k, delta)
-}
-
-// change int key value
-func (db *RedisDB) incr(k string, delta int) (int, error) {
-	v := 0
-	if sv, ok := db.stringKeys[k]; ok {
-		var err error
-		v, err = strconv.Atoi(sv)
-		if err != nil {
-			return 0, errIntValueError
-		}
-	}
-	v += delta
-	db.set(k, strconv.Itoa(v))
-	return v, nil
-}
-
-// Incrfloat changes a float string value by delta.
-func (m *Miniredis) Incrfloat(k string, delta float64) (float64, error) {
-	return m.DB(m.selectedDB).Incrfloat(k, delta)
-}
-
-// Incrfloat changes a float string value by delta.
-func (db *RedisDB) Incrfloat(k string, delta float64) (float64, error) {
-	db.master.Lock()
-	defer db.master.Unlock()
-	return db.incrfloat(k, delta)
-}
-
-// change float key value
-func (db *RedisDB) incrfloat(k string, delta float64) (float64, error) {
-	v := 0.0
-	if sv, ok := db.stringKeys[k]; ok {
-		var err error
-		v, err = strconv.ParseFloat(sv, 64)
-		if err != nil {
-			return 0, errFloatValueError
-		}
-	}
-	v += delta
-	db.set(k, formatFloat(v))
-	return v, nil
-}
 
 // commandsString handles all string value operations.
 func commandsString(m *Miniredis, srv *redeo.Server) {

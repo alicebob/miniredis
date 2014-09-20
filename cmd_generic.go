@@ -10,95 +10,6 @@ import (
 	"github.com/bsm/redeo"
 )
 
-// Del deletes a key and any expiration value. Returns whether there was a key.
-func (m *Miniredis) Del(k string) bool {
-	return m.DB(m.selectedDB).Del(k)
-}
-
-// Del deletes a key and any expiration value. Returns whether there was a key.
-func (db *RedisDB) Del(k string) bool {
-	db.master.Lock()
-	defer db.master.Unlock()
-	return db.del(k, false)
-}
-
-// internal, non-locked delete.
-func (db *RedisDB) del(k string, delTTL bool) bool {
-	t, ok := db.keys[k]
-	if !ok {
-		return false
-	}
-	delete(db.keys, k)
-	db.keyVersion[k]++
-	if delTTL {
-		delete(db.expire, k)
-	}
-	switch t {
-	case "string":
-		delete(db.stringKeys, k)
-	case "hash":
-		delete(db.hashKeys, k)
-	case "list":
-		delete(db.listKeys, k)
-	case "set":
-		delete(db.setKeys, k)
-	default:
-		panic("Unknown key type: " + t)
-	}
-	return true
-}
-
-// Expire value. As set by the client (via EXPIRE, PEXPIRE, EXPIREAT, PEXPIREAT and
-// similar commands). 0 if not set.
-func (m *Miniredis) Expire(k string) int {
-	return m.DB(m.selectedDB).Expire(k)
-}
-
-// Expire value. As set by the client (via EXPIRE, PEXPIRE, EXPIREAT, PEXPIREAT and
-// similar commands). 0 if not set.
-func (db *RedisDB) Expire(k string) int {
-	db.master.Lock()
-	defer db.master.Unlock()
-	return db.expire[k]
-}
-
-// SetExpire sets expiration of a key.
-func (m *Miniredis) SetExpire(k string, ex int) {
-	m.DB(m.selectedDB).SetExpire(k, ex)
-}
-
-// SetExpire sets expiration of a key.
-func (db *RedisDB) SetExpire(k string, ex int) {
-	db.master.Lock()
-	defer db.master.Unlock()
-	db.expire[k] = ex
-	db.keyVersion[k]++
-}
-
-// Type gives the type of a key, or ""
-func (m *Miniredis) Type(k string) string {
-	return m.DB(m.selectedDB).Type(k)
-}
-
-// Type gives the type of a key, or ""
-func (db *RedisDB) Type(k string) string {
-	db.master.Lock()
-	defer db.master.Unlock()
-	return db.keys[k]
-}
-
-// Exists tells whether a key exists.
-func (m *Miniredis) Exists(k string) bool {
-	return m.DB(m.selectedDB).Exists(k)
-}
-
-// Exists tells whether a key exists.
-func (db *RedisDB) Exists(k string) bool {
-	db.master.Lock()
-	defer db.master.Unlock()
-	return db.exists(k)
-}
-
 // commandsGeneric handles EXPIRE, TTL, PERSIST, &c.
 func commandsGeneric(m *Miniredis, srv *redeo.Server) {
 	srv.HandleFunc("DEL", m.cmdDel)
@@ -244,9 +155,10 @@ func (m *Miniredis) cmdDel(out *redeo.Responder, r *redeo.Request) error {
 
 		count := 0
 		for _, key := range r.Args {
-			if db.del(key, true) {
+			if db.exists(key) {
 				count++
 			}
+			db.del(key, true) // delete expire
 		}
 		out.WriteInt(count)
 	})

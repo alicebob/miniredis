@@ -8,153 +8,6 @@ import (
 	"github.com/bsm/redeo"
 )
 
-// HKeys returns all keys ('fields') for a hash key.
-func (m *Miniredis) HKeys(k string) []string {
-	return m.DB(m.selectedDB).HKeys(k)
-}
-
-// HKeys returns all keys ('fields') for a hash key.
-func (db *RedisDB) HKeys(k string) []string {
-	db.master.Lock()
-	defer db.master.Unlock()
-	v, ok := db.hashKeys[k]
-	if !ok {
-		return []string{}
-	}
-	r := []string{}
-	for k := range v {
-		r = append(r, k)
-	}
-	return r
-}
-
-// HGet returns hash keys added with HSET.
-// This will return an empty string if the key is not set. Redis would return
-// a nil.
-// Returns empty string when the key is of a different type.
-func (m *Miniredis) HGet(k, f string) string {
-	return m.DB(m.selectedDB).HGet(k, f)
-}
-
-// HGet returns hash keys added with HSET.
-// Returns empty string when the key is of a different type.
-func (db *RedisDB) HGet(k, f string) string {
-	db.master.Lock()
-	defer db.master.Unlock()
-	h, ok := db.hashKeys[k]
-	if !ok {
-		return ""
-	}
-	return h[f]
-}
-
-// HSet sets a hash key.
-// If there is another key by the same name it will be gone.
-func (m *Miniredis) HSet(k, f, v string) {
-	m.DB(m.selectedDB).HSet(k, f, v)
-}
-
-// HSet sets a hash key.
-// If there is another key by the same name it will be gone.
-func (db *RedisDB) HSet(k, f, v string) {
-	db.master.Lock()
-	defer db.master.Unlock()
-	db.hset(k, f, v)
-}
-
-// hset returns whether the key already existed
-func (db *RedisDB) hset(k, f, v string) bool {
-	if t, ok := db.keys[k]; ok && t != "hash" {
-		db.del(k, true)
-	}
-	db.keys[k] = "hash"
-	if _, ok := db.hashKeys[k]; !ok {
-		db.hashKeys[k] = map[string]string{}
-	}
-	_, ok := db.hashKeys[k][f]
-	db.hashKeys[k][f] = v
-	db.keyVersion[k]++
-	return ok
-}
-
-// HDel deletes a hash key.
-func (m *Miniredis) HDel(k, f string) {
-	m.DB(m.selectedDB).HDel(k, f)
-}
-
-// HDel deletes a hash key.
-func (db *RedisDB) HDel(k, f string) {
-	db.master.Lock()
-	defer db.master.Unlock()
-	db.hdel(k, f)
-}
-
-func (db *RedisDB) hdel(k, f string) {
-	if _, ok := db.hashKeys[k]; !ok {
-		return
-	}
-	delete(db.hashKeys[k], f)
-	db.keyVersion[k]++
-}
-
-// HIncr increases a key/field by delta (int).
-func (m *Miniredis) HIncr(k, f string, delta int) (int, error) {
-	return m.DB(m.selectedDB).HIncr(k, f, delta)
-}
-
-// HIncr increases a key/field by delta (int).
-func (db *RedisDB) HIncr(k, f string, delta int) (int, error) {
-	db.master.Lock()
-	defer db.master.Unlock()
-	return db.hincr(k, f, delta)
-}
-
-// change int key value
-func (db *RedisDB) hincr(key, field string, delta int) (int, error) {
-	v := 0
-	if h, ok := db.hashKeys[key]; ok {
-		if f, ok := h[field]; ok {
-			var err error
-			v, err = strconv.Atoi(f)
-			if err != nil {
-				return 0, errIntValueError
-			}
-		}
-	}
-	v += delta
-	db.hset(key, field, strconv.Itoa(v))
-	return v, nil
-}
-
-// HIncrfloat increases a key/field by delta (float).
-func (m *Miniredis) HIncrfloat(k, f string, delta float64) (float64, error) {
-	return m.DB(m.selectedDB).HIncrfloat(k, f, delta)
-}
-
-// HIncrfloat increases a key/field by delta (float).
-func (db *RedisDB) HIncrfloat(k, f string, delta float64) (float64, error) {
-	db.master.Lock()
-	defer db.master.Unlock()
-	return db.hincrfloat(k, f, delta)
-}
-
-// change float key value
-func (db *RedisDB) hincrfloat(key, field string, delta float64) (float64, error) {
-	v := 0.0
-	if h, ok := db.hashKeys[key]; ok {
-		if f, ok := h[field]; ok {
-			var err error
-			v, err = strconv.ParseFloat(f, 64)
-			if err != nil {
-				return 0, errFloatValueError
-			}
-		}
-	}
-	v += delta
-	db.hset(key, field, formatFloat(v))
-	return v, nil
-}
-
 // commandsHash handles all hash value operations.
 func commandsHash(m *Miniredis, srv *redeo.Server) {
 	srv.HandleFunc("HDEL", m.cmdHdel)
@@ -170,7 +23,7 @@ func commandsHash(m *Miniredis, srv *redeo.Server) {
 	srv.HandleFunc("HSET", m.cmdHset)
 	srv.HandleFunc("HSETNX", m.cmdHsetnx)
 	srv.HandleFunc("HVALS", m.cmdHvals)
-	// HSCAN skipped
+	// HSCAN
 }
 
 // HSET
@@ -412,18 +265,18 @@ func (m *Miniredis) cmdHkeys(out *redeo.Responder, r *redeo.Request) error {
 	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
-		t, ok := db.keys[key]
-		if !ok {
+		if !db.exists(key) {
 			out.WriteBulkLen(0)
 			return
 		}
-		if t != "hash" {
+		if db.t(key) != "hash" {
 			out.WriteErrorString(msgWrongType)
 			return
 		}
 
-		out.WriteBulkLen(len(db.hashKeys[key]))
-		for f := range db.hashKeys[key] {
+		fields := db.hkeys(key)
+		out.WriteBulkLen(len(fields))
+		for _, f := range fields {
 			out.WriteString(f)
 		}
 	})

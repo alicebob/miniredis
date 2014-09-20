@@ -255,29 +255,35 @@ func TestHashKeys(t *testing.T) {
 	s.HSet("wim", "teun", "vuur")
 	s.HSet("wim", "gijs", "lam")
 	s.HSet("wim", "kees", "bok")
-	v, err := redis.Strings(c.Do("HKEYS", "wim"))
-	ok(t, err)
-	equals(t, 4, len(v))
-	sort.Strings(v)
-	equals(t, []string{
-		"gijs",
-		"kees",
-		"teun",
-		"zus",
-	}, v)
+	{
+		v, err := redis.Strings(c.Do("HKEYS", "wim"))
+		ok(t, err)
+		equals(t, 4, len(v))
+		sort.Strings(v)
+		equals(t, []string{
+			"gijs",
+			"kees",
+			"teun",
+			"zus",
+		}, v)
+	}
 
-	// Direct command, while we're at it
-	direct := s.HKeys("wim")
-	sort.Strings(direct)
-	equals(t, []string{
-		"gijs",
-		"kees",
-		"teun",
-		"zus",
-	}, direct)
-	equals(t, []string{}, s.HKeys("nosuch"))
+	// Direct command
+	{
+		direct, err := s.HKeys("wim")
+		ok(t, err)
+		sort.Strings(direct)
+		equals(t, []string{
+			"gijs",
+			"kees",
+			"teun",
+			"zus",
+		}, direct)
+		_, err = s.HKeys("nosuch")
+		equals(t, err, ErrKeyNotFound)
+	}
 
-	v, err = redis.Strings(c.Do("HKEYS", "nosuch"))
+	v, err := redis.Strings(c.Do("HKEYS", "nosuch"))
 	ok(t, err)
 	equals(t, 0, len(v))
 

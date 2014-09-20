@@ -8,13 +8,6 @@ import (
 	"github.com/bsm/redeo"
 )
 
-// Select sets the DB id for all direct commands.
-func (m *Miniredis) Select(i int) {
-	m.Lock()
-	defer m.Unlock()
-	m.selectedDB = i
-}
-
 func commandsConnection(m *Miniredis, srv *redeo.Server) {
 	srv.HandleFunc("AUTH", m.cmdAuth)
 	srv.HandleFunc("ECHO", m.cmdEcho)

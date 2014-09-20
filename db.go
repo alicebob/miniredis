@@ -2,6 +2,7 @@ package miniredis
 
 import (
 	"sort"
+	"strconv"
 )
 
 func (db *RedisDB) exists(k string) bool {
@@ -28,6 +29,36 @@ func (db *RedisDB) set(k, v string) {
 	db.keys[k] = "string"
 	db.stringKeys[k] = v
 	db.keyVersion[k]++
+}
+
+// change int key value
+func (db *RedisDB) incr(k string, delta int) (int, error) {
+	v := 0
+	if sv, ok := db.stringKeys[k]; ok {
+		var err error
+		v, err = strconv.Atoi(sv)
+		if err != nil {
+			return 0, ErrIntValueError
+		}
+	}
+	v += delta
+	db.set(k, strconv.Itoa(v))
+	return v, nil
+}
+
+// change float key value
+func (db *RedisDB) incrfloat(k string, delta float64) (float64, error) {
+	v := 0.0
+	if sv, ok := db.stringKeys[k]; ok {
+		var err error
+		v, err = strconv.ParseFloat(sv, 64)
+		if err != nil {
+			return 0, ErrFloatValueError
+		}
+	}
+	v += delta
+	db.set(k, formatFloat(v))
+	return v, nil
 }
 
 // move something to another db. Will return ok. Or not.
@@ -151,14 +182,11 @@ func (db *RedisDB) pop(k string) (string, error) {
 }
 
 // setadd adds members to a set. Returns nr of new keys.
-func (db *RedisDB) setadd(k string, elems ...string) (int, error) {
-	if t, ok := db.keys[k]; ok && t != "set" {
-		return 0, ErrWrongType
-	}
-
+func (db *RedisDB) setadd(k string, elems ...string) int {
 	s, ok := db.setKeys[k]
 	if !ok {
 		s = setKey{}
+		db.keys[k] = "set"
 	}
 	added := 0
 	for _, e := range elems {
@@ -167,38 +195,111 @@ func (db *RedisDB) setadd(k string, elems ...string) (int, error) {
 		}
 		s[e] = struct{}{}
 	}
-	db.keys[k] = "set"
 	db.setKeys[k] = s
 	db.keyVersion[k]++
-	return added, nil
+	return added
 }
 
 // All members of a set.
-func (db *RedisDB) members(k string) ([]string, error) {
-	if t, ok := db.keys[k]; ok && t != "set" {
-		return nil, ErrWrongType
-	}
-	set, ok := db.setKeys[k]
-	if !ok || len(set) < 1 {
-		return nil, ErrKeyNotFound
-	}
+func (db *RedisDB) members(k string) []string {
+	set := db.setKeys[k]
 	members := make([]string, 0, len(set))
 	for k := range set {
 		members = append(members, k)
 	}
 	sort.Strings(members)
-	return members, nil
+	return members
 }
 
-// Is a value present?
-func (db *RedisDB) isMember(k, v string) (bool, error) {
-	if t, ok := db.keys[k]; ok && t != "set" {
-		return false, ErrWrongType
-	}
+// Is a SET value present?
+func (db *RedisDB) isMember(k, v string) bool {
 	set, ok := db.setKeys[k]
 	if !ok {
-		return false, ErrKeyNotFound
+		return false
 	}
 	_, ok = set[v]
-	return ok, nil
+	return ok
+}
+
+// hkeys returns all keys ('fields') for a hash key.
+func (db *RedisDB) hkeys(k string) []string {
+	v := db.hashKeys[k]
+	r := make([]string, 0, len(v))
+	for k := range v {
+		r = append(r, k)
+	}
+	return r
+}
+
+func (db *RedisDB) del(k string, delTTL bool) {
+	if !db.exists(k) {
+		return
+	}
+	t := db.t(k)
+	delete(db.keys, k)
+	db.keyVersion[k]++
+	if delTTL {
+		delete(db.expire, k)
+	}
+	switch t {
+	case "string":
+		delete(db.stringKeys, k)
+	case "hash":
+		delete(db.hashKeys, k)
+	case "list":
+		delete(db.listKeys, k)
+	case "set":
+		delete(db.setKeys, k)
+	default:
+		panic("Unknown key type: " + t)
+	}
+}
+
+// hset returns whether the key already existed
+func (db *RedisDB) hset(k, f, v string) bool {
+	if t, ok := db.keys[k]; ok && t != "hash" {
+		db.del(k, true)
+	}
+	db.keys[k] = "hash"
+	if _, ok := db.hashKeys[k]; !ok {
+		db.hashKeys[k] = map[string]string{}
+	}
+	_, ok := db.hashKeys[k][f]
+	db.hashKeys[k][f] = v
+	db.keyVersion[k]++
+	return ok
+}
+
+// change int key value
+func (db *RedisDB) hincr(key, field string, delta int) (int, error) {
+	v := 0
+	if h, ok := db.hashKeys[key]; ok {
+		if f, ok := h[field]; ok {
+			var err error
+			v, err = strconv.Atoi(f)
+			if err != nil {
+				return 0, ErrIntValueError
+			}
+		}
+	}
+	v += delta
+	db.hset(key, field, strconv.Itoa(v))
+	return v, nil
+}
+
+// change float key value
+func (db *RedisDB) hincrfloat(key, field string, delta float64) (float64, error) {
+	v := 0.0
+	if h, ok := db.hashKeys[key]; ok {
+		if f, ok := h[field]; ok {
+			var err error
+			v, err = strconv.ParseFloat(f, 64)
+			if err != nil {
+				return 0, ErrFloatValueError
+			}
+		}
+	}
+	v += delta
+	db.hset(key, field, formatFloat(v))
+	return v, nil
 }

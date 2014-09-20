@@ -11,7 +11,18 @@ var (
 	ErrKeyNotFound = errors.New("key not found")
 	// ErrWrongType when a key is not the right type.
 	ErrWrongType = errors.New(msgWrongType)
+	// ErrIntValueError can returned by INCRBY
+	ErrIntValueError = errors.New("ERR value is not an integer or out of range")
+	// ErrFloatValueError can returned by INCRBYFLOAT
+	ErrFloatValueError = errors.New("ERR value is not a valid float")
 )
+
+// Select sets the DB id for all direct commands.
+func (m *Miniredis) Select(i int) {
+	m.Lock()
+	defer m.Unlock()
+	m.selectedDB = i
+}
 
 // Get returns string keys added with SET.
 func (m *Miniredis) Get(k string) (string, error) {
@@ -48,6 +59,30 @@ func (db *RedisDB) Set(k, v string) error {
 	db.del(k, true) // Remove expire
 	db.set(k, v)
 	return nil
+}
+
+// Incr changes a int string value by delta.
+func (m *Miniredis) Incr(k string, delta int) (int, error) {
+	return m.DB(m.selectedDB).Incr(k, delta)
+}
+
+// Incr changes a int string value by delta.
+func (db *RedisDB) Incr(k string, delta int) (int, error) {
+	db.master.Lock()
+	defer db.master.Unlock()
+	return db.incr(k, delta)
+}
+
+// Incrfloat changes a float string value by delta.
+func (m *Miniredis) Incrfloat(k string, delta float64) (float64, error) {
+	return m.DB(m.selectedDB).Incrfloat(k, delta)
+}
+
+// Incrfloat changes a float string value by delta.
+func (db *RedisDB) Incrfloat(k string, delta float64) (float64, error) {
+	db.master.Lock()
+	defer db.master.Unlock()
+	return db.incrfloat(k, delta)
 }
 
 // List returns the list k, or an error if it's not there or something else.
@@ -131,7 +166,10 @@ func (m *Miniredis) SetAdd(k string, elems ...string) (int, error) {
 func (db *RedisDB) SetAdd(k string, elems ...string) (int, error) {
 	db.master.Lock()
 	defer db.master.Unlock()
-	return db.setadd(k, elems...)
+	if db.exists(k) && db.t(k) != "set" {
+		return 0, ErrWrongType
+	}
+	return db.setadd(k, elems...), nil
 }
 
 // Members gives all set keys. Sorted.
@@ -143,7 +181,13 @@ func (m *Miniredis) Members(k string) ([]string, error) {
 func (db *RedisDB) Members(k string) ([]string, error) {
 	db.master.Lock()
 	defer db.master.Unlock()
-	return db.members(k)
+	if !db.exists(k) {
+		return nil, ErrKeyNotFound
+	}
+	if db.t(k) != "set" {
+		return nil, ErrWrongType
+	}
+	return db.members(k), nil
 }
 
 // IsMember tells if value is in the set.
@@ -155,5 +199,174 @@ func (m *Miniredis) IsMember(k, v string) (bool, error) {
 func (db *RedisDB) IsMember(k, v string) (bool, error) {
 	db.master.Lock()
 	defer db.master.Unlock()
-	return db.isMember(k, v)
+	if !db.exists(k) {
+		return false, ErrKeyNotFound
+	}
+	if db.t(k) != "set" {
+		return false, ErrWrongType
+	}
+	return db.isMember(k, v), nil
+}
+
+// HKeys returns all keys ('fields') for a hash key.
+func (m *Miniredis) HKeys(k string) ([]string, error) {
+	return m.DB(m.selectedDB).HKeys(k)
+}
+
+// HKeys returns all keys ('fields') for a hash key.
+func (db *RedisDB) HKeys(key string) ([]string, error) {
+	db.master.Lock()
+	defer db.master.Unlock()
+	if !db.exists(key) {
+		return nil, ErrKeyNotFound
+	}
+	if db.t(key) != "hash" {
+		return nil, ErrWrongType
+	}
+	return db.hkeys(key), nil
+}
+
+// Del deletes a key and any expiration value. Returns whether there was a key.
+func (m *Miniredis) Del(k string) bool {
+	return m.DB(m.selectedDB).Del(k)
+}
+
+// Del deletes a key and any expiration value. Returns whether there was a key.
+func (db *RedisDB) Del(k string) bool {
+	db.master.Lock()
+	defer db.master.Unlock()
+	if !db.exists(k) {
+		return false
+	}
+	db.del(k, true)
+	return true
+}
+
+// Expire value. As set by the client (via EXPIRE, PEXPIRE, EXPIREAT, PEXPIREAT and
+// similar commands). 0 if not set.
+func (m *Miniredis) Expire(k string) int {
+	return m.DB(m.selectedDB).Expire(k)
+}
+
+// Expire value. As set by the client (via EXPIRE, PEXPIRE, EXPIREAT, PEXPIREAT and
+// similar commands). 0 if not set.
+func (db *RedisDB) Expire(k string) int {
+	db.master.Lock()
+	defer db.master.Unlock()
+	return db.expire[k]
+}
+
+// SetExpire sets expiration of a key.
+func (m *Miniredis) SetExpire(k string, ex int) {
+	m.DB(m.selectedDB).SetExpire(k, ex)
+}
+
+// SetExpire sets expiration of a key.
+func (db *RedisDB) SetExpire(k string, ex int) {
+	db.master.Lock()
+	defer db.master.Unlock()
+	db.expire[k] = ex
+	db.keyVersion[k]++
+}
+
+// Type gives the type of a key, or ""
+func (m *Miniredis) Type(k string) string {
+	return m.DB(m.selectedDB).Type(k)
+}
+
+// Type gives the type of a key, or ""
+func (db *RedisDB) Type(k string) string {
+	db.master.Lock()
+	defer db.master.Unlock()
+	return db.t(k)
+}
+
+// Exists tells whether a key exists.
+func (m *Miniredis) Exists(k string) bool {
+	return m.DB(m.selectedDB).Exists(k)
+}
+
+// Exists tells whether a key exists.
+func (db *RedisDB) Exists(k string) bool {
+	db.master.Lock()
+	defer db.master.Unlock()
+	return db.exists(k)
+}
+
+// HGet returns hash keys added with HSET.
+// This will return an empty string if the key is not set. Redis would return
+// a nil.
+// Returns empty string when the key is of a different type.
+func (m *Miniredis) HGet(k, f string) string {
+	return m.DB(m.selectedDB).HGet(k, f)
+}
+
+// HGet returns hash keys added with HSET.
+// Returns empty string when the key is of a different type.
+func (db *RedisDB) HGet(k, f string) string {
+	db.master.Lock()
+	defer db.master.Unlock()
+	h, ok := db.hashKeys[k]
+	if !ok {
+		return ""
+	}
+	return h[f]
+}
+
+// HSet sets a hash key.
+// If there is another key by the same name it will be gone.
+func (m *Miniredis) HSet(k, f, v string) {
+	m.DB(m.selectedDB).HSet(k, f, v)
+}
+
+// HSet sets a hash key.
+// If there is another key by the same name it will be gone.
+func (db *RedisDB) HSet(k, f, v string) {
+	db.master.Lock()
+	defer db.master.Unlock()
+	db.hset(k, f, v)
+}
+
+// HDel deletes a hash key.
+func (m *Miniredis) HDel(k, f string) {
+	m.DB(m.selectedDB).HDel(k, f)
+}
+
+// HDel deletes a hash key.
+func (db *RedisDB) HDel(k, f string) {
+	db.master.Lock()
+	defer db.master.Unlock()
+	db.hdel(k, f)
+}
+
+func (db *RedisDB) hdel(k, f string) {
+	if _, ok := db.hashKeys[k]; !ok {
+		return
+	}
+	delete(db.hashKeys[k], f)
+	db.keyVersion[k]++
+}
+
+// HIncr increases a key/field by delta (int).
+func (m *Miniredis) HIncr(k, f string, delta int) (int, error) {
+	return m.DB(m.selectedDB).HIncr(k, f, delta)
+}
+
+// HIncr increases a key/field by delta (int).
+func (db *RedisDB) HIncr(k, f string, delta int) (int, error) {
+	db.master.Lock()
+	defer db.master.Unlock()
+	return db.hincr(k, f, delta)
+}
+
+// HIncrfloat increases a key/field by delta (float).
+func (m *Miniredis) HIncrfloat(k, f string, delta float64) (float64, error) {
+	return m.DB(m.selectedDB).HIncrfloat(k, f, delta)
+}
+
+// HIncrfloat increases a key/field by delta (float).
+func (db *RedisDB) HIncrfloat(k, f string, delta float64) (float64, error) {
+	db.master.Lock()
+	defer db.master.Unlock()
+	return db.hincrfloat(k, f, delta)
 }
