@@ -81,6 +81,8 @@ func (db *RedisDB) move(key string, to *RedisDB) bool {
 		to.listKeys[key] = db.listKeys[key]
 	case "set":
 		to.setKeys[key] = db.setKeys[key]
+	case "zset":
+		to.sortedsetKeys[key] = db.sortedsetKeys[key]
 	default:
 		panic("unhandled key type")
 	}
@@ -103,6 +105,8 @@ func (db *RedisDB) rename(from, to string) error {
 		db.listKeys[to] = db.listKeys[from]
 	case "set":
 		db.setKeys[to] = db.setKeys[from]
+	case "zset":
+		db.sortedsetKeys[to] = db.sortedsetKeys[from]
 	default:
 		panic("missing case")
 	}
@@ -268,6 +272,8 @@ func (db *RedisDB) del(k string, delTTL bool) {
 		delete(db.listKeys, k)
 	case "set":
 		delete(db.setKeys, k)
+	case "zset":
+		delete(db.sortedsetKeys, k)
 	default:
 		panic("Unknown key type: " + t)
 	}
