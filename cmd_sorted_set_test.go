@@ -136,3 +136,86 @@ func TestSortedSet(t *testing.T) {
 	}
 
 }
+
+// Test ZRANGE
+func TestSortedSetRange(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	s.ZAdd("z", 1, "one")
+	s.ZAdd("z", 2, "two")
+	s.ZAdd("z", 2, "zwei")
+	s.ZAdd("z", 3, "three")
+	s.ZAdd("z", 3, "drei")
+	s.ZAdd("z", math.Inf(+1), "inf")
+
+	{
+		b, err := redis.Strings(c.Do("ZRANGE", "z", 0, -1))
+		ok(t, err)
+		equals(t, []string{"one", "two", "zwei", "drei", "three", "inf"}, b)
+	}
+	{
+		b, err := redis.Strings(c.Do("ZRANGE", "z", 0, 1))
+		ok(t, err)
+		equals(t, []string{"one", "two"}, b)
+	}
+	{
+		b, err := redis.Strings(c.Do("ZRANGE", "z", -1, -1))
+		ok(t, err)
+		equals(t, []string{"inf"}, b)
+	}
+
+	// weird cases.
+	{
+		b, err := redis.Strings(c.Do("ZRANGE", "z", -100, -100))
+		ok(t, err)
+		equals(t, []string{}, b)
+	}
+	{
+		b, err := redis.Strings(c.Do("ZRANGE", "z", 100, 400))
+		ok(t, err)
+		equals(t, []string{}, b)
+	}
+	// Nonexistent key
+	{
+		b, err := redis.Strings(c.Do("ZRANGE", "nosuch", 1, 4))
+		ok(t, err)
+		equals(t, []string{}, b)
+	}
+
+	// With scores
+	{
+		b, err := redis.Strings(c.Do("ZRANGE", "z", 1, 2, "WITHSCORES"))
+		ok(t, err)
+		equals(t, []string{"two", "2", "zwei", "2"}, b)
+	}
+	// INF in WITHSCORES
+	{
+		b, err := redis.Strings(c.Do("ZRANGE", "z", 4, -1, "WITHSCORES"))
+		ok(t, err)
+		equals(t, []string{"three", "3", "inf", "inf"}, b)
+	}
+
+	// Error cases
+	{
+		_, err = redis.String(c.Do("ZRANGE"))
+		assert(t, err != nil, "ZRANGE error")
+		_, err = redis.String(c.Do("ZRANGE", "set"))
+		assert(t, err != nil, "ZRANGE error")
+		_, err = redis.String(c.Do("ZRANGE", "set", 1))
+		assert(t, err != nil, "ZRANGE error")
+		_, err = redis.String(c.Do("ZRANGE", "set", "noint", 1))
+		assert(t, err != nil, "ZRANGE error")
+		_, err = redis.String(c.Do("ZRANGE", "set", 1, "noint"))
+		assert(t, err != nil, "ZRANGE error")
+		_, err = redis.String(c.Do("ZRANGE", "set", 1, 2, "toomany"))
+		assert(t, err != nil, "ZRANGE error")
+		// Wrong type of key
+		s.Set("str", "value")
+		_, err = redis.Int(c.Do("ZRANGE", "str", 1, 2))
+		assert(t, err != nil, "ZRANGE error")
+	}
+}

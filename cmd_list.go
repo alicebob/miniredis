@@ -184,7 +184,7 @@ func (m *Miniredis) cmdLrange(out *redeo.Responder, r *redeo.Request) error {
 			return
 		}
 
-		rs, re := redisRange(len(l), start, end)
+		rs, re := redisRange(len(l), start, end, false)
 		out.WriteBulkLen(re - rs)
 		for _, el := range l[rs:re] {
 			out.WriteString(el)
@@ -227,7 +227,7 @@ func (m *Miniredis) cmdLtrim(out *redeo.Responder, r *redeo.Request) error {
 		}
 
 		l := db.listKeys[key]
-		rs, re := redisRange(len(l), start, end)
+		rs, re := redisRange(len(l), start, end, false)
 		db.listKeys[key] = l[rs:re]
 		db.keyVersion[key]++
 		out.WriteOK()

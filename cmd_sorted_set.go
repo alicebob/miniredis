@@ -1,9 +1,10 @@
-// Commands from http://redis.io/commands#set
+// Commands from http://redis.io/commands#sorted_set
 
 package miniredis
 
 import (
 	"strconv"
+	"strings"
 
 	"github.com/bsm/redeo"
 )
@@ -16,7 +17,7 @@ func commandsSortedSet(m *Miniredis, srv *redeo.Server) {
 	// ZINCRBY key increment member
 	// ZINTERSTORE destination numkeys key [key ...] [WEIGHTS weight [weight ...]] [AGGREGATE SUM|MIN|MAX]
 	// ZLEXCOUNT key min max
-	// ZRANGE key start stop [WITHSCORES]
+	srv.HandleFunc("ZRANGE", m.cmdZrange)
 	// ZRANGEBYLEX key min max [LIMIT offset count]
 	// ZRANGEBYSCORE key min max [WITHSCORES] [LIMIT offset count]
 	srv.HandleFunc("ZRANK", m.cmdZrank)
@@ -102,6 +103,71 @@ func (m *Miniredis) cmdZcard(out *redeo.Responder, r *redeo.Request) error {
 		}
 
 		out.WriteInt(db.zcard(key))
+	})
+}
+
+// ZRANGE
+func (m *Miniredis) cmdZrange(out *redeo.Responder, r *redeo.Request) error {
+	if len(r.Args) < 3 {
+		setDirty(r.Client())
+		out.WriteErrorString("ERR wrong number of arguments for 'zrange' command")
+		return nil
+	}
+
+	key := r.Args[0]
+	start, err := strconv.Atoi(r.Args[1])
+	if err != nil {
+		setDirty(r.Client())
+		out.WriteErrorString(msgInvalidInt)
+		return nil
+	}
+	end, err := strconv.Atoi(r.Args[2])
+	if err != nil {
+		setDirty(r.Client())
+		out.WriteErrorString(msgInvalidInt)
+		return nil
+	}
+
+	withScores := false
+	if len(r.Args) > 4 {
+		out.WriteErrorString(msgSyntaxError)
+		return nil
+	}
+	if len(r.Args) == 4 {
+		if strings.ToLower(r.Args[3]) != "withscores" {
+			setDirty(r.Client())
+			out.WriteErrorString(msgSyntaxError)
+			return nil
+		}
+		withScores = true
+	}
+
+	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+		db := m.db(ctx.selectedDB)
+
+		if !db.exists(key) {
+			out.WriteBulkLen(0)
+			return
+		}
+
+		if db.t(key) != "zset" {
+			out.WriteErrorString(ErrWrongType.Error())
+			return
+		}
+
+		members := db.zmembers(key)
+		rs, re := redisRange(len(members), start, end, false)
+		if withScores {
+			out.WriteBulkLen((re - rs) * 2)
+		} else {
+			out.WriteBulkLen(re - rs)
+		}
+		for _, el := range members[rs:re] {
+			out.WriteString(el)
+			if withScores {
+				out.WriteString(formatFloat(db.zscore(key, el)))
+			}
+		}
 	})
 }
 

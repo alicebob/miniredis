@@ -2,6 +2,7 @@ package miniredis
 
 import (
 	"fmt"
+	"math"
 	"strings"
 
 	"github.com/bsm/redeo"
@@ -38,6 +39,12 @@ func formatFloat(v float64) string {
 	// Format with %f and strip trailing 0s. This is the most like Redis does
 	// it :(
 	// .12 is the magic number where most output is the same as Redis.
+	if math.IsInf(v, +1) {
+		return "inf"
+	}
+	if math.IsInf(v, -1) {
+		return "-inf"
+	}
 	sv := fmt.Sprintf("%.12f", v)
 	for strings.Contains(sv, ".") {
 		if sv[len(sv)-1] != '0' {
@@ -58,7 +65,9 @@ func formatFloat(v float64) string {
 // Redis semantics. Both start and end can be negative.
 // Used for string range and list range things.
 // The results can be used as: v[start:end]
-func redisRange(l, start, end int) (int, int) {
+// Note that GETRANGE (on a string key) never returns an empty string when end
+// is a large negative number.
+func redisRange(l, start, end int, stringSymantics bool) (int, int) {
 	if start < 0 {
 		start = l + start
 		if start < 0 {
@@ -72,7 +81,10 @@ func redisRange(l, start, end int) (int, int) {
 	if end < 0 {
 		end = l + end
 		if end < 0 {
-			end = 0
+			end = -1
+			if stringSymantics {
+				end = 0
+			}
 		}
 	}
 	end++ // end argument is inclusive in Redis.

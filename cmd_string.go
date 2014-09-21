@@ -904,7 +904,7 @@ func (m *Miniredis) cmdSetbit(out *redeo.Responder, r *redeo.Request) error {
 
 // Redis range. both start and end can be negative.
 func withRange(v string, start, end int) string {
-	s, e := redisRange(len(v), start, end)
+	s, e := redisRange(len(v), start, end, true /* string getrange symantics */)
 	return v[s:e]
 }
 

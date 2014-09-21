@@ -373,3 +373,9 @@ func (db *RedisDB) zrank(key, member string) (int, bool) {
 	ss := db.sortedsetKeys[key]
 	return ss.rankByScore(member)
 }
+
+// sorted set score
+func (db *RedisDB) zscore(key, member string) float64 {
+	ss := db.sortedsetKeys[key]
+	return ss[member]
+}
