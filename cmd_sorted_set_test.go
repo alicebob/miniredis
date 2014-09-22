@@ -137,8 +137,9 @@ func TestSortedSet(t *testing.T) {
 
 }
 
-// Test ZRANGE
+// Test ZRANGE and ZREVRANGE
 func TestSortedSetRange(t *testing.T) {
+	// ZREVRANGE is the same code as ZRANGE
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
@@ -156,16 +157,28 @@ func TestSortedSetRange(t *testing.T) {
 		b, err := redis.Strings(c.Do("ZRANGE", "z", 0, -1))
 		ok(t, err)
 		equals(t, []string{"one", "two", "zwei", "drei", "three", "inf"}, b)
+
+		b, err = redis.Strings(c.Do("ZREVRANGE", "z", 0, -1))
+		ok(t, err)
+		equals(t, []string{"inf", "three", "drei", "zwei", "two", "one"}, b)
 	}
 	{
 		b, err := redis.Strings(c.Do("ZRANGE", "z", 0, 1))
 		ok(t, err)
 		equals(t, []string{"one", "two"}, b)
+
+		b, err = redis.Strings(c.Do("ZREVRANGE", "z", 0, 1))
+		ok(t, err)
+		equals(t, []string{"inf", "three"}, b)
 	}
 	{
 		b, err := redis.Strings(c.Do("ZRANGE", "z", -1, -1))
 		ok(t, err)
 		equals(t, []string{"inf"}, b)
+
+		b, err = redis.Strings(c.Do("ZREVRANGE", "z", -1, -1))
+		ok(t, err)
+		equals(t, []string{"one"}, b)
 	}
 
 	// weird cases.
@@ -191,6 +204,10 @@ func TestSortedSetRange(t *testing.T) {
 		b, err := redis.Strings(c.Do("ZRANGE", "z", 1, 2, "WITHSCORES"))
 		ok(t, err)
 		equals(t, []string{"two", "2", "zwei", "2"}, b)
+
+		b, err = redis.Strings(c.Do("ZREVRANGE", "z", 1, 2, "WITHSCORES"))
+		ok(t, err)
+		equals(t, []string{"three", "3", "drei", "3"}, b)
 	}
 	// INF in WITHSCORES
 	{
@@ -203,6 +220,8 @@ func TestSortedSetRange(t *testing.T) {
 	{
 		_, err = redis.String(c.Do("ZRANGE"))
 		assert(t, err != nil, "ZRANGE error")
+		_, err = redis.String(c.Do("ZREVRANGE"))
+		assert(t, err != nil, "ZREVRANGE error")
 		_, err = redis.String(c.Do("ZRANGE", "set"))
 		assert(t, err != nil, "ZRANGE error")
 		_, err = redis.String(c.Do("ZRANGE", "set", 1))

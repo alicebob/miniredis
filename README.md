@@ -107,6 +107,7 @@ Implemented commands:
    - ZRANGE
    - ZRANK
    - ZDEL
+   - ZREVRANGE
    - ZSCORE
 
 
