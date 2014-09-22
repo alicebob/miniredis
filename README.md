@@ -107,6 +107,7 @@ Implemented commands:
    - ZRANGE
    - ZRANK
    - ZDEL
+   - ZSCORE
 
 
 Since this is intended to be used in unittests timeouts are not implemented.

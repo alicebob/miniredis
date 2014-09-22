@@ -278,3 +278,58 @@ func TestSortedSetRem(t *testing.T) {
 		assert(t, err != nil, "ZREM error")
 	}
 }
+
+// Test ZSCORE
+func TestSortedSetScore(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	s.ZAdd("z", 1, "one")
+	s.ZAdd("z", 2, "two")
+	s.ZAdd("z", 2, "zwei")
+
+	// Simple case
+	{
+		b, err := redis.Float64(c.Do("ZSCORE", "z", "two"))
+		ok(t, err)
+		equals(t, 2.0, b)
+	}
+	// no such member
+	{
+		b, err := c.Do("ZSCORE", "z", "nosuch")
+		ok(t, err)
+		equals(t, nil, b)
+	}
+	// no such key
+	{
+		b, err := c.Do("ZSCORE", "nosuch", "nosuch")
+		ok(t, err)
+		equals(t, nil, b)
+	}
+
+	// Direct
+	{
+		s.ZAdd("z2", 1, "one")
+		s.ZAdd("z2", 2, "two")
+		score, err := s.ZScore("z2", "two")
+		ok(t, err)
+		equals(t, 2.0, score)
+	}
+
+	// Error cases
+	{
+		_, err = redis.String(c.Do("ZSCORE"))
+		assert(t, err != nil, "ZSCORE error")
+		_, err = redis.String(c.Do("ZSCORE", "key"))
+		assert(t, err != nil, "ZSCORE error")
+		_, err = redis.String(c.Do("ZSCORE", "too", "many", "arguments"))
+		assert(t, err != nil, "ZSCORE error")
+		// Wrong type of key
+		s.Set("str", "value")
+		_, err = redis.Int(c.Do("ZSCORE", "str", "aap"))
+		assert(t, err != nil, "ZSCORE error")
+	}
+}

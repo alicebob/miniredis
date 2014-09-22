@@ -28,7 +28,7 @@ func commandsSortedSet(m *Miniredis, srv *redeo.Server) {
 	// ZREVRANGE key start stop [WITHSCORES]
 	// ZREVRANGEBYSCORE key max min [WITHSCORES] [LIMIT offset count]
 	// ZREVRANK key member
-	// ZSCORE key member
+	srv.HandleFunc("ZSCORE", m.cmdZscore)
 	// ZUNIONSTORE destination numkeys key [key ...] [WEIGHTS weight [weight ...]] [AGGREGATE SUM|MIN|MAX]
 	// ZSCAN key cursor [MATCH pattern] [COUNT count]
 }
@@ -235,5 +235,38 @@ func (m *Miniredis) cmdZrem(out *redeo.Responder, r *redeo.Request) error {
 			}
 		}
 		out.WriteInt(deleted)
+	})
+}
+
+// ZSCORE
+func (m *Miniredis) cmdZscore(out *redeo.Responder, r *redeo.Request) error {
+	if len(r.Args) != 2 {
+		setDirty(r.Client())
+		out.WriteErrorString("ERR wrong number of arguments for 'zscore' command")
+		return nil
+	}
+
+	key := r.Args[0]
+	member := r.Args[1]
+
+	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+		db := m.db(ctx.selectedDB)
+
+		if !db.exists(key) {
+			out.WriteNil()
+			return
+		}
+
+		if db.t(key) != "zset" {
+			out.WriteErrorString(ErrWrongType.Error())
+			return
+		}
+
+		if !db.zexists(key, member) {
+			out.WriteNil()
+			return
+		}
+
+		out.WriteString(formatFloat(db.zscore(key, member)))
 	})
 }

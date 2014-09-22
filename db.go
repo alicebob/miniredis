@@ -391,3 +391,10 @@ func (db *RedisDB) zrem(key, member string) bool {
 	}
 	return ok
 }
+
+// zexists tells if a member exists in a sorted set
+func (db *RedisDB) zexists(key, member string) bool {
+	ss := db.sortedsetKeys[key]
+	_, ok := ss[member]
+	return ok
+}

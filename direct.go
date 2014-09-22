@@ -457,3 +457,21 @@ func (db *RedisDB) ZRem(k, member string) (bool, error) {
 	}
 	return db.zrem(k, member), nil
 }
+
+// ZScore gives the score of a sorted set member.
+func (m *Miniredis) ZScore(k, member string) (float64, error) {
+	return m.DB(m.selectedDB).ZScore(k, member)
+}
+
+// ZScore gives the score of a sorted set member.
+func (db *RedisDB) ZScore(k, member string) (float64, error) {
+	db.master.Lock()
+	defer db.master.Unlock()
+	if !db.exists(k) {
+		return 0, ErrKeyNotFound
+	}
+	if db.t(k) != "zset" {
+		return 0, ErrWrongType
+	}
+	return db.zscore(k, member), nil
+}
