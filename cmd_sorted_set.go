@@ -20,13 +20,14 @@ func commandsSortedSet(m *Miniredis, srv *redeo.Server) {
 	srv.HandleFunc("ZRANGE", m.makeCmdZrange("zrange", false))
 	// ZRANGEBYLEX key min max [LIMIT offset count]
 	// ZRANGEBYSCORE key min max [WITHSCORES] [LIMIT offset count]
+	srv.HandleFunc("ZRANGEBYSCORE", m.makeCmdZrangebyscore("zrangebyscore", false))
 	srv.HandleFunc("ZRANK", m.cmdZrank)
 	srv.HandleFunc("ZREM", m.cmdZrem)
 	// ZREMRANGEBYLEX key min max
 	// ZREMRANGEBYRANK key start stop
 	// ZREMRANGEBYSCORE key min max
 	srv.HandleFunc("ZREVRANGE", m.makeCmdZrange("zrevrange", true))
-	// ZREVRANGEBYSCORE key max min [WITHSCORES] [LIMIT offset count]
+	srv.HandleFunc("ZREVRANGEBYSCORE", m.makeCmdZrangebyscore("zrevrangebyscore", true))
 	// ZREVRANK key member
 	srv.HandleFunc("ZSCORE", m.cmdZscore)
 	// ZUNIONSTORE destination numkeys key [key ...] [WEIGHTS weight [weight ...]] [AGGREGATE SUM|MIN|MAX]
@@ -176,6 +177,112 @@ func (m *Miniredis) makeCmdZrange(cmd string, reverse bool) redeo.HandlerFunc {
 	}
 }
 
+// ZRANGEBYSCORE and ZREVRANGEBYSCORE
+func (m *Miniredis) makeCmdZrangebyscore(cmd string, reverse bool) redeo.HandlerFunc {
+	return func(out *redeo.Responder, r *redeo.Request) error {
+		if len(r.Args) < 3 {
+			setDirty(r.Client())
+			out.WriteErrorString("ERR wrong number of arguments for '" + cmd + "' command")
+			return nil
+		}
+
+		key := r.Args[0]
+		min, minIncl, err := parseFloatRange(r.Args[1])
+		if err != nil {
+			setDirty(r.Client())
+			out.WriteErrorString(msgInvalidMinMax)
+			return nil
+		}
+		max, maxIncl, err := parseFloatRange(r.Args[2])
+		if err != nil {
+			setDirty(r.Client())
+			out.WriteErrorString(msgInvalidMinMax)
+			return nil
+		}
+
+		withScores := false
+		if len(r.Args) > 4 {
+			out.WriteErrorString(msgSyntaxError)
+			return nil
+		}
+		if len(r.Args) == 4 {
+			if strings.ToLower(r.Args[3]) != "withscores" {
+				setDirty(r.Client())
+				out.WriteErrorString(msgSyntaxError)
+				return nil
+			}
+			withScores = true
+		}
+
+		return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+			db := m.db(ctx.selectedDB)
+
+			if !db.exists(key) {
+				out.WriteBulkLen(0)
+				return
+			}
+
+			if db.t(key) != "zset" {
+				out.WriteErrorString(ErrWrongType.Error())
+				return
+			}
+
+			members := db.zelements(key)
+			if reverse {
+				min, max = max, min
+				minIncl, maxIncl = maxIncl, minIncl
+			}
+			if minIncl {
+				for i, tup := range members {
+					if tup.score >= min {
+						members = members[i:]
+						break
+					}
+				}
+			} else {
+				// Excluding min
+				for i, tup := range members {
+					if tup.score > min {
+						members = members[i:]
+						break
+					}
+				}
+			}
+			if maxIncl {
+				for i, tup := range members {
+					if tup.score > max {
+						members = members[:i]
+						break
+					}
+				}
+			} else {
+				// Excluding max
+				for i, tup := range members {
+					if tup.score >= max {
+						members = members[:i]
+						break
+					}
+				}
+			}
+			if reverse {
+				reverseElems(members)
+			}
+
+			if withScores {
+				out.WriteBulkLen(len(members) * 2)
+			} else {
+				out.WriteBulkLen(len(members))
+			}
+			for _, el := range members {
+				out.WriteString(el.member)
+				if withScores {
+					out.WriteString(formatFloat(el.score))
+				}
+			}
+		})
+	}
+}
+
 // ZRANK
 func (m *Miniredis) cmdZrank(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) != 2 {
@@ -281,4 +388,26 @@ func reverseSlice(o []string) {
 		other := len(o) - 1 - i
 		o[i], o[other] = o[other], o[i]
 	}
+}
+
+func reverseElems(o ssElems) {
+	for i := range make([]struct{}, len(o)/2) {
+		other := len(o) - 1 - i
+		o[i], o[other] = o[other], o[i]
+	}
+}
+
+// parseFloatRange handles ZRANGEBYSCORE floats. They are inclusive unless the
+// string starts with '('
+func parseFloatRange(s string) (float64, bool, error) {
+	if len(s) == 0 {
+		return 0, false, nil
+	}
+	inclusive := true
+	if s[0] == '(' {
+		s = s[1:]
+		inclusive = false
+	}
+	f, err := strconv.ParseFloat(s, 64)
+	return f, inclusive, err
 }

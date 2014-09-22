@@ -239,6 +239,112 @@ func TestSortedSetRange(t *testing.T) {
 	}
 }
 
+// Test ZRANGEBYSCORE ZREVRANGEBYSCORE
+func TestSortedSetRangeByScore(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	s.ZAdd("z", -273.15, "zero kelvin")
+	s.ZAdd("z", -4, "minusfour")
+	s.ZAdd("z", 1, "one")
+	s.ZAdd("z", 2, "two")
+	s.ZAdd("z", 2, "zwei")
+	s.ZAdd("z", 3, "three")
+	s.ZAdd("z", 3, "drei")
+	s.ZAdd("z", math.Inf(+1), "inf")
+
+	{
+		b, err := redis.Strings(c.Do("ZRANGEBYSCORE", "z", "-inf", "inf"))
+		ok(t, err)
+		equals(t, []string{"zero kelvin", "minusfour", "one", "two", "zwei", "drei", "three", "inf"}, b)
+
+		b, err = redis.Strings(c.Do("ZREVRANGEBYSCORE", "z", "inf", "-inf"))
+		ok(t, err)
+		equals(t, []string{"inf", "three", "drei", "zwei", "two", "one", "minusfour", "zero kelvin"}, b)
+	}
+	{
+		b, err := redis.Strings(c.Do("ZRANGEBYSCORE", "z", "2", "3"))
+		ok(t, err)
+		equals(t, []string{"two", "zwei", "drei", "three"}, b)
+
+		b, err = redis.Strings(c.Do("ZREVRANGEBYSCORE", "z", "3", "2"))
+		ok(t, err)
+		equals(t, []string{"three", "drei", "zwei", "two"}, b)
+	}
+	// Exclusive min
+	{
+		b, err := redis.Strings(c.Do("ZRANGEBYSCORE", "z", "(2", "3"))
+		ok(t, err)
+		equals(t, []string{"drei", "three"}, b)
+	}
+	// Exclusive max
+	{
+		b, err := redis.Strings(c.Do("ZRANGEBYSCORE", "z", "2", "(3"))
+		ok(t, err)
+		equals(t, []string{"two", "zwei"}, b)
+	}
+	// Exclusive both
+	{
+		b, err := redis.Strings(c.Do("ZRANGEBYSCORE", "z", "(2", "(3"))
+		ok(t, err)
+		equals(t, []string{}, b)
+	}
+	// Wrong ranges
+	{
+		b, err := redis.Strings(c.Do("ZRANGEBYSCORE", "z", "+inf", "-inf"))
+		ok(t, err)
+		equals(t, []string{}, b)
+
+		b, err = redis.Strings(c.Do("ZREVRANGEBYSCORE", "z", "-inf", "+inf"))
+		ok(t, err)
+		equals(t, []string{}, b)
+	}
+
+	// No such key
+	{
+		b, err := redis.Strings(c.Do("ZRANGEBYSCORE", "nosuch", "-inf", "inf"))
+		ok(t, err)
+		equals(t, []string{}, b)
+	}
+
+	// With scores
+	{
+		b, err := redis.Strings(c.Do("ZRANGEBYSCORE", "z", "(1", 2, "WITHSCORES"))
+		ok(t, err)
+		equals(t, []string{"two", "2", "zwei", "2"}, b)
+	}
+
+	// Error cases
+	{
+		_, err = redis.String(c.Do("ZRANGEBYSCORE"))
+		assert(t, err != nil, "ZRANGEBYSCORE error")
+		_, err = redis.String(c.Do("ZRANGEBYSCORE", "set"))
+		assert(t, err != nil, "ZRANGEBYSCORE error")
+		_, err = redis.String(c.Do("ZRANGEBYSCORE", "set", 1))
+		assert(t, err != nil, "ZRANGEBYSCORE error")
+		_, err = redis.String(c.Do("ZRANGEBYSCORE", "set", "nofloat", 1))
+		assert(t, err != nil, "ZRANGEBYSCORE error")
+		_, err = redis.String(c.Do("ZRANGEBYSCORE", "set", 1, "nofloat"))
+		assert(t, err != nil, "ZRANGEBYSCORE error")
+		_, err = redis.String(c.Do("ZRANGEBYSCORE", "set", 1, 2, "toomany"))
+		assert(t, err != nil, "ZRANGEBYSCORE error")
+		_, err = redis.String(c.Do("ZRANGEBYSCORE", "set", "[1", 2, "toomany"))
+		assert(t, err != nil, "ZRANGEBYSCORE error")
+		_, err = redis.String(c.Do("ZRANGEBYSCORE", "set", 1, "[2", "toomany"))
+		assert(t, err != nil, "ZRANGEBYSCORE error")
+		// Wrong type of key
+		s.Set("str", "value")
+		_, err = redis.Int(c.Do("ZRANGEBYSCORE", "str", 1, 2))
+		assert(t, err != nil, "ZRANGEBYSCORE error")
+
+		_, err = redis.String(c.Do("ZREVRANGEBYSCORE"))
+		assert(t, err != nil, "ZREVRANGEBYSCORE error")
+	}
+}
+
 // Test ZREM
 func TestSortedSetRem(t *testing.T) {
 	s, err := Run()

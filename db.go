@@ -362,6 +362,15 @@ func (db *RedisDB) zmembers(key string) []string {
 	return members
 }
 
+// All members+scores from a sorted set, ordered by score.
+func (db *RedisDB) zelements(key string) ssElems {
+	ss, ok := db.sortedsetKeys[key]
+	if !ok {
+		return nil
+	}
+	return ss.byScore()
+}
+
 // sorted set cardinality
 func (db *RedisDB) zcard(key string) int {
 	ss := db.sortedsetKeys[key]
