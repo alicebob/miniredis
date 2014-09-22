@@ -106,6 +106,7 @@ Implemented commands:
    - ZCARD
    - ZRANGE
    - ZRANK
+   - ZDEL
 
 
 Since this is intended to be used in unittests timeouts are not implemented.

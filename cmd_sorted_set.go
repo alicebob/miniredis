@@ -21,7 +21,7 @@ func commandsSortedSet(m *Miniredis, srv *redeo.Server) {
 	// ZRANGEBYLEX key min max [LIMIT offset count]
 	// ZRANGEBYSCORE key min max [WITHSCORES] [LIMIT offset count]
 	srv.HandleFunc("ZRANK", m.cmdZrank)
-	// ZREM key member [member ...]
+	srv.HandleFunc("ZREM", m.cmdZrem)
 	// ZREMRANGEBYLEX key min max
 	// ZREMRANGEBYRANK key start stop
 	// ZREMRANGEBYSCORE key min max
@@ -201,5 +201,39 @@ func (m *Miniredis) cmdZrank(out *redeo.Responder, r *redeo.Request) error {
 			return
 		}
 		out.WriteInt(rank)
+	})
+}
+
+// ZREM
+func (m *Miniredis) cmdZrem(out *redeo.Responder, r *redeo.Request) error {
+	if len(r.Args) < 2 {
+		setDirty(r.Client())
+		out.WriteErrorString("ERR wrong number of arguments for 'zrem' command")
+		return nil
+	}
+
+	key := r.Args[0]
+	members := r.Args[1:]
+
+	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+		db := m.db(ctx.selectedDB)
+
+		if !db.exists(key) {
+			out.WriteZero()
+			return
+		}
+
+		if db.t(key) != "zset" {
+			out.WriteErrorString(ErrWrongType.Error())
+			return
+		}
+
+		deleted := 0
+		for _, member := range members {
+			if db.zrem(key, member) {
+				deleted++
+			}
+		}
+		out.WriteInt(deleted)
 	})
 }

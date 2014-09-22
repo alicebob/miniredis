@@ -379,3 +379,15 @@ func (db *RedisDB) zscore(key, member string) float64 {
 	ss := db.sortedsetKeys[key]
 	return ss[member]
 }
+
+// sorted set key delete
+func (db *RedisDB) zrem(key, member string) bool {
+	ss := db.sortedsetKeys[key]
+	_, ok := ss[member]
+	delete(ss, member)
+	if len(ss) == 0 {
+		// Delete key on removal of last member
+		db.del(key, true)
+	}
+	return ok
+}

@@ -219,3 +219,62 @@ func TestSortedSetRange(t *testing.T) {
 		assert(t, err != nil, "ZRANGE error")
 	}
 }
+
+// Test ZREM
+func TestSortedSetRem(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	s.ZAdd("z", 1, "one")
+	s.ZAdd("z", 2, "two")
+	s.ZAdd("z", 2, "zwei")
+
+	// Simple delete
+	{
+		b, err := redis.Int(c.Do("ZREM", "z", "two", "zwei", "nosuch"))
+		ok(t, err)
+		equals(t, 2, b)
+		assert(t, s.Exists("z"), "key is there")
+	}
+	// Delete the last member
+	{
+		b, err := redis.Int(c.Do("ZREM", "z", "one"))
+		ok(t, err)
+		equals(t, 1, b)
+		assert(t, !s.Exists("z"), "key is gone")
+	}
+	// Nonexistent key
+	{
+		b, err := redis.Int(c.Do("ZREM", "nosuch", "member"))
+		ok(t, err)
+		equals(t, 0, b)
+	}
+
+	// Direct
+	{
+		s.ZAdd("z2", 1, "one")
+		s.ZAdd("z2", 2, "two")
+		s.ZAdd("z2", 2, "zwei")
+		gone, err := s.ZRem("z2", "two")
+		ok(t, err)
+		assert(t, gone, "member gone")
+		members, err := s.ZMembers("z2")
+		ok(t, err)
+		equals(t, []string{"one", "zwei"}, members)
+	}
+
+	// Error cases
+	{
+		_, err = redis.String(c.Do("ZREM"))
+		assert(t, err != nil, "ZREM error")
+		_, err = redis.String(c.Do("ZREM", "set"))
+		assert(t, err != nil, "ZREM error")
+		// Wrong type of key
+		s.Set("str", "value")
+		_, err = redis.Int(c.Do("ZREM", "str", "aap"))
+		assert(t, err != nil, "ZREM error")
+	}
+}

@@ -439,3 +439,21 @@ func (db *RedisDB) SortedSet(k string) (map[string]float64, error) {
 	}
 	return db.sortedSet(k), nil
 }
+
+// ZRem deletes a member. Returns whether the was a key.
+func (m *Miniredis) ZRem(k, member string) (bool, error) {
+	return m.DB(m.selectedDB).ZRem(k, member)
+}
+
+// ZRem deletes a member. Returns whether the was a key.
+func (db *RedisDB) ZRem(k, member string) (bool, error) {
+	db.master.Lock()
+	defer db.master.Unlock()
+	if !db.exists(k) {
+		return false, ErrKeyNotFound
+	}
+	if db.t(k) != "zset" {
+		return false, ErrWrongType
+	}
+	return db.zrem(k, member), nil
+}
