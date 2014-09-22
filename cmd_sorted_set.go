@@ -200,18 +200,43 @@ func (m *Miniredis) makeCmdZrangebyscore(cmd string, reverse bool) redeo.Handler
 			return nil
 		}
 
+		args := r.Args[3:]
 		withScores := false
-		if len(r.Args) > 4 {
+		withLimit := false
+		limitStart := 0
+		limitEnd := 0
+		for len(args) > 0 {
+			if strings.ToLower(args[0]) == "limit" {
+				withLimit = true
+				args = args[1:]
+				if len(args) < 2 {
+					out.WriteErrorString(msgSyntaxError)
+					return nil
+				}
+				limitStart, err = strconv.Atoi(args[0])
+				if err != nil {
+					setDirty(r.Client())
+					out.WriteErrorString(msgInvalidInt)
+					return nil
+				}
+				limitEnd, err = strconv.Atoi(args[1])
+				if err != nil {
+					setDirty(r.Client())
+					out.WriteErrorString(msgInvalidInt)
+					return nil
+				}
+				args = args[2:]
+				continue
+			}
+			if strings.ToLower(args[0]) == "withscores" {
+				withScores = true
+				args = args[1:]
+				continue
+			}
+			// Syntax error
+			setDirty(r.Client())
 			out.WriteErrorString(msgSyntaxError)
 			return nil
-		}
-		if len(r.Args) == 4 {
-			if strings.ToLower(r.Args[3]) != "withscores" {
-				setDirty(r.Client())
-				out.WriteErrorString(msgSyntaxError)
-				return nil
-			}
-			withScores = true
 		}
 
 		return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
@@ -266,6 +291,25 @@ func (m *Miniredis) makeCmdZrangebyscore(cmd string, reverse bool) redeo.Handler
 			}
 			if reverse {
 				reverseElems(members)
+			}
+
+			// Apply LIMIT ranges. That's <start> <elements>. Unlike RANGE.
+			if withLimit {
+				if limitStart < 0 {
+					members = ssElems{}
+				} else {
+					if limitStart < len(members) {
+						members = members[limitStart:]
+					} else {
+						// out of range
+						members = ssElems{}
+					}
+					if limitEnd >= 0 {
+						if len(members) > limitEnd {
+							members = members[:limitEnd]
+						}
+					}
+				}
 			}
 
 			if withScores {

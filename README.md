@@ -105,9 +105,11 @@ Implemented commands:
    - ZADD
    - ZCARD
    - ZRANGE
+   - ZRANGEBYSCORE
    - ZRANK
    - ZDEL
    - ZREVRANGE
+   - ZREVRANGEBYSCORE
    - ZSCORE
 
 

@@ -256,6 +256,7 @@ func TestSortedSetRangeByScore(t *testing.T) {
 	s.ZAdd("z", 3, "drei")
 	s.ZAdd("z", math.Inf(+1), "inf")
 
+	// Normal cases
 	{
 		b, err := redis.Strings(c.Do("ZRANGEBYSCORE", "z", "-inf", "inf"))
 		ok(t, err)
@@ -317,6 +318,46 @@ func TestSortedSetRangeByScore(t *testing.T) {
 		equals(t, []string{"two", "2", "zwei", "2"}, b)
 	}
 
+	// With LIMIT
+	// (note, this is SQL like logic, not the redis RANGE logic)
+	{
+		b, err := redis.Strings(c.Do("ZRANGEBYSCORE", "z", "-inf", "inf", "LIMIT", 1, 2))
+		ok(t, err)
+		equals(t, []string{"minusfour", "one"}, b)
+
+		b, err = redis.Strings(c.Do("ZREVRANGEBYSCORE", "z", "inf", "-inf", "LIMIT", 1, 2))
+		ok(t, err)
+		equals(t, []string{"three", "drei"}, b)
+
+		b, err = redis.Strings(c.Do("ZRANGEBYSCORE", "z", "1", "inf", "LIMIT", 1, 2000))
+		ok(t, err)
+		equals(t, []string{"two", "zwei", "drei", "three", "inf"}, b)
+
+		b, err = redis.Strings(c.Do("ZREVRANGEBYSCORE", "z", "inf", "1", "LIMIT", 1, 2000))
+		ok(t, err)
+		equals(t, []string{"three", "drei", "zwei", "two", "one"}, b)
+
+		// Negative start limit. No go.
+		b, err = redis.Strings(c.Do("ZRANGEBYSCORE", "z", "-inf", "inf", "LIMIT", -1, 2))
+		ok(t, err)
+		equals(t, []string{}, b)
+
+		// Negative end limit. Is fine but ignored.
+		b, err = redis.Strings(c.Do("ZRANGEBYSCORE", "z", "-inf", "inf", "LIMIT", 1, -2))
+		ok(t, err)
+		equals(t, []string{"minusfour", "one", "two", "zwei", "drei", "three", "inf"}, b)
+	}
+	// Everything
+	{
+		b, err := redis.Strings(c.Do("ZRANGEBYSCORE", "z", "-inf", "inf", "WITHSCORES", "LIMIT", 1, 2))
+		ok(t, err)
+		equals(t, []string{"minusfour", "-4", "one", "1"}, b)
+
+		b, err = redis.Strings(c.Do("ZRANGEBYSCORE", "z", "-inf", "inf", "LIMIT", 1, 2, "WITHSCORES"))
+		ok(t, err)
+		equals(t, []string{"minusfour", "-4", "one", "1"}, b)
+	}
+
 	// Error cases
 	{
 		_, err = redis.String(c.Do("ZRANGEBYSCORE"))
@@ -334,6 +375,10 @@ func TestSortedSetRangeByScore(t *testing.T) {
 		_, err = redis.String(c.Do("ZRANGEBYSCORE", "set", "[1", 2, "toomany"))
 		assert(t, err != nil, "ZRANGEBYSCORE error")
 		_, err = redis.String(c.Do("ZRANGEBYSCORE", "set", 1, "[2", "toomany"))
+		assert(t, err != nil, "ZRANGEBYSCORE error")
+		_, err = redis.String(c.Do("ZRANGEBYSCORE", "set", "[1", 2, "LIMIT", "noint", 1))
+		assert(t, err != nil, "ZRANGEBYSCORE error")
+		_, err = redis.String(c.Do("ZRANGEBYSCORE", "set", "[1", 2, "LIMIT", 1, "noint"))
 		assert(t, err != nil, "ZRANGEBYSCORE error")
 		// Wrong type of key
 		s.Set("str", "value")
