@@ -24,7 +24,7 @@ func TestSortedSetImpl(t *testing.T) {
 
 	// Set ordered by score
 	{
-		elems := s.byScore()
+		elems := s.byScore(asc)
 		equals(t, 3, len(elems))
 		equals(t, ssElems{
 			{3.141592, "pi"},
@@ -35,15 +35,19 @@ func TestSortedSetImpl(t *testing.T) {
 
 	// Rank of a key
 	{
-		rank, found := s.rankByScore("pi")
+		rank, found := s.rankByScore("pi", asc)
 		assert(t, found, "Found pi")
 		equals(t, 0, rank)
 
-		rank, found = s.rankByScore("3pi")
+		rank, found = s.rankByScore("3pi", desc)
+		assert(t, found, "Found 3pi")
+		equals(t, 0, rank)
+
+		rank, found = s.rankByScore("3pi", asc)
 		assert(t, found, "Found 3pi")
 		equals(t, 2, rank)
 
-		rank, found = s.rankByScore("nosuch")
+		rank, found = s.rankByScore("nosuch", asc)
 		assert(t, !found, "Did not find nosuch")
 	}
 }
@@ -65,7 +69,7 @@ func TestSortOrder(t *testing.T) {
 
 	// Set ordered by score, member
 	{
-		elems := s.byScore()
+		elems := s.byScore(asc)
 		equals(t, 9, len(elems))
 		equals(t, ssElems{
 			{1, "1"},

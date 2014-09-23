@@ -7,6 +7,13 @@ import (
 	"sort"
 )
 
+type direction int
+
+const (
+	asc direction = iota
+	desc
+)
+
 type sortedSet map[string]float64
 
 type ssElem struct {
@@ -52,18 +59,21 @@ func (ss *sortedSet) elems() ssElems {
 	return elems
 }
 
-func (ss *sortedSet) byScore() ssElems {
-	elems := byScore(ss.elems())
-	sort.Sort(elems)
+func (ss *sortedSet) byScore(d direction) ssElems {
+	elems := ss.elems()
+	sort.Sort(byScore(elems))
+	if d == desc {
+		reverseElems(elems)
+	}
 	return ssElems(elems)
 }
 
 // rankByScore gives the (0-based) index of member, or returns false.
-func (ss *sortedSet) rankByScore(member string) (int, bool) {
+func (ss *sortedSet) rankByScore(member string, d direction) (int, bool) {
 	if _, ok := (*ss)[member]; !ok {
 		return 0, false
 	}
-	for i, e := range ss.byScore() {
+	for i, e := range ss.byScore(d) {
 		if e.member == member {
 			return i, true
 		}

@@ -354,7 +354,7 @@ func (db *RedisDB) zmembers(key string) []string {
 	if !ok {
 		return nil
 	}
-	elems := ss.byScore()
+	elems := ss.byScore(asc)
 	members := make([]string, 0, len(elems))
 	for _, e := range elems {
 		members = append(members, e.member)
@@ -368,7 +368,7 @@ func (db *RedisDB) zelements(key string) ssElems {
 	if !ok {
 		return nil
 	}
-	return ss.byScore()
+	return ss.byScore(asc)
 }
 
 // sorted set cardinality
@@ -378,9 +378,9 @@ func (db *RedisDB) zcard(key string) int {
 }
 
 // sorted set rank
-func (db *RedisDB) zrank(key, member string) (int, bool) {
+func (db *RedisDB) zrank(key, member string, d direction) (int, bool) {
 	ss := db.sortedsetKeys[key]
-	return ss.rankByScore(member)
+	return ss.rankByScore(member, d)
 }
 
 // sorted set score

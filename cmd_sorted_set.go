@@ -21,14 +21,14 @@ func commandsSortedSet(m *Miniredis, srv *redeo.Server) {
 	// ZRANGEBYLEX key min max [LIMIT offset count]
 	// ZRANGEBYSCORE key min max [WITHSCORES] [LIMIT offset count]
 	srv.HandleFunc("ZRANGEBYSCORE", m.makeCmdZrangebyscore("zrangebyscore", false))
-	srv.HandleFunc("ZRANK", m.cmdZrank)
+	srv.HandleFunc("ZRANK", m.makeCmdZrank("zrank", false))
 	srv.HandleFunc("ZREM", m.cmdZrem)
 	// ZREMRANGEBYLEX key min max
 	// ZREMRANGEBYRANK key start stop
 	// ZREMRANGEBYSCORE key min max
 	srv.HandleFunc("ZREVRANGE", m.makeCmdZrange("zrevrange", true))
 	srv.HandleFunc("ZREVRANGEBYSCORE", m.makeCmdZrangebyscore("zrevrangebyscore", true))
-	// ZREVRANK key member
+	srv.HandleFunc("ZREVRANK", m.makeCmdZrank("zrevrank", true))
 	srv.HandleFunc("ZSCORE", m.cmdZscore)
 	// ZUNIONSTORE destination numkeys key [key ...] [WEIGHTS weight [weight ...]] [AGGREGATE SUM|MIN|MAX]
 	// ZSCAN key cursor [MATCH pattern] [COUNT count]
@@ -327,37 +327,43 @@ func (m *Miniredis) makeCmdZrangebyscore(cmd string, reverse bool) redeo.Handler
 	}
 }
 
-// ZRANK
-func (m *Miniredis) cmdZrank(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) != 2 {
-		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'zrank' command")
-		return nil
+// ZRANK and ZREVRANK
+func (m *Miniredis) makeCmdZrank(cmd string, reverse bool) redeo.HandlerFunc {
+	return func(out *redeo.Responder, r *redeo.Request) error {
+		if len(r.Args) != 2 {
+			setDirty(r.Client())
+			out.WriteErrorString("ERR wrong number of arguments for '" + cmd + "' command")
+			return nil
+		}
+
+		key := r.Args[0]
+		member := r.Args[1]
+
+		return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+			db := m.db(ctx.selectedDB)
+
+			if !db.exists(key) {
+				out.WriteNil()
+				return
+			}
+
+			if db.t(key) != "zset" {
+				out.WriteErrorString(ErrWrongType.Error())
+				return
+			}
+
+			direction := asc
+			if reverse {
+				direction = desc
+			}
+			rank, ok := db.zrank(key, member, direction)
+			if !ok {
+				out.WriteNil()
+				return
+			}
+			out.WriteInt(rank)
+		})
 	}
-
-	key := r.Args[0]
-	member := r.Args[1]
-
-	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
-		db := m.db(ctx.selectedDB)
-
-		if !db.exists(key) {
-			out.WriteNil()
-			return
-		}
-
-		if db.t(key) != "zset" {
-			out.WriteErrorString(ErrWrongType.Error())
-			return
-		}
-
-		rank, ok := db.zrank(key, member)
-		if !ok {
-			out.WriteNil()
-			return
-		}
-		out.WriteInt(rank)
-	})
 }
 
 // ZREM

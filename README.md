@@ -110,6 +110,7 @@ Implemented commands:
    - ZDEL
    - ZREVRANGE
    - ZREVRANGEBYSCORE
+   - ZREVRANK
    - ZSCORE
 
 

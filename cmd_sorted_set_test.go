@@ -7,7 +7,7 @@ import (
 	"github.com/garyburd/redigo/redis"
 )
 
-// Test ZADD / ZCARD / ZRANK.
+// Test ZADD / ZCARD / ZRANK / ZREVRANK.
 func TestSortedSet(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
@@ -30,6 +30,13 @@ func TestSortedSet(t *testing.T) {
 		m, err = redis.Int(c.Do("ZRANK", "z", "three"))
 		ok(t, err)
 		equals(t, 2, m)
+
+		m, err = redis.Int(c.Do("ZREVRANK", "z", "one"))
+		ok(t, err)
+		equals(t, 2, m)
+		m, err = redis.Int(c.Do("ZREVRANK", "z", "three"))
+		ok(t, err)
+		equals(t, 0, m)
 	}
 
 	// TYPE of our zset
@@ -126,6 +133,9 @@ func TestSortedSet(t *testing.T) {
 		assert(t, err != nil, "ZRANK error")
 		_, err = redis.String(c.Do("ZRANK", "set", "spurious"))
 		assert(t, err != nil, "ZRANK error")
+
+		_, err = redis.String(c.Do("ZDEVRANK"))
+		assert(t, err != nil, "ZDEVRANK error")
 
 		_, err = redis.Int(c.Do("ZCARD", "str"))
 		assert(t, err != nil, "ZCARD error")
