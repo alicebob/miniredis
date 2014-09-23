@@ -104,6 +104,7 @@ Implemented commands:
  - Sorted Set keys
    - ZADD
    - ZCARD
+   - ZCOUNT
    - ZRANGE
    - ZRANGEBYSCORE
    - ZRANK

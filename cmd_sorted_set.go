@@ -13,7 +13,7 @@ import (
 func commandsSortedSet(m *Miniredis, srv *redeo.Server) {
 	srv.HandleFunc("ZADD", m.cmdZadd)
 	srv.HandleFunc("ZCARD", m.cmdZcard)
-	// ZCOUNT key min max
+	srv.HandleFunc("ZCOUNT", m.cmdZcount)
 	// ZINCRBY key increment member
 	// ZINTERSTORE destination numkeys key [key ...] [WEIGHTS weight [weight ...]] [AGGREGATE SUM|MIN|MAX]
 	// ZLEXCOUNT key min max
@@ -104,6 +104,47 @@ func (m *Miniredis) cmdZcard(out *redeo.Responder, r *redeo.Request) error {
 		}
 
 		out.WriteInt(db.zcard(key))
+	})
+}
+
+// ZCOUNT
+func (m *Miniredis) cmdZcount(out *redeo.Responder, r *redeo.Request) error {
+	if len(r.Args) != 3 {
+		setDirty(r.Client())
+		out.WriteErrorString("ERR wrong number of arguments for 'zcount' command")
+		return nil
+	}
+
+	key := r.Args[0]
+	min, minIncl, err := parseFloatRange(r.Args[1])
+	if err != nil {
+		setDirty(r.Client())
+		out.WriteErrorString(msgInvalidMinMax)
+		return nil
+	}
+	max, maxIncl, err := parseFloatRange(r.Args[2])
+	if err != nil {
+		setDirty(r.Client())
+		out.WriteErrorString(msgInvalidMinMax)
+		return nil
+	}
+
+	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+		db := m.db(ctx.selectedDB)
+
+		if !db.exists(key) {
+			out.WriteZero()
+			return
+		}
+
+		if db.t(key) != "zset" {
+			out.WriteErrorString(ErrWrongType.Error())
+			return
+		}
+
+		members := db.zelements(key)
+		members = withSSRange(members, min, minIncl, max, maxIncl)
+		out.WriteInt(len(members))
 	})
 }
 
@@ -257,38 +298,7 @@ func (m *Miniredis) makeCmdZrangebyscore(cmd string, reverse bool) redeo.Handler
 				min, max = max, min
 				minIncl, maxIncl = maxIncl, minIncl
 			}
-			if minIncl {
-				for i, tup := range members {
-					if tup.score >= min {
-						members = members[i:]
-						break
-					}
-				}
-			} else {
-				// Excluding min
-				for i, tup := range members {
-					if tup.score > min {
-						members = members[i:]
-						break
-					}
-				}
-			}
-			if maxIncl {
-				for i, tup := range members {
-					if tup.score > max {
-						members = members[:i]
-						break
-					}
-				}
-			} else {
-				// Excluding max
-				for i, tup := range members {
-					if tup.score >= max {
-						members = members[:i]
-						break
-					}
-				}
-			}
+			members = withSSRange(members, min, minIncl, max, maxIncl)
 			if reverse {
 				reverseElems(members)
 			}
@@ -460,4 +470,42 @@ func parseFloatRange(s string) (float64, bool, error) {
 	}
 	f, err := strconv.ParseFloat(s, 64)
 	return f, inclusive, err
+}
+
+// withSSRange limits a list of sorted set elements by the ZRANGEBYSCORE range
+// logic.
+func withSSRange(members ssElems, min float64, minIncl bool, max float64, maxIncl bool) ssElems {
+	if minIncl {
+		for i, m := range members {
+			if m.score >= min {
+				members = members[i:]
+				break
+			}
+		}
+	} else {
+		// Excluding min
+		for i, m := range members {
+			if m.score > min {
+				members = members[i:]
+				break
+			}
+		}
+	}
+	if maxIncl {
+		for i, m := range members {
+			if m.score > max {
+				members = members[:i]
+				break
+			}
+		}
+	} else {
+		// Excluding max
+		for i, m := range members {
+			if m.score >= max {
+				members = members[:i]
+				break
+			}
+		}
+	}
+	return members
 }

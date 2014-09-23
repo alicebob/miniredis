@@ -249,7 +249,7 @@ func TestSortedSetRange(t *testing.T) {
 	}
 }
 
-// Test ZRANGEBYSCORE ZREVRANGEBYSCORE
+// Test ZRANGEBYSCORE,  ZREVRANGEBYSCORE, and ZCOUNT
 func TestSortedSetRangeByScore(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
@@ -275,6 +275,10 @@ func TestSortedSetRangeByScore(t *testing.T) {
 		b, err = redis.Strings(c.Do("ZREVRANGEBYSCORE", "z", "inf", "-inf"))
 		ok(t, err)
 		equals(t, []string{"inf", "three", "drei", "zwei", "two", "one", "minusfour", "zero kelvin"}, b)
+
+		i, err := redis.Int(c.Do("ZCOUNT", "z", "-inf", "inf"))
+		ok(t, err)
+		equals(t, 8, i)
 	}
 	{
 		b, err := redis.Strings(c.Do("ZRANGEBYSCORE", "z", "2", "3"))
@@ -284,12 +288,20 @@ func TestSortedSetRangeByScore(t *testing.T) {
 		b, err = redis.Strings(c.Do("ZREVRANGEBYSCORE", "z", "3", "2"))
 		ok(t, err)
 		equals(t, []string{"three", "drei", "zwei", "two"}, b)
+
+		i, err := redis.Int(c.Do("ZCOUNT", "z", "2", "3"))
+		ok(t, err)
+		equals(t, 4, i)
 	}
 	// Exclusive min
 	{
 		b, err := redis.Strings(c.Do("ZRANGEBYSCORE", "z", "(2", "3"))
 		ok(t, err)
 		equals(t, []string{"drei", "three"}, b)
+
+		i, err := redis.Int(c.Do("ZCOUNT", "z", "(2", "3"))
+		ok(t, err)
+		equals(t, 2, i)
 	}
 	// Exclusive max
 	{
@@ -397,6 +409,9 @@ func TestSortedSetRangeByScore(t *testing.T) {
 
 		_, err = redis.String(c.Do("ZREVRANGEBYSCORE"))
 		assert(t, err != nil, "ZREVRANGEBYSCORE error")
+
+		_, err = redis.String(c.Do("ZCOUNT"))
+		assert(t, err != nil, "ZCOUNT error")
 	}
 }
 
