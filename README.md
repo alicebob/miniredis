@@ -105,6 +105,7 @@ Implemented commands:
    - ZADD
    - ZCARD
    - ZCOUNT
+   - ZLEXCOUNT
    - ZRANGE
    - ZRANGEBYLEX
    - ZRANGEBYSCORE

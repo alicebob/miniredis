@@ -529,7 +529,7 @@ func TestSortedSetScore(t *testing.T) {
 	}
 }
 
-// Test ZRANGEBYLEX
+// Test ZRANGEBYLEX, ZLEXCOUNT
 func TestSortedSetRangeByLex(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
@@ -552,18 +552,30 @@ func TestSortedSetRangeByLex(t *testing.T) {
 		b, err := redis.Strings(c.Do("ZRANGEBYLEX", "z", "-", "+"))
 		ok(t, err)
 		equals(t, []string{"drei", "inf", "minusfour", "one", "oneone", "three", "two", "zero kelvin", "zwei"}, b)
+
+		i, err := redis.Int(c.Do("ZLEXCOUNT", "z", "-", "+"))
+		ok(t, err)
+		equals(t, 9, i)
 	}
 	// Inclusive range
 	{
 		b, err := redis.Strings(c.Do("ZRANGEBYLEX", "z", "[o", "[three"))
 		ok(t, err)
 		equals(t, []string{"one", "oneone", "three"}, b)
+
+		i, err := redis.Int(c.Do("ZLEXCOUNT", "z", "[o", "[three"))
+		ok(t, err)
+		equals(t, 3, i)
 	}
 	// Inclusive range
 	{
 		b, err := redis.Strings(c.Do("ZRANGEBYLEX", "z", "(o", "(z"))
 		ok(t, err)
 		equals(t, []string{"one", "oneone", "three", "two"}, b)
+
+		i, err := redis.Int(c.Do("ZLEXCOUNT", "z", "(o", "(z"))
+		ok(t, err)
+		equals(t, 4, i)
 	}
 	// Wrong ranges
 	{
@@ -578,6 +590,10 @@ func TestSortedSetRangeByLex(t *testing.T) {
 		b, err = redis.Strings(c.Do("ZRANGEBYLEX", "z", "(z", "(a"))
 		ok(t, err)
 		equals(t, []string{}, b)
+
+		i, err := redis.Int(c.Do("ZLEXCOUNT", "z", "(z", "(z"))
+		ok(t, err)
+		equals(t, 0, i)
 	}
 
 	// No such key
@@ -585,6 +601,10 @@ func TestSortedSetRangeByLex(t *testing.T) {
 		b, err := redis.Strings(c.Do("ZRANGEBYLEX", "nosuch", "-", "+"))
 		ok(t, err)
 		equals(t, []string{}, b)
+
+		i, err := redis.Int(c.Do("ZLEXCOUNT", "nosuch", "-", "+"))
+		ok(t, err)
+		equals(t, 0, i)
 	}
 
 	// With LIMIT
@@ -627,5 +647,16 @@ func TestSortedSetRangeByLex(t *testing.T) {
 		s.Set("str", "value")
 		_, err = redis.Int(c.Do("ZRANGEBYLEX", "str", "-", "+"))
 		assert(t, err != nil, "ZRANGEBYLEX error")
+
+		_, err = redis.String(c.Do("ZLEXCOUNT"))
+		assert(t, err != nil, "ZLEXCOUNT error")
+		_, err = redis.String(c.Do("ZLEXCOUNT", "k"))
+		assert(t, err != nil, "ZLEXCOUNT error")
+		_, err = redis.String(c.Do("ZLEXCOUNT", "k", "[a", "a"))
+		assert(t, err != nil, "ZLEXCOUNT error")
+		_, err = redis.String(c.Do("ZLEXCOUNT", "k", "a", "(a"))
+		assert(t, err != nil, "ZLEXCOUNT error")
+		_, err = redis.String(c.Do("ZLEXCOUNT", "k", "(a", "(a", "toomany"))
+		assert(t, err != nil, "ZLEXCOUNT error")
 	}
 }
