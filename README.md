@@ -106,6 +106,7 @@ Implemented commands:
    - ZCARD
    - ZCOUNT
    - ZRANGE
+   - ZRANGEBYLEX
    - ZRANGEBYSCORE
    - ZRANK
    - ZDEL

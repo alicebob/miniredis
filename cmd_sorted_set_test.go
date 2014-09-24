@@ -528,3 +528,104 @@ func TestSortedSetScore(t *testing.T) {
 		assert(t, err != nil, "ZSCORE error")
 	}
 }
+
+// Test ZRANGEBYLEX
+func TestSortedSetRangeByLex(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	s.ZAdd("z", 12, "zero kelvin")
+	s.ZAdd("z", 12, "minusfour")
+	s.ZAdd("z", 12, "one")
+	s.ZAdd("z", 12, "oneone")
+	s.ZAdd("z", 12, "two")
+	s.ZAdd("z", 12, "zwei")
+	s.ZAdd("z", 12, "three")
+	s.ZAdd("z", 12, "drei")
+	s.ZAdd("z", 12, "inf")
+
+	// Normal cases
+	{
+		b, err := redis.Strings(c.Do("ZRANGEBYLEX", "z", "-", "+"))
+		ok(t, err)
+		equals(t, []string{"drei", "inf", "minusfour", "one", "oneone", "three", "two", "zero kelvin", "zwei"}, b)
+	}
+	// Inclusive range
+	{
+		b, err := redis.Strings(c.Do("ZRANGEBYLEX", "z", "[o", "[three"))
+		ok(t, err)
+		equals(t, []string{"one", "oneone", "three"}, b)
+	}
+	// Inclusive range
+	{
+		b, err := redis.Strings(c.Do("ZRANGEBYLEX", "z", "(o", "(z"))
+		ok(t, err)
+		equals(t, []string{"one", "oneone", "three", "two"}, b)
+	}
+	// Wrong ranges
+	{
+		b, err := redis.Strings(c.Do("ZRANGEBYLEX", "z", "+", "(z"))
+		ok(t, err)
+		equals(t, []string{}, b)
+
+		b, err = redis.Strings(c.Do("ZRANGEBYLEX", "z", "(a", "-"))
+		ok(t, err)
+		equals(t, []string{}, b)
+
+		b, err = redis.Strings(c.Do("ZRANGEBYLEX", "z", "(z", "(a"))
+		ok(t, err)
+		equals(t, []string{}, b)
+	}
+
+	// No such key
+	{
+		b, err := redis.Strings(c.Do("ZRANGEBYLEX", "nosuch", "-", "+"))
+		ok(t, err)
+		equals(t, []string{}, b)
+	}
+
+	// With LIMIT
+	// (note, this is SQL like logic, not the redis RANGE logic)
+	{
+		b, err := redis.Strings(c.Do("ZRANGEBYLEX", "z", "-", "+", "LIMIT", 1, 2))
+		ok(t, err)
+		equals(t, []string{"inf", "minusfour"}, b)
+
+		// Negative start limit. No go.
+		b, err = redis.Strings(c.Do("ZRANGEBYLEX", "z", "-", "+", "LIMIT", -1, 2))
+		ok(t, err)
+		equals(t, []string{}, b)
+
+		// Negative end limit. Is fine but ignored.
+		b, err = redis.Strings(c.Do("ZRANGEBYLEX", "z", "-", "+", "LIMIT", 1, -2))
+		ok(t, err)
+		equals(t, []string{"inf", "minusfour", "one", "oneone", "three", "two", "zero kelvin", "zwei"}, b)
+	}
+
+	// Error cases
+	{
+		_, err = redis.String(c.Do("ZRANGEBYLEX"))
+		assert(t, err != nil, "ZRANGEBYLEX error")
+		_, err = redis.String(c.Do("ZRANGEBYLEX", "set"))
+		assert(t, err != nil, "ZRANGEBYLEX error")
+		_, err = redis.String(c.Do("ZRANGEBYLEX", "set", "1", "[a"))
+		assert(t, err != nil, "ZRANGEBYLEX error")
+		_, err = redis.String(c.Do("ZRANGEBYLEX", "set", "[a", "1"))
+		assert(t, err != nil, "ZRANGEBYLEX error")
+		_, err = redis.String(c.Do("ZRANGEBYLEX", "set", "[a", "!a"))
+		assert(t, err != nil, "ZRANGEBYLEX error")
+		_, err = redis.String(c.Do("ZRANGEBYLEX", "set", "-", "+", "toomany"))
+		assert(t, err != nil, "ZRANGEBYLEX error")
+		_, err = redis.String(c.Do("ZRANGEBYLEX", "set", "[1", "(1", "LIMIT", "noint", 1))
+		assert(t, err != nil, "ZRANGEBYLEX error")
+		_, err = redis.String(c.Do("ZRANGEBYLEX", "set", "[1", "(1", "LIMIT", 1, "noint"))
+		assert(t, err != nil, "ZRANGEBYLEX error")
+		// Wrong type of key
+		s.Set("str", "value")
+		_, err = redis.Int(c.Do("ZRANGEBYLEX", "str", "-", "+"))
+		assert(t, err != nil, "ZRANGEBYLEX error")
+	}
+}

@@ -3,10 +3,16 @@
 package miniredis
 
 import (
+	"errors"
+	"sort"
 	"strconv"
 	"strings"
 
 	"github.com/bsm/redeo"
+)
+
+var (
+	errInvalidRangeItem = errors.New(msgInvalidRangeItem)
 )
 
 // commandsSortedSet handles all sorted set operations.
@@ -18,8 +24,7 @@ func commandsSortedSet(m *Miniredis, srv *redeo.Server) {
 	// ZINTERSTORE destination numkeys key [key ...] [WEIGHTS weight [weight ...]] [AGGREGATE SUM|MIN|MAX]
 	// ZLEXCOUNT key min max
 	srv.HandleFunc("ZRANGE", m.makeCmdZrange("zrange", false))
-	// ZRANGEBYLEX key min max [LIMIT offset count]
-	// ZRANGEBYSCORE key min max [WITHSCORES] [LIMIT offset count]
+	srv.HandleFunc("ZRANGEBYLEX", m.cmdZrangebylex)
 	srv.HandleFunc("ZRANGEBYSCORE", m.makeCmdZrangebyscore("zrangebyscore", false))
 	srv.HandleFunc("ZRANK", m.makeCmdZrank("zrank", false))
 	srv.HandleFunc("ZREM", m.cmdZrem)
@@ -216,6 +221,105 @@ func (m *Miniredis) makeCmdZrange(cmd string, reverse bool) redeo.HandlerFunc {
 			}
 		})
 	}
+}
+
+// ZRANGEBYLEX
+func (m *Miniredis) cmdZrangebylex(out *redeo.Responder, r *redeo.Request) error {
+	if len(r.Args) < 3 {
+		setDirty(r.Client())
+		out.WriteErrorString("ERR wrong number of arguments for 'zrangebylex' command")
+		return nil
+	}
+
+	key := r.Args[0]
+	min, minIncl, err := parseLexrange(r.Args[1])
+	if err != nil {
+		setDirty(r.Client())
+		out.WriteErrorString(err.Error())
+		return nil
+	}
+	max, maxIncl, err := parseLexrange(r.Args[2])
+	if err != nil {
+		setDirty(r.Client())
+		out.WriteErrorString(err.Error())
+		return nil
+	}
+
+	args := r.Args[3:]
+	withLimit := false
+	limitStart := 0
+	limitEnd := 0
+	for len(args) > 0 {
+		if strings.ToLower(args[0]) == "limit" {
+			withLimit = true
+			args = args[1:]
+			if len(args) < 2 {
+				out.WriteErrorString(msgSyntaxError)
+				return nil
+			}
+			limitStart, err = strconv.Atoi(args[0])
+			if err != nil {
+				setDirty(r.Client())
+				out.WriteErrorString(msgInvalidInt)
+				return nil
+			}
+			limitEnd, err = strconv.Atoi(args[1])
+			if err != nil {
+				setDirty(r.Client())
+				out.WriteErrorString(msgInvalidInt)
+				return nil
+			}
+			args = args[2:]
+			continue
+		}
+		// Syntax error
+		setDirty(r.Client())
+		out.WriteErrorString(msgSyntaxError)
+		return nil
+	}
+
+	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+		db := m.db(ctx.selectedDB)
+
+		if !db.exists(key) {
+			out.WriteBulkLen(0)
+			return
+		}
+
+		if db.t(key) != "zset" {
+			out.WriteErrorString(ErrWrongType.Error())
+			return
+		}
+
+		members := db.zmembers(key)
+		// Just key sort. If scores are not the same we don't care.
+		sort.Strings(members)
+		members = withLexRange(members, min, minIncl, max, maxIncl)
+
+		// Apply LIMIT ranges. That's <start> <elements>. Unlike RANGE.
+		if withLimit {
+			if limitStart < 0 {
+				members = nil
+			} else {
+				if limitStart < len(members) {
+					members = members[limitStart:]
+				} else {
+					// out of range
+					members = nil
+				}
+				if limitEnd >= 0 {
+					if len(members) > limitEnd {
+						members = members[:limitEnd]
+					}
+				}
+			}
+		}
+
+		out.WriteBulkLen(len(members))
+		for _, el := range members {
+			out.WriteString(el)
+		}
+	})
 }
 
 // ZRANGEBYSCORE and ZREVRANGEBYSCORE
@@ -472,6 +576,27 @@ func parseFloatRange(s string) (float64, bool, error) {
 	return f, inclusive, err
 }
 
+// parseLexrange handles ZRANGEBYLEX ranges. They start with '[', '(', or are
+// '+' or '-'.
+// Returns range, inclusive, error.
+// On '+' or '-' that's just returned.
+func parseLexrange(s string) (string, bool, error) {
+	if len(s) == 0 {
+		return "", false, errInvalidRangeItem
+	}
+	if s == "+" || s == "-" {
+		return s, false, nil
+	}
+	switch s[0] {
+	case '(':
+		return s[1:], false, nil
+	case '[':
+		return s[1:], true, nil
+	default:
+		return "", false, errInvalidRangeItem
+	}
+}
+
 // withSSRange limits a list of sorted set elements by the ZRANGEBYSCORE range
 // logic.
 func withSSRange(members ssElems, min float64, minIncl bool, max float64, maxIncl bool) ssElems {
@@ -504,6 +629,50 @@ func withSSRange(members ssElems, min float64, minIncl bool, max float64, maxInc
 			if m.score >= max {
 				members = members[:i]
 				break
+			}
+		}
+	}
+	return members
+}
+
+// withLexRange limits a list of sorted set elements.
+func withLexRange(members []string, min string, minIncl bool, max string, maxIncl bool) []string {
+	if max == "-" || min == "+" {
+		return nil
+	}
+	if min != "-" {
+		if minIncl {
+			for i, m := range members {
+				if m >= min {
+					members = members[i:]
+					break
+				}
+			}
+		} else {
+			// Excluding min
+			for i, m := range members {
+				if m > min {
+					members = members[i:]
+					break
+				}
+			}
+		}
+	}
+	if max != "+" {
+		if maxIncl {
+			for i, m := range members {
+				if m > max {
+					members = members[:i]
+					break
+				}
+			}
+		} else {
+			// Excluding max
+			for i, m := range members {
+				if m >= max {
+					members = members[:i]
+					break
+				}
 			}
 		}
 	}
