@@ -372,6 +372,18 @@ func TestIncr(t *testing.T) {
 		assert(t, err != nil, "do INCR error")
 	}
 
+	// Direct usage
+	{
+		i, err := s.Incr("count", 1)
+		ok(t, err)
+		equals(t, 1, i)
+		i, err = s.Incr("count", 1)
+		ok(t, err)
+		equals(t, 2, i)
+		_, err = s.Incr("wrong", 1)
+		assert(t, err != nil, "do s.Incr error")
+	}
+
 	// Wrong usage
 	{
 		_, err := redis.Int(c.Do("INCR"))
@@ -472,6 +484,10 @@ func TestIncrbyfloat(t *testing.T) {
 		ok(t, err)
 		equals(t, 512.1, f)
 		s.CheckGet(t, "foo", "512.1")
+
+		s.HSet("wrong", "aap", "noot")
+		_, err = s.Incrfloat("wrong", 12)
+		assert(t, err != nil, "do s.Incrfloat() error")
 	}
 
 	// Wrong type of existing key

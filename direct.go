@@ -70,6 +70,11 @@ func (m *Miniredis) Incr(k string, delta int) (int, error) {
 func (db *RedisDB) Incr(k string, delta int) (int, error) {
 	db.master.Lock()
 	defer db.master.Unlock()
+
+	if db.exists(k) && db.t(k) != "string" {
+		return 0, ErrWrongType
+	}
+
 	return db.incr(k, delta)
 }
 
@@ -82,6 +87,11 @@ func (m *Miniredis) Incrfloat(k string, delta float64) (float64, error) {
 func (db *RedisDB) Incrfloat(k string, delta float64) (float64, error) {
 	db.master.Lock()
 	defer db.master.Unlock()
+
+	if db.exists(k) && db.t(k) != "string" {
+		return 0, ErrWrongType
+	}
+
 	return db.incrfloat(k, delta)
 }
 
@@ -99,11 +109,10 @@ func (db *RedisDB) List(k string) ([]string, error) {
 	db.master.Lock()
 	defer db.master.Unlock()
 
-	t, ok := db.keys[k]
-	if !ok {
+	if !db.exists(k) {
 		return nil, ErrKeyNotFound
 	}
-	if t != "list" {
+	if db.t(k) != "list" {
 		return nil, ErrWrongType
 	}
 	return db.listKeys[k], nil
@@ -130,7 +139,13 @@ func (m *Miniredis) Lpop(k string) (string, error) {
 func (db *RedisDB) Lpop(k string) (string, error) {
 	db.master.Lock()
 	defer db.master.Unlock()
-	return db.lpop(k)
+	if !db.exists(k) {
+		return "", ErrKeyNotFound
+	}
+	if db.t(k) != "list" {
+		return "", ErrWrongType
+	}
+	return db.lpop(k), nil
 }
 
 // Push add element at the end. Is called RPUSH in redis. Returns the new length.

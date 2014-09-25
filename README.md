@@ -173,7 +173,7 @@ Commands which will probably not be implemented:
 ## &c.
 
 See https://github.com/alicebob/miniredis_vs_redis for tests comparing
-miniredis against the real thing. Tests are run against Redis 2.8.7 (Debian
+miniredis against the real thing. Tests are run against Redis 2.8.14 (Debian
 testing).
 
 

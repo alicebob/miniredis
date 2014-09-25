@@ -109,16 +109,17 @@ func (m *Miniredis) cmdLpop(out *redeo.Responder, r *redeo.Request) error {
 	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
-		elem, err := db.lpop(key)
-		if err != nil {
-			if err == ErrKeyNotFound {
-				// Non-existing key is fine.
-				out.WriteNil()
-				return
-			}
-			out.WriteErrorString(err.Error())
+		if !db.exists(key) {
+			// Non-existing key is fine.
+			out.WriteNil()
 			return
 		}
+		if db.t(key) != "list" {
+			out.WriteErrorString(msgWrongType)
+			return
+		}
+
+		elem := db.lpop(key)
 		out.WriteString(elem)
 	})
 }
