@@ -14,6 +14,7 @@ const (
 	msgInvalidMinMax    = "ERR min or max is not a float"
 	msgInvalidRangeItem = "ERR min or max not valid string range item"
 	msgSyntaxError      = "ERR syntax error"
+	msgKeyNotFound      = "ERR no such key"
 )
 
 // withTx wraps the non-argument-checking part of command handling code in

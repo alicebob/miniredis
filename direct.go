@@ -127,7 +127,11 @@ func (m *Miniredis) Lpush(k, v string) (int, error) {
 func (db *RedisDB) Lpush(k, v string) (int, error) {
 	db.master.Lock()
 	defer db.master.Unlock()
-	return db.lpush(k, v)
+
+	if db.exists(k) && db.t(k) != "list" {
+		return 0, ErrWrongType
+	}
+	return db.lpush(k, v), nil
 }
 
 // Lpop is a shift. Returns the popped element.

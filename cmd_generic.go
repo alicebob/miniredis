@@ -314,11 +314,12 @@ func (m *Miniredis) cmdRename(out *redeo.Responder, r *redeo.Request) error {
 	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
-		if err := db.rename(from, to); err != nil {
-			out.WriteErrorString(err.Error())
+		if !db.exists(from) {
+			out.WriteErrorString(msgKeyNotFound)
 			return
 		}
 
+		db.rename(from, to)
 		out.WriteOK()
 	})
 }

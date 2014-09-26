@@ -455,7 +455,7 @@ func TestRename(t *testing.T) {
 	{
 		s.Set("from", "string value")
 		s.HSet("to", "key", "value")
-		s.SetExpire("to", 999999)
+		s.SetExpire("from", 999999)
 
 		str, err := redis.String(c.Do("RENAME", "from", "to"))
 		ok(t, err)

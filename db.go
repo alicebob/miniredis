@@ -91,12 +91,9 @@ func (db *RedisDB) move(key string, to *RedisDB) bool {
 	return true
 }
 
-func (db *RedisDB) rename(from, to string) error {
-	t, ok := db.keys[from]
-	if !ok {
-		return ErrKeyNotFound
-	}
-	switch t {
+func (db *RedisDB) rename(from, to string) {
+	db.del(to, true)
+	switch db.t(from) {
 	case "string":
 		db.stringKeys[to] = db.stringKeys[from]
 	case "hash":
@@ -112,15 +109,12 @@ func (db *RedisDB) rename(from, to string) error {
 	}
 	db.keys[to] = db.keys[from]
 	db.keyVersion[to]++
+	db.expire[to] = db.expire[from]
 
 	db.del(from, true)
-	return nil
 }
 
-func (db *RedisDB) lpush(k, v string) (int, error) {
-	if t, ok := db.keys[k]; ok && t != "list" {
-		return 0, ErrWrongType
-	}
+func (db *RedisDB) lpush(k, v string) int {
 	l, ok := db.listKeys[k]
 	if !ok {
 		db.keys[k] = "list"
@@ -129,7 +123,7 @@ func (db *RedisDB) lpush(k, v string) (int, error) {
 	l = append([]string{v}, l...)
 	db.listKeys[k] = l
 	db.keyVersion[k]++
-	return len(l), nil
+	return len(l)
 }
 
 func (db *RedisDB) lpop(k string) string {

@@ -137,14 +137,14 @@ func (m *Miniredis) cmdLpush(out *redeo.Responder, r *redeo.Request) error {
 	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
+		if db.exists(key) && db.t(key) != "list" {
+			out.WriteErrorString(msgWrongType)
+			return
+		}
+
 		var newLen int
-		var err error
 		for _, value := range args {
-			newLen, err = db.lpush(key, value)
-			if err != nil {
-				out.WriteErrorString(err.Error())
-				return
-			}
+			newLen = db.lpush(key, value)
 		}
 		out.WriteInt(newLen)
 	})
