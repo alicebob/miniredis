@@ -62,21 +62,21 @@ func (m *Miniredis) cmdSet(out *redeo.Responder, r *redeo.Request) error {
 		case "EX", "PX":
 			if len(r.Args) < 2 {
 				setDirty(r.Client())
-				out.WriteErrorString("ERR value is not an integer or out of range")
+				out.WriteErrorString(msgInvalidInt)
 				return nil
 			}
 			var err error
 			expire, err = strconv.Atoi(r.Args[1])
 			if err != nil {
 				setDirty(r.Client())
-				out.WriteErrorString("ERR value is not an integer or out of range")
+				out.WriteErrorString(msgInvalidInt)
 				return nil
 			}
 			r.Args = r.Args[2:]
 			continue
 		default:
 			setDirty(r.Client())
-			out.WriteErrorString("ERR syntax error")
+			out.WriteErrorString(msgSyntaxError)
 			return nil
 		}
 	}
@@ -118,7 +118,7 @@ func (m *Miniredis) cmdSetex(out *redeo.Responder, r *redeo.Request) error {
 	ttl, err := strconv.Atoi(r.Args[1])
 	if err != nil {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR value is not an integer or out of range")
+		out.WriteErrorString(msgInvalidInt)
 		return nil
 	}
 	value := r.Args[2]
@@ -144,7 +144,7 @@ func (m *Miniredis) cmdPsetex(out *redeo.Responder, r *redeo.Request) error {
 	ttl, err := strconv.Atoi(r.Args[1])
 	if err != nil {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR value is not an integer or out of range")
+		out.WriteErrorString(msgInvalidInt)
 		return nil
 	}
 	value := r.Args[2]
@@ -371,7 +371,7 @@ func (m *Miniredis) cmdIncrby(out *redeo.Responder, r *redeo.Request) error {
 	delta, err := strconv.Atoi(r.Args[1])
 	if err != nil {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR value is not an integer or out of range")
+		out.WriteErrorString(msgInvalidInt)
 		return nil
 	}
 
@@ -405,7 +405,7 @@ func (m *Miniredis) cmdIncrbyfloat(out *redeo.Responder, r *redeo.Request) error
 	delta, err := strconv.ParseFloat(r.Args[1], 64)
 	if err != nil {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR value is not a valid float")
+		out.WriteErrorString(msgInvalidFloat)
 		return nil
 	}
 
@@ -465,7 +465,7 @@ func (m *Miniredis) cmdDecrby(out *redeo.Responder, r *redeo.Request) error {
 	delta, err := strconv.Atoi(r.Args[1])
 	if err != nil {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR value is not an integer or out of range")
+		out.WriteErrorString(msgInvalidInt)
 		return nil
 	}
 
@@ -547,13 +547,13 @@ func (m *Miniredis) cmdGetrange(out *redeo.Responder, r *redeo.Request) error {
 	start, err := strconv.Atoi(r.Args[1])
 	if err != nil {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR value is not an integer or out of range")
+		out.WriteErrorString(msgInvalidInt)
 		return nil
 	}
 	end, err := strconv.Atoi(r.Args[2])
 	if err != nil {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR value is not an integer or out of range")
+		out.WriteErrorString(msgInvalidInt)
 		return nil
 	}
 
@@ -582,7 +582,7 @@ func (m *Miniredis) cmdSetrange(out *redeo.Responder, r *redeo.Request) error {
 	pos, err := strconv.Atoi(r.Args[1])
 	if err != nil {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR value is not an integer or out of range")
+		out.WriteErrorString(msgInvalidInt)
 		return nil
 	}
 	if pos < 0 {
@@ -616,7 +616,7 @@ func (m *Miniredis) cmdSetrange(out *redeo.Responder, r *redeo.Request) error {
 func (m *Miniredis) cmdBitcount(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) != 1 && len(r.Args) != 3 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR syntax error")
+		out.WriteErrorString(msgSyntaxError)
 		return nil
 	}
 
@@ -629,13 +629,13 @@ func (m *Miniredis) cmdBitcount(out *redeo.Responder, r *redeo.Request) error {
 		start, err = strconv.Atoi(r.Args[1])
 		if err != nil {
 			setDirty(r.Client())
-			out.WriteErrorString("ERR value is not an integer or out of range")
+			out.WriteErrorString(msgInvalidInt)
 			return nil
 		}
 		end, err = strconv.Atoi(r.Args[2])
 		if err != nil {
 			setDirty(r.Client())
-			out.WriteErrorString("ERR value is not an integer or out of range")
+			out.WriteErrorString(msgInvalidInt)
 			return nil
 		}
 	}
@@ -724,7 +724,7 @@ func (m *Miniredis) cmdBitop(out *redeo.Responder, r *redeo.Request) error {
 			}
 			out.WriteInt(len(value))
 		default:
-			out.WriteErrorString("ERR syntax error")
+			out.WriteErrorString(msgSyntaxError)
 		}
 	})
 }
@@ -741,7 +741,7 @@ func (m *Miniredis) cmdBitpos(out *redeo.Responder, r *redeo.Request) error {
 	bit, err := strconv.Atoi(r.Args[1])
 	if err != nil {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR value is not an integer or out of range")
+		out.WriteErrorString(msgInvalidInt)
 		return nil
 	}
 	var start, end int
@@ -750,7 +750,7 @@ func (m *Miniredis) cmdBitpos(out *redeo.Responder, r *redeo.Request) error {
 		start, err = strconv.Atoi(r.Args[2])
 		if err != nil {
 			setDirty(r.Client())
-			out.WriteErrorString("ERR value is not an integer or out of range")
+			out.WriteErrorString(msgInvalidInt)
 			return nil
 		}
 	}
@@ -758,7 +758,7 @@ func (m *Miniredis) cmdBitpos(out *redeo.Responder, r *redeo.Request) error {
 		end, err = strconv.Atoi(r.Args[3])
 		if err != nil {
 			setDirty(r.Client())
-			out.WriteErrorString("ERR value is not an integer or out of range")
+			out.WriteErrorString(msgInvalidInt)
 			return nil
 		}
 		withEnd = true

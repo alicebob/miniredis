@@ -20,7 +20,7 @@ func commandsSortedSet(m *Miniredis, srv *redeo.Server) {
 	srv.HandleFunc("ZADD", m.cmdZadd)
 	srv.HandleFunc("ZCARD", m.cmdZcard)
 	srv.HandleFunc("ZCOUNT", m.cmdZcount)
-	// ZINCRBY key increment member
+	srv.HandleFunc("ZINCRBY", m.cmdZincrby)
 	// ZINTERSTORE destination numkeys key [key ...] [WEIGHTS weight [weight ...]] [AGGREGATE SUM|MIN|MAX]
 	srv.HandleFunc("ZLEXCOUNT", m.cmdZlexcount)
 	srv.HandleFunc("ZRANGE", m.makeCmdZrange("zrange", false))
@@ -60,7 +60,7 @@ func (m *Miniredis) cmdZadd(out *redeo.Responder, r *redeo.Request) error {
 		score, err := strconv.ParseFloat(args[0], 64)
 		if err != nil {
 			setDirty(r.Client())
-			out.WriteErrorString("ERR value is not a valid float")
+			out.WriteErrorString(msgInvalidFloat)
 			return nil
 		}
 		elems[args[1]] = score
@@ -150,6 +150,35 @@ func (m *Miniredis) cmdZcount(out *redeo.Responder, r *redeo.Request) error {
 		members := db.zelements(key)
 		members = withSSRange(members, min, minIncl, max, maxIncl)
 		out.WriteInt(len(members))
+	})
+}
+
+// ZINCRBY
+func (m *Miniredis) cmdZincrby(out *redeo.Responder, r *redeo.Request) error {
+	if len(r.Args) != 3 {
+		setDirty(r.Client())
+		out.WriteErrorString("ERR wrong number of arguments for 'zincrby' command")
+		return nil
+	}
+
+	key := r.Args[0]
+	delta, err := strconv.ParseFloat(r.Args[1], 64)
+	if err != nil {
+		setDirty(r.Client())
+		out.WriteErrorString(msgInvalidFloat)
+		return nil
+	}
+	member := r.Args[2]
+
+	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+		db := m.db(ctx.selectedDB)
+
+		if db.exists(key) && db.t(key) != "zset" {
+			out.WriteErrorString(msgWrongType)
+			return
+		}
+		newScore := db.zincrby(key, member, delta)
+		out.WriteString(formatFloat(newScore))
 	})
 }
 

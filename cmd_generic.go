@@ -48,7 +48,7 @@ func makeCmdExpire(m *Miniredis, cmd string) func(*redeo.Responder, *redeo.Reque
 		i, err := strconv.Atoi(value)
 		if err != nil {
 			setDirty(r.Client())
-			out.WriteErrorString("ERR value is not an integer or out of range")
+			out.WriteErrorString(msgInvalidInt)
 			return nil
 		}
 

@@ -627,36 +627,79 @@ func TestSortedSetRangeByLex(t *testing.T) {
 
 	// Error cases
 	{
-		_, err = redis.String(c.Do("ZRANGEBYLEX"))
+		_, err = c.Do("ZRANGEBYLEX")
 		assert(t, err != nil, "ZRANGEBYLEX error")
-		_, err = redis.String(c.Do("ZRANGEBYLEX", "set"))
+		_, err = c.Do("ZRANGEBYLEX", "set")
 		assert(t, err != nil, "ZRANGEBYLEX error")
-		_, err = redis.String(c.Do("ZRANGEBYLEX", "set", "1", "[a"))
+		_, err = c.Do("ZRANGEBYLEX", "set", "1", "[a")
 		assert(t, err != nil, "ZRANGEBYLEX error")
-		_, err = redis.String(c.Do("ZRANGEBYLEX", "set", "[a", "1"))
+		_, err = c.Do("ZRANGEBYLEX", "set", "[a", "1")
 		assert(t, err != nil, "ZRANGEBYLEX error")
-		_, err = redis.String(c.Do("ZRANGEBYLEX", "set", "[a", "!a"))
+		_, err = c.Do("ZRANGEBYLEX", "set", "[a", "!a")
 		assert(t, err != nil, "ZRANGEBYLEX error")
-		_, err = redis.String(c.Do("ZRANGEBYLEX", "set", "-", "+", "toomany"))
+		_, err = c.Do("ZRANGEBYLEX", "set", "-", "+", "toomany")
 		assert(t, err != nil, "ZRANGEBYLEX error")
-		_, err = redis.String(c.Do("ZRANGEBYLEX", "set", "[1", "(1", "LIMIT", "noint", 1))
+		_, err = c.Do("ZRANGEBYLEX", "set", "[1", "(1", "LIMIT", "noint", 1)
 		assert(t, err != nil, "ZRANGEBYLEX error")
-		_, err = redis.String(c.Do("ZRANGEBYLEX", "set", "[1", "(1", "LIMIT", 1, "noint"))
+		_, err = c.Do("ZRANGEBYLEX", "set", "[1", "(1", "LIMIT", 1, "noint")
 		assert(t, err != nil, "ZRANGEBYLEX error")
 		// Wrong type of key
 		s.Set("str", "value")
-		_, err = redis.Int(c.Do("ZRANGEBYLEX", "str", "-", "+"))
+		_, err = c.Do("ZRANGEBYLEX", "str", "-", "+")
 		assert(t, err != nil, "ZRANGEBYLEX error")
 
-		_, err = redis.String(c.Do("ZLEXCOUNT"))
+		_, err = c.Do("ZLEXCOUNT")
 		assert(t, err != nil, "ZLEXCOUNT error")
-		_, err = redis.String(c.Do("ZLEXCOUNT", "k"))
+		_, err = c.Do("ZLEXCOUNT", "k")
 		assert(t, err != nil, "ZLEXCOUNT error")
-		_, err = redis.String(c.Do("ZLEXCOUNT", "k", "[a", "a"))
+		_, err = c.Do("ZLEXCOUNT", "k", "[a", "a")
 		assert(t, err != nil, "ZLEXCOUNT error")
-		_, err = redis.String(c.Do("ZLEXCOUNT", "k", "a", "(a"))
+		_, err = c.Do("ZLEXCOUNT", "k", "a", "(a")
 		assert(t, err != nil, "ZLEXCOUNT error")
-		_, err = redis.String(c.Do("ZLEXCOUNT", "k", "(a", "(a", "toomany"))
+		_, err = c.Do("ZLEXCOUNT", "k", "(a", "(a", "toomany")
 		assert(t, err != nil, "ZLEXCOUNT error")
+	}
+}
+
+// Test ZINCRBY
+func TestSortedSetIncrby(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	// Normal cases
+	{
+		// New key
+		b, err := redis.Float64(c.Do("ZINCRBY", "z", 1, "member"))
+		ok(t, err)
+		equals(t, 1.0, b)
+
+		// Existing key
+		b, err = redis.Float64(c.Do("ZINCRBY", "z", 2.5, "member"))
+		ok(t, err)
+		equals(t, 3.5, b)
+
+		// New member
+		b, err = redis.Float64(c.Do("ZINCRBY", "z", 1, "othermember"))
+		ok(t, err)
+		equals(t, 1.0, b)
+	}
+
+	// Error cases
+	{
+		_, err = redis.String(c.Do("ZINCRBY"))
+		assert(t, err != nil, "ZINCRBY error")
+		_, err = redis.String(c.Do("ZINCRBY", "set"))
+		assert(t, err != nil, "ZINCRBY error")
+		_, err = redis.String(c.Do("ZINCRBY", "set", "nofloat", "a"))
+		assert(t, err != nil, "ZINCRBY error")
+		_, err = redis.String(c.Do("ZINCRBY", "set", 1.0, "too", "many"))
+		assert(t, err != nil, "ZINCRBY error")
+		// Wrong type of key
+		s.Set("str", "value")
+		_, err = c.Do("ZINCRBY", "str", 1.0, "member")
+		assert(t, err != nil, "ZINCRBY error")
 	}
 }

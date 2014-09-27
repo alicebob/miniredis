@@ -383,7 +383,7 @@ func (m *Miniredis) cmdHincrby(out *redeo.Responder, r *redeo.Request) error {
 	delta, err := strconv.Atoi(r.Args[2])
 	if err != nil {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR value is not an integer or out of range")
+		out.WriteErrorString(msgInvalidInt)
 		return nil
 	}
 
@@ -416,7 +416,7 @@ func (m *Miniredis) cmdHincrbyfloat(out *redeo.Responder, r *redeo.Request) erro
 	delta, err := strconv.ParseFloat(r.Args[2], 64)
 	if err != nil {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR value is not a valid float")
+		out.WriteErrorString(msgInvalidFloat)
 		return nil
 	}
 

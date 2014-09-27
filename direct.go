@@ -12,9 +12,9 @@ var (
 	// ErrWrongType when a key is not the right type.
 	ErrWrongType = errors.New(msgWrongType)
 	// ErrIntValueError can returned by INCRBY
-	ErrIntValueError = errors.New("ERR value is not an integer or out of range")
+	ErrIntValueError = errors.New(msgInvalidInt)
 	// ErrFloatValueError can returned by INCRBYFLOAT
-	ErrFloatValueError = errors.New("ERR value is not a valid float")
+	ErrFloatValueError = errors.New(msgInvalidFloat)
 )
 
 // Select sets the DB id for all direct commands.

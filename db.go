@@ -395,3 +395,19 @@ func (db *RedisDB) zexists(key, member string) bool {
 	_, ok := ss[member]
 	return ok
 }
+
+// change float sorted set score
+func (db *RedisDB) zincrby(k, m string, delta float64) float64 {
+	ss, ok := db.sortedsetKeys[k]
+	if !ok {
+		ss = newSortedSet()
+		db.keys[k] = "zset"
+		db.sortedsetKeys[k] = ss
+	}
+
+	v, ok := ss.get(m)
+	v += delta
+	ss.set(v, m)
+	db.keyVersion[k]++
+	return v
+}

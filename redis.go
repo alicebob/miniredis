@@ -11,6 +11,7 @@ import (
 const (
 	msgWrongType        = "WRONGTYPE Operation against a key holding the wrong kind of value"
 	msgInvalidInt       = "ERR value is not an integer or out of range"
+	msgInvalidFloat     = "ERR value is not a valid float"
 	msgInvalidMinMax    = "ERR min or max is not a float"
 	msgInvalidRangeItem = "ERR min or max not valid string range item"
 	msgSyntaxError      = "ERR syntax error"
