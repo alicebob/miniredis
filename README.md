@@ -111,7 +111,8 @@ Implemented commands:
    - ZRANGEBYLEX
    - ZRANGEBYSCORE
    - ZRANK
-   - ZDEL
+   - ZREM
+   - ZREMRANGEBYLEX
    - ZREVRANGE
    - ZREVRANGEBYSCORE
    - ZREVRANK

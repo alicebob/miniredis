@@ -474,6 +474,73 @@ func TestSortedSetRem(t *testing.T) {
 	}
 }
 
+// Test ZREMRANGEBYLEX
+func TestSortedSetRemRangeByLex(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	s.ZAdd("z", 12, "zero kelvin")
+	s.ZAdd("z", 12, "minusfour")
+	s.ZAdd("z", 12, "one")
+	s.ZAdd("z", 12, "oneone")
+	s.ZAdd("z", 12, "two")
+	s.ZAdd("z", 12, "zwei")
+	s.ZAdd("z", 12, "three")
+	s.ZAdd("z", 12, "drei")
+	s.ZAdd("z", 12, "inf")
+
+	// Inclusive range
+	{
+		b, err := redis.Int(c.Do("ZREMRANGEBYLEX", "z", "[o", "[three"))
+		ok(t, err)
+		equals(t, 3, b)
+
+		members, err := s.ZMembers("z")
+		ok(t, err)
+		equals(t,
+			[]string{"drei", "inf", "minusfour", "two", "zero kelvin", "zwei"},
+			members,
+		)
+	}
+
+	// Wrong ranges
+	{
+		b, err := redis.Int(c.Do("ZREMRANGEBYLEX", "z", "+", "(z"))
+		ok(t, err)
+		equals(t, 0, b)
+	}
+
+	// No such key
+	{
+		b, err := redis.Int(c.Do("ZREMRANGEBYLEX", "nosuch", "-", "+"))
+		ok(t, err)
+		equals(t, 0, b)
+	}
+
+	// Error cases
+	{
+		_, err = c.Do("ZREMRANGEBYLEX")
+		assert(t, err != nil, "ZREMRANGEBYLEX error")
+		_, err = c.Do("ZREMRANGEBYLEX", "set")
+		assert(t, err != nil, "ZREMRANGEBYLEX error")
+		_, err = c.Do("ZREMRANGEBYLEX", "set", "1", "[a")
+		assert(t, err != nil, "ZREMRANGEBYLEX error")
+		_, err = c.Do("ZREMRANGEBYLEX", "set", "[a", "1")
+		assert(t, err != nil, "ZREMRANGEBYLEX error")
+		_, err = c.Do("ZREMRANGEBYLEX", "set", "[a", "!a")
+		assert(t, err != nil, "ZREMRANGEBYLEX error")
+		_, err = c.Do("ZREMRANGEBYLEX", "set", "-", "+", "toomany")
+		assert(t, err != nil, "ZREMRANGEBYLEX error")
+		// Wrong type of key
+		s.Set("str", "value")
+		_, err = c.Do("ZREMRANGEBYLEX", "str", "-", "+")
+		assert(t, err != nil, "ZREMRANGEBYLEX error")
+	}
+}
+
 // Test ZSCORE
 func TestSortedSetScore(t *testing.T) {
 	s, err := Run()
