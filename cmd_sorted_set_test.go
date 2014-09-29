@@ -613,6 +613,79 @@ func TestSortedSetRemRangeByRank(t *testing.T) {
 	}
 }
 
+// Test ZREMRANGEBYSCORE
+func TestSortedSetRangeRemByScore(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	s.ZAdd("z", -273.15, "zero kelvin")
+	s.ZAdd("z", -4, "minusfour")
+	s.ZAdd("z", 1, "one")
+	s.ZAdd("z", 2, "two")
+	s.ZAdd("z", 2, "zwei")
+	s.ZAdd("z", 3, "three")
+	s.ZAdd("z", 3, "drei")
+	s.ZAdd("z", math.Inf(+1), "inf")
+
+	// Normal cases
+	{
+		n, err := redis.Int(c.Do("ZREMRANGEBYSCORE", "z", "-inf", 1))
+		ok(t, err)
+		equals(t, 3, n)
+
+		b, err := redis.Strings(c.Do("ZRANGE", "z", 0, -1))
+		ok(t, err)
+		equals(t, []string{"two", "zwei", "drei", "three", "inf"}, b)
+	}
+	// Exclusive min
+	{
+		n, err := redis.Int(c.Do("ZREMRANGEBYSCORE", "z", "(2", "(4"))
+		ok(t, err)
+		equals(t, 2, n)
+
+		b, err := redis.Strings(c.Do("ZRANGE", "z", 0, -1))
+		ok(t, err)
+		equals(t, []string{"two", "zwei", "inf"}, b)
+	}
+
+	// Wrong ranges
+	{
+		n, err := redis.Int(c.Do("ZREMRANGEBYSCORE", "z", "+inf", "-inf"))
+		ok(t, err)
+		equals(t, 0, n)
+	}
+
+	// No such key
+	{
+		n, err := redis.Int(c.Do("ZREMRANGEBYSCORE", "nosuch", "-inf", "inf"))
+		ok(t, err)
+		equals(t, 0, n)
+	}
+
+	// Error cases
+	{
+		_, err = redis.String(c.Do("ZREMRANGEBYSCORE"))
+		assert(t, err != nil, "ZREMRANGEBYSCORE error")
+		_, err = redis.String(c.Do("ZREMRANGEBYSCORE", "set"))
+		assert(t, err != nil, "ZREMRANGEBYSCORE error")
+		_, err = redis.String(c.Do("ZREMRANGEBYSCORE", "set", 1))
+		assert(t, err != nil, "ZREMRANGEBYSCORE error")
+		_, err = redis.String(c.Do("ZREMRANGEBYSCORE", "set", "nofloat", 1))
+		assert(t, err != nil, "ZREMRANGEBYSCORE error")
+		_, err = redis.String(c.Do("ZREMRANGEBYSCORE", "set", 1, "nofloat"))
+		assert(t, err != nil, "ZREMRANGEBYSCORE error")
+		_, err = redis.String(c.Do("ZREMRANGEBYSCORE", "set", 1, 2, "toomany"))
+		assert(t, err != nil, "ZREMRANGEBYSCORE error")
+		// Wrong type of key
+		s.Set("str", "value")
+		_, err = redis.Int(c.Do("ZREMRANGEBYSCORE", "str", 1, 2))
+		assert(t, err != nil, "ZREMRANGEBYSCORE error")
+	}
+}
+
 // Test ZSCORE
 func TestSortedSetScore(t *testing.T) {
 	s, err := Run()

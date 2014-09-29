@@ -30,7 +30,7 @@ func commandsSortedSet(m *Miniredis, srv *redeo.Server) {
 	srv.HandleFunc("ZREM", m.cmdZrem)
 	srv.HandleFunc("ZREMRANGEBYLEX", m.cmdZremrangebylex)
 	srv.HandleFunc("ZREMRANGEBYRANK", m.cmdZremrangebyrank)
-	// ZREMRANGEBYSCORE key min max
+	srv.HandleFunc("ZREMRANGEBYSCORE", m.cmdZremrangebyscore)
 	srv.HandleFunc("ZREVRANGE", m.makeCmdZrange("zrevrange", true))
 	srv.HandleFunc("ZREVRANGEBYSCORE", m.makeCmdZrangebyscore("zrevrangebyscore", true))
 	srv.HandleFunc("ZREVRANK", m.makeCmdZrank("zrevrank", true))
@@ -674,6 +674,51 @@ func (m *Miniredis) cmdZremrangebyrank(out *redeo.Responder, r *redeo.Request) e
 			db.zrem(key, el)
 		}
 		out.WriteInt(re - rs)
+	})
+}
+
+// ZREMRANGEBYSCORE
+func (m *Miniredis) cmdZremrangebyscore(out *redeo.Responder, r *redeo.Request) error {
+	if len(r.Args) != 3 {
+		setDirty(r.Client())
+		out.WriteErrorString("ERR wrong number of arguments for 'zremrangebyscore' command")
+		return nil
+	}
+
+	key := r.Args[0]
+	min, minIncl, err := parseFloatRange(r.Args[1])
+	if err != nil {
+		setDirty(r.Client())
+		out.WriteErrorString(msgInvalidMinMax)
+		return nil
+	}
+	max, maxIncl, err := parseFloatRange(r.Args[2])
+	if err != nil {
+		setDirty(r.Client())
+		out.WriteErrorString(msgInvalidMinMax)
+		return nil
+	}
+
+	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+		db := m.db(ctx.selectedDB)
+
+		if !db.exists(key) {
+			out.WriteInt(0)
+			return
+		}
+
+		if db.t(key) != "zset" {
+			out.WriteErrorString(ErrWrongType.Error())
+			return
+		}
+
+		members := db.zelements(key)
+		members = withSSRange(members, min, minIncl, max, maxIncl)
+
+		for _, el := range members {
+			db.zrem(key, el.member)
+		}
+		out.WriteInt(len(members))
 	})
 }
 
