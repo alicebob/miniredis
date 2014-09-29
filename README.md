@@ -113,6 +113,7 @@ Implemented commands:
    - ZRANK
    - ZREM
    - ZREMRANGEBYLEX
+   - ZREMRANGEBYRANK
    - ZREVRANGE
    - ZREVRANGEBYSCORE
    - ZREVRANK

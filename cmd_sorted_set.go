@@ -29,7 +29,7 @@ func commandsSortedSet(m *Miniredis, srv *redeo.Server) {
 	srv.HandleFunc("ZRANK", m.makeCmdZrank("zrank", false))
 	srv.HandleFunc("ZREM", m.cmdZrem)
 	srv.HandleFunc("ZREMRANGEBYLEX", m.cmdZremrangebylex)
-	// ZREMRANGEBYRANK key start stop
+	srv.HandleFunc("ZREMRANGEBYRANK", m.cmdZremrangebyrank)
 	// ZREMRANGEBYSCORE key min max
 	srv.HandleFunc("ZREVRANGE", m.makeCmdZrange("zrevrange", true))
 	srv.HandleFunc("ZREVRANGEBYSCORE", m.makeCmdZrangebyscore("zrevrangebyscore", true))
@@ -630,6 +630,50 @@ func (m *Miniredis) cmdZremrangebylex(out *redeo.Responder, r *redeo.Request) er
 			db.zrem(key, el)
 		}
 		out.WriteInt(len(members))
+	})
+}
+
+// ZREMRANGEBYRANK
+func (m *Miniredis) cmdZremrangebyrank(out *redeo.Responder, r *redeo.Request) error {
+	if len(r.Args) != 3 {
+		setDirty(r.Client())
+		out.WriteErrorString("ERR wrong number of arguments for 'zremrangebyrank' command")
+		return nil
+	}
+
+	key := r.Args[0]
+	start, err := strconv.Atoi(r.Args[1])
+	if err != nil {
+		setDirty(r.Client())
+		out.WriteErrorString(msgInvalidInt)
+		return nil
+	}
+	end, err := strconv.Atoi(r.Args[2])
+	if err != nil {
+		setDirty(r.Client())
+		out.WriteErrorString(msgInvalidInt)
+		return nil
+	}
+
+	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+		db := m.db(ctx.selectedDB)
+
+		if !db.exists(key) {
+			out.WriteInt(0)
+			return
+		}
+
+		if db.t(key) != "zset" {
+			out.WriteErrorString(ErrWrongType.Error())
+			return
+		}
+
+		members := db.zmembers(key)
+		rs, re := redisRange(len(members), start, end, false)
+		for _, el := range members[rs:re] {
+			db.zrem(key, el)
+		}
+		out.WriteInt(re - rs)
 	})
 }
 

@@ -541,6 +541,78 @@ func TestSortedSetRemRangeByLex(t *testing.T) {
 	}
 }
 
+// Test ZREMRANGEBYRANK
+func TestSortedSetRemRangeByRank(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	s.ZAdd("z", 1, "one")
+	s.ZAdd("z", 2, "two")
+	s.ZAdd("z", 2, "zwei")
+	s.ZAdd("z", 3, "three")
+	s.ZAdd("z", 3, "drei")
+	s.ZAdd("z", math.Inf(+1), "inf")
+
+	{
+		n, err := redis.Int(c.Do("ZREMRANGEBYRANK", "z", -2, -1))
+		ok(t, err)
+		equals(t, 2, n)
+
+		b, err := redis.Strings(c.Do("ZRANGE", "z", 0, -1))
+		ok(t, err)
+		equals(t, []string{"one", "two", "zwei", "drei"}, b)
+	}
+
+	// weird cases.
+	{
+		n, err := redis.Int(c.Do("ZREMRANGEBYRANK", "z", -100, -100))
+		ok(t, err)
+		equals(t, 0, n)
+	}
+	{
+		n, err := redis.Int(c.Do("ZREMRANGEBYRANK", "z", 100, 400))
+		ok(t, err)
+		equals(t, 0, n)
+	}
+	// Nonexistent key
+	{
+		n, err := redis.Int(c.Do("ZREMRANGEBYRANK", "nosuch", 1, 4))
+		ok(t, err)
+		equals(t, 0, n)
+	}
+
+	// Delete all. Key should be gone.
+	{
+		n, err := redis.Int(c.Do("ZREMRANGEBYRANK", "z", 0, -1))
+		ok(t, err)
+		equals(t, 4, n)
+		equals(t, false, s.Exists("z"))
+	}
+
+	// Error cases
+	{
+		_, err = redis.String(c.Do("ZREMRANGEBYRANK"))
+		assert(t, err != nil, "ZREMRANGEBYRANK error")
+		_, err = redis.String(c.Do("ZREMRANGEBYRANK", "set"))
+		assert(t, err != nil, "ZREMRANGEBYRANK error")
+		_, err = redis.String(c.Do("ZREMRANGEBYRANK", "set", 1))
+		assert(t, err != nil, "ZREMRANGEBYRANK error")
+		_, err = redis.String(c.Do("ZREMRANGEBYRANK", "set", "noint", 1))
+		assert(t, err != nil, "ZREMRANGEBYRANK error")
+		_, err = redis.String(c.Do("ZREMRANGEBYRANK", "set", 1, "noint"))
+		assert(t, err != nil, "ZREMRANGEBYRANK error")
+		_, err = redis.String(c.Do("ZREMRANGEBYRANK", "set", 1, 2, "toomany"))
+		assert(t, err != nil, "ZREMRANGEBYRANK error")
+		// Wrong type of key
+		s.Set("str", "value")
+		_, err = redis.Int(c.Do("ZREMRANGEBYRANK", "str", 1, 2))
+		assert(t, err != nil, "ZREMRANGEBYRANK error")
+	}
+}
+
 // Test ZSCORE
 func TestSortedSetScore(t *testing.T) {
 	s, err := Run()
