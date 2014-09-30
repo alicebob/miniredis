@@ -205,7 +205,11 @@ func (db *RedisDB) setrem(k string, fields ...string) int {
 			delete(s, f)
 		}
 	}
-	db.setKeys[k] = s
+	if len(s) == 0 {
+		db.del(k, true)
+	} else {
+		db.setKeys[k] = s
+	}
 	db.keyVersion[k]++
 	return removed
 }

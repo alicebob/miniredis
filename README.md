@@ -100,6 +100,7 @@ Implemented commands:
    - SCARD
    - SISMEMBER
    - SMEMBERS
+   - SMOVE
    - SREM
  - Sorted Set keys
    - ZADD

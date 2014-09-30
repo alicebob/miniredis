@@ -16,7 +16,7 @@ func commandsSet(m *Miniredis, srv *redeo.Server) {
 	// SINTERSTORE destination key [key ...]
 	srv.HandleFunc("SISMEMBER", m.cmdSismember)
 	srv.HandleFunc("SMEMBERS", m.cmdSmembers)
-	// SMOVE source destination member
+	srv.HandleFunc("SMOVE", m.cmdSmove)
 	// SPOP key
 	// SRANDMEMBER key [count]
 	srv.HandleFunc("SREM", m.cmdSrem)
@@ -138,6 +138,46 @@ func (m *Miniredis) cmdSmembers(out *redeo.Responder, r *redeo.Request) error {
 		for _, elem := range members {
 			out.WriteString(elem)
 		}
+	})
+}
+
+// SMOVE
+func (m *Miniredis) cmdSmove(out *redeo.Responder, r *redeo.Request) error {
+	if len(r.Args) != 3 {
+		setDirty(r.Client())
+		out.WriteErrorString("ERR wrong number of arguments for 'smove' command")
+		return nil
+	}
+
+	src := r.Args[0]
+	dst := r.Args[1]
+	member := r.Args[2]
+
+	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+		db := m.db(ctx.selectedDB)
+
+		if !db.exists(src) {
+			out.WriteInt(0)
+			return
+		}
+
+		if db.t(src) != "set" {
+			out.WriteErrorString(ErrWrongType.Error())
+			return
+		}
+
+		if db.exists(dst) && db.t(dst) != "set" {
+			out.WriteErrorString(ErrWrongType.Error())
+			return
+		}
+
+		if !db.isMember(src, member) {
+			out.WriteInt(0)
+			return
+		}
+		db.setrem(src, member)
+		db.setadd(dst, member)
+		out.WriteInt(1)
 	})
 }
 

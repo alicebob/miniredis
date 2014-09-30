@@ -194,3 +194,73 @@ func TestSrem(t *testing.T) {
 		assert(t, err != nil, "SREM error")
 	}
 }
+
+// Test SMOVE
+func TestSmove(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	s.SetAdd("s", "aap", "noot")
+
+	{
+		b, err := redis.Int(c.Do("SMOVE", "s", "s2", "aap"))
+		ok(t, err)
+		equals(t, 1, b)
+
+		m, err := s.IsMember("s", "aap")
+		ok(t, err)
+		equals(t, false, m)
+		m, err = s.IsMember("s2", "aap")
+		ok(t, err)
+		equals(t, true, m)
+	}
+
+	// Move away the last member
+	{
+		b, err := redis.Int(c.Do("SMOVE", "s", "s2", "noot"))
+		ok(t, err)
+		equals(t, 1, b)
+
+		equals(t, false, s.Exists("s"))
+
+		m, err := s.IsMember("s2", "noot")
+		ok(t, err)
+		equals(t, true, m)
+	}
+
+	// a nonexisting member
+	{
+		b, err := redis.Int(c.Do("SMOVE", "s", "s2", "nosuch"))
+		ok(t, err)
+		equals(t, 0, b)
+	}
+
+	// a nonexisting key
+	{
+		b, err := redis.Int(c.Do("SMOVE", "nosuch", "nosuch2", "nosuch"))
+		ok(t, err)
+		equals(t, 0, b)
+	}
+
+	// Wrong type of key
+	{
+		_, err := redis.String(c.Do("SET", "str", "value"))
+		ok(t, err)
+		_, err = redis.Int(c.Do("SMOVE", "str", "dst", "value"))
+		assert(t, err != nil, "SMOVE error")
+		_, err = redis.Int(c.Do("SMOVE", "s2", "str", "value"))
+		assert(t, err != nil, "SMOVE error")
+		// Wrong argument counts
+		_, err = redis.String(c.Do("SMOVE"))
+		assert(t, err != nil, "SMOVE error")
+		_, err = redis.String(c.Do("SMOVE", "set"))
+		assert(t, err != nil, "SMOVE error")
+		_, err = redis.String(c.Do("SMOVE", "set", "set2"))
+		assert(t, err != nil, "SMOVE error")
+		_, err = redis.String(c.Do("SMOVE", "set", "set2", "spurious", "args"))
+		assert(t, err != nil, "SMOVE error")
+	}
+}
