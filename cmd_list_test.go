@@ -361,3 +361,78 @@ func TestLtrim(t *testing.T) {
 		assert(t, err != nil, "LTRIM error")
 	}
 }
+
+func TestLrem(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	// Reverse
+	{
+		s.Push("l", "aap", "noot", "mies", "vuur", "noot", "noot")
+		n, err := redis.Int(c.Do("LREM", "l", -1, "noot"))
+		ok(t, err)
+		equals(t, 1, n)
+		l, err := s.List("l")
+		ok(t, err)
+		equals(t, []string{"aap", "noot", "mies", "vuur", "noot"}, l)
+	}
+	// Normal
+	{
+		s.Push("l2", "aap", "noot", "mies", "vuur", "noot", "noot")
+		n, err := redis.Int(c.Do("LREM", "l2", 2, "noot"))
+		ok(t, err)
+		equals(t, 2, n)
+		l, err := s.List("l2")
+		ok(t, err)
+		equals(t, []string{"aap", "mies", "vuur", "noot"}, l)
+	}
+
+	// All
+	{
+		s.Push("l3", "aap", "noot", "mies", "vuur", "noot", "noot")
+		n, err := redis.Int(c.Do("LREM", "l3", 0, "noot"))
+		ok(t, err)
+		equals(t, 3, n)
+		l, err := s.List("l3")
+		ok(t, err)
+		equals(t, []string{"aap", "mies", "vuur"}, l)
+	}
+
+	// All
+	{
+		s.Push("l4", "aap", "noot", "mies", "vuur", "noot", "noot")
+		n, err := redis.Int(c.Do("LREM", "l4", 200, "noot"))
+		ok(t, err)
+		equals(t, 3, n)
+		l, err := s.List("l4")
+		ok(t, err)
+		equals(t, []string{"aap", "mies", "vuur"}, l)
+	}
+
+	// Non exising key
+	{
+		n, err := redis.Int(c.Do("LREM", "nonexisting", 0, "aap"))
+		ok(t, err)
+		equals(t, 0, n)
+	}
+
+	// Error cases
+	{
+		_, err = redis.String(c.Do("LREM"))
+		assert(t, err != nil, "LREM error")
+		_, err = redis.String(c.Do("LREM", "l"))
+		assert(t, err != nil, "LREM error")
+		_, err = redis.String(c.Do("LREM", "l", 1))
+		assert(t, err != nil, "LREM error")
+		_, err = redis.String(c.Do("LREM", "l", "noint", "aap"))
+		assert(t, err != nil, "LREM error")
+		_, err = redis.String(c.Do("LREM", "l", 1, "aap", "toomany"))
+		assert(t, err != nil, "LREM error")
+		s.Set("str", "string!")
+		_, err = redis.Int(c.Do("LREM", "str", 0, "aap"))
+		assert(t, err != nil, "LREM error")
+	}
+}

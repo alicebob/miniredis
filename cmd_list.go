@@ -20,7 +20,7 @@ func commandsList(m *Miniredis, srv *redeo.Server) {
 	srv.HandleFunc("LPUSH", m.cmdLpush)
 	// LPUSHX key value
 	srv.HandleFunc("LRANGE", m.cmdLrange)
-	// LREM key count value
+	srv.HandleFunc("LREM", m.cmdLrem)
 	// LSET key index value
 	srv.HandleFunc("LTRIM", m.cmdLtrim)
 	srv.HandleFunc("RPOP", m.cmdRpop)
@@ -190,6 +190,67 @@ func (m *Miniredis) cmdLrange(out *redeo.Responder, r *redeo.Request) error {
 		for _, el := range l[rs:re] {
 			out.WriteString(el)
 		}
+	})
+}
+
+// LREM
+func (m *Miniredis) cmdLrem(out *redeo.Responder, r *redeo.Request) error {
+	if len(r.Args) != 3 {
+		setDirty(r.Client())
+		out.WriteErrorString("ERR wrong number of arguments for 'lrem' command")
+		return nil
+	}
+	key := r.Args[0]
+	count, err := strconv.Atoi(r.Args[1])
+	if err != nil {
+		setDirty(r.Client())
+		out.WriteErrorString(msgInvalidInt)
+		return nil
+	}
+	value := r.Args[2]
+
+	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+		db := m.db(ctx.selectedDB)
+
+		if !db.exists(key) {
+			out.WriteZero()
+			return
+		}
+		if db.t(key) != "list" {
+			out.WriteErrorString(msgWrongType)
+			return
+		}
+
+		l := db.listKeys[key]
+		if count < 0 {
+			reverseSlice(l)
+		}
+		deleted := 0
+		newL := []string{}
+		toDelete := len(l)
+		if count < 0 {
+			toDelete = -count
+		}
+		if count > 0 {
+			toDelete = count
+		}
+		for _, el := range l {
+			if el == value {
+				if toDelete > 0 {
+					deleted++
+					toDelete--
+					continue
+				}
+			}
+			newL = append(newL, el)
+		}
+		if count < 0 {
+			reverseSlice(newL)
+		}
+		db.listKeys[key] = newL
+		db.keyVersion[key]++
+
+		out.WriteInt(deleted)
 	})
 }
 

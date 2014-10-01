@@ -92,6 +92,7 @@ Implemented commands:
    - LPOP
    - LPUSH
    - LRANGE
+   - LREM
    - LTRIM
    - RPOP
    - RPUSH

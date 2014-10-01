@@ -114,6 +114,7 @@ func (db *RedisDB) rename(from, to string) {
 	db.del(from, true)
 }
 
+// 'left push', aka unshift.
 func (db *RedisDB) lpush(k, v string) int {
 	l, ok := db.listKeys[k]
 	if !ok {
@@ -126,6 +127,7 @@ func (db *RedisDB) lpush(k, v string) int {
 	return len(l)
 }
 
+// 'left pop', aka shift.
 func (db *RedisDB) lpop(k string) string {
 	l := db.listKeys[k]
 	el := l[0]
