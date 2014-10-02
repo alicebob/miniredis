@@ -436,3 +436,87 @@ func TestLrem(t *testing.T) {
 		assert(t, err != nil, "LREM error")
 	}
 }
+
+func TestLinsert(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	s.Push("l", "aap", "noot", "mies", "vuur", "noot", "end")
+	// Before
+	{
+		n, err := redis.Int(c.Do("LINSERT", "l", "BEFORE", "noot", "!"))
+		ok(t, err)
+		equals(t, 7, n)
+		l, err := s.List("l")
+		ok(t, err)
+		equals(t, []string{"aap", "!", "noot", "mies", "vuur", "noot", "end"}, l)
+	}
+
+	// After
+	{
+		n, err := redis.Int(c.Do("LINSERT", "l", "AFTER", "noot", "?"))
+		ok(t, err)
+		equals(t, 8, n)
+		l, err := s.List("l")
+		ok(t, err)
+		equals(t, []string{"aap", "!", "noot", "?", "mies", "vuur", "noot", "end"}, l)
+	}
+
+	// Edge case before
+	{
+		n, err := redis.Int(c.Do("LINSERT", "l", "BEFORE", "aap", "["))
+		ok(t, err)
+		equals(t, 9, n)
+		l, err := s.List("l")
+		ok(t, err)
+		equals(t, []string{"[", "aap", "!", "noot", "?", "mies", "vuur", "noot", "end"}, l)
+	}
+
+	// Edge case after
+	{
+		n, err := redis.Int(c.Do("LINSERT", "l", "AFTER", "end", "]"))
+		ok(t, err)
+		equals(t, 10, n)
+		l, err := s.List("l")
+		ok(t, err)
+		equals(t, []string{"[", "aap", "!", "noot", "?", "mies", "vuur", "noot", "end", "]"}, l)
+	}
+
+	// Non exising pivot
+	{
+		n, err := redis.Int(c.Do("LINSERT", "l", "before", "nosuch", "noot"))
+		ok(t, err)
+		equals(t, -1, n)
+	}
+
+	// Non exising key
+	{
+		n, err := redis.Int(c.Do("LINSERT", "nonexisting", "before", "aap",
+			"noot"))
+		ok(t, err)
+		equals(t, 0, n)
+	}
+
+	// Error cases
+	{
+		_, err = redis.String(c.Do("LINSERT"))
+		assert(t, err != nil, "LINSERT error")
+		_, err = redis.String(c.Do("LINSERT", "l"))
+		assert(t, err != nil, "LINSERT error")
+		_, err = redis.String(c.Do("LINSERT", "l", "before"))
+		assert(t, err != nil, "LINSERT error")
+		_, err = redis.String(c.Do("LINSERT", "l", "before", "value"))
+		assert(t, err != nil, "LINSERT error")
+		_, err = redis.String(c.Do("LINSERT", "l", "wrong", "value", "value"))
+		assert(t, err != nil, "LINSERT error")
+		_, err = redis.String(c.Do("LINSERT", "l", "wrong", "value", "value",
+			"toomany"))
+		assert(t, err != nil, "LINSERT error")
+		s.Set("str", "string!")
+		_, err = redis.String(c.Do("LINSERT", "str", "before", "value", "value"))
+		assert(t, err != nil, "LINSERT error")
+	}
+}

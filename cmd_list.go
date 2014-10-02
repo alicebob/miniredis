@@ -4,6 +4,7 @@ package miniredis
 
 import (
 	"strconv"
+	"strings"
 
 	"github.com/bsm/redeo"
 )
@@ -14,7 +15,7 @@ func commandsList(m *Miniredis, srv *redeo.Server) {
 	// BRPOP key [key ...] timeout
 	// BRPOPLPUSH source destination timeout
 	srv.HandleFunc("LINDEX", m.cmdLindex)
-	// LINSERT key BEFORE|AFTER pivot value
+	srv.HandleFunc("LINSERT", m.cmdLinsert)
 	srv.HandleFunc("LLEN", m.cmdLlen)
 	srv.HandleFunc("LPOP", m.cmdLpop)
 	srv.HandleFunc("LPUSH", m.cmdLpush)
@@ -67,6 +68,66 @@ func (m *Miniredis) cmdLindex(out *redeo.Responder, r *redeo.Request) error {
 			return
 		}
 		out.WriteString(l[offset])
+	})
+}
+
+// LINSERT
+func (m *Miniredis) cmdLinsert(out *redeo.Responder, r *redeo.Request) error {
+	if len(r.Args) != 4 {
+		setDirty(r.Client())
+		out.WriteErrorString("ERR wrong number of arguments for 'linsert' command")
+		return nil
+	}
+	key := r.Args[0]
+	where := 0
+	switch strings.ToLower(r.Args[1]) {
+	case "before":
+		where = -1
+	case "after":
+		where = +1
+	default:
+		setDirty(r.Client())
+		out.WriteErrorString(msgSyntaxError)
+		return nil
+	}
+	pivot := r.Args[2]
+	value := r.Args[3]
+
+	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+		db := m.db(ctx.selectedDB)
+
+		t, ok := db.keys[key]
+		if !ok {
+			// No such key
+			out.WriteZero()
+			return
+		}
+		if t != "list" {
+			out.WriteErrorString(msgWrongType)
+			return
+		}
+
+		l := db.listKeys[key]
+		for i, el := range l {
+			if el != pivot {
+				continue
+			}
+
+			if where < 0 {
+				l = append(l[:i], append(listKey{value}, l[i:]...)...)
+			} else {
+				if i == len(l)-1 {
+					l = append(l, value)
+				} else {
+					l = append(l[:i+1], append(listKey{value}, l[i+1:]...)...)
+				}
+			}
+			db.listKeys[key] = l
+			db.keyVersion[key]++
+			out.WriteInt(len(l))
+			return
+		}
+		out.WriteInt(-1)
 	})
 }
 
