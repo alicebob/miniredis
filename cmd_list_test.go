@@ -64,12 +64,57 @@ func TestLpush(t *testing.T) {
 		equals(t, false, s.Exists("l2"))
 	}
 
-	// Wrong type of key
+	// Various errors
 	{
+		_, err = redis.Int(c.Do("LPUSH"))
+		assert(t, err != nil, "LPUSH error")
+		_, err = redis.Int(c.Do("LPUSH", "l"))
+		assert(t, err != nil, "LPUSH error")
 		_, err := redis.String(c.Do("SET", "str", "value"))
 		ok(t, err)
 		_, err = redis.Int(c.Do("LPUSH", "str", "noot", "mies"))
 		assert(t, err != nil, "LPUSH error")
+	}
+
+}
+
+func TestLpushx(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	{
+		b, err := redis.Int(c.Do("LPUSHX", "l", "aap"))
+		ok(t, err)
+		equals(t, 0, b)
+		equals(t, false, s.Exists("l"))
+
+		// Create the list with a normal LPUSH
+		b, err = redis.Int(c.Do("LPUSH", "l", "noot"))
+		ok(t, err)
+		equals(t, 1, b)
+		equals(t, true, s.Exists("l"))
+
+		b, err = redis.Int(c.Do("LPUSHX", "l", "mies"))
+		ok(t, err)
+		equals(t, 2, b)
+		equals(t, true, s.Exists("l"))
+	}
+
+	// Errors
+	{
+		_, err = redis.Int(c.Do("LPUSHX"))
+		assert(t, err != nil, "LPUSHX error")
+		_, err = redis.Int(c.Do("LPUSHX", "l"))
+		assert(t, err != nil, "LPUSHX error")
+		_, err = redis.Int(c.Do("LPUSHX", "l", "too", "many"))
+		assert(t, err != nil, "LPUSHX error")
+		_, err := redis.String(c.Do("SET", "str", "value"))
+		ok(t, err)
+		_, err = redis.Int(c.Do("LPUSHX", "str", "mies"))
+		assert(t, err != nil, "LPUSHX error")
 	}
 
 }
@@ -437,6 +482,66 @@ func TestLrem(t *testing.T) {
 	}
 }
 
+func TestLset(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	s.Push("l", "aap", "noot", "mies", "vuur", "noot", "noot")
+	// Simple LSET
+	{
+		n, err := redis.String(c.Do("LSET", "l", 1, "noot!"))
+		ok(t, err)
+		equals(t, "OK", n)
+		l, err := s.List("l")
+		ok(t, err)
+		equals(t, []string{"aap", "noot!", "mies", "vuur", "noot", "noot"}, l)
+	}
+
+	{
+		n, err := redis.String(c.Do("LSET", "l", -1, "noot?"))
+		ok(t, err)
+		equals(t, "OK", n)
+		l, err := s.List("l")
+		ok(t, err)
+		equals(t, []string{"aap", "noot!", "mies", "vuur", "noot", "noot?"}, l)
+	}
+
+	// Out of range
+	{
+		_, err := c.Do("LSET", "l", 10000, "aap")
+		assert(t, err != nil, "LSET error")
+
+		_, err = c.Do("LSET", "l", -10000, "aap")
+		assert(t, err != nil, "LSET error")
+	}
+
+	// Non exising key
+	{
+		_, err := c.Do("LSET", "nonexisting", 0, "aap")
+		assert(t, err != nil, "LSET error")
+	}
+
+	// Error cases
+	{
+		_, err = redis.String(c.Do("LSET"))
+		assert(t, err != nil, "LSET error")
+		_, err = redis.String(c.Do("LSET", "l"))
+		assert(t, err != nil, "LSET error")
+		_, err = redis.String(c.Do("LSET", "l", 1))
+		assert(t, err != nil, "LSET error")
+		_, err = redis.String(c.Do("LSET", "l", "noint", "aap"))
+		assert(t, err != nil, "SET error")
+		_, err = redis.String(c.Do("LSET", "l", 1, "aap", "toomany"))
+		assert(t, err != nil, "LSET error")
+		s.Set("str", "string!")
+		_, err = redis.Int(c.Do("LSET", "str", 0, "aap"))
+		assert(t, err != nil, "LSET error")
+	}
+}
+
 func TestLinsert(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
@@ -519,4 +624,120 @@ func TestLinsert(t *testing.T) {
 		_, err = redis.String(c.Do("LINSERT", "str", "before", "value", "value"))
 		assert(t, err != nil, "LINSERT error")
 	}
+}
+
+func TestRpoplpush(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	s.Push("l", "aap", "noot", "mies")
+	s.Push("l2", "vuur", "noot", "end")
+	{
+		n, err := redis.String(c.Do("RPOPLPUSH", "l", "l2"))
+		ok(t, err)
+		equals(t, "mies", n)
+		s.CheckList(t, "l", "aap", "noot")
+		s.CheckList(t, "l2", "mies", "vuur", "noot", "end")
+	}
+	// Again!
+	{
+		n, err := redis.String(c.Do("RPOPLPUSH", "l", "l2"))
+		ok(t, err)
+		equals(t, "noot", n)
+		s.CheckList(t, "l", "aap")
+		s.CheckList(t, "l2", "noot", "mies", "vuur", "noot", "end")
+	}
+	// Again!
+	{
+		n, err := redis.String(c.Do("RPOPLPUSH", "l", "l2"))
+		ok(t, err)
+		equals(t, "aap", n)
+		assert(t, !s.Exists("l"), "l exists")
+		s.CheckList(t, "l2", "aap", "noot", "mies", "vuur", "noot", "end")
+	}
+
+	// Non exising lists
+	{
+		s.Push("ll", "aap", "noot", "mies")
+
+		n, err := redis.String(c.Do("RPOPLPUSH", "ll", "nosuch"))
+		ok(t, err)
+		equals(t, "mies", n)
+		assert(t, s.Exists("nosuch"), "nosuch exists")
+		s.CheckList(t, "ll", "aap", "noot")
+		s.CheckList(t, "nosuch", "mies")
+
+		nada, err := c.Do("RPOPLPUSH", "nosuch2", "ll")
+		ok(t, err)
+		equals(t, nil, nada)
+	}
+
+	// Cycle
+	{
+		s.Push("cycle", "aap", "noot", "mies")
+
+		n, err := redis.String(c.Do("RPOPLPUSH", "cycle", "cycle"))
+		ok(t, err)
+		equals(t, "mies", n)
+		s.CheckList(t, "cycle", "mies", "aap", "noot")
+	}
+
+	// Error cases
+	{
+		s.Push("src", "aap", "noot", "mies")
+		_, err = redis.String(c.Do("RPOPLPUSH"))
+		assert(t, err != nil, "RPOPLPUSH error")
+		_, err = redis.String(c.Do("RPOPLPUSH", "l"))
+		assert(t, err != nil, "RPOPLPUSH error")
+		_, err = redis.String(c.Do("RPOPLPUSH", "too", "many", "arguments"))
+		assert(t, err != nil, "RPOPLPUSH error")
+		s.Set("str", "string!")
+		_, err = redis.String(c.Do("RPOPLPUSH", "str", "src"))
+		assert(t, err != nil, "RPOPLPUSH error")
+		_, err = redis.String(c.Do("RPOPLPUSH", "src", "str"))
+		assert(t, err != nil, "RPOPLPUSH error")
+	}
+}
+
+func TestRpushx(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	// Simple cases
+	{
+		// No key key
+		i, err := redis.Int(c.Do("RPUSHX", "l", "value"))
+		ok(t, err)
+		equals(t, 0, i)
+		assert(t, !s.Exists("l"), "l doesn't exist")
+
+		s.Push("l", "aap", "noot")
+
+		i, err = redis.Int(c.Do("RPUSHX", "l", "mies"))
+		ok(t, err)
+		equals(t, 3, i)
+
+		s.CheckList(t, "l", "aap", "noot", "mies")
+	}
+
+	// Error cases
+	{
+		s.Push("src", "aap", "noot", "mies")
+		_, err = redis.String(c.Do("RPUSHX"))
+		assert(t, err != nil, "RPUSHX error")
+		_, err = redis.String(c.Do("RPUSHX", "l"))
+		assert(t, err != nil, "RPUSHX error")
+		_, err = redis.String(c.Do("RPUSHX", "too", "many", "arguments"))
+		assert(t, err != nil, "RPUSHX error")
+		s.Set("str", "string!")
+		_, err = redis.String(c.Do("RPUSHX", "str", "value"))
+		assert(t, err != nil, "RPUSHX error")
+	}
+
 }

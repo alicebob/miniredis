@@ -19,15 +19,15 @@ func commandsList(m *Miniredis, srv *redeo.Server) {
 	srv.HandleFunc("LLEN", m.cmdLlen)
 	srv.HandleFunc("LPOP", m.cmdLpop)
 	srv.HandleFunc("LPUSH", m.cmdLpush)
-	// LPUSHX key value
+	srv.HandleFunc("LPUSHX", m.cmdLpushx)
 	srv.HandleFunc("LRANGE", m.cmdLrange)
 	srv.HandleFunc("LREM", m.cmdLrem)
-	// LSET key index value
+	srv.HandleFunc("LSET", m.cmdLset)
 	srv.HandleFunc("LTRIM", m.cmdLtrim)
 	srv.HandleFunc("RPOP", m.cmdRpop)
-	// RPOPLPUSH source destination
+	srv.HandleFunc("RPOPLPUSH", m.cmdRpoplpush)
 	srv.HandleFunc("RPUSH", m.cmdRpush)
-	// RPUSHX key value
+	srv.HandleFunc("RPUSHX", m.cmdRpushx)
 }
 
 // LINDEX
@@ -211,6 +211,33 @@ func (m *Miniredis) cmdLpush(out *redeo.Responder, r *redeo.Request) error {
 	})
 }
 
+// LPUSHX
+func (m *Miniredis) cmdLpushx(out *redeo.Responder, r *redeo.Request) error {
+	if len(r.Args) != 2 {
+		setDirty(r.Client())
+		out.WriteErrorString("ERR wrong number of arguments for 'lpushx' command")
+		return nil
+	}
+	key := r.Args[0]
+	value := r.Args[1]
+
+	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+		db := m.db(ctx.selectedDB)
+
+		if !db.exists(key) {
+			out.WriteZero()
+			return
+		}
+		if db.t(key) != "list" {
+			out.WriteErrorString(msgWrongType)
+			return
+		}
+
+		newLen := db.lpush(key, value)
+		out.WriteInt(newLen)
+	})
+}
+
 // LRANGE
 func (m *Miniredis) cmdLrange(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) != 3 {
@@ -315,6 +342,49 @@ func (m *Miniredis) cmdLrem(out *redeo.Responder, r *redeo.Request) error {
 	})
 }
 
+// LSET
+func (m *Miniredis) cmdLset(out *redeo.Responder, r *redeo.Request) error {
+	if len(r.Args) != 3 {
+		setDirty(r.Client())
+		out.WriteErrorString("ERR wrong number of arguments for 'lset' command")
+		return nil
+	}
+	key := r.Args[0]
+	index, err := strconv.Atoi(r.Args[1])
+	if err != nil {
+		setDirty(r.Client())
+		out.WriteErrorString(msgInvalidInt)
+		return nil
+	}
+	value := r.Args[2]
+
+	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+		db := m.db(ctx.selectedDB)
+
+		if !db.exists(key) {
+			out.WriteErrorString(msgKeyNotFound)
+			return
+		}
+		if db.t(key) != "list" {
+			out.WriteErrorString(msgWrongType)
+			return
+		}
+
+		l := db.listKeys[key]
+		if index < 0 {
+			index = len(l) + index
+		}
+		if index < 0 || index > len(l)-1 {
+			out.WriteErrorString(msgOutOfRange)
+			return
+		}
+		l[index] = value
+		db.keyVersion[key]++
+
+		out.WriteOK()
+	})
+}
+
 // LTRIM
 func (m *Miniredis) cmdLtrim(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) != 3 {
@@ -369,16 +439,43 @@ func (m *Miniredis) cmdRpop(out *redeo.Responder, r *redeo.Request) error {
 	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
-		elem, err := db.pop(key)
-		if err != nil {
-			if err == ErrKeyNotFound {
-				// Non-existing key is fine.
-				out.WriteNil()
-				return
-			}
-			out.WriteErrorString(err.Error())
+		if !db.exists(key) {
+			out.WriteNil()
 			return
 		}
+		if db.t(key) != "list" {
+			out.WriteErrorString(msgWrongType)
+			return
+		}
+
+		elem := db.pop(key)
+		out.WriteString(elem)
+	})
+}
+
+// RPOPLPUSH
+func (m *Miniredis) cmdRpoplpush(out *redeo.Responder, r *redeo.Request) error {
+	if len(r.Args) != 2 {
+		setDirty(r.Client())
+		out.WriteErrorString("ERR wrong number of arguments for 'rpoplpush' command")
+		return nil
+	}
+	src := r.Args[0]
+	dst := r.Args[1]
+
+	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+		db := m.db(ctx.selectedDB)
+
+		if !db.exists(src) {
+			out.WriteNil()
+			return
+		}
+		if db.t(src) != "list" || (db.exists(dst) && db.t(dst) != "list") {
+			out.WriteErrorString(msgWrongType)
+			return
+		}
+		elem := db.pop(src)
+		db.lpush(dst, elem)
 		out.WriteString(elem)
 	})
 }
@@ -396,15 +493,42 @@ func (m *Miniredis) cmdRpush(out *redeo.Responder, r *redeo.Request) error {
 	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
-		var newLen int
-		var err error
-		for _, value := range args {
-			newLen, err = db.push(key, value)
-			if err != nil {
-				out.WriteErrorString(err.Error())
-				return
-			}
+		if db.exists(key) && db.t(key) != "list" {
+			out.WriteErrorString(msgWrongType)
+			return
 		}
+
+		var newLen int
+		for _, value := range args {
+			newLen = db.push(key, value)
+		}
+		out.WriteInt(newLen)
+	})
+}
+
+// RPUSHX
+func (m *Miniredis) cmdRpushx(out *redeo.Responder, r *redeo.Request) error {
+	if len(r.Args) != 2 {
+		setDirty(r.Client())
+		out.WriteErrorString("ERR wrong number of arguments for 'rpushx' command")
+		return nil
+	}
+	key := r.Args[0]
+	value := r.Args[1]
+
+	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+		db := m.db(ctx.selectedDB)
+
+		if !db.exists(key) {
+			out.WriteZero()
+			return
+		}
+		if db.t(key) != "list" {
+			out.WriteErrorString(msgWrongType)
+			return
+		}
+
+		newLen := db.push(key, value)
 		out.WriteInt(newLen)
 	})
 }

@@ -8,7 +8,7 @@ import (
 
 var (
 	// ErrKeyNotFound is returned when a key doesn't exist.
-	ErrKeyNotFound = errors.New("key not found")
+	ErrKeyNotFound = errors.New(msgKeyNotFound)
 	// ErrWrongType when a key is not the right type.
 	ErrWrongType = errors.New(msgWrongType)
 	// ErrIntValueError can returned by INCRBY
@@ -143,6 +143,7 @@ func (m *Miniredis) Lpop(k string) (string, error) {
 func (db *RedisDB) Lpop(k string) (string, error) {
 	db.master.Lock()
 	defer db.master.Unlock()
+
 	if !db.exists(k) {
 		return "", ErrKeyNotFound
 	}
@@ -161,7 +162,11 @@ func (m *Miniredis) Push(k string, v ...string) (int, error) {
 func (db *RedisDB) Push(k string, v ...string) (int, error) {
 	db.master.Lock()
 	defer db.master.Unlock()
-	return db.push(k, v...)
+
+	if db.exists(k) && db.t(k) != "list" {
+		return 0, ErrWrongType
+	}
+	return db.push(k, v...), nil
 }
 
 // Pop removes and returns the last element. Is called RPOP in Redis.
@@ -173,7 +178,15 @@ func (m *Miniredis) Pop(k string) (string, error) {
 func (db *RedisDB) Pop(k string) (string, error) {
 	db.master.Lock()
 	defer db.master.Unlock()
-	return db.pop(k)
+
+	if !db.exists(k) {
+		return "", ErrKeyNotFound
+	}
+	if db.t(k) != "list" {
+		return "", ErrWrongType
+	}
+
+	return db.pop(k), nil
 }
 
 // SetAdd adds keys to a set. Returns the number of new keys.

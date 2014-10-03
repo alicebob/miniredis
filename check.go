@@ -5,6 +5,7 @@ package miniredis
 import (
 	"fmt"
 	"path/filepath"
+	"reflect"
 	"runtime"
 )
 
@@ -22,6 +23,21 @@ func (m *Miniredis) CheckGet(t T, key, expected string) {
 		return
 	}
 	if found != expected {
+		lError(t, "GET error, key %#v: Expected %#v, got %#v", key, expected, found)
+		return
+	}
+}
+
+// CheckList does not call Errorf() iff there is a list key with the
+// expected values.
+// Normal use case is `m.CheckGet(t, "favorite_colors", "red", "green", "infrared")`.
+func (m *Miniredis) CheckList(t T, key string, expected ...string) {
+	found, err := m.List(key)
+	if err != nil {
+		lError(t, "GET error, key %#v: %v", key, err)
+		return
+	}
+	if !reflect.DeepEqual(expected, found) {
 		lError(t, "GET error, key %#v: Expected %#v, got %#v", key, expected, found)
 		return
 	}

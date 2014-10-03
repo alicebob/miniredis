@@ -92,11 +92,15 @@ Implemented commands:
    - LLEN
    - LPOP
    - LPUSH
+   - LPUSHX
    - LRANGE
    - LREM
+   - LSET
    - LTRIM
    - RPOP
+   - RPOPLPUSH
    - RPUSH
+   - RPUSHX
  - Set keys
    - SADD
    - SCARD

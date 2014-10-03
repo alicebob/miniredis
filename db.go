@@ -114,12 +114,11 @@ func (db *RedisDB) rename(from, to string) {
 	db.del(from, true)
 }
 
-// 'left push', aka unshift.
+// 'left push', aka unshift. Returns the new length.
 func (db *RedisDB) lpush(k, v string) int {
 	l, ok := db.listKeys[k]
 	if !ok {
 		db.keys[k] = "list"
-		l = []string{}
 	}
 	l = append([]string{v}, l...)
 	db.listKeys[k] = l
@@ -141,29 +140,19 @@ func (db *RedisDB) lpop(k string) string {
 	return el
 }
 
-func (db *RedisDB) push(k string, v ...string) (int, error) {
-	if t, ok := db.keys[k]; ok && t != "list" {
-		return 0, ErrWrongType
-	}
+func (db *RedisDB) push(k string, v ...string) int {
 	l, ok := db.listKeys[k]
 	if !ok {
 		db.keys[k] = "list"
-		l = []string{}
 	}
 	l = append(l, v...)
 	db.listKeys[k] = l
 	db.keyVersion[k]++
-	return len(l), nil
+	return len(l)
 }
 
-func (db *RedisDB) pop(k string) (string, error) {
-	if t, ok := db.keys[k]; ok && t != "list" {
-		return "", ErrWrongType
-	}
-	l, ok := db.listKeys[k]
-	if !ok || len(l) < 1 {
-		return "", ErrKeyNotFound
-	}
+func (db *RedisDB) pop(k string) string {
+	l := db.listKeys[k]
 	el := l[len(l)-1]
 	l = l[:len(l)-1]
 	if len(l) == 0 {
@@ -172,7 +161,7 @@ func (db *RedisDB) pop(k string) (string, error) {
 		db.listKeys[k] = l
 		db.keyVersion[k]++
 	}
-	return el, nil
+	return el
 }
 
 // setadd adds members to a set. Returns nr of new keys.
