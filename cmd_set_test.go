@@ -264,3 +264,102 @@ func TestSmove(t *testing.T) {
 		assert(t, err != nil, "SMOVE error")
 	}
 }
+
+// Test SPOP
+func TestSpop(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	s.SetAdd("s", "aap", "noot")
+
+	{
+		el, err := redis.String(c.Do("SPOP", "s"))
+		ok(t, err)
+		assert(t, el == "aap" || el == "noot", "spop got something")
+
+		el, err = redis.String(c.Do("SPOP", "s"))
+		ok(t, err)
+		assert(t, el == "aap" || el == "noot", "spop got something")
+
+		assert(t, !s.Exists("s"), "all spopped away")
+	}
+
+	// a nonexisting key
+	{
+		b, err := c.Do("SPOP", "nosuch")
+		ok(t, err)
+		equals(t, nil, b)
+	}
+
+	// Various errors
+	{
+		s.SetAdd("chk", "aap", "noot")
+		s.Set("str", "value")
+
+		_, err = redis.String(c.Do("SMOVE"))
+		assert(t, err != nil, "SMOVE error")
+		_, err = redis.String(c.Do("SMOVE", "chk", "set2"))
+		assert(t, err != nil, "SMOVE error")
+
+		_, err = c.Do("SPOP", "str")
+		assert(t, err != nil, "SPOP error")
+	}
+}
+
+// Test SRANDMEMBER
+func TestSrandmember(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	s.SetAdd("s", "aap", "noot", "mies")
+
+	// No count
+	{
+		el, err := redis.String(c.Do("SRANDMEMBER", "s"))
+		ok(t, err)
+		assert(t, el == "aap" || el == "noot" || el == "mies", "srandmember got something")
+	}
+
+	// Positive count
+	{
+		els, err := redis.Strings(c.Do("SRANDMEMBER", "s", 2))
+		ok(t, err)
+		equals(t, 2, len(els))
+	}
+
+	// Negative count
+	{
+		els, err := redis.Strings(c.Do("SRANDMEMBER", "s", -2))
+		ok(t, err)
+		equals(t, 2, len(els))
+	}
+
+	// a nonexisting key
+	{
+		b, err := c.Do("SRANDMEMBER", "nosuch")
+		ok(t, err)
+		equals(t, nil, b)
+	}
+
+	// Various errors
+	{
+		s.SetAdd("chk", "aap", "noot")
+		s.Set("str", "value")
+
+		_, err = redis.String(c.Do("SRANDMEMBER"))
+		assert(t, err != nil, "SRANDMEMBER error")
+		_, err = redis.String(c.Do("SRANDMEMBER", "chk", "noint"))
+		assert(t, err != nil, "SRANDMEMBER error")
+		_, err = redis.String(c.Do("SRANDMEMBER", "chk", 1, "toomanu"))
+		assert(t, err != nil, "SRANDMEMBER error")
+
+		_, err = c.Do("SRANDMEMBER", "str")
+		assert(t, err != nil, "SRANDMEMBER error")
+	}
+}

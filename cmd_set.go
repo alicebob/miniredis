@@ -3,6 +3,9 @@
 package miniredis
 
 import (
+	"math/rand"
+	"strconv"
+
 	"github.com/bsm/redeo"
 )
 
@@ -17,8 +20,8 @@ func commandsSet(m *Miniredis, srv *redeo.Server) {
 	srv.HandleFunc("SISMEMBER", m.cmdSismember)
 	srv.HandleFunc("SMEMBERS", m.cmdSmembers)
 	srv.HandleFunc("SMOVE", m.cmdSmove)
-	// SPOP key
-	// SRANDMEMBER key [count]
+	srv.HandleFunc("SPOP", m.cmdSpop)
+	srv.HandleFunc("SRANDMEMBER", m.cmdSrandmember)
 	srv.HandleFunc("SREM", m.cmdSrem)
 	// SUNION key [key ...]
 	// SUNIONSTORE destination key [key ...]
@@ -181,6 +184,104 @@ func (m *Miniredis) cmdSmove(out *redeo.Responder, r *redeo.Request) error {
 	})
 }
 
+// SPOP
+func (m *Miniredis) cmdSpop(out *redeo.Responder, r *redeo.Request) error {
+	if len(r.Args) != 1 {
+		setDirty(r.Client())
+		out.WriteErrorString("ERR wrong number of arguments for 'spop' command")
+		return nil
+	}
+
+	key := r.Args[0]
+
+	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+		db := m.db(ctx.selectedDB)
+
+		if !db.exists(key) {
+			out.WriteNil()
+			return
+		}
+
+		if db.t(key) != "set" {
+			out.WriteErrorString(ErrWrongType.Error())
+			return
+		}
+
+		members := db.members(key)
+		member := members[rand.Intn(len(members))]
+		db.setrem(key, member)
+		out.WriteString(member)
+	})
+}
+
+// SRANDMEMBER
+func (m *Miniredis) cmdSrandmember(out *redeo.Responder, r *redeo.Request) error {
+	if len(r.Args) < 1 {
+		setDirty(r.Client())
+		out.WriteErrorString("ERR wrong number of arguments for 'srandmember' command")
+		return nil
+	}
+	if len(r.Args) > 2 {
+		setDirty(r.Client())
+		out.WriteErrorString(msgSyntaxError)
+		return nil
+	}
+
+	key := r.Args[0]
+	count := 0
+	withCount := false
+	if len(r.Args) == 2 {
+		var err error
+		count, err = strconv.Atoi(r.Args[1])
+		if err != nil {
+			setDirty(r.Client())
+			out.WriteErrorString(msgInvalidInt)
+			return nil
+		}
+		withCount = true
+	}
+
+	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+		db := m.db(ctx.selectedDB)
+
+		if !db.exists(key) {
+			out.WriteNil()
+			return
+		}
+
+		if db.t(key) != "set" {
+			out.WriteErrorString(ErrWrongType.Error())
+			return
+		}
+
+		members := db.members(key)
+		if count < 0 {
+			// Non-unique elements is allowed with negative count.
+			out.WriteBulkLen(-count)
+			for count != 0 {
+				member := members[rand.Intn(len(members))]
+				out.WriteString(member)
+				count++
+			}
+			return
+		}
+
+		// Must be unique elements.
+		shuffle(members)
+		if count > len(members) {
+			count = len(members)
+		}
+		if !withCount {
+			out.WriteString(members[0])
+			return
+		}
+		out.WriteBulkLen(count)
+		for i := range make([]struct{}, count) {
+			out.WriteString(members[i])
+		}
+	})
+}
+
 // SREM
 func (m *Miniredis) cmdSrem(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) < 2 {
@@ -207,4 +308,13 @@ func (m *Miniredis) cmdSrem(out *redeo.Responder, r *redeo.Request) error {
 
 		out.WriteInt(db.setrem(key, fields...))
 	})
+}
+
+// shuffle shuffles a string. Kinda.
+func shuffle(m []string) {
+	for _ = range m {
+		i := rand.Intn(len(m))
+		j := rand.Intn(len(m))
+		m[i], m[j] = m[j], m[i]
+	}
 }

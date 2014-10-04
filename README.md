@@ -39,7 +39,7 @@ Implemented commands:
    - PEXPIREAT
    - PTTL
    - RENAME
-   - RANDOMKEY -- call math.rand.Seed(...) before using.
+   - RANDOMKEY -- call math.rand.Seed(...) once before using.
    - TTL
    - TYPE
  - Transactions (complete)
@@ -107,6 +107,8 @@ Implemented commands:
    - SISMEMBER
    - SMEMBERS
    - SMOVE
+   - SPOP -- call math.rand.Seed(...) once before using.
+   - SRANDMEMBER -- call math.rand.Seed(...) once before using.
    - SREM
  - Sorted Set keys
    - ZADD
