@@ -477,3 +477,87 @@ func TestRename(t *testing.T) {
 		assert(t, err != nil, "do MOVE error")
 	}
 }
+
+func TestScan(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	// We cheat with scan. It always returns everything.
+
+	s.Set("key", "value")
+
+	// No problem
+	{
+		res, err := redis.Values(c.Do("SCAN", 0))
+		ok(t, err)
+		equals(t, 2, len(res))
+
+		var c int
+		var keys []string
+		_, err = redis.Scan(res, &c, &keys)
+		ok(t, err)
+		equals(t, 0, c)
+		equals(t, []string{"key"}, keys)
+	}
+
+	// Invalid cursor
+	{
+		res, err := redis.Values(c.Do("SCAN", 42))
+		ok(t, err)
+		equals(t, 2, len(res))
+
+		var c int
+		var keys []string
+		_, err = redis.Scan(res, &c, &keys)
+		ok(t, err)
+		equals(t, 0, c)
+		equals(t, []string(nil), keys)
+	}
+
+	// COUNT (ignored)
+	{
+		res, err := redis.Values(c.Do("SCAN", 0, "COUNT", 200))
+		ok(t, err)
+		equals(t, 2, len(res))
+
+		var c int
+		var keys []string
+		_, err = redis.Scan(res, &c, &keys)
+		ok(t, err)
+		equals(t, 0, c)
+		equals(t, []string{"key"}, keys)
+	}
+
+	// MATCH
+	{
+		s.Set("aap", "noot")
+		s.Set("mies", "wim")
+		res, err := redis.Values(c.Do("SCAN", 0, "MATCH", "mi*"))
+		ok(t, err)
+		equals(t, 2, len(res))
+
+		var c int
+		var keys []string
+		_, err = redis.Scan(res, &c, &keys)
+		ok(t, err)
+		equals(t, 0, c)
+		equals(t, []string{"mies"}, keys)
+	}
+
+	// Wrong usage
+	{
+		_, err := redis.Int(c.Do("SCAN"))
+		assert(t, err != nil, "do SCAN error")
+		_, err = redis.Int(c.Do("SCAN", "noint"))
+		assert(t, err != nil, "do SCAN error")
+		_, err = redis.Int(c.Do("SCAN", 1, "MATCH"))
+		assert(t, err != nil, "do SCAN error")
+		_, err = redis.Int(c.Do("SCAN", 1, "COUNT"))
+		assert(t, err != nil, "do SCAN error")
+		_, err = redis.Int(c.Do("SCAN", 1, "COUNT", "noint"))
+		assert(t, err != nil, "do SCAN error")
+	}
+}

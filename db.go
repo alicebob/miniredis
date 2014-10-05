@@ -15,6 +15,16 @@ func (db *RedisDB) t(k string) string {
 	return db.keys[k]
 }
 
+// allKeys returns all keys. Sorted.
+func (db *RedisDB) allKeys() []string {
+	res := make([]string, 0, len(db.keys))
+	for k := range db.keys {
+		res = append(res, k)
+	}
+	sort.Strings(res) // To make things deterministic.
+	return res
+}
+
 // get returns the string key or "" on error/nonexists.
 func (db *RedisDB) get(k string) string {
 	if t, ok := db.keys[k]; !ok || t != "string" {

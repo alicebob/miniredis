@@ -17,6 +17,7 @@ const (
 	msgSyntaxError      = "ERR syntax error"
 	msgKeyNotFound      = "ERR no such key"
 	msgOutOfRange       = "ERR index out of range"
+	msgInvalidCursor    = "ERR invalid cursor"
 )
 
 // withTx wraps the non-argument-checking part of command handling code in
@@ -101,4 +102,23 @@ func redisRange(l, start, end int, stringSymantics bool) (int, int) {
 		return 0, 0
 	}
 	return start, end
+}
+
+// matchKeys filters only matching keys.
+// Will return an empty list on invalid match expression.
+func matchKeys(keys []string, match string) []string {
+	re := patternRE(match)
+	if re == nil {
+		// Special case, the given pattern won't match anything / is
+		// invalid.
+		return nil
+	}
+	res := []string{}
+	for _, k := range keys {
+		if !re.MatchString(k) {
+			continue
+		}
+		res = append(res, k)
+	}
+	return res
 }

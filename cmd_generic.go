@@ -4,8 +4,8 @@ package miniredis
 
 import (
 	"math/rand"
-	"sort"
 	"strconv"
+	"strings"
 
 	"github.com/bsm/redeo"
 )
@@ -32,7 +32,7 @@ func commandsGeneric(m *Miniredis, srv *redeo.Server) {
 	// SORT
 	srv.HandleFunc("TTL", m.cmdTTL)
 	srv.HandleFunc("TYPE", m.cmdType)
-	// SCAN
+	srv.HandleFunc("SCAN", m.cmdScan)
 }
 
 // generic expire command for EXPIRE, PEXPIRE, EXPIREAT, PEXPIREAT
@@ -251,24 +251,9 @@ func (m *Miniredis) cmdKeys(out *redeo.Responder, r *redeo.Request) error {
 	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
-		var res []string
-		re := patternRE(key)
-		if re == nil {
-			// Special case, the given pattern won't match anything / is
-			// invalid.
-			out.WriteBulkLen(0)
-			return
-		}
-		for k := range db.keys {
-			if !re.MatchString(k) {
-				continue
-			}
-			res = append(res, k)
-		}
-
-		out.WriteBulkLen(len(res))
-		sort.Strings(res) // To make things deterministic.
-		for _, s := range res {
+		keys := matchKeys(db.allKeys(), key)
+		out.WriteBulkLen(len(keys))
+		for _, s := range keys {
 			out.WriteString(s)
 		}
 	})
@@ -321,5 +306,82 @@ func (m *Miniredis) cmdRename(out *redeo.Responder, r *redeo.Request) error {
 
 		db.rename(from, to)
 		out.WriteOK()
+	})
+}
+
+// SCAN
+func (m *Miniredis) cmdScan(out *redeo.Responder, r *redeo.Request) error {
+	if len(r.Args) < 1 {
+		setDirty(r.Client())
+		out.WriteErrorString("ERR wrong number of arguments for 'scan' command")
+		return nil
+	}
+
+	cursor, err := strconv.Atoi(r.Args[0])
+	if err != nil {
+		setDirty(r.Client())
+		out.WriteErrorString(msgInvalidCursor)
+		return nil
+	}
+	// MATCH and COUNT options
+	var withMatch bool
+	var match string
+	args := r.Args[1:]
+	for len(args) > 0 {
+		if strings.ToLower(args[0]) == "count" {
+			if len(args) < 2 {
+				setDirty(r.Client())
+				out.WriteErrorString(msgSyntaxError)
+				return nil
+			}
+			_, err := strconv.Atoi(args[1])
+			if err != nil {
+				setDirty(r.Client())
+				out.WriteErrorString(msgInvalidInt)
+				return nil
+			}
+			// We do nothing with count.
+			args = args[2:]
+			continue
+		}
+		if strings.ToLower(args[0]) == "match" {
+			if len(args) < 2 {
+				setDirty(r.Client())
+				out.WriteErrorString(msgSyntaxError)
+				return nil
+			}
+			withMatch = true
+			match = args[1]
+			args = args[2:]
+			continue
+		}
+		setDirty(r.Client())
+		out.WriteErrorString(msgSyntaxError)
+		return nil
+	}
+
+	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+		db := m.db(ctx.selectedDB)
+		// We return _all_ (matched) keys every time.
+
+		if cursor != 0 {
+			// Invalid cursor.
+			out.WriteBulkLen(2)
+			out.WriteString("0") // no next cursor
+			out.WriteBulkLen(0)  // no elements
+			return
+		}
+
+		keys := db.allKeys()
+		if withMatch {
+			keys = matchKeys(keys, match)
+		}
+
+		out.WriteBulkLen(2)
+		out.WriteString("0") // no next cursor
+		out.WriteBulkLen(len(keys))
+		for _, k := range keys {
+			out.WriteString(k)
+		}
 	})
 }

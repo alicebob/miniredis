@@ -42,6 +42,7 @@ Implemented commands:
    - RANDOMKEY -- call math.rand.Seed(...) once before using.
    - TTL
    - TYPE
+   - SCAN
  - Transactions (complete)
    - DISCARD
    - EXEC
