@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"runtime"
+	"sort"
 )
 
 // T is implemented by Testing.T
@@ -34,11 +35,27 @@ func (m *Miniredis) CheckGet(t T, key, expected string) {
 func (m *Miniredis) CheckList(t T, key string, expected ...string) {
 	found, err := m.List(key)
 	if err != nil {
-		lError(t, "GET error, key %#v: %v", key, err)
+		lError(t, "List error, key %#v: %v", key, err)
 		return
 	}
 	if !reflect.DeepEqual(expected, found) {
-		lError(t, "GET error, key %#v: Expected %#v, got %#v", key, expected, found)
+		lError(t, "List error, key %#v: Expected %#v, got %#v", key, expected, found)
+		return
+	}
+}
+
+// CheckSet does not call Errorf() iff there is a set key with the
+// expected values.
+// Normal use case is `m.CheckSet(t, "visited", "Rome", "Stockholm", "Dublin")`.
+func (m *Miniredis) CheckSet(t T, key string, expected ...string) {
+	found, err := m.Members(key)
+	if err != nil {
+		lError(t, "Set error, key %#v: %v", key, err)
+		return
+	}
+	sort.Strings(expected)
+	if !reflect.DeepEqual(expected, found) {
+		lError(t, "Set error, key %#v: Expected %#v, got %#v", key, expected, found)
 		return
 	}
 }

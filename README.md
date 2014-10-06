@@ -105,6 +105,8 @@ Implemented commands:
  - Set keys
    - SADD
    - SCARD
+   - SDIFF
+   - SDIFFSTORE
    - SISMEMBER
    - SMEMBERS
    - SMOVE

@@ -174,6 +174,13 @@ func (db *RedisDB) pop(k string) string {
 	return el
 }
 
+// setset replaces a whole set.
+func (db *RedisDB) setset(k string, set setKey) {
+	db.keys[k] = "set"
+	db.setKeys[k] = set
+	db.keyVersion[k]++
+}
+
 // setadd adds members to a set. Returns nr of new keys.
 func (db *RedisDB) setadd(k string, elems ...string) int {
 	s, ok := db.setKeys[k]

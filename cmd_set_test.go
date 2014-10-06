@@ -1,6 +1,7 @@
 package miniredis
 
 import (
+	"sort"
 	"testing"
 
 	"github.com/garyburd/redigo/redis"
@@ -361,5 +362,94 @@ func TestSrandmember(t *testing.T) {
 
 		_, err = c.Do("SRANDMEMBER", "str")
 		assert(t, err != nil, "SRANDMEMBER error")
+	}
+}
+
+// Test SDIFF
+func TestSdiff(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	s.SetAdd("s1", "aap", "noot", "mies")
+	s.SetAdd("s2", "noot", "mies", "vuur")
+	s.SetAdd("s3", "aap", "mies", "wim")
+
+	// Simple case
+	{
+		els, err := redis.Strings(c.Do("SDIFF", "s1", "s2"))
+		ok(t, err)
+		equals(t, []string{"aap"}, els)
+	}
+
+	// No other set
+	{
+		els, err := redis.Strings(c.Do("SDIFF", "s1"))
+		ok(t, err)
+		sort.Strings(els)
+		equals(t, []string{"aap", "mies", "noot"}, els)
+	}
+
+	// 3 sets
+	{
+		els, err := redis.Strings(c.Do("SDIFF", "s1", "s2", "s3"))
+		ok(t, err)
+		equals(t, []string{}, els)
+	}
+
+	// A nonexisting key
+	{
+		els, err := redis.Strings(c.Do("SDIFF", "s9"))
+		ok(t, err)
+		equals(t, []string{}, els)
+	}
+
+	// Various errors
+	{
+		s.SetAdd("chk", "aap", "noot")
+		s.Set("str", "value")
+
+		_, err = redis.String(c.Do("SDIFF"))
+		assert(t, err != nil, "SDIFF error")
+		_, err = redis.String(c.Do("SDIFF", "str"))
+		assert(t, err != nil, "SDIFF error")
+		_, err = redis.String(c.Do("SDIFF", "chk", "str"))
+		assert(t, err != nil, "SDIFF error")
+	}
+}
+
+// Test SDIFFSTORE
+func TestSdiffstore(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	s.SetAdd("s1", "aap", "noot", "mies")
+	s.SetAdd("s2", "noot", "mies", "vuur")
+	s.SetAdd("s3", "aap", "mies", "wim")
+
+	// Simple case
+	{
+		i, err := redis.Int(c.Do("SDIFFSTORE", "res", "s1", "s3"))
+		ok(t, err)
+		equals(t, 1, i)
+		s.CheckSet(t, "res", "noot")
+	}
+
+	// Various errors
+	{
+		s.SetAdd("chk", "aap", "noot")
+		s.Set("str", "value")
+
+		_, err = redis.String(c.Do("SDIFFSTORE"))
+		assert(t, err != nil, "SDIFFSTORE error")
+		_, err = redis.String(c.Do("SDIFFSTORE", "t"))
+		assert(t, err != nil, "SDIFFSTORE error")
+		_, err = redis.String(c.Do("SDIFFSTORE", "t", "str"))
+		assert(t, err != nil, "SDIFFSTORE error")
 	}
 }
