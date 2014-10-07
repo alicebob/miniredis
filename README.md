@@ -107,6 +107,8 @@ Implemented commands:
    - SCARD
    - SDIFF
    - SDIFFSTORE
+   - SINTER
+   - SINTERSTORE
    - SISMEMBER
    - SMEMBERS
    - SMOVE

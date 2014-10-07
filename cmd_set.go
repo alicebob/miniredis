@@ -15,8 +15,8 @@ func commandsSet(m *Miniredis, srv *redeo.Server) {
 	srv.HandleFunc("SCARD", m.cmdScard)
 	srv.HandleFunc("SDIFF", m.cmdSdiff)
 	srv.HandleFunc("SDIFFSTORE", m.cmdSdiffstore)
-	// SINTER key [key ...]
-	// SINTERSTORE destination key [key ...]
+	srv.HandleFunc("SINTER", m.cmdSinter)
+	srv.HandleFunc("SINTERSTORE", m.cmdSinterstore)
 	srv.HandleFunc("SISMEMBER", m.cmdSismember)
 	srv.HandleFunc("SMEMBERS", m.cmdSmembers)
 	srv.HandleFunc("SMOVE", m.cmdSmove)
@@ -93,7 +93,7 @@ func (m *Miniredis) cmdSdiff(out *redeo.Responder, r *redeo.Request) error {
 	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
-		set, err := setDiff(db, keys)
+		set, err := db.setDiff(keys)
 		if err != nil {
 			out.WriteErrorString(err.Error())
 			return
@@ -120,7 +120,59 @@ func (m *Miniredis) cmdSdiffstore(out *redeo.Responder, r *redeo.Request) error 
 	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
-		set, err := setDiff(db, keys)
+		set, err := db.setDiff(keys)
+		if err != nil {
+			out.WriteErrorString(err.Error())
+			return
+		}
+
+		db.del(dest, true)
+		db.setset(dest, set)
+		out.WriteInt(len(set))
+	})
+}
+
+// SINTER
+func (m *Miniredis) cmdSinter(out *redeo.Responder, r *redeo.Request) error {
+	if len(r.Args) < 1 {
+		setDirty(r.Client())
+		out.WriteErrorString("ERR wrong number of arguments for 'sinter' command")
+		return nil
+	}
+
+	keys := r.Args
+
+	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+		db := m.db(ctx.selectedDB)
+
+		set, err := db.setInter(keys)
+		if err != nil {
+			out.WriteErrorString(err.Error())
+			return
+		}
+
+		out.WriteBulkLen(len(set))
+		for k := range set {
+			out.WriteString(k)
+		}
+	})
+}
+
+// SINTERSTORE
+func (m *Miniredis) cmdSinterstore(out *redeo.Responder, r *redeo.Request) error {
+	if len(r.Args) < 2 {
+		setDirty(r.Client())
+		out.WriteErrorString("ERR wrong number of arguments for 'sinterstore' command")
+		return nil
+	}
+
+	dest := r.Args[0]
+	keys := r.Args[1:]
+
+	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+		db := m.db(ctx.selectedDB)
+
+		set, err := db.setInter(keys)
 		if err != nil {
 			out.WriteErrorString(err.Error())
 			return
@@ -369,28 +421,4 @@ func shuffle(m []string) {
 		j := rand.Intn(len(m))
 		m[i], m[j] = m[j], m[i]
 	}
-}
-
-func setDiff(db *RedisDB, keys []string) (setKey, error) {
-	key := keys[0]
-	keys = keys[1:]
-	if db.exists(key) && db.t(key) != "set" {
-		return nil, ErrWrongType
-	}
-	s := setKey{}
-	for k := range db.setKeys[key] {
-		s[k] = struct{}{}
-	}
-	for _, sk := range keys {
-		if !db.exists(sk) {
-			continue
-		}
-		if db.t(sk) != "set" {
-			return nil, ErrWrongType
-		}
-		for e := range db.setKeys[sk] {
-			delete(s, e)
-		}
-	}
-	return s, nil
 }

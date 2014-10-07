@@ -453,3 +453,93 @@ func TestSdiffstore(t *testing.T) {
 		assert(t, err != nil, "SDIFFSTORE error")
 	}
 }
+
+// Test SINTER
+func TestSinter(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	s.SetAdd("s1", "aap", "noot", "mies")
+	s.SetAdd("s2", "noot", "mies", "vuur")
+	s.SetAdd("s3", "aap", "mies", "wim")
+
+	// Simple case
+	{
+		els, err := redis.Strings(c.Do("SINTER", "s1", "s2"))
+		ok(t, err)
+		sort.Strings(els)
+		equals(t, []string{"mies", "noot"}, els)
+	}
+
+	// No other set
+	{
+		els, err := redis.Strings(c.Do("SINTER", "s1"))
+		ok(t, err)
+		sort.Strings(els)
+		equals(t, []string{"aap", "mies", "noot"}, els)
+	}
+
+	// 3 sets
+	{
+		els, err := redis.Strings(c.Do("SINTER", "s1", "s2", "s3"))
+		ok(t, err)
+		equals(t, []string{"mies"}, els)
+	}
+
+	// A nonexisting key
+	{
+		els, err := redis.Strings(c.Do("SINTER", "s9"))
+		ok(t, err)
+		equals(t, []string{}, els)
+	}
+
+	// Various errors
+	{
+		s.SetAdd("chk", "aap", "noot")
+		s.Set("str", "value")
+
+		_, err = redis.String(c.Do("SINTER"))
+		assert(t, err != nil, "SINTER error")
+		_, err = redis.String(c.Do("SINTER", "str"))
+		assert(t, err != nil, "SINTER error")
+		_, err = redis.String(c.Do("SINTER", "chk", "str"))
+		assert(t, err != nil, "SINTER error")
+	}
+}
+
+// Test SINTERSTORE
+func TestSinterstore(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	s.SetAdd("s1", "aap", "noot", "mies")
+	s.SetAdd("s2", "noot", "mies", "vuur")
+	s.SetAdd("s3", "aap", "mies", "wim")
+
+	// Simple case
+	{
+		i, err := redis.Int(c.Do("SINTERSTORE", "res", "s1", "s3"))
+		ok(t, err)
+		equals(t, 2, i)
+		s.CheckSet(t, "res", "aap", "mies")
+	}
+
+	// Various errors
+	{
+		s.SetAdd("chk", "aap", "noot")
+		s.Set("str", "value")
+
+		_, err = redis.String(c.Do("SINTERSTORE"))
+		assert(t, err != nil, "SINTERSTORE error")
+		_, err = redis.String(c.Do("SINTERSTORE", "t"))
+		assert(t, err != nil, "SINTERSTORE error")
+		_, err = redis.String(c.Do("SINTERSTORE", "t", "str"))
+		assert(t, err != nil, "SINTERSTORE error")
+	}
+}

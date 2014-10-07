@@ -423,3 +423,59 @@ func (db *RedisDB) zincrby(k, m string, delta float64) float64 {
 	db.keyVersion[k]++
 	return v
 }
+
+// setDiff implements the logic behind SDIFF*
+func (db *RedisDB) setDiff(keys []string) (setKey, error) {
+	key := keys[0]
+	keys = keys[1:]
+	if db.exists(key) && db.t(key) != "set" {
+		return nil, ErrWrongType
+	}
+	s := setKey{}
+	for k := range db.setKeys[key] {
+		s[k] = struct{}{}
+	}
+	for _, sk := range keys {
+		if !db.exists(sk) {
+			continue
+		}
+		if db.t(sk) != "set" {
+			return nil, ErrWrongType
+		}
+		for e := range db.setKeys[sk] {
+			delete(s, e)
+		}
+	}
+	return s, nil
+}
+
+// setInter implements the logic behind SINTER*
+func (db *RedisDB) setInter(keys []string) (setKey, error) {
+	key := keys[0]
+	keys = keys[1:]
+	if db.exists(key) && db.t(key) != "set" {
+		return nil, ErrWrongType
+	}
+	s := setKey{}
+	for k := range db.setKeys[key] {
+		s[k] = struct{}{}
+	}
+	for _, sk := range keys {
+		if !db.exists(sk) {
+			continue
+		}
+		if db.t(sk) != "set" {
+			// Bug(?) in redis 2.8.14, it just skips the key.
+			continue
+			// return nil, ErrWrongType
+		}
+		other := db.setKeys[sk]
+		for e := range s {
+			if _, ok := other[e]; ok {
+				continue
+			}
+			delete(s, e)
+		}
+	}
+	return s, nil
+}
