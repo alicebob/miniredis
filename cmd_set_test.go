@@ -543,3 +543,94 @@ func TestSinterstore(t *testing.T) {
 		assert(t, err != nil, "SINTERSTORE error")
 	}
 }
+
+// Test SUNION
+func TestSunion(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	s.SetAdd("s1", "aap", "noot", "mies")
+	s.SetAdd("s2", "noot", "mies", "vuur")
+	s.SetAdd("s3", "aap", "mies", "wim")
+
+	// Simple case
+	{
+		els, err := redis.Strings(c.Do("SUNION", "s1", "s2"))
+		ok(t, err)
+		sort.Strings(els)
+		equals(t, []string{"aap", "mies", "noot", "vuur"}, els)
+	}
+
+	// No other set
+	{
+		els, err := redis.Strings(c.Do("SUNION", "s1"))
+		ok(t, err)
+		sort.Strings(els)
+		equals(t, []string{"aap", "mies", "noot"}, els)
+	}
+
+	// 3 sets
+	{
+		els, err := redis.Strings(c.Do("SUNION", "s1", "s2", "s3"))
+		ok(t, err)
+		sort.Strings(els)
+		equals(t, []string{"aap", "mies", "noot", "vuur", "wim"}, els)
+	}
+
+	// A nonexisting key
+	{
+		els, err := redis.Strings(c.Do("SUNION", "s9"))
+		ok(t, err)
+		equals(t, []string{}, els)
+	}
+
+	// Various errors
+	{
+		s.SetAdd("chk", "aap", "noot")
+		s.Set("str", "value")
+
+		_, err = redis.String(c.Do("SUNION"))
+		assert(t, err != nil, "SUNION error")
+		_, err = redis.String(c.Do("SUNION", "str"))
+		assert(t, err != nil, "SUNION error")
+		_, err = redis.String(c.Do("SUNION", "chk", "str"))
+		assert(t, err != nil, "SUNION error")
+	}
+}
+
+// Test SUNIONSTORE
+func TestSunionstore(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	s.SetAdd("s1", "aap", "noot", "mies")
+	s.SetAdd("s2", "noot", "mies", "vuur")
+	s.SetAdd("s3", "aap", "mies", "wim")
+
+	// Simple case
+	{
+		i, err := redis.Int(c.Do("SUNIONSTORE", "res", "s1", "s3"))
+		ok(t, err)
+		equals(t, 4, i)
+		s.CheckSet(t, "res", "aap", "mies", "noot", "wim")
+	}
+
+	// Various errors
+	{
+		s.SetAdd("chk", "aap", "noot")
+		s.Set("str", "value")
+
+		_, err = redis.String(c.Do("SUNIONSTORE"))
+		assert(t, err != nil, "SUNIONSTORE error")
+		_, err = redis.String(c.Do("SUNIONSTORE", "t"))
+		assert(t, err != nil, "SUNIONSTORE error")
+		_, err = redis.String(c.Do("SUNIONSTORE", "t", "str"))
+		assert(t, err != nil, "SUNIONSTORE error")
+	}
+}

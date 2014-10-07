@@ -115,6 +115,8 @@ Implemented commands:
    - SPOP -- call math.rand.Seed(...) once before using.
    - SRANDMEMBER -- call math.rand.Seed(...) once before using.
    - SREM
+   - SUNION
+   - SUNIONSTORE
  - Sorted Set keys
    - ZADD
    - ZCARD

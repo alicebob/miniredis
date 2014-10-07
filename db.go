@@ -479,3 +479,28 @@ func (db *RedisDB) setInter(keys []string) (setKey, error) {
 	}
 	return s, nil
 }
+
+// setUnion implements the logic behind SUNION*
+func (db *RedisDB) setUnion(keys []string) (setKey, error) {
+	key := keys[0]
+	keys = keys[1:]
+	if db.exists(key) && db.t(key) != "set" {
+		return nil, ErrWrongType
+	}
+	s := setKey{}
+	for k := range db.setKeys[key] {
+		s[k] = struct{}{}
+	}
+	for _, sk := range keys {
+		if !db.exists(sk) {
+			continue
+		}
+		if db.t(sk) != "set" {
+			return nil, ErrWrongType
+		}
+		for e := range db.setKeys[sk] {
+			s[e] = struct{}{}
+		}
+	}
+	return s, nil
+}

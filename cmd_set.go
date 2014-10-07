@@ -23,8 +23,8 @@ func commandsSet(m *Miniredis, srv *redeo.Server) {
 	srv.HandleFunc("SPOP", m.cmdSpop)
 	srv.HandleFunc("SRANDMEMBER", m.cmdSrandmember)
 	srv.HandleFunc("SREM", m.cmdSrem)
-	// SUNION key [key ...]
-	// SUNIONSTORE destination key [key ...]
+	srv.HandleFunc("SUNION", m.cmdSunion)
+	srv.HandleFunc("SUNIONSTORE", m.cmdSunionstore)
 	// SSCAN key cursor [MATCH pattern] [COUNT count]
 }
 
@@ -411,6 +411,58 @@ func (m *Miniredis) cmdSrem(out *redeo.Responder, r *redeo.Request) error {
 		}
 
 		out.WriteInt(db.setrem(key, fields...))
+	})
+}
+
+// SUNION
+func (m *Miniredis) cmdSunion(out *redeo.Responder, r *redeo.Request) error {
+	if len(r.Args) < 1 {
+		setDirty(r.Client())
+		out.WriteErrorString("ERR wrong number of arguments for 'sunion' command")
+		return nil
+	}
+
+	keys := r.Args
+
+	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+		db := m.db(ctx.selectedDB)
+
+		set, err := db.setUnion(keys)
+		if err != nil {
+			out.WriteErrorString(err.Error())
+			return
+		}
+
+		out.WriteBulkLen(len(set))
+		for k := range set {
+			out.WriteString(k)
+		}
+	})
+}
+
+// SUNIONSTORE
+func (m *Miniredis) cmdSunionstore(out *redeo.Responder, r *redeo.Request) error {
+	if len(r.Args) < 2 {
+		setDirty(r.Client())
+		out.WriteErrorString("ERR wrong number of arguments for 'sunionstore' command")
+		return nil
+	}
+
+	dest := r.Args[0]
+	keys := r.Args[1:]
+
+	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+		db := m.db(ctx.selectedDB)
+
+		set, err := db.setUnion(keys)
+		if err != nil {
+			out.WriteErrorString(err.Error())
+			return
+		}
+
+		db.del(dest, true)
+		db.setset(dest, set)
+		out.WriteInt(len(set))
 	})
 }
 
