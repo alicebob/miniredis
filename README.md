@@ -102,7 +102,7 @@ Implemented commands:
    - RPOPLPUSH
    - RPUSH
    - RPUSHX
- - Set keys
+ - Set keys (complete)
    - SADD
    - SCARD
    - SDIFF
@@ -117,6 +117,7 @@ Implemented commands:
    - SREM
    - SUNION
    - SUNIONSTORE
+   - SSCAN
  - Sorted Set keys
    - ZADD
    - ZCARD

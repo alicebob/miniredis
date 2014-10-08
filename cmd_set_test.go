@@ -634,3 +634,91 @@ func TestSunionstore(t *testing.T) {
 		assert(t, err != nil, "SUNIONSTORE error")
 	}
 }
+
+func TestSscan(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	// We cheat with sscan. It always returns everything.
+
+	s.SetAdd("set", "value1", "value2")
+
+	// No problem
+	{
+		res, err := redis.Values(c.Do("SSCAN", "set", 0))
+		ok(t, err)
+		equals(t, 2, len(res))
+
+		var c int
+		var keys []string
+		_, err = redis.Scan(res, &c, &keys)
+		ok(t, err)
+		equals(t, 0, c)
+		equals(t, []string{"value1", "value2"}, keys)
+	}
+
+	// Invalid cursor
+	{
+		res, err := redis.Values(c.Do("SSCAN", "set", 42))
+		ok(t, err)
+		equals(t, 2, len(res))
+
+		var c int
+		var keys []string
+		_, err = redis.Scan(res, &c, &keys)
+		ok(t, err)
+		equals(t, 0, c)
+		equals(t, []string(nil), keys)
+	}
+
+	// COUNT (ignored)
+	{
+		res, err := redis.Values(c.Do("SSCAN", "set", 0, "COUNT", 200))
+		ok(t, err)
+		equals(t, 2, len(res))
+
+		var c int
+		var keys []string
+		_, err = redis.Scan(res, &c, &keys)
+		ok(t, err)
+		equals(t, 0, c)
+		equals(t, []string{"value1", "value2"}, keys)
+	}
+
+	// MATCH
+	{
+		s.SetAdd("set", "aap", "noot", "mies")
+		res, err := redis.Values(c.Do("SSCAN", "set", 0, "MATCH", "mi*"))
+		ok(t, err)
+		equals(t, 2, len(res))
+
+		var c int
+		var keys []string
+		_, err = redis.Scan(res, &c, &keys)
+		ok(t, err)
+		equals(t, 0, c)
+		equals(t, []string{"mies"}, keys)
+	}
+
+	// Wrong usage
+	{
+		_, err := redis.Int(c.Do("SSCAN"))
+		assert(t, err != nil, "do SSCAN error")
+		_, err = redis.Int(c.Do("SSCAN", "set"))
+		assert(t, err != nil, "do SSCAN error")
+		_, err = redis.Int(c.Do("SSCAN", "set", "noint"))
+		assert(t, err != nil, "do SSCAN error")
+		_, err = redis.Int(c.Do("SSCAN", "set", 1, "MATCH"))
+		assert(t, err != nil, "do SSCAN error")
+		_, err = redis.Int(c.Do("SSCAN", "set", 1, "COUNT"))
+		assert(t, err != nil, "do SSCAN error")
+		_, err = redis.Int(c.Do("SSCAN", "set", 1, "COUNT", "noint"))
+		assert(t, err != nil, "do SSCAN error")
+		s.Set("str", "value")
+		_, err = redis.Int(c.Do("SSCAN", "str", 1))
+		assert(t, err != nil, "do SSCAN error")
+	}
+}
