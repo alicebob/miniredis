@@ -488,3 +488,94 @@ func TestHashIncrbyfloat(t *testing.T) {
 		assert(t, err != nil, "do HINCRBYFLOAT error")
 	}
 }
+
+func TestHscan(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	// We cheat with hscan. It always returns everything.
+
+	s.HSet("h", "field1", "value1")
+	s.HSet("h", "field2", "value2")
+
+	// No problem
+	{
+		res, err := redis.Values(c.Do("HSCAN", "h", 0))
+		ok(t, err)
+		equals(t, 2, len(res))
+
+		var c int
+		var keys []string
+		_, err = redis.Scan(res, &c, &keys)
+		ok(t, err)
+		equals(t, 0, c)
+		equals(t, []string{"field1", "value1", "field2", "value2"}, keys)
+	}
+
+	// Invalid cursor
+	{
+		res, err := redis.Values(c.Do("HSCAN", "h", 42))
+		ok(t, err)
+		equals(t, 2, len(res))
+
+		var c int
+		var keys []string
+		_, err = redis.Scan(res, &c, &keys)
+		ok(t, err)
+		equals(t, 0, c)
+		equals(t, []string(nil), keys)
+	}
+
+	// COUNT (ignored)
+	{
+		res, err := redis.Values(c.Do("HSCAN", "h", 0, "COUNT", 200))
+		ok(t, err)
+		equals(t, 2, len(res))
+
+		var c int
+		var keys []string
+		_, err = redis.Scan(res, &c, &keys)
+		ok(t, err)
+		equals(t, 0, c)
+		equals(t, []string{"field1", "value1", "field2", "value2"}, keys)
+	}
+
+	// MATCH
+	{
+		s.HSet("h", "aap", "a")
+		s.HSet("h", "noot", "b")
+		s.HSet("h", "mies", "m")
+		res, err := redis.Values(c.Do("HSCAN", "h", 0, "MATCH", "mi*"))
+		ok(t, err)
+		equals(t, 2, len(res))
+
+		var c int
+		var keys []string
+		_, err = redis.Scan(res, &c, &keys)
+		ok(t, err)
+		equals(t, 0, c)
+		equals(t, []string{"mies", "m"}, keys)
+	}
+
+	// Wrong usage
+	{
+		_, err := redis.Int(c.Do("HSCAN"))
+		assert(t, err != nil, "do HSCAN error")
+		_, err = redis.Int(c.Do("HSCAN", "set"))
+		assert(t, err != nil, "do HSCAN error")
+		_, err = redis.Int(c.Do("HSCAN", "set", "noint"))
+		assert(t, err != nil, "do HSCAN error")
+		_, err = redis.Int(c.Do("HSCAN", "set", 1, "MATCH"))
+		assert(t, err != nil, "do HSCAN error")
+		_, err = redis.Int(c.Do("HSCAN", "set", 1, "COUNT"))
+		assert(t, err != nil, "do HSCAN error")
+		_, err = redis.Int(c.Do("HSCAN", "set", 1, "COUNT", "noint"))
+		assert(t, err != nil, "do HSCAN error")
+		s.Set("str", "value")
+		_, err = redis.Int(c.Do("HSCAN", "str", 1))
+		assert(t, err != nil, "do HSCAN error")
+	}
+}

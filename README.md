@@ -73,7 +73,7 @@ Implemented commands:
    - SETNX
    - SETRANGE
    - STRLEN
- - Hash keys
+ - Hash keys (complete)
    - HDEL
    - HEXISTS
    - HGET
@@ -87,6 +87,7 @@ Implemented commands:
    - HSET
    - HSETNX
    - HVALS
+   - HSCAN
  - List keys
    - LINDEX
    - LINSERT

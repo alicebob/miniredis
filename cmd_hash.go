@@ -4,6 +4,7 @@ package miniredis
 
 import (
 	"strconv"
+	"strings"
 
 	"github.com/bsm/redeo"
 )
@@ -23,7 +24,7 @@ func commandsHash(m *Miniredis, srv *redeo.Server) {
 	srv.HandleFunc("HSET", m.cmdHset)
 	srv.HandleFunc("HSETNX", m.cmdHsetnx)
 	srv.HandleFunc("HVALS", m.cmdHvals)
-	// HSCAN
+	srv.HandleFunc("HSCAN", m.cmdHscan)
 }
 
 // HSET
@@ -434,5 +435,89 @@ func (m *Miniredis) cmdHincrbyfloat(out *redeo.Responder, r *redeo.Request) erro
 			return
 		}
 		out.WriteString(formatFloat(v))
+	})
+}
+
+// HSCAN
+func (m *Miniredis) cmdHscan(out *redeo.Responder, r *redeo.Request) error {
+	if len(r.Args) < 2 {
+		setDirty(r.Client())
+		out.WriteErrorString("ERR wrong number of arguments for 'hscan' command")
+		return nil
+	}
+
+	key := r.Args[0]
+	cursor, err := strconv.Atoi(r.Args[1])
+	if err != nil {
+		setDirty(r.Client())
+		out.WriteErrorString(msgInvalidCursor)
+		return nil
+	}
+	// MATCH and COUNT options
+	var withMatch bool
+	var match string
+	args := r.Args[2:]
+	for len(args) > 0 {
+		if strings.ToLower(args[0]) == "count" {
+			if len(args) < 2 {
+				setDirty(r.Client())
+				out.WriteErrorString(msgSyntaxError)
+				return nil
+			}
+			_, err := strconv.Atoi(args[1])
+			if err != nil {
+				setDirty(r.Client())
+				out.WriteErrorString(msgInvalidInt)
+				return nil
+			}
+			// We do nothing with count.
+			args = args[2:]
+			continue
+		}
+		if strings.ToLower(args[0]) == "match" {
+			if len(args) < 2 {
+				setDirty(r.Client())
+				out.WriteErrorString(msgSyntaxError)
+				return nil
+			}
+			withMatch = true
+			match = args[1]
+			args = args[2:]
+			continue
+		}
+		setDirty(r.Client())
+		out.WriteErrorString(msgSyntaxError)
+		return nil
+	}
+
+	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+		db := m.db(ctx.selectedDB)
+		// We return _all_ (matched) keys every time.
+
+		if cursor != 0 {
+			// Invalid cursor.
+			out.WriteBulkLen(2)
+			out.WriteString("0") // no next cursor
+			out.WriteBulkLen(0)  // no elements
+			return
+		}
+		if db.exists(key) && db.t(key) != "hash" {
+			out.WriteErrorString(ErrWrongType.Error())
+			return
+		}
+
+		members := db.hkeys(key)
+		if withMatch {
+			members = matchKeys(members, match)
+		}
+
+		out.WriteBulkLen(2)
+		out.WriteString("0") // no next cursor
+		// HSCAN gives key, values.
+		out.WriteBulkLen(len(members) * 2)
+		for _, k := range members {
+			out.WriteString(k)
+			out.WriteString(db.hashGet(key, k))
+		}
 	})
 }

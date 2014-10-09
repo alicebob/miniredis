@@ -250,7 +250,13 @@ func (db *RedisDB) hkeys(k string) []string {
 	for k := range v {
 		r = append(r, k)
 	}
+	sort.Strings(r)
 	return r
+}
+
+// hashGet a value
+func (db *RedisDB) hashGet(key, field string) string {
+	return db.hashKeys[key][field]
 }
 
 func (db *RedisDB) del(k string, delTTL bool) {
