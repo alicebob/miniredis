@@ -36,7 +36,7 @@ func commandsSortedSet(m *Miniredis, srv *redeo.Server) {
 	srv.HandleFunc("ZREVRANK", m.makeCmdZrank("zrevrank", true))
 	srv.HandleFunc("ZSCORE", m.cmdZscore)
 	// ZUNIONSTORE destination numkeys key [key ...] [WEIGHTS weight [weight ...]] [AGGREGATE SUM|MIN|MAX]
-	// ZSCAN key cursor [MATCH pattern] [COUNT count]
+	srv.HandleFunc("ZSCAN", m.cmdZscan)
 }
 
 // ZADD
@@ -885,4 +885,88 @@ func withLexRange(members []string, min string, minIncl bool, max string, maxInc
 		}
 	}
 	return members
+}
+
+// ZSCAN
+func (m *Miniredis) cmdZscan(out *redeo.Responder, r *redeo.Request) error {
+	if len(r.Args) < 2 {
+		setDirty(r.Client())
+		out.WriteErrorString("ERR wrong number of arguments for 'zscan' command")
+		return nil
+	}
+
+	key := r.Args[0]
+	cursor, err := strconv.Atoi(r.Args[1])
+	if err != nil {
+		setDirty(r.Client())
+		out.WriteErrorString(msgInvalidCursor)
+		return nil
+	}
+	// MATCH and COUNT options
+	var withMatch bool
+	var match string
+	args := r.Args[2:]
+	for len(args) > 0 {
+		if strings.ToLower(args[0]) == "count" {
+			if len(args) < 2 {
+				setDirty(r.Client())
+				out.WriteErrorString(msgSyntaxError)
+				return nil
+			}
+			_, err := strconv.Atoi(args[1])
+			if err != nil {
+				setDirty(r.Client())
+				out.WriteErrorString(msgInvalidInt)
+				return nil
+			}
+			// We do nothing with count.
+			args = args[2:]
+			continue
+		}
+		if strings.ToLower(args[0]) == "match" {
+			if len(args) < 2 {
+				setDirty(r.Client())
+				out.WriteErrorString(msgSyntaxError)
+				return nil
+			}
+			withMatch = true
+			match = args[1]
+			args = args[2:]
+			continue
+		}
+		setDirty(r.Client())
+		out.WriteErrorString(msgSyntaxError)
+		return nil
+	}
+
+	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+		db := m.db(ctx.selectedDB)
+		// We return _all_ (matched) keys every time.
+
+		if cursor != 0 {
+			// Invalid cursor.
+			out.WriteBulkLen(2)
+			out.WriteString("0") // no next cursor
+			out.WriteBulkLen(0)  // no elements
+			return
+		}
+		if db.exists(key) && db.t(key) != "zset" {
+			out.WriteErrorString(ErrWrongType.Error())
+			return
+		}
+
+		members := db.zmembers(key)
+		if withMatch {
+			members = matchKeys(members, match)
+		}
+
+		out.WriteBulkLen(2)
+		out.WriteString("0") // no next cursor
+		// HSCAN gives key, values.
+		out.WriteBulkLen(len(members) * 2)
+		for _, k := range members {
+			out.WriteString(k)
+			out.WriteString(formatFloat(db.zscore(key, k)))
+		}
+	})
 }

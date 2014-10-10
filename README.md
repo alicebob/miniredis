@@ -137,6 +137,7 @@ Implemented commands:
    - ZREVRANGEBYSCORE
    - ZREVRANK
    - ZSCORE
+   - ZSCAN
 
 
 Since miniredis is intended to be used in unittests timeouts are not implemented.

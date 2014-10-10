@@ -915,3 +915,94 @@ func TestSortedSetIncrby(t *testing.T) {
 		assert(t, err != nil, "ZINCRBY error")
 	}
 }
+
+func TestZscan(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	// We cheat with zscan. It always returns everything.
+
+	s.ZAdd("h", 1.0, "field1")
+	s.ZAdd("h", 2.0, "field2")
+
+	// No problem
+	{
+		res, err := redis.Values(c.Do("ZSCAN", "h", 0))
+		ok(t, err)
+		equals(t, 2, len(res))
+
+		var c int
+		var keys []string
+		_, err = redis.Scan(res, &c, &keys)
+		ok(t, err)
+		equals(t, 0, c)
+		equals(t, []string{"field1", "1", "field2", "2"}, keys)
+	}
+
+	// Invalid cursor
+	{
+		res, err := redis.Values(c.Do("ZSCAN", "h", 42))
+		ok(t, err)
+		equals(t, 2, len(res))
+
+		var c int
+		var keys []string
+		_, err = redis.Scan(res, &c, &keys)
+		ok(t, err)
+		equals(t, 0, c)
+		equals(t, []string(nil), keys)
+	}
+
+	// COUNT (ignored)
+	{
+		res, err := redis.Values(c.Do("ZSCAN", "h", 0, "COUNT", 200))
+		ok(t, err)
+		equals(t, 2, len(res))
+
+		var c int
+		var keys []string
+		_, err = redis.Scan(res, &c, &keys)
+		ok(t, err)
+		equals(t, 0, c)
+		equals(t, []string{"field1", "1", "field2", "2"}, keys)
+	}
+
+	// MATCH
+	{
+		s.ZAdd("h", 3.0, "aap")
+		s.ZAdd("h", 4.0, "noot")
+		s.ZAdd("h", 5.0, "mies")
+		res, err := redis.Values(c.Do("ZSCAN", "h", 0, "MATCH", "mi*"))
+		ok(t, err)
+		equals(t, 2, len(res))
+
+		var c int
+		var keys []string
+		_, err = redis.Scan(res, &c, &keys)
+		ok(t, err)
+		equals(t, 0, c)
+		equals(t, []string{"mies", "5"}, keys)
+	}
+
+	// Wrong usage
+	{
+		_, err := redis.Int(c.Do("ZSCAN"))
+		assert(t, err != nil, "do ZSCAN error")
+		_, err = redis.Int(c.Do("ZSCAN", "set"))
+		assert(t, err != nil, "do ZSCAN error")
+		_, err = redis.Int(c.Do("ZSCAN", "set", "noint"))
+		assert(t, err != nil, "do ZSCAN error")
+		_, err = redis.Int(c.Do("ZSCAN", "set", 1, "MATCH"))
+		assert(t, err != nil, "do ZSCAN error")
+		_, err = redis.Int(c.Do("ZSCAN", "set", 1, "COUNT"))
+		assert(t, err != nil, "do ZSCAN error")
+		_, err = redis.Int(c.Do("ZSCAN", "set", 1, "COUNT", "noint"))
+		assert(t, err != nil, "do ZSCAN error")
+		s.Set("str", "value")
+		_, err = redis.Int(c.Do("ZSCAN", "str", 1))
+		assert(t, err != nil, "do ZSCAN error")
+	}
+}
