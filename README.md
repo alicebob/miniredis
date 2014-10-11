@@ -39,6 +39,7 @@ Implemented commands:
    - PEXPIREAT
    - PTTL
    - RENAME
+   - RENAMENX
    - RANDOMKEY -- call math.rand.Seed(...) once before using.
    - TTL
    - TYPE

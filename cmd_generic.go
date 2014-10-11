@@ -27,7 +27,7 @@ func commandsGeneric(m *Miniredis, srv *redeo.Server) {
 	srv.HandleFunc("PTTL", m.cmdPTTL)
 	srv.HandleFunc("RANDOMKEY", m.cmdRandomkey)
 	srv.HandleFunc("RENAME", m.cmdRename)
-	// RENAMENX
+	srv.HandleFunc("RENAMENX", m.cmdRenamenx)
 	// RESTORE
 	// SORT
 	srv.HandleFunc("TTL", m.cmdTTL)
@@ -306,6 +306,35 @@ func (m *Miniredis) cmdRename(out *redeo.Responder, r *redeo.Request) error {
 
 		db.rename(from, to)
 		out.WriteOK()
+	})
+}
+
+// RENAMENX
+func (m *Miniredis) cmdRenamenx(out *redeo.Responder, r *redeo.Request) error {
+	if len(r.Args) != 2 {
+		setDirty(r.Client())
+		out.WriteErrorString("ERR wrong number of arguments for 'renamenx' command")
+		return nil
+	}
+
+	from := r.Args[0]
+	to := r.Args[1]
+
+	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+		db := m.db(ctx.selectedDB)
+
+		if !db.exists(from) {
+			out.WriteErrorString(msgKeyNotFound)
+			return
+		}
+
+		if db.exists(to) {
+			out.WriteZero()
+			return
+		}
+
+		db.rename(from, to)
+		out.WriteOne()
 	})
 }
 
