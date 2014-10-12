@@ -340,6 +340,13 @@ func (db *RedisDB) sortedSet(key string) map[string]float64 {
 	return map[string]float64(ss)
 }
 
+// ssetSet sets a complete sorted set.
+func (db *RedisDB) ssetSet(key string, sset sortedSet) {
+	db.keys[key] = "zset"
+	db.keyVersion[key]++
+	db.sortedsetKeys[key] = sset
+}
+
 // Add member to a sorted set. Returns whether this was a new member.
 func (db *RedisDB) zadd(key string, score float64, member string) bool {
 	ss, ok := db.sortedsetKeys[key]

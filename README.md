@@ -138,6 +138,7 @@ Implemented commands:
    - ZREVRANGEBYSCORE
    - ZREVRANK
    - ZSCORE
+   - ZUNIONSTORE
    - ZSCAN
 
 
