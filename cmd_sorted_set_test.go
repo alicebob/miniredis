@@ -1088,3 +1088,89 @@ func TestZunionstore(t *testing.T) {
 		assert(t, err != nil, "do ZUNIONSTORE error")
 	}
 }
+
+func TestZinterstore(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	s.ZAdd("h1", 1.0, "field1")
+	s.ZAdd("h1", 2.0, "field2")
+	s.ZAdd("h1", 3.0, "field3")
+	s.ZAdd("h2", 1.0, "field1")
+	s.ZAdd("h2", 2.0, "field2")
+	s.ZAdd("h2", 4.0, "field4")
+
+	// Simple case
+	{
+		res, err := redis.Int(c.Do("ZINTERSTORE", "new", 2, "h1", "h2"))
+		ok(t, err)
+		equals(t, 2, res)
+
+		ss, err := s.SortedSet("new")
+		ok(t, err)
+		equals(t, map[string]float64{"field1": 2, "field2": 4}, ss)
+	}
+
+	// WEIGHTS
+	{
+		res, err := redis.Int(c.Do("ZINTERSTORE", "weighted", 2, "h1", "h2", "WeIgHtS", "4.5", "12"))
+		ok(t, err)
+		equals(t, 2, res)
+
+		ss, err := s.SortedSet("weighted")
+		ok(t, err)
+		equals(t, map[string]float64{"field1": 16.5, "field2": 33}, ss)
+	}
+
+	// AGGREGATE
+	{
+		res, err := redis.Int(c.Do("ZINTERSTORE", "aggr", 2, "h1", "h2", "AgGrEgAtE", "min"))
+		ok(t, err)
+		equals(t, 2, res)
+
+		ss, err := s.SortedSet("aggr")
+		ok(t, err)
+		equals(t, map[string]float64{"field1": 1.0, "field2": 2.0}, ss)
+	}
+
+	// Wrong usage
+	{
+		_, err := redis.Int(c.Do("ZINTERSTORE"))
+		assert(t, err != nil, "do ZINTERSTORE error")
+		_, err = redis.Int(c.Do("ZINTERSTORE", "set"))
+		assert(t, err != nil, "do ZINTERSTORE error")
+		_, err = redis.Int(c.Do("ZINTERSTORE", "set", "noint"))
+		assert(t, err != nil, "do ZINTERSTORE error")
+		_, err = redis.Int(c.Do("ZINTERSTORE", "set", 0, "key"))
+		assert(t, err != nil, "do ZINTERSTORE error")
+		_, err = redis.Int(c.Do("ZINTERSTORE", "set", -1, "key"))
+		assert(t, err != nil, "do ZINTERSTORE error")
+		_, err = redis.Int(c.Do("ZINTERSTORE", "set", 1, "too", "many"))
+		assert(t, err != nil, "do ZINTERSTORE error")
+		_, err = redis.Int(c.Do("ZINTERSTORE", "set", 2, "key"))
+		assert(t, err != nil, "do ZINTERSTORE error")
+
+		_, err = redis.Int(c.Do("ZINTERSTORE", "set", 2, "k1", "k2", "WEIGHTS"))
+		assert(t, err != nil, "do ZINTERSTORE error")
+		_, err = redis.Int(c.Do("ZINTERSTORE", "set", 2, "k1", "k2", "WEIGHTS", 1, 2, 3))
+		assert(t, err != nil, "do ZINTERSTORE error")
+		_, err = redis.Int(c.Do("ZINTERSTORE", "set", 2, "k1", "k2", "WEIGHTS", 1, "nof"))
+		assert(t, err != nil, "do ZINTERSTORE error")
+
+		_, err = redis.Int(c.Do("ZINTERSTORE", "set", 2, "k1", "k2", "AGGREGATE"))
+		assert(t, err != nil, "do ZINTERSTORE error")
+		_, err = redis.Int(c.Do("ZINTERSTORE", "set", 2, "k1", "k2", "AGGREGATE", "foo"))
+		assert(t, err != nil, "do ZINTERSTORE error")
+		_, err = redis.Int(c.Do("ZINTERSTORE", "set", 2, "k1", "k2", "AGGREGATE", "sum", "foo"))
+		assert(t, err != nil, "do ZINTERSTORE error")
+
+		s.Set("str", "value")
+		_, err = redis.Int(c.Do("ZINTERSTORE", "set", 1, "str"))
+		assert(t, err != nil, "do ZINTERSTORE error")
+		_, err = redis.Int(c.Do("ZINTERSTORE", "set", 2, "set", "str"))
+		assert(t, err != nil, "do ZINTERSTORE error")
+	}
+}

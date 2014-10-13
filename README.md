@@ -120,11 +120,12 @@ Implemented commands:
    - SUNION
    - SUNIONSTORE
    - SSCAN
- - Sorted Set keys
+ - Sorted Set keys (complete)
    - ZADD
    - ZCARD
    - ZCOUNT
    - ZINCRBY
+   - ZINTERSTORE
    - ZLEXCOUNT
    - ZRANGE
    - ZRANGEBYLEX

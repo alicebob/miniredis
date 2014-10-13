@@ -21,7 +21,7 @@ func commandsSortedSet(m *Miniredis, srv *redeo.Server) {
 	srv.HandleFunc("ZCARD", m.cmdZcard)
 	srv.HandleFunc("ZCOUNT", m.cmdZcount)
 	srv.HandleFunc("ZINCRBY", m.cmdZincrby)
-	// ZINTERSTORE destination numkeys key [key ...] [WEIGHTS weight [weight ...]] [AGGREGATE SUM|MIN|MAX]
+	srv.HandleFunc("ZINTERSTORE", m.cmdZinterstore)
 	srv.HandleFunc("ZLEXCOUNT", m.cmdZlexcount)
 	srv.HandleFunc("ZRANGE", m.makeCmdZrange("zrange", false))
 	srv.HandleFunc("ZRANGEBYLEX", m.cmdZrangebylex)
@@ -179,6 +179,133 @@ func (m *Miniredis) cmdZincrby(out *redeo.Responder, r *redeo.Request) error {
 		}
 		newScore := db.zincrby(key, member, delta)
 		out.WriteString(formatFloat(newScore))
+	})
+}
+
+// ZINTERSTORE
+func (m *Miniredis) cmdZinterstore(out *redeo.Responder, r *redeo.Request) error {
+	if len(r.Args) < 3 {
+		setDirty(r.Client())
+		out.WriteErrorString("ERR wrong number of arguments for 'zinterstore' command")
+		return nil
+	}
+
+	destination := r.Args[0]
+	numKeys, err := strconv.Atoi(r.Args[1])
+	if err != nil {
+		setDirty(r.Client())
+		out.WriteErrorString(msgInvalidInt)
+		return nil
+	}
+	args := r.Args[2:]
+	if len(args) < numKeys {
+		setDirty(r.Client())
+		out.WriteErrorString(msgSyntaxError)
+		return nil
+	}
+	if numKeys <= 0 {
+		setDirty(r.Client())
+		out.WriteErrorString("ERR at least 1 input key is needed for ZUNIONSTORE/ZINTERSTORE")
+		return nil
+	}
+	keys := args[:numKeys]
+	args = args[numKeys:]
+
+	withWeights := false
+	weights := []float64{}
+	aggregate := "sum"
+	for len(args) > 0 {
+		if strings.ToLower(args[0]) == "weights" {
+			if len(args) < numKeys+1 {
+				setDirty(r.Client())
+				out.WriteErrorString(msgSyntaxError)
+				return nil
+			}
+			for i := 0; i < numKeys; i++ {
+				f, err := strconv.ParseFloat(args[i+1], 64)
+				if err != nil {
+					setDirty(r.Client())
+					out.WriteErrorString("ERR weight value is not a float")
+					return nil
+				}
+				weights = append(weights, f)
+			}
+			withWeights = true
+			args = args[numKeys+1:]
+			continue
+		}
+		if strings.ToLower(args[0]) == "aggregate" {
+			if len(args) < 2 {
+				setDirty(r.Client())
+				out.WriteErrorString(msgSyntaxError)
+				return nil
+			}
+			aggregate = strings.ToLower(args[1])
+			switch aggregate {
+			default:
+				setDirty(r.Client())
+				out.WriteErrorString(msgSyntaxError)
+				return nil
+			case "sum", "min", "max":
+			}
+			args = args[2:]
+			continue
+		}
+		setDirty(r.Client())
+		out.WriteErrorString(msgSyntaxError)
+		return nil
+	}
+
+	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+		db := m.db(ctx.selectedDB)
+		db.del(destination, true)
+
+		// We collect everything and remove all keys which turned out not to be
+		// present in every set.
+		sset := map[string]float64{}
+		counts := map[string]int{}
+		for i, key := range keys {
+			if !db.exists(key) {
+				continue
+			}
+			if db.t(key) != "zset" {
+				out.WriteErrorString(msgWrongType)
+				return
+			}
+			for _, el := range db.zelements(key) {
+				score := el.score
+				if withWeights {
+					score *= weights[i]
+				}
+				counts[el.member]++
+				old, ok := sset[el.member]
+				if !ok {
+					sset[el.member] = score
+					continue
+				}
+				switch aggregate {
+				default:
+					panic("Invalid aggregate")
+				case "sum":
+					sset[el.member] += score
+				case "min":
+					if score < old {
+						sset[el.member] = score
+					}
+				case "max":
+					if score > old {
+						sset[el.member] = score
+					}
+				}
+			}
+		}
+		for key, count := range counts {
+			if count != numKeys {
+				delete(sset, key)
+			}
+		}
+		db.ssetSet(destination, sset)
+		out.WriteInt(len(sset))
 	})
 }
 
