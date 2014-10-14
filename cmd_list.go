@@ -180,7 +180,7 @@ func (m *Miniredis) cmdLpop(out *redeo.Responder, r *redeo.Request) error {
 			return
 		}
 
-		elem := db.lpop(key)
+		elem := db.listLpop(key)
 		out.WriteString(elem)
 	})
 }
@@ -205,7 +205,7 @@ func (m *Miniredis) cmdLpush(out *redeo.Responder, r *redeo.Request) error {
 
 		var newLen int
 		for _, value := range args {
-			newLen = db.lpush(key, value)
+			newLen = db.listLpush(key, value)
 		}
 		out.WriteInt(newLen)
 	})
@@ -233,7 +233,7 @@ func (m *Miniredis) cmdLpushx(out *redeo.Responder, r *redeo.Request) error {
 			return
 		}
 
-		newLen := db.lpush(key, value)
+		newLen := db.listLpush(key, value)
 		out.WriteInt(newLen)
 	})
 }
@@ -448,7 +448,7 @@ func (m *Miniredis) cmdRpop(out *redeo.Responder, r *redeo.Request) error {
 			return
 		}
 
-		elem := db.pop(key)
+		elem := db.listPop(key)
 		out.WriteString(elem)
 	})
 }
@@ -474,8 +474,8 @@ func (m *Miniredis) cmdRpoplpush(out *redeo.Responder, r *redeo.Request) error {
 			out.WriteErrorString(msgWrongType)
 			return
 		}
-		elem := db.pop(src)
-		db.lpush(dst, elem)
+		elem := db.listPop(src)
+		db.listLpush(dst, elem)
 		out.WriteString(elem)
 	})
 }
@@ -500,7 +500,7 @@ func (m *Miniredis) cmdRpush(out *redeo.Responder, r *redeo.Request) error {
 
 		var newLen int
 		for _, value := range args {
-			newLen = db.push(key, value)
+			newLen = db.listPush(key, value)
 		}
 		out.WriteInt(newLen)
 	})
@@ -528,7 +528,7 @@ func (m *Miniredis) cmdRpushx(out *redeo.Responder, r *redeo.Request) error {
 			return
 		}
 
-		newLen := db.push(key, value)
+		newLen := db.listPush(key, value)
 		out.WriteInt(newLen)
 	})
 }

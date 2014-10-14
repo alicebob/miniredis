@@ -48,7 +48,7 @@ func (m *Miniredis) cmdSadd(out *redeo.Responder, r *redeo.Request) error {
 			return
 		}
 
-		added := db.setadd(key, elems...)
+		added := db.setAdd(key, elems...)
 		out.WriteInt(added)
 	})
 }
@@ -76,7 +76,7 @@ func (m *Miniredis) cmdScard(out *redeo.Responder, r *redeo.Request) error {
 			return
 		}
 
-		members := db.members(key)
+		members := db.setMembers(key)
 		out.WriteInt(len(members))
 	})
 }
@@ -128,7 +128,7 @@ func (m *Miniredis) cmdSdiffstore(out *redeo.Responder, r *redeo.Request) error 
 		}
 
 		db.del(dest, true)
-		db.setset(dest, set)
+		db.setSet(dest, set)
 		out.WriteInt(len(set))
 	})
 }
@@ -180,7 +180,7 @@ func (m *Miniredis) cmdSinterstore(out *redeo.Responder, r *redeo.Request) error
 		}
 
 		db.del(dest, true)
-		db.setset(dest, set)
+		db.setSet(dest, set)
 		out.WriteInt(len(set))
 	})
 }
@@ -209,7 +209,7 @@ func (m *Miniredis) cmdSismember(out *redeo.Responder, r *redeo.Request) error {
 			return
 		}
 
-		if db.isMember(key, value) {
+		if db.setIsMember(key, value) {
 			out.WriteOne()
 			return
 		}
@@ -240,7 +240,7 @@ func (m *Miniredis) cmdSmembers(out *redeo.Responder, r *redeo.Request) error {
 			return
 		}
 
-		members := db.members(key)
+		members := db.setMembers(key)
 
 		out.WriteBulkLen(len(members))
 		for _, elem := range members {
@@ -279,12 +279,12 @@ func (m *Miniredis) cmdSmove(out *redeo.Responder, r *redeo.Request) error {
 			return
 		}
 
-		if !db.isMember(src, member) {
+		if !db.setIsMember(src, member) {
 			out.WriteInt(0)
 			return
 		}
-		db.setrem(src, member)
-		db.setadd(dst, member)
+		db.setRem(src, member)
+		db.setAdd(dst, member)
 		out.WriteInt(1)
 	})
 }
@@ -312,9 +312,9 @@ func (m *Miniredis) cmdSpop(out *redeo.Responder, r *redeo.Request) error {
 			return
 		}
 
-		members := db.members(key)
+		members := db.setMembers(key)
 		member := members[rand.Intn(len(members))]
-		db.setrem(key, member)
+		db.setRem(key, member)
 		out.WriteString(member)
 	})
 }
@@ -359,7 +359,7 @@ func (m *Miniredis) cmdSrandmember(out *redeo.Responder, r *redeo.Request) error
 			return
 		}
 
-		members := db.members(key)
+		members := db.setMembers(key)
 		if count < 0 {
 			// Non-unique elements is allowed with negative count.
 			out.WriteBulkLen(-count)
@@ -411,7 +411,7 @@ func (m *Miniredis) cmdSrem(out *redeo.Responder, r *redeo.Request) error {
 			return
 		}
 
-		out.WriteInt(db.setrem(key, fields...))
+		out.WriteInt(db.setRem(key, fields...))
 	})
 }
 
@@ -462,7 +462,7 @@ func (m *Miniredis) cmdSunionstore(out *redeo.Responder, r *redeo.Request) error
 		}
 
 		db.del(dest, true)
-		db.setset(dest, set)
+		db.setSet(dest, set)
 		out.WriteInt(len(set))
 	})
 }
@@ -535,7 +535,7 @@ func (m *Miniredis) cmdSscan(out *redeo.Responder, r *redeo.Request) error {
 			return
 		}
 
-		members := db.members(key)
+		members := db.setMembers(key)
 		if withMatch {
 			members = matchKeys(members, match)
 		}

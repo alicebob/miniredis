@@ -77,7 +77,7 @@ func (m *Miniredis) cmdZadd(out *redeo.Responder, r *redeo.Request) error {
 
 		added := 0
 		for member, score := range elems {
-			if db.zadd(key, score, member) {
+			if db.ssetAdd(key, score, member) {
 				added++
 			}
 		}
@@ -108,7 +108,7 @@ func (m *Miniredis) cmdZcard(out *redeo.Responder, r *redeo.Request) error {
 			return
 		}
 
-		out.WriteInt(db.zcard(key))
+		out.WriteInt(db.ssetCard(key))
 	})
 }
 
@@ -147,7 +147,7 @@ func (m *Miniredis) cmdZcount(out *redeo.Responder, r *redeo.Request) error {
 			return
 		}
 
-		members := db.zelements(key)
+		members := db.ssetElements(key)
 		members = withSSRange(members, min, minIncl, max, maxIncl)
 		out.WriteInt(len(members))
 	})
@@ -177,7 +177,7 @@ func (m *Miniredis) cmdZincrby(out *redeo.Responder, r *redeo.Request) error {
 			out.WriteErrorString(msgWrongType)
 			return
 		}
-		newScore := db.zincrby(key, member, delta)
+		newScore := db.ssetIncrby(key, member, delta)
 		out.WriteString(formatFloat(newScore))
 	})
 }
@@ -272,7 +272,7 @@ func (m *Miniredis) cmdZinterstore(out *redeo.Responder, r *redeo.Request) error
 				out.WriteErrorString(msgWrongType)
 				return
 			}
-			for _, el := range db.zelements(key) {
+			for _, el := range db.ssetElements(key) {
 				score := el.score
 				if withWeights {
 					score *= weights[i]
@@ -343,7 +343,7 @@ func (m *Miniredis) cmdZlexcount(out *redeo.Responder, r *redeo.Request) error {
 			return
 		}
 
-		members := db.zmembers(key)
+		members := db.ssetMembers(key)
 		// Just key sort. If scores are not the same we don't care.
 		sort.Strings(members)
 		members = withLexRange(members, min, minIncl, max, maxIncl)
@@ -402,7 +402,7 @@ func (m *Miniredis) makeCmdZrange(cmd string, reverse bool) redeo.HandlerFunc {
 				return
 			}
 
-			members := db.zmembers(key)
+			members := db.ssetMembers(key)
 			if reverse {
 				reverseSlice(members)
 			}
@@ -415,7 +415,7 @@ func (m *Miniredis) makeCmdZrange(cmd string, reverse bool) redeo.HandlerFunc {
 			for _, el := range members[rs:re] {
 				out.WriteString(el)
 				if withScores {
-					out.WriteString(formatFloat(db.zscore(key, el)))
+					out.WriteString(formatFloat(db.ssetScore(key, el)))
 				}
 			}
 		})
@@ -490,7 +490,7 @@ func (m *Miniredis) cmdZrangebylex(out *redeo.Responder, r *redeo.Request) error
 			return
 		}
 
-		members := db.zmembers(key)
+		members := db.ssetMembers(key)
 		// Just key sort. If scores are not the same we don't care.
 		sort.Strings(members)
 		members = withLexRange(members, min, minIncl, max, maxIncl)
@@ -596,7 +596,7 @@ func (m *Miniredis) makeCmdZrangebyscore(cmd string, reverse bool) redeo.Handler
 				return
 			}
 
-			members := db.zelements(key)
+			members := db.ssetElements(key)
 			if reverse {
 				min, max = max, min
 				minIncl, maxIncl = maxIncl, minIncl
@@ -669,7 +669,7 @@ func (m *Miniredis) makeCmdZrank(cmd string, reverse bool) redeo.HandlerFunc {
 			if reverse {
 				direction = desc
 			}
-			rank, ok := db.zrank(key, member, direction)
+			rank, ok := db.ssetRank(key, member, direction)
 			if !ok {
 				out.WriteNil()
 				return
@@ -705,7 +705,7 @@ func (m *Miniredis) cmdZrem(out *redeo.Responder, r *redeo.Request) error {
 
 		deleted := 0
 		for _, member := range members {
-			if db.zrem(key, member) {
+			if db.ssetRem(key, member) {
 				deleted++
 			}
 		}
@@ -748,13 +748,13 @@ func (m *Miniredis) cmdZremrangebylex(out *redeo.Responder, r *redeo.Request) er
 			return
 		}
 
-		members := db.zmembers(key)
+		members := db.ssetMembers(key)
 		// Just key sort. If scores are not the same we don't care.
 		sort.Strings(members)
 		members = withLexRange(members, min, minIncl, max, maxIncl)
 
 		for _, el := range members {
-			db.zrem(key, el)
+			db.ssetRem(key, el)
 		}
 		out.WriteInt(len(members))
 	})
@@ -795,10 +795,10 @@ func (m *Miniredis) cmdZremrangebyrank(out *redeo.Responder, r *redeo.Request) e
 			return
 		}
 
-		members := db.zmembers(key)
+		members := db.ssetMembers(key)
 		rs, re := redisRange(len(members), start, end, false)
 		for _, el := range members[rs:re] {
-			db.zrem(key, el)
+			db.ssetRem(key, el)
 		}
 		out.WriteInt(re - rs)
 	})
@@ -839,11 +839,11 @@ func (m *Miniredis) cmdZremrangebyscore(out *redeo.Responder, r *redeo.Request) 
 			return
 		}
 
-		members := db.zelements(key)
+		members := db.ssetElements(key)
 		members = withSSRange(members, min, minIncl, max, maxIncl)
 
 		for _, el := range members {
-			db.zrem(key, el.member)
+			db.ssetRem(key, el.member)
 		}
 		out.WriteInt(len(members))
 	})
@@ -873,12 +873,12 @@ func (m *Miniredis) cmdZscore(out *redeo.Responder, r *redeo.Request) error {
 			return
 		}
 
-		if !db.zexists(key, member) {
+		if !db.ssetExists(key, member) {
 			out.WriteNil()
 			return
 		}
 
-		out.WriteString(formatFloat(db.zscore(key, member)))
+		out.WriteString(formatFloat(db.ssetScore(key, member)))
 	})
 }
 
@@ -1101,7 +1101,7 @@ func (m *Miniredis) cmdZunionstore(out *redeo.Responder, r *redeo.Request) error
 				out.WriteErrorString(msgWrongType)
 				return
 			}
-			for _, el := range db.zelements(key) {
+			for _, el := range db.ssetElements(key) {
 				score := el.score
 				if withWeights {
 					score *= weights[i]
@@ -1200,7 +1200,7 @@ func (m *Miniredis) cmdZscan(out *redeo.Responder, r *redeo.Request) error {
 			return
 		}
 
-		members := db.zmembers(key)
+		members := db.ssetMembers(key)
 		if withMatch {
 			members = matchKeys(members, match)
 		}
@@ -1211,7 +1211,7 @@ func (m *Miniredis) cmdZscan(out *redeo.Responder, r *redeo.Request) error {
 		out.WriteBulkLen(len(members) * 2)
 		for _, k := range members {
 			out.WriteString(k)
-			out.WriteString(formatFloat(db.zscore(key, k)))
+			out.WriteString(formatFloat(db.ssetScore(key, k)))
 		}
 	})
 }

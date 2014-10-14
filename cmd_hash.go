@@ -46,7 +46,7 @@ func (m *Miniredis) cmdHset(out *redeo.Responder, r *redeo.Request) error {
 			return
 		}
 
-		if db.hset(key, field, value) {
+		if db.hashSet(key, field, value) {
 			out.WriteZero()
 		} else {
 			out.WriteOne()
@@ -115,7 +115,7 @@ func (m *Miniredis) cmdHmset(out *redeo.Responder, r *redeo.Request) error {
 			value := args[1]
 			args = args[2:]
 
-			db.hset(key, field, value)
+			db.hashSet(key, field, value)
 		}
 		out.WriteOK()
 	})
@@ -275,7 +275,7 @@ func (m *Miniredis) cmdHkeys(out *redeo.Responder, r *redeo.Request) error {
 			return
 		}
 
-		fields := db.hkeys(key)
+		fields := db.hashFields(key)
 		out.WriteBulkLen(len(fields))
 		for _, f := range fields {
 			out.WriteString(f)
@@ -396,7 +396,7 @@ func (m *Miniredis) cmdHincrby(out *redeo.Responder, r *redeo.Request) error {
 			return
 		}
 
-		v, err := db.hincr(key, field, delta)
+		v, err := db.hashIncr(key, field, delta)
 		if err != nil {
 			out.WriteErrorString(err.Error())
 			return
@@ -429,7 +429,7 @@ func (m *Miniredis) cmdHincrbyfloat(out *redeo.Responder, r *redeo.Request) erro
 			return
 		}
 
-		v, err := db.hincrfloat(key, field, delta)
+		v, err := db.hashIncrfloat(key, field, delta)
 		if err != nil {
 			out.WriteErrorString(err.Error())
 			return
@@ -506,7 +506,7 @@ func (m *Miniredis) cmdHscan(out *redeo.Responder, r *redeo.Request) error {
 			return
 		}
 
-		members := db.hkeys(key)
+		members := db.hashFields(key)
 		if withMatch {
 			members = matchKeys(members, match)
 		}

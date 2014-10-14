@@ -99,7 +99,7 @@ func (m *Miniredis) cmdSet(out *redeo.Responder, r *redeo.Request) error {
 
 		db.del(key, true) // be sure to remove existing values of other type keys.
 		// a vanilla SET clears the expire
-		db.set(key, value)
+		db.stringSet(key, value)
 		if expire != 0 {
 			db.expire[key] = expire
 		}
@@ -127,7 +127,7 @@ func (m *Miniredis) cmdSetex(out *redeo.Responder, r *redeo.Request) error {
 		db := m.db(ctx.selectedDB)
 
 		db.del(key, true) // Clear any existing keys.
-		db.set(key, value)
+		db.stringSet(key, value)
 		db.expire[key] = ttl
 		out.WriteOK()
 	})
@@ -153,7 +153,7 @@ func (m *Miniredis) cmdPsetex(out *redeo.Responder, r *redeo.Request) error {
 		db := m.db(ctx.selectedDB)
 
 		db.del(key, true) // Clear any existing keys.
-		db.set(key, value)
+		db.stringSet(key, value)
 		db.expire[key] = ttl // We put millisecond keys in with the second keys.
 		out.WriteOK()
 	})
@@ -177,7 +177,7 @@ func (m *Miniredis) cmdSetnx(out *redeo.Responder, r *redeo.Request) error {
 			return
 		}
 
-		db.set(key, value)
+		db.stringSet(key, value)
 		out.WriteOne()
 	})
 }
@@ -203,7 +203,7 @@ func (m *Miniredis) cmdMset(out *redeo.Responder, r *redeo.Request) error {
 			r.Args = r.Args[2:]
 
 			db.del(key, true) // clear TTL
-			db.set(key, value)
+			db.stringSet(key, value)
 		}
 		out.WriteOK()
 	})
@@ -241,7 +241,7 @@ func (m *Miniredis) cmdMsetnx(out *redeo.Responder, r *redeo.Request) error {
 			res = 1
 			for k, v := range keys {
 				// Nothing to delete. That's the whole point.
-				db.set(k, v)
+				db.stringSet(k, v)
 			}
 		}
 		out.WriteInt(res)
@@ -269,7 +269,7 @@ func (m *Miniredis) cmdGet(out *redeo.Responder, r *redeo.Request) error {
 			return
 		}
 
-		out.WriteString(db.get(key))
+		out.WriteString(db.stringGet(key))
 	})
 }
 
@@ -292,7 +292,7 @@ func (m *Miniredis) cmdGetset(out *redeo.Responder, r *redeo.Request) error {
 		}
 
 		old, ok := db.stringKeys[key]
-		db.set(key, value)
+		db.stringSet(key, value)
 		// a GETSET clears the expire
 		delete(db.expire, key)
 
@@ -349,7 +349,7 @@ func (m *Miniredis) cmdIncr(out *redeo.Responder, r *redeo.Request) error {
 			out.WriteErrorString(msgWrongType)
 			return
 		}
-		v, err := db.incr(key, +1)
+		v, err := db.stringIncr(key, +1)
 		if err != nil {
 			out.WriteErrorString(err.Error())
 			return
@@ -383,7 +383,7 @@ func (m *Miniredis) cmdIncrby(out *redeo.Responder, r *redeo.Request) error {
 			return
 		}
 
-		v, err := db.incr(key, delta)
+		v, err := db.stringIncr(key, delta)
 		if err != nil {
 			out.WriteErrorString(err.Error())
 			return
@@ -417,7 +417,7 @@ func (m *Miniredis) cmdIncrbyfloat(out *redeo.Responder, r *redeo.Request) error
 			return
 		}
 
-		v, err := db.incrfloat(key, delta)
+		v, err := db.stringIncrfloat(key, delta)
 		if err != nil {
 			out.WriteErrorString(err.Error())
 			return
@@ -443,7 +443,7 @@ func (m *Miniredis) cmdDecr(out *redeo.Responder, r *redeo.Request) error {
 			out.WriteErrorString(msgWrongType)
 			return
 		}
-		v, err := db.incr(key, -1)
+		v, err := db.stringIncr(key, -1)
 		if err != nil {
 			out.WriteErrorString(err.Error())
 			return
@@ -477,7 +477,7 @@ func (m *Miniredis) cmdDecrby(out *redeo.Responder, r *redeo.Request) error {
 			return
 		}
 
-		v, err := db.incr(key, -delta)
+		v, err := db.stringIncr(key, -delta)
 		if err != nil {
 			out.WriteErrorString(err.Error())
 			return
@@ -529,7 +529,7 @@ func (m *Miniredis) cmdAppend(out *redeo.Responder, r *redeo.Request) error {
 		}
 
 		newValue := db.stringKeys[key] + value
-		db.set(key, newValue)
+		db.stringSet(key, newValue)
 
 		out.WriteInt(len(newValue))
 	})
@@ -607,7 +607,7 @@ func (m *Miniredis) cmdSetrange(out *redeo.Responder, r *redeo.Request) error {
 			v = newV
 		}
 		copy(v[pos:pos+len(subst)], subst)
-		db.set(key, string(v))
+		db.stringSet(key, string(v))
 		out.WriteInt(len(v))
 	})
 }
@@ -698,7 +698,7 @@ func (m *Miniredis) cmdBitop(out *redeo.Responder, r *redeo.Request) error {
 			if len(res) == 0 {
 				db.del(target, true)
 			} else {
-				db.set(target, string(res))
+				db.stringSet(target, string(res))
 			}
 			out.WriteInt(len(res))
 		case "NOT":
@@ -720,7 +720,7 @@ func (m *Miniredis) cmdBitop(out *redeo.Responder, r *redeo.Request) error {
 			if len(value) == 0 {
 				db.del(target, true)
 			} else {
-				db.set(target, string(value))
+				db.stringSet(target, string(value))
 			}
 			out.WriteInt(len(value))
 		default:
@@ -896,7 +896,7 @@ func (m *Miniredis) cmdSetbit(out *redeo.Responder, r *redeo.Request) error {
 		} else {
 			value[ourByteNr] |= 1 << uint8(7-ourBitNr)
 		}
-		db.set(key, string(value))
+		db.stringSet(key, string(value))
 
 		out.WriteInt(old)
 	})

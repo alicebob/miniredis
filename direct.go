@@ -39,7 +39,7 @@ func (db *RedisDB) Get(k string) (string, error) {
 	if db.t(k) != "string" {
 		return "", ErrWrongType
 	}
-	return db.get(k), nil
+	return db.stringGet(k), nil
 }
 
 // Set sets a string key. Removes expire.
@@ -57,7 +57,7 @@ func (db *RedisDB) Set(k, v string) error {
 		return ErrWrongType
 	}
 	db.del(k, true) // Remove expire
-	db.set(k, v)
+	db.stringSet(k, v)
 	return nil
 }
 
@@ -75,7 +75,7 @@ func (db *RedisDB) Incr(k string, delta int) (int, error) {
 		return 0, ErrWrongType
 	}
 
-	return db.incr(k, delta)
+	return db.stringIncr(k, delta)
 }
 
 // Incrfloat changes a float string value by delta.
@@ -92,7 +92,7 @@ func (db *RedisDB) Incrfloat(k string, delta float64) (float64, error) {
 		return 0, ErrWrongType
 	}
 
-	return db.incrfloat(k, delta)
+	return db.stringIncrfloat(k, delta)
 }
 
 // List returns the list k, or an error if it's not there or something else.
@@ -131,7 +131,7 @@ func (db *RedisDB) Lpush(k, v string) (int, error) {
 	if db.exists(k) && db.t(k) != "list" {
 		return 0, ErrWrongType
 	}
-	return db.lpush(k, v), nil
+	return db.listLpush(k, v), nil
 }
 
 // Lpop is a shift. Returns the popped element.
@@ -150,7 +150,7 @@ func (db *RedisDB) Lpop(k string) (string, error) {
 	if db.t(k) != "list" {
 		return "", ErrWrongType
 	}
-	return db.lpop(k), nil
+	return db.listLpop(k), nil
 }
 
 // Push add element at the end. Is called RPUSH in redis. Returns the new length.
@@ -166,7 +166,7 @@ func (db *RedisDB) Push(k string, v ...string) (int, error) {
 	if db.exists(k) && db.t(k) != "list" {
 		return 0, ErrWrongType
 	}
-	return db.push(k, v...), nil
+	return db.listPush(k, v...), nil
 }
 
 // Pop removes and returns the last element. Is called RPOP in Redis.
@@ -186,7 +186,7 @@ func (db *RedisDB) Pop(k string) (string, error) {
 		return "", ErrWrongType
 	}
 
-	return db.pop(k), nil
+	return db.listPop(k), nil
 }
 
 // SetAdd adds keys to a set. Returns the number of new keys.
@@ -201,7 +201,7 @@ func (db *RedisDB) SetAdd(k string, elems ...string) (int, error) {
 	if db.exists(k) && db.t(k) != "set" {
 		return 0, ErrWrongType
 	}
-	return db.setadd(k, elems...), nil
+	return db.setAdd(k, elems...), nil
 }
 
 // Members gives all set keys. Sorted.
@@ -219,7 +219,7 @@ func (db *RedisDB) Members(k string) ([]string, error) {
 	if db.t(k) != "set" {
 		return nil, ErrWrongType
 	}
-	return db.members(k), nil
+	return db.setMembers(k), nil
 }
 
 // IsMember tells if value is in the set.
@@ -237,7 +237,7 @@ func (db *RedisDB) IsMember(k, v string) (bool, error) {
 	if db.t(k) != "set" {
 		return false, ErrWrongType
 	}
-	return db.isMember(k, v), nil
+	return db.setIsMember(k, v), nil
 }
 
 // HKeys returns all keys ('fields') for a hash key.
@@ -255,7 +255,7 @@ func (db *RedisDB) HKeys(key string) ([]string, error) {
 	if db.t(key) != "hash" {
 		return nil, ErrWrongType
 	}
-	return db.hkeys(key), nil
+	return db.hashFields(key), nil
 }
 
 // Del deletes a key and any expiration value. Returns whether there was a key.
@@ -356,7 +356,7 @@ func (m *Miniredis) HSet(k, f, v string) {
 func (db *RedisDB) HSet(k, f, v string) {
 	db.master.Lock()
 	defer db.master.Unlock()
-	db.hset(k, f, v)
+	db.hashSet(k, f, v)
 }
 
 // HDel deletes a hash key.
@@ -388,7 +388,7 @@ func (m *Miniredis) HIncr(k, f string, delta int) (int, error) {
 func (db *RedisDB) HIncr(k, f string, delta int) (int, error) {
 	db.master.Lock()
 	defer db.master.Unlock()
-	return db.hincr(k, f, delta)
+	return db.hashIncr(k, f, delta)
 }
 
 // HIncrfloat increases a key/field by delta (float).
@@ -400,7 +400,7 @@ func (m *Miniredis) HIncrfloat(k, f string, delta float64) (float64, error) {
 func (db *RedisDB) HIncrfloat(k, f string, delta float64) (float64, error) {
 	db.master.Lock()
 	defer db.master.Unlock()
-	return db.hincrfloat(k, f, delta)
+	return db.hashIncrfloat(k, f, delta)
 }
 
 // SRem removes fields from a set. Returns number of deleted fields.
@@ -418,7 +418,7 @@ func (db *RedisDB) SRem(k string, fields ...string) (int, error) {
 	if db.t(k) != "set" {
 		return 0, ErrWrongType
 	}
-	return db.setrem(k, fields...), nil
+	return db.setRem(k, fields...), nil
 }
 
 // ZAdd adds a score,member to a sorted set.
@@ -433,7 +433,7 @@ func (db *RedisDB) ZAdd(k string, score float64, member string) (bool, error) {
 	if db.exists(k) && !db.exists(k) && db.t(k) != "zset" {
 		return false, ErrWrongType
 	}
-	return db.zadd(k, score, member), nil
+	return db.ssetAdd(k, score, member), nil
 }
 
 // ZMembers returns all members by score
@@ -451,7 +451,7 @@ func (db *RedisDB) ZMembers(k string) ([]string, error) {
 	if db.t(k) != "zset" {
 		return nil, ErrWrongType
 	}
-	return db.zmembers(k), nil
+	return db.ssetMembers(k), nil
 }
 
 // SortedSet returns a raw string->float64 map.
@@ -487,7 +487,7 @@ func (db *RedisDB) ZRem(k, member string) (bool, error) {
 	if db.t(k) != "zset" {
 		return false, ErrWrongType
 	}
-	return db.zrem(k, member), nil
+	return db.ssetRem(k, member), nil
 }
 
 // ZScore gives the score of a sorted set member.
@@ -505,5 +505,5 @@ func (db *RedisDB) ZScore(k, member string) (float64, error) {
 	if db.t(k) != "zset" {
 		return 0, ErrWrongType
 	}
-	return db.zscore(k, member), nil
+	return db.ssetScore(k, member), nil
 }
