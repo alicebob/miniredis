@@ -163,7 +163,7 @@ func (m *Miniredis) cmdPsetex(out *redeo.Responder, r *redeo.Request) error {
 func (m *Miniredis) cmdSetnx(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) != 2 {
 		setDirty(r.Client())
-		out.WriteErrorString("usage error")
+		out.WriteErrorString("ERR wrong number of arguments for 'setnx' command")
 		return nil
 	}
 	key := r.Args[0]

@@ -58,7 +58,7 @@ func (m *Miniredis) cmdHset(out *redeo.Responder, r *redeo.Request) error {
 func (m *Miniredis) cmdHsetnx(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) != 3 {
 		setDirty(r.Client())
-		out.WriteErrorString("usage error")
+		out.WriteErrorString("ERR wrong number of arguments for 'hsetnx' command")
 		return nil
 	}
 	key := r.Args[0]
@@ -156,10 +156,11 @@ func (m *Miniredis) cmdHget(out *redeo.Responder, r *redeo.Request) error {
 func (m *Miniredis) cmdHdel(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) < 2 {
 		setDirty(r.Client())
-		out.WriteErrorString("usage error")
+		out.WriteErrorString("ERR wrong number of arguments for 'hdel' command")
 		return nil
 	}
 	key := r.Args[0]
+	fields := r.Args[1:]
 
 	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
@@ -176,7 +177,7 @@ func (m *Miniredis) cmdHdel(out *redeo.Responder, r *redeo.Request) error {
 		}
 
 		deleted := 0
-		for _, f := range r.Args[1:] {
+		for _, f := range fields {
 			_, ok := db.hashKeys[key][f]
 			if !ok {
 				continue
@@ -195,9 +196,9 @@ func (m *Miniredis) cmdHdel(out *redeo.Responder, r *redeo.Request) error {
 
 // HEXISTS
 func (m *Miniredis) cmdHexists(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) < 2 {
+	if len(r.Args) != 2 {
 		setDirty(r.Client())
-		out.WriteErrorString("usage error")
+		out.WriteErrorString("ERR wrong number of arguments for 'hexists' command")
 		return nil
 	}
 	key := r.Args[0]
@@ -228,7 +229,7 @@ func (m *Miniredis) cmdHexists(out *redeo.Responder, r *redeo.Request) error {
 func (m *Miniredis) cmdHgetall(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) != 1 {
 		setDirty(r.Client())
-		out.WriteErrorString("usage error")
+		out.WriteErrorString("ERR wrong number of arguments for 'hgetall' command")
 		return nil
 	}
 	key := r.Args[0]
