@@ -277,7 +277,7 @@ func (m *Miniredis) cmdGet(out *redeo.Responder, r *redeo.Request) error {
 func (m *Miniredis) cmdGetset(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) != 2 {
 		setDirty(r.Client())
-		out.WriteErrorString("usage error")
+		out.WriteErrorString("ERR wrong number of arguments for 'getset' command")
 		return nil
 	}
 	key := r.Args[0]
@@ -309,7 +309,7 @@ func (m *Miniredis) cmdGetset(out *redeo.Responder, r *redeo.Request) error {
 func (m *Miniredis) cmdMget(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) < 1 {
 		setDirty(r.Client())
-		out.WriteErrorString("usage error")
+		out.WriteErrorString("ERR wrong number of arguments for 'mget' command")
 		return nil
 	}
 
@@ -614,37 +614,49 @@ func (m *Miniredis) cmdSetrange(out *redeo.Responder, r *redeo.Request) error {
 
 // BITCOUNT
 func (m *Miniredis) cmdBitcount(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) != 1 && len(r.Args) != 3 {
+	if len(r.Args) < 1 {
 		setDirty(r.Client())
-		out.WriteErrorString(msgSyntaxError)
+		out.WriteErrorString("ERR wrong number of arguments for 'bitcount' command")
 		return nil
 	}
 
 	key := r.Args[0]
 	useRange := false
 	start, end := 0, 0
-	if len(r.Args) == 3 {
+	args := r.Args[1:]
+	if len(args) >= 2 {
 		useRange = true
 		var err error
-		start, err = strconv.Atoi(r.Args[1])
+		start, err = strconv.Atoi(args[0])
 		if err != nil {
 			setDirty(r.Client())
 			out.WriteErrorString(msgInvalidInt)
 			return nil
 		}
-		end, err = strconv.Atoi(r.Args[2])
+		end, err = strconv.Atoi(args[1])
 		if err != nil {
 			setDirty(r.Client())
 			out.WriteErrorString(msgInvalidInt)
 			return nil
 		}
+		args = args[2:]
 	}
 
 	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
-		if t, ok := db.keys[key]; ok && t != "string" {
+		if !db.exists(key) {
+			out.WriteZero()
+			return
+		}
+		if db.t(key) != "string" {
 			out.WriteErrorString(msgWrongType)
+			return
+		}
+
+		// Real redis only checks after it knows the key is there and a string.
+		if len(args) != 0 {
+			out.WriteErrorString(msgSyntaxError)
 			return
 		}
 
