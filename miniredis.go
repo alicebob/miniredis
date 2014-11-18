@@ -18,7 +18,6 @@ import (
 	"sync"
 
 	"github.com/bsm/redeo"
-	"github.com/bsm/redeo/info"
 )
 
 type hashKey map[string]string
@@ -182,12 +181,14 @@ func (m *Miniredis) Port() string {
 	return port
 }
 
+/*
 // CommandCount returns the number of processed commands.
 func (m *Miniredis) CommandCount() int {
 	m.Lock()
 	defer m.Unlock()
-	return int(m.info.Section("Stats").Get("total_commands_processed").(*info.Counter).Value())
+	return int(m.info.TotalProcessed())
 }
+*/
 
 // CurrentConnectionCount returns the number of currently connected clients.
 func (m *Miniredis) CurrentConnectionCount() int {
@@ -196,12 +197,14 @@ func (m *Miniredis) CurrentConnectionCount() int {
 	return m.info.ClientsLen()
 }
 
+/*
 // TotalConnectionCount returns the number of client connections since server start.
 func (m *Miniredis) TotalConnectionCount() int {
 	m.Lock()
 	defer m.Unlock()
-	return int(m.info.Section("Stats").Get("total_connections_received").(*info.Counter).Value())
+	return int(m.info.TotalConnections())
 }
+*/
 
 func getCtx(cl *redeo.Client) *connCtx {
 	if cl.Ctx == nil {
