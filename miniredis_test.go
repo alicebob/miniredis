@@ -42,3 +42,20 @@ func TestMultipleServers(t *testing.T) {
 	go s1.Close()
 	s1.Close()
 }
+
+func TestRestart(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	addr := s.Addr()
+	s.Close()
+	err = s.Restart()
+	ok(t, err)
+	if s.Addr() != addr {
+		t.Fatal("should be the same address")
+	}
+
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+	_, err = c.Do("PING")
+	ok(t, err)
+}

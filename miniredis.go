@@ -41,6 +41,8 @@ type RedisDB struct {
 // Miniredis is a Redis server implementation.
 type Miniredis struct {
 	sync.Mutex
+	srv        *redeo.Server
+	listenAddr string
 	closed     chan struct{}
 	listen     net.Listener
 	info       *redeo.ServerInfo
@@ -93,10 +95,34 @@ func Run() (*Miniredis, error) {
 	return m, m.Start()
 }
 
+func (m *Miniredis) Restart() error {
+	m.Lock()
+	defer m.Unlock()
+
+	l, err := net.Listen("tcp", m.listenAddr)
+	if err != nil {
+		if l, err = net.Listen("tcp6", m.listenAddr); err != nil {
+			return fmt.Errorf("failed to listen on a port: %v", err)
+		}
+	}
+
+	m.listen = l
+
+	go func() {
+		e := make(chan error)
+		go m.srv.Serve(e, m.listen)
+		<-e
+		m.closed <- struct{}{}
+	}()
+
+	return nil
+}
+
 // Start starts a server. It listens on a random port on localhost. See also Addr().
 func (m *Miniredis) Start() error {
 	m.Lock()
 	defer m.Unlock()
+
 	l, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		if l, err = net.Listen("tcp6", "[::1]:0"); err != nil {
@@ -104,22 +130,23 @@ func (m *Miniredis) Start() error {
 		}
 	}
 	m.listen = l
-	srv := redeo.NewServer(&redeo.Config{Addr: "localhost:0"})
+	m.srv = redeo.NewServer(&redeo.Config{Addr: "localhost:0"})
+	m.listenAddr = m.listen.Addr().String()
 
-	m.info = srv.Info()
+	m.info = m.srv.Info()
 
-	commandsConnection(m, srv)
-	commandsGeneric(m, srv)
-	commandsString(m, srv)
-	commandsHash(m, srv)
-	commandsList(m, srv)
-	commandsSet(m, srv)
-	commandsSortedSet(m, srv)
-	commandsTransaction(m, srv)
+	commandsConnection(m, m.srv)
+	commandsGeneric(m, m.srv)
+	commandsString(m, m.srv)
+	commandsHash(m, m.srv)
+	commandsList(m, m.srv)
+	commandsSet(m, m.srv)
+	commandsSortedSet(m, m.srv)
+	commandsTransaction(m, m.srv)
 
 	go func() {
 		e := make(chan error)
-		go srv.Serve(e, m.listen)
+		go m.srv.Serve(e, m.listen)
 		<-e
 		m.closed <- struct{}{}
 	}()
