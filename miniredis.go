@@ -95,17 +95,16 @@ func Run() (*Miniredis, error) {
 	return m, m.Start()
 }
 
+// Restart restarts a Close()d server on the same port. Values will be
+// preserved.
 func (m *Miniredis) Restart() error {
 	m.Lock()
 	defer m.Unlock()
 
-	l, err := net.Listen("tcp", m.listenAddr)
+	l, err := listen(m.listenAddr)
 	if err != nil {
-		if l, err = net.Listen("tcp6", m.listenAddr); err != nil {
-			return fmt.Errorf("failed to listen on a port: %v", err)
-		}
+		return err
 	}
-
 	m.listen = l
 
 	go func() {
@@ -123,15 +122,13 @@ func (m *Miniredis) Start() error {
 	m.Lock()
 	defer m.Unlock()
 
-	l, err := net.Listen("tcp", "127.0.0.1:0")
+	l, err := listen("127.0.0.1:0")
 	if err != nil {
-		if l, err = net.Listen("tcp6", "[::1]:0"); err != nil {
-			return fmt.Errorf("failed to listen on a port: %v", err)
-		}
+		return err
 	}
 	m.listen = l
-	m.srv = redeo.NewServer(&redeo.Config{Addr: "localhost:0"})
-	m.listenAddr = m.listen.Addr().String()
+	m.listenAddr = l.Addr().String()
+	m.srv = redeo.NewServer(&redeo.Config{Addr: m.listenAddr})
 
 	m.info = m.srv.Info()
 
@@ -151,6 +148,16 @@ func (m *Miniredis) Start() error {
 		m.closed <- struct{}{}
 	}()
 	return nil
+}
+
+func listen(addr string) (net.Listener, error) {
+	l, err := net.Listen("tcp", addr)
+	if err != nil {
+		if l, err = net.Listen("tcp6", addr); err != nil {
+			return nil, fmt.Errorf("failed to listen on a port: %v", err)
+		}
+	}
+	return l, nil
 }
 
 // Close shuts down a Miniredis.
@@ -189,14 +196,14 @@ func (m *Miniredis) db(i int) *RedisDB {
 func (m *Miniredis) Addr() string {
 	m.Lock()
 	defer m.Unlock()
-	return m.listen.Addr().String()
+	return m.listenAddr
 }
 
 // Host returns the host part of Addr()
 func (m *Miniredis) Host() string {
 	m.Lock()
 	defer m.Unlock()
-	host, _, _ := net.SplitHostPort(m.listen.Addr().String())
+	host, _, _ := net.SplitHostPort(m.listenAddr)
 	return host
 }
 
@@ -204,7 +211,7 @@ func (m *Miniredis) Host() string {
 func (m *Miniredis) Port() string {
 	m.Lock()
 	defer m.Unlock()
-	_, port, _ := net.SplitHostPort(m.listen.Addr().String())
+	_, port, _ := net.SplitHostPort(m.listenAddr)
 	return port
 }
 

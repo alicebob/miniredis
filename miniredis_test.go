@@ -47,6 +47,9 @@ func TestRestart(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	addr := s.Addr()
+
+	s.Set("color", "red")
+
 	s.Close()
 	err = s.Restart()
 	ok(t, err)
@@ -58,4 +61,10 @@ func TestRestart(t *testing.T) {
 	ok(t, err)
 	_, err = c.Do("PING")
 	ok(t, err)
+
+	red, err := redis.String(c.Do("GET", "color"))
+	ok(t, err)
+	if have, want := red, "red"; have != want {
+		t.Errorf("have: %s, want: %s", have, want)
+	}
 }
