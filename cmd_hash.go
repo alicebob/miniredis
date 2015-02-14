@@ -86,7 +86,7 @@ func (m *Miniredis) cmdHsetnx(out *redeo.Responder, r *redeo.Request) error {
 	})
 }
 
-// MMSET
+// HMSET
 func (m *Miniredis) cmdHmset(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) < 3 {
 		setDirty(r.Client())
@@ -96,7 +96,9 @@ func (m *Miniredis) cmdHmset(out *redeo.Responder, r *redeo.Request) error {
 	args := r.Args[1:]
 	if len(args)%2 != 0 {
 		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+		// non-default error message
+		out.WriteErrorString("ERR wrong number of arguments for HMSET")
+		return nil
 	}
 	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)

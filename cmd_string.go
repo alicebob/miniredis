@@ -186,7 +186,9 @@ func (m *Miniredis) cmdMset(out *redeo.Responder, r *redeo.Request) error {
 	}
 	if len(r.Args)%2 != 0 {
 		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+		// non-default error message
+		out.WriteErrorString("ERR wrong number of arguments for MSET")
+		return nil
 	}
 	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
@@ -211,7 +213,9 @@ func (m *Miniredis) cmdMsetnx(out *redeo.Responder, r *redeo.Request) error {
 	}
 	if len(r.Args)%2 != 0 {
 		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+		// non-default error message (yes, with 'MSET').
+		out.WriteErrorString("ERR wrong number of arguments for MSET")
+		return nil
 	}
 	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
