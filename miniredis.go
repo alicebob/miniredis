@@ -9,7 +9,9 @@
 //
 // Set keys directly via s.Set(...) and similar commands, or use a Redis client.
 //
-// For direct use you can select a Redis database with either `s.Select(12); s.Get("foo")` or `s.DB(12).Get("foo")`.
+// For direct use you can select a Redis database with either `s.Select(12);
+// s.Get("foo")` or `s.DB(12).Get("foo")`.
+
 package miniredis
 
 import (
@@ -45,7 +47,6 @@ type Miniredis struct {
 	listenAddr string
 	closed     chan struct{}
 	listen     net.Listener
-	info       *redeo.ServerInfo
 	dbs        map[int]*RedisDB
 	selectedDB int // DB id used in the direct Get(), Set() &c.
 }
@@ -115,7 +116,8 @@ func (m *Miniredis) Restart() error {
 	return nil
 }
 
-// Start starts a server. It listens on a random port on localhost. See also Addr().
+// Start starts a server. It listens on a random port on localhost. See also
+// Addr().
 func (m *Miniredis) Start() error {
 	m.Lock()
 	defer m.Unlock()
@@ -127,8 +129,6 @@ func (m *Miniredis) Start() error {
 	m.listen = l
 	m.listenAddr = l.Addr().String()
 	m.srv = redeo.NewServer(&redeo.Config{Addr: m.listenAddr})
-
-	m.info = m.srv.Info()
 
 	commandsConnection(m, m.srv)
 	commandsGeneric(m, m.srv)
@@ -195,7 +195,7 @@ func (m *Miniredis) Addr() string {
 	return m.listenAddr
 }
 
-// Host returns the host part of Addr()
+// Host returns the host part of Addr().
 func (m *Miniredis) Host() string {
 	m.Lock()
 	defer m.Unlock()
@@ -215,21 +215,21 @@ func (m *Miniredis) Port() string {
 func (m *Miniredis) CommandCount() int {
 	m.Lock()
 	defer m.Unlock()
-	return int(m.info.TotalCommands())
+	return int(m.srv.Info().TotalCommands())
 }
 
 // CurrentConnectionCount returns the number of currently connected clients.
 func (m *Miniredis) CurrentConnectionCount() int {
 	m.Lock()
 	defer m.Unlock()
-	return m.info.ClientsLen()
+	return m.srv.Info().ClientsLen()
 }
 
 // TotalConnectionCount returns the number of client connections since server start.
 func (m *Miniredis) TotalConnectionCount() int {
 	m.Lock()
 	defer m.Unlock()
-	return int(m.info.TotalConnections())
+	return int(m.srv.Info().TotalConnections())
 }
 
 func getCtx(cl *redeo.Client) *connCtx {
