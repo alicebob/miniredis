@@ -32,8 +32,7 @@ func (m *Miniredis) cmdAuth(out *redeo.Responder, r *redeo.Request) error {
 func (m *Miniredis) cmdEcho(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) != 1 {
 		setDirty(r.Client())
-		out.WriteErrorString("usage error")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 	msg := r.Args[0]
 	out.WriteString(msg)
@@ -44,8 +43,7 @@ func (m *Miniredis) cmdEcho(out *redeo.Responder, r *redeo.Request) error {
 func (m *Miniredis) cmdSelect(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) != 1 {
 		setDirty(r.Client())
-		out.WriteErrorString("usage error")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 	id, err := strconv.Atoi(r.Args[0])
 	if err != nil {

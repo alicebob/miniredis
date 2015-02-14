@@ -43,8 +43,7 @@ func commandsSortedSet(m *Miniredis, srv *redeo.Server) {
 func (m *Miniredis) cmdZadd(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) < 3 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'zadd' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 
 	key := r.Args[0]
@@ -89,8 +88,7 @@ func (m *Miniredis) cmdZadd(out *redeo.Responder, r *redeo.Request) error {
 func (m *Miniredis) cmdZcard(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) != 1 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'zcard' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 
 	key := r.Args[0]
@@ -116,8 +114,7 @@ func (m *Miniredis) cmdZcard(out *redeo.Responder, r *redeo.Request) error {
 func (m *Miniredis) cmdZcount(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) != 3 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'zcount' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 
 	key := r.Args[0]
@@ -157,8 +154,7 @@ func (m *Miniredis) cmdZcount(out *redeo.Responder, r *redeo.Request) error {
 func (m *Miniredis) cmdZincrby(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) != 3 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'zincrby' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 
 	key := r.Args[0]
@@ -186,8 +182,7 @@ func (m *Miniredis) cmdZincrby(out *redeo.Responder, r *redeo.Request) error {
 func (m *Miniredis) cmdZinterstore(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) < 3 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'zinterstore' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 
 	destination := r.Args[0]
@@ -205,8 +200,7 @@ func (m *Miniredis) cmdZinterstore(out *redeo.Responder, r *redeo.Request) error
 	}
 	if numKeys <= 0 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR at least 1 input key is needed for ZUNIONSTORE/ZINTERSTORE")
-		return nil
+		return redeo.ClientError("at least 1 input key is needed for ZUNIONSTORE/ZINTERSTORE")
 	}
 	keys := args[:numKeys]
 	args = args[numKeys:]
@@ -225,8 +219,7 @@ func (m *Miniredis) cmdZinterstore(out *redeo.Responder, r *redeo.Request) error
 				f, err := strconv.ParseFloat(args[i+1], 64)
 				if err != nil {
 					setDirty(r.Client())
-					out.WriteErrorString("ERR weight value is not a float")
-					return nil
+					return redeo.ClientError("weight value is not a float")
 				}
 				weights = append(weights, f)
 			}
@@ -313,8 +306,7 @@ func (m *Miniredis) cmdZinterstore(out *redeo.Responder, r *redeo.Request) error
 func (m *Miniredis) cmdZlexcount(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) != 3 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'zlexcount' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 
 	key := r.Args[0]
@@ -357,8 +349,7 @@ func (m *Miniredis) makeCmdZrange(cmd string, reverse bool) redeo.HandlerFunc {
 	return func(out *redeo.Responder, r *redeo.Request) error {
 		if len(r.Args) < 3 {
 			setDirty(r.Client())
-			out.WriteErrorString("ERR wrong number of arguments for '" + cmd + "' command")
-			return nil
+			return r.WrongNumberOfArgs()
 		}
 
 		key := r.Args[0]
@@ -426,8 +417,7 @@ func (m *Miniredis) makeCmdZrange(cmd string, reverse bool) redeo.HandlerFunc {
 func (m *Miniredis) cmdZrangebylex(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) < 3 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'zrangebylex' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 
 	key := r.Args[0]
@@ -526,8 +516,7 @@ func (m *Miniredis) makeCmdZrangebyscore(cmd string, reverse bool) redeo.Handler
 	return func(out *redeo.Responder, r *redeo.Request) error {
 		if len(r.Args) < 3 {
 			setDirty(r.Client())
-			out.WriteErrorString("ERR wrong number of arguments for '" + cmd + "' command")
-			return nil
+			return r.WrongNumberOfArgs()
 		}
 
 		key := r.Args[0]
@@ -645,8 +634,7 @@ func (m *Miniredis) makeCmdZrank(cmd string, reverse bool) redeo.HandlerFunc {
 	return func(out *redeo.Responder, r *redeo.Request) error {
 		if len(r.Args) != 2 {
 			setDirty(r.Client())
-			out.WriteErrorString("ERR wrong number of arguments for '" + cmd + "' command")
-			return nil
+			return r.WrongNumberOfArgs()
 		}
 
 		key := r.Args[0]
@@ -683,8 +671,7 @@ func (m *Miniredis) makeCmdZrank(cmd string, reverse bool) redeo.HandlerFunc {
 func (m *Miniredis) cmdZrem(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) < 2 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'zrem' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 
 	key := r.Args[0]
@@ -717,8 +704,7 @@ func (m *Miniredis) cmdZrem(out *redeo.Responder, r *redeo.Request) error {
 func (m *Miniredis) cmdZremrangebylex(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) != 3 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'zremrangebylex' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 
 	key := r.Args[0]
@@ -764,8 +750,7 @@ func (m *Miniredis) cmdZremrangebylex(out *redeo.Responder, r *redeo.Request) er
 func (m *Miniredis) cmdZremrangebyrank(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) != 3 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'zremrangebyrank' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 
 	key := r.Args[0]
@@ -808,8 +793,7 @@ func (m *Miniredis) cmdZremrangebyrank(out *redeo.Responder, r *redeo.Request) e
 func (m *Miniredis) cmdZremrangebyscore(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) != 3 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'zremrangebyscore' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 
 	key := r.Args[0]
@@ -853,8 +837,7 @@ func (m *Miniredis) cmdZremrangebyscore(out *redeo.Responder, r *redeo.Request) 
 func (m *Miniredis) cmdZscore(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) != 2 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'zscore' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 
 	key := r.Args[0]
@@ -1018,8 +1001,7 @@ func withLexRange(members []string, min string, minIncl bool, max string, maxInc
 func (m *Miniredis) cmdZunionstore(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) < 3 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'zunionstore' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 
 	destination := r.Args[0]
@@ -1037,8 +1019,7 @@ func (m *Miniredis) cmdZunionstore(out *redeo.Responder, r *redeo.Request) error
 	}
 	if numKeys <= 0 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR at least 1 input key is needed for ZUNIONSTORE/ZINTERSTORE")
-		return nil
+		return redeo.ClientError("at least 1 input key is needed for ZUNIONSTORE/ZINTERSTORE")
 	}
 	keys := args[:numKeys]
 	args = args[numKeys:]
@@ -1057,8 +1038,7 @@ func (m *Miniredis) cmdZunionstore(out *redeo.Responder, r *redeo.Request) error
 				f, err := strconv.ParseFloat(args[i+1], 64)
 				if err != nil {
 					setDirty(r.Client())
-					out.WriteErrorString("ERR weight value is not a float")
-					return nil
+					return redeo.ClientError("weight value is not a float")
 				}
 				weights = append(weights, f)
 			}
@@ -1136,8 +1116,7 @@ func (m *Miniredis) cmdZunionstore(out *redeo.Responder, r *redeo.Request) error
 func (m *Miniredis) cmdZscan(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) < 2 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'zscan' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 
 	key := r.Args[0]

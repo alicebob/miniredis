@@ -40,8 +40,7 @@ func makeCmdExpire(m *Miniredis, cmd string) func(*redeo.Responder, *redeo.Reque
 	return func(out *redeo.Responder, r *redeo.Request) error {
 		if len(r.Args) != 2 {
 			setDirty(r.Client())
-			out.WriteErrorString("ERR wrong number of arguments for '" + cmd + "' command")
-			return nil
+			return r.WrongNumberOfArgs()
 		}
 		key := r.Args[0]
 		value := r.Args[1]
@@ -71,8 +70,7 @@ func makeCmdExpire(m *Miniredis, cmd string) func(*redeo.Responder, *redeo.Reque
 func (m *Miniredis) cmdTTL(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) != 1 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'ttl' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 	key := r.Args[0]
 
@@ -99,8 +97,7 @@ func (m *Miniredis) cmdTTL(out *redeo.Responder, r *redeo.Request) error {
 func (m *Miniredis) cmdPTTL(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) != 1 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'pttl' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 	key := r.Args[0]
 
@@ -191,8 +188,7 @@ func (m *Miniredis) cmdType(out *redeo.Responder, r *redeo.Request) error {
 func (m *Miniredis) cmdExists(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) != 1 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'exists' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 
 	key := r.Args[0]
@@ -212,8 +208,7 @@ func (m *Miniredis) cmdExists(out *redeo.Responder, r *redeo.Request) error {
 func (m *Miniredis) cmdMove(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) != 2 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'move' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 
 	key := r.Args[0]
@@ -242,8 +237,7 @@ func (m *Miniredis) cmdMove(out *redeo.Responder, r *redeo.Request) error {
 func (m *Miniredis) cmdKeys(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) != 1 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'keys' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 
 	key := r.Args[0]
@@ -263,8 +257,7 @@ func (m *Miniredis) cmdKeys(out *redeo.Responder, r *redeo.Request) error {
 func (m *Miniredis) cmdRandomkey(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) != 0 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'randomkey' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 
 	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
@@ -289,8 +282,7 @@ func (m *Miniredis) cmdRandomkey(out *redeo.Responder, r *redeo.Request) error {
 func (m *Miniredis) cmdRename(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) != 2 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'rename' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 
 	from := r.Args[0]
@@ -313,8 +305,7 @@ func (m *Miniredis) cmdRename(out *redeo.Responder, r *redeo.Request) error {
 func (m *Miniredis) cmdRenamenx(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) != 2 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'renamenx' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 
 	from := r.Args[0]
@@ -342,8 +333,7 @@ func (m *Miniredis) cmdRenamenx(out *redeo.Responder, r *redeo.Request) error {
 func (m *Miniredis) cmdScan(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) < 1 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'scan' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 
 	cursor, err := strconv.Atoi(r.Args[0])

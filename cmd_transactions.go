@@ -18,14 +18,12 @@ func commandsTransaction(m *Miniredis, srv *redeo.Server) {
 // MULTI
 func (m *Miniredis) cmdMulti(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) != 0 {
-		out.WriteErrorString("ERR wrong number of arguments for 'multi' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 	ctx := getCtx(r.Client())
 
 	if inTx(ctx) {
-		out.WriteErrorString("ERR MULTI calls can not be nested")
-		return nil
+		return redeo.ClientError("MULTI calls can not be nested")
 	}
 
 	startTx(ctx)
@@ -38,15 +36,13 @@ func (m *Miniredis) cmdMulti(out *redeo.Responder, r *redeo.Request) error {
 func (m *Miniredis) cmdExec(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) != 0 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'exec' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 
 	ctx := getCtx(r.Client())
 
 	if !inTx(ctx) {
-		out.WriteErrorString("ERR EXEC without MULTI")
-		return nil
+		return redeo.ClientError("EXEC without MULTI")
 	}
 
 	if dirtyTx(ctx) {
@@ -80,14 +76,12 @@ func (m *Miniredis) cmdExec(out *redeo.Responder, r *redeo.Request) error {
 func (m *Miniredis) cmdDiscard(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) != 0 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'discard' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 
 	ctx := getCtx(r.Client())
 	if !inTx(ctx) {
-		out.WriteErrorString("ERR DISCARD without MULTI")
-		return nil
+		return redeo.ClientError("DISCARD without MULTI")
 	}
 
 	stopTx(ctx)
@@ -99,14 +93,12 @@ func (m *Miniredis) cmdDiscard(out *redeo.Responder, r *redeo.Request) error {
 func (m *Miniredis) cmdWatch(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) == 0 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'watch' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 
 	ctx := getCtx(r.Client())
 	if inTx(ctx) {
-		out.WriteErrorString("ERR WATCH in MULTI")
-		return nil
+		return redeo.ClientError("WATCH in MULTI")
 	}
 
 	m.Lock()
@@ -124,8 +116,7 @@ func (m *Miniredis) cmdWatch(out *redeo.Responder, r *redeo.Request) error {
 func (m *Miniredis) cmdUnwatch(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) != 0 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'unwatch' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 
 	// Doesn't matter if UNWATCH is in a TX or not. Looks like a Redis bug to me.

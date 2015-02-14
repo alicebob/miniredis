@@ -40,8 +40,7 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 func (m *Miniredis) cmdSet(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) < 2 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'set' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 	nx := false // set iff not exists
 	xx := false // set iff exists
@@ -111,8 +110,7 @@ func (m *Miniredis) cmdSet(out *redeo.Responder, r *redeo.Request) error {
 func (m *Miniredis) cmdSetex(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) != 3 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'setex' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 	key := r.Args[0]
 	ttl, err := strconv.Atoi(r.Args[1])
@@ -137,8 +135,7 @@ func (m *Miniredis) cmdSetex(out *redeo.Responder, r *redeo.Request) error {
 func (m *Miniredis) cmdPsetex(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) != 3 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'psetex' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 	key := r.Args[0]
 	ttl, err := strconv.Atoi(r.Args[1])
@@ -163,8 +160,7 @@ func (m *Miniredis) cmdPsetex(out *redeo.Responder, r *redeo.Request) error {
 func (m *Miniredis) cmdSetnx(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) != 2 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'setnx' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 	key := r.Args[0]
 	value := r.Args[1]
@@ -186,13 +182,11 @@ func (m *Miniredis) cmdSetnx(out *redeo.Responder, r *redeo.Request) error {
 func (m *Miniredis) cmdMset(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) < 2 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'mset' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 	if len(r.Args)%2 != 0 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for MSET")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
@@ -213,13 +207,11 @@ func (m *Miniredis) cmdMset(out *redeo.Responder, r *redeo.Request) error {
 func (m *Miniredis) cmdMsetnx(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) < 2 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'msetnx' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 	if len(r.Args)%2 != 0 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for MSET")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
@@ -252,8 +244,7 @@ func (m *Miniredis) cmdMsetnx(out *redeo.Responder, r *redeo.Request) error {
 func (m *Miniredis) cmdGet(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) != 1 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'get' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 	key := r.Args[0]
 
@@ -277,8 +268,7 @@ func (m *Miniredis) cmdGet(out *redeo.Responder, r *redeo.Request) error {
 func (m *Miniredis) cmdGetset(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) != 2 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'getset' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 	key := r.Args[0]
 	value := r.Args[1]
@@ -309,8 +299,7 @@ func (m *Miniredis) cmdGetset(out *redeo.Responder, r *redeo.Request) error {
 func (m *Miniredis) cmdMget(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) < 1 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'mget' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 
 	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
@@ -337,8 +326,7 @@ func (m *Miniredis) cmdMget(out *redeo.Responder, r *redeo.Request) error {
 func (m *Miniredis) cmdIncr(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) != 1 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'incr' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 
 	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
@@ -363,8 +351,7 @@ func (m *Miniredis) cmdIncr(out *redeo.Responder, r *redeo.Request) error {
 func (m *Miniredis) cmdIncrby(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) != 2 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'incrby' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 
 	key := r.Args[0]
@@ -397,8 +384,7 @@ func (m *Miniredis) cmdIncrby(out *redeo.Responder, r *redeo.Request) error {
 func (m *Miniredis) cmdIncrbyfloat(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) != 2 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'incrbyfloat' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 
 	key := r.Args[0]
@@ -431,8 +417,7 @@ func (m *Miniredis) cmdIncrbyfloat(out *redeo.Responder, r *redeo.Request) error
 func (m *Miniredis) cmdDecr(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) != 1 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'decr' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 
 	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
@@ -457,8 +442,7 @@ func (m *Miniredis) cmdDecr(out *redeo.Responder, r *redeo.Request) error {
 func (m *Miniredis) cmdDecrby(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) != 2 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'decrby' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 
 	key := r.Args[0]
@@ -491,8 +475,7 @@ func (m *Miniredis) cmdDecrby(out *redeo.Responder, r *redeo.Request) error {
 func (m *Miniredis) cmdStrlen(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) != 1 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'strlen' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 
 	key := r.Args[0]
@@ -513,8 +496,7 @@ func (m *Miniredis) cmdStrlen(out *redeo.Responder, r *redeo.Request) error {
 func (m *Miniredis) cmdAppend(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) != 2 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'append' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 
 	key := r.Args[0]
@@ -539,8 +521,7 @@ func (m *Miniredis) cmdAppend(out *redeo.Responder, r *redeo.Request) error {
 func (m *Miniredis) cmdGetrange(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) != 3 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'getrange' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 
 	key := r.Args[0]
@@ -574,8 +555,7 @@ func (m *Miniredis) cmdGetrange(out *redeo.Responder, r *redeo.Request) error {
 func (m *Miniredis) cmdSetrange(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) != 3 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'setrange' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 
 	key := r.Args[0]
@@ -587,8 +567,7 @@ func (m *Miniredis) cmdSetrange(out *redeo.Responder, r *redeo.Request) error {
 	}
 	if pos < 0 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR offset is out of range")
-		return nil
+		return redeo.ClientError("offset is out of range")
 	}
 	subst := r.Args[2]
 
@@ -616,8 +595,7 @@ func (m *Miniredis) cmdSetrange(out *redeo.Responder, r *redeo.Request) error {
 func (m *Miniredis) cmdBitcount(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) < 1 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'bitcount' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 
 	key := r.Args[0]
@@ -673,8 +651,7 @@ func (m *Miniredis) cmdBitcount(out *redeo.Responder, r *redeo.Request) error {
 func (m *Miniredis) cmdBitop(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) < 3 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'bitop' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 
 	op := strings.ToUpper(r.Args[0])
@@ -745,8 +722,7 @@ func (m *Miniredis) cmdBitop(out *redeo.Responder, r *redeo.Request) error {
 func (m *Miniredis) cmdBitpos(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) < 2 || len(r.Args) > 4 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'bitpos' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 
 	key := r.Args[0]
@@ -824,16 +800,14 @@ func (m *Miniredis) cmdBitpos(out *redeo.Responder, r *redeo.Request) error {
 func (m *Miniredis) cmdGetbit(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) != 2 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'getbit' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 
 	key := r.Args[0]
 	bit, err := strconv.Atoi(r.Args[1])
 	if err != nil {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR bit offset is not an integer or out of range")
-		return nil
+		return redeo.ClientError("bit offset is not an integer or out of range")
 	}
 
 	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
@@ -864,22 +838,19 @@ func (m *Miniredis) cmdGetbit(out *redeo.Responder, r *redeo.Request) error {
 func (m *Miniredis) cmdSetbit(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) != 3 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'setbit' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 
 	key := r.Args[0]
 	bit, err := strconv.Atoi(r.Args[1])
 	if err != nil || bit < 0 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR bit offset is not an integer or out of range")
-		return nil
+		return redeo.ClientError("bit offset is not an integer or out of range")
 	}
 	newBit, err := strconv.Atoi(r.Args[2])
 	if err != nil || (newBit != 0 && newBit != 1) {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR bit is not an integer or out of range")
-		return nil
+		return redeo.ClientError("bit is not an integer or out of range")
 	}
 
 	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {

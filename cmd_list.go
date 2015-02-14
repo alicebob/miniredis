@@ -34,8 +34,7 @@ func commandsList(m *Miniredis, srv *redeo.Server) {
 func (m *Miniredis) cmdLindex(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) != 2 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'lindex' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 	key := r.Args[0]
 	offset, err := strconv.Atoi(r.Args[1])
@@ -75,8 +74,7 @@ func (m *Miniredis) cmdLindex(out *redeo.Responder, r *redeo.Request) error {
 func (m *Miniredis) cmdLinsert(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) != 4 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'linsert' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 	key := r.Args[0]
 	where := 0
@@ -135,8 +133,7 @@ func (m *Miniredis) cmdLinsert(out *redeo.Responder, r *redeo.Request) error {
 func (m *Miniredis) cmdLlen(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) != 1 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'llen' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 	key := r.Args[0]
 
@@ -162,8 +159,7 @@ func (m *Miniredis) cmdLlen(out *redeo.Responder, r *redeo.Request) error {
 func (m *Miniredis) cmdLpop(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) != 1 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'lpop' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 	key := r.Args[0]
 
@@ -189,8 +185,7 @@ func (m *Miniredis) cmdLpop(out *redeo.Responder, r *redeo.Request) error {
 func (m *Miniredis) cmdLpush(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) < 2 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'lpush' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 	key := r.Args[0]
 	args := r.Args[1:]
@@ -215,8 +210,7 @@ func (m *Miniredis) cmdLpush(out *redeo.Responder, r *redeo.Request) error {
 func (m *Miniredis) cmdLpushx(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) != 2 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'lpushx' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 	key := r.Args[0]
 	value := r.Args[1]
@@ -242,8 +236,7 @@ func (m *Miniredis) cmdLpushx(out *redeo.Responder, r *redeo.Request) error {
 func (m *Miniredis) cmdLrange(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) != 3 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'lrange' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 	key := r.Args[0]
 	start, err := strconv.Atoi(r.Args[1])
@@ -285,8 +278,7 @@ func (m *Miniredis) cmdLrange(out *redeo.Responder, r *redeo.Request) error {
 func (m *Miniredis) cmdLrem(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) != 3 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'lrem' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 	key := r.Args[0]
 	count, err := strconv.Atoi(r.Args[1])
@@ -346,8 +338,7 @@ func (m *Miniredis) cmdLrem(out *redeo.Responder, r *redeo.Request) error {
 func (m *Miniredis) cmdLset(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) != 3 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'lset' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 	key := r.Args[0]
 	index, err := strconv.Atoi(r.Args[1])
@@ -389,8 +380,7 @@ func (m *Miniredis) cmdLset(out *redeo.Responder, r *redeo.Request) error {
 func (m *Miniredis) cmdLtrim(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) != 3 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'ltrim' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 	key := r.Args[0]
 	start, err := strconv.Atoi(r.Args[1])
@@ -431,8 +421,7 @@ func (m *Miniredis) cmdLtrim(out *redeo.Responder, r *redeo.Request) error {
 func (m *Miniredis) cmdRpop(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) != 1 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'rpop' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 	key := r.Args[0]
 
@@ -457,8 +446,7 @@ func (m *Miniredis) cmdRpop(out *redeo.Responder, r *redeo.Request) error {
 func (m *Miniredis) cmdRpoplpush(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) != 2 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'rpoplpush' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 	src := r.Args[0]
 	dst := r.Args[1]
@@ -484,8 +472,7 @@ func (m *Miniredis) cmdRpoplpush(out *redeo.Responder, r *redeo.Request) error {
 func (m *Miniredis) cmdRpush(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) < 2 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'rpush' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 	key := r.Args[0]
 	args := r.Args[1:]
@@ -510,8 +497,7 @@ func (m *Miniredis) cmdRpush(out *redeo.Responder, r *redeo.Request) error {
 func (m *Miniredis) cmdRpushx(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) != 2 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'rpushx' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 	key := r.Args[0]
 	value := r.Args[1]

@@ -33,8 +33,7 @@ func commandsSet(m *Miniredis, srv *redeo.Server) {
 func (m *Miniredis) cmdSadd(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) < 2 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'sadd' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 
 	key := r.Args[0]
@@ -57,8 +56,7 @@ func (m *Miniredis) cmdSadd(out *redeo.Responder, r *redeo.Request) error {
 func (m *Miniredis) cmdScard(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) != 1 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'scard' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 
 	key := r.Args[0]
@@ -85,8 +83,7 @@ func (m *Miniredis) cmdScard(out *redeo.Responder, r *redeo.Request) error {
 func (m *Miniredis) cmdSdiff(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) < 1 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'sdiff' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 
 	keys := r.Args
@@ -111,8 +108,7 @@ func (m *Miniredis) cmdSdiff(out *redeo.Responder, r *redeo.Request) error {
 func (m *Miniredis) cmdSdiffstore(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) < 2 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'sdiffstore' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 
 	dest := r.Args[0]
@@ -137,8 +133,7 @@ func (m *Miniredis) cmdSdiffstore(out *redeo.Responder, r *redeo.Request) error 
 func (m *Miniredis) cmdSinter(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) < 1 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'sinter' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 
 	keys := r.Args
@@ -163,8 +158,7 @@ func (m *Miniredis) cmdSinter(out *redeo.Responder, r *redeo.Request) error {
 func (m *Miniredis) cmdSinterstore(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) < 2 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'sinterstore' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 
 	dest := r.Args[0]
@@ -189,8 +183,7 @@ func (m *Miniredis) cmdSinterstore(out *redeo.Responder, r *redeo.Request) error
 func (m *Miniredis) cmdSismember(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) != 2 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'sismember' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 
 	key := r.Args[0]
@@ -221,8 +214,7 @@ func (m *Miniredis) cmdSismember(out *redeo.Responder, r *redeo.Request) error {
 func (m *Miniredis) cmdSmembers(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) != 1 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'smembers' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 
 	key := r.Args[0]
@@ -253,8 +245,7 @@ func (m *Miniredis) cmdSmembers(out *redeo.Responder, r *redeo.Request) error {
 func (m *Miniredis) cmdSmove(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) != 3 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'smove' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 
 	src := r.Args[0]
@@ -293,8 +284,7 @@ func (m *Miniredis) cmdSmove(out *redeo.Responder, r *redeo.Request) error {
 func (m *Miniredis) cmdSpop(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) != 1 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'spop' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 
 	key := r.Args[0]
@@ -323,8 +313,7 @@ func (m *Miniredis) cmdSpop(out *redeo.Responder, r *redeo.Request) error {
 func (m *Miniredis) cmdSrandmember(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) < 1 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'srandmember' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 	if len(r.Args) > 2 {
 		setDirty(r.Client())
@@ -391,8 +380,7 @@ func (m *Miniredis) cmdSrandmember(out *redeo.Responder, r *redeo.Request) error
 func (m *Miniredis) cmdSrem(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) < 2 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'srem' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 
 	key := r.Args[0]
@@ -419,8 +407,7 @@ func (m *Miniredis) cmdSrem(out *redeo.Responder, r *redeo.Request) error {
 func (m *Miniredis) cmdSunion(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) < 1 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'sunion' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 
 	keys := r.Args
@@ -445,8 +432,7 @@ func (m *Miniredis) cmdSunion(out *redeo.Responder, r *redeo.Request) error {
 func (m *Miniredis) cmdSunionstore(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) < 2 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'sunionstore' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 
 	dest := r.Args[0]
@@ -471,8 +457,7 @@ func (m *Miniredis) cmdSunionstore(out *redeo.Responder, r *redeo.Request) error
 func (m *Miniredis) cmdSscan(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) < 2 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'sscan' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 
 	key := r.Args[0]

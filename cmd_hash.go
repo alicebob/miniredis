@@ -31,8 +31,7 @@ func commandsHash(m *Miniredis, srv *redeo.Server) {
 func (m *Miniredis) cmdHset(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) != 3 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'hset' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 	key := r.Args[0]
 	field := r.Args[1]
@@ -58,8 +57,7 @@ func (m *Miniredis) cmdHset(out *redeo.Responder, r *redeo.Request) error {
 func (m *Miniredis) cmdHsetnx(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) != 3 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'hsetnx' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 	key := r.Args[0]
 	field := r.Args[1]
@@ -92,15 +90,13 @@ func (m *Miniredis) cmdHsetnx(out *redeo.Responder, r *redeo.Request) error {
 func (m *Miniredis) cmdHmset(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) < 3 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'hmset' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 	key := r.Args[0]
 	args := r.Args[1:]
 	if len(args)%2 != 0 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for HMSET")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
@@ -125,8 +121,7 @@ func (m *Miniredis) cmdHmset(out *redeo.Responder, r *redeo.Request) error {
 func (m *Miniredis) cmdHget(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) != 2 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'hget' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 	key := r.Args[0]
 	field := r.Args[1]
@@ -156,8 +151,7 @@ func (m *Miniredis) cmdHget(out *redeo.Responder, r *redeo.Request) error {
 func (m *Miniredis) cmdHdel(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) < 2 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'hdel' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 	key := r.Args[0]
 	fields := r.Args[1:]
@@ -198,8 +192,7 @@ func (m *Miniredis) cmdHdel(out *redeo.Responder, r *redeo.Request) error {
 func (m *Miniredis) cmdHexists(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) != 2 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'hexists' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 	key := r.Args[0]
 	field := r.Args[1]
@@ -229,8 +222,7 @@ func (m *Miniredis) cmdHexists(out *redeo.Responder, r *redeo.Request) error {
 func (m *Miniredis) cmdHgetall(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) != 1 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'hgetall' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 	key := r.Args[0]
 
@@ -259,8 +251,7 @@ func (m *Miniredis) cmdHgetall(out *redeo.Responder, r *redeo.Request) error {
 func (m *Miniredis) cmdHkeys(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) != 1 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'hkeys' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 	key := r.Args[0]
 
@@ -288,8 +279,7 @@ func (m *Miniredis) cmdHkeys(out *redeo.Responder, r *redeo.Request) error {
 func (m *Miniredis) cmdHvals(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) != 1 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'hvals' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 	key := r.Args[0]
 
@@ -317,8 +307,7 @@ func (m *Miniredis) cmdHvals(out *redeo.Responder, r *redeo.Request) error {
 func (m *Miniredis) cmdHlen(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) != 1 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'hlen' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 	key := r.Args[0]
 
@@ -343,8 +332,7 @@ func (m *Miniredis) cmdHlen(out *redeo.Responder, r *redeo.Request) error {
 func (m *Miniredis) cmdHmget(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) < 2 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'hmget' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 	key := r.Args[0]
 
@@ -377,8 +365,7 @@ func (m *Miniredis) cmdHmget(out *redeo.Responder, r *redeo.Request) error {
 func (m *Miniredis) cmdHincrby(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) != 3 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'hincrby' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 	key := r.Args[0]
 	field := r.Args[1]
@@ -410,8 +397,7 @@ func (m *Miniredis) cmdHincrby(out *redeo.Responder, r *redeo.Request) error {
 func (m *Miniredis) cmdHincrbyfloat(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) != 3 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'hincrbyfloat' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 	key := r.Args[0]
 	field := r.Args[1]
@@ -443,8 +429,7 @@ func (m *Miniredis) cmdHincrbyfloat(out *redeo.Responder, r *redeo.Request) erro
 func (m *Miniredis) cmdHscan(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) < 2 {
 		setDirty(r.Client())
-		out.WriteErrorString("ERR wrong number of arguments for 'hscan' command")
-		return nil
+		return r.WrongNumberOfArgs()
 	}
 
 	key := r.Args[0]
