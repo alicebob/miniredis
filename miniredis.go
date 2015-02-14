@@ -47,7 +47,6 @@ type Miniredis struct {
 	listenAddr string
 	closed     chan struct{}
 	listen     net.Listener
-	info       *redeo.ServerInfo
 	dbs        map[int]*RedisDB
 	selectedDB int // DB id used in the direct Get(), Set() &c.
 }
@@ -130,8 +129,6 @@ func (m *Miniredis) Start() error {
 	m.listen = l
 	m.listenAddr = l.Addr().String()
 	m.srv = redeo.NewServer(&redeo.Config{Addr: m.listenAddr})
-
-	m.info = m.srv.Info()
 
 	commandsConnection(m, m.srv)
 	commandsGeneric(m, m.srv)
@@ -218,21 +215,21 @@ func (m *Miniredis) Port() string {
 func (m *Miniredis) CommandCount() int {
 	m.Lock()
 	defer m.Unlock()
-	return int(m.info.TotalCommands())
+	return int(m.srv.Info().TotalCommands())
 }
 
 // CurrentConnectionCount returns the number of currently connected clients.
 func (m *Miniredis) CurrentConnectionCount() int {
 	m.Lock()
 	defer m.Unlock()
-	return m.info.ClientsLen()
+	return m.srv.Info().ClientsLen()
 }
 
 // TotalConnectionCount returns the number of client connections since server start.
 func (m *Miniredis) TotalConnectionCount() int {
 	m.Lock()
 	defer m.Unlock()
-	return int(m.info.TotalConnections())
+	return int(m.srv.Info().TotalConnections())
 }
 
 func getCtx(cl *redeo.Client) *connCtx {
