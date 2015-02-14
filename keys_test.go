@@ -8,14 +8,14 @@ func TestKeysSel(t *testing.T) {
 	// Helper to test the selection behind KEYS
 	// pattern -> cases -> should match?
 	for pat, chk := range map[string]map[string]bool{
-		"aap": map[string]bool{
+		"aap": {
 			"aap":         true,
 			"aapnoot":     false,
 			"nootaap":     false,
 			"nootaapnoot": false,
 			"AAP":         false,
 		},
-		"aap*": map[string]bool{
+		"aap*": {
 			"aap":         true,
 			"aapnoot":     true,
 			"nootaap":     false,
@@ -23,11 +23,11 @@ func TestKeysSel(t *testing.T) {
 			"AAP":         false,
 		},
 		// No problem with regexp meta chars?
-		"(?:a)ap*": map[string]bool{
+		"(?:a)ap*": {
 			"(?:a)ap!": true,
 			"aap":      false,
 		},
-		"*aap*": map[string]bool{
+		"*aap*": {
 			"aap":         true,
 			"aapnoot":     true,
 			"nootaap":     true,
@@ -35,32 +35,32 @@ func TestKeysSel(t *testing.T) {
 			"AAP":         false,
 			"a_a_p":       false,
 		},
-		`\*aap*`: map[string]bool{
+		`\*aap*`: {
 			"*aap":     true,
 			"aap":      false,
 			"*aapnoot": true,
 			"aapnoot":  false,
 		},
-		`aa?`: map[string]bool{
+		`aa?`: {
 			"aap":  true,
 			"aal":  true,
 			"aaf":  true,
 			"aa?":  true,
 			"aap!": false,
 		},
-		`aa\?`: map[string]bool{
+		`aa\?`: {
 			"aap":  false,
 			"aa?":  true,
 			"aa?!": false,
 		},
-		"aa[pl]": map[string]bool{
+		"aa[pl]": {
 			"aap":  true,
 			"aal":  true,
 			"aaf":  false,
 			"aa?":  false,
 			"aap!": false,
 		},
-		"[ab]a[pl]": map[string]bool{
+		"[ab]a[pl]": {
 			"aap":  true,
 			"aal":  true,
 			"bap":  true,
@@ -70,28 +70,28 @@ func TestKeysSel(t *testing.T) {
 			"aa?":  false,
 			"aap!": false,
 		},
-		`\[ab\]`: map[string]bool{
+		`\[ab\]`: {
 			"[ab]": true,
 			"a":    false,
 		},
-		`[\[ab]`: map[string]bool{
+		`[\[ab]`: {
 			"[": true,
 			"a": true,
 			"b": true,
 			"c": false,
 			"]": false,
 		},
-		`[\[\]]`: map[string]bool{
+		`[\[\]]`: {
 			"[": true,
 			"]": true,
 			"c": false,
 		},
-		`\\ap`: map[string]bool{
+		`\\ap`: {
 			`\ap`:  true,
 			`\\ap`: false,
 		},
 		// Escape a normal char
-		`\foo`: map[string]bool{
+		`\foo`: {
 			`foo`:  true,
 			`\foo`: false,
 		},
