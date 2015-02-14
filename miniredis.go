@@ -9,7 +9,9 @@
 //
 // Set keys directly via s.Set(...) and similar commands, or use a Redis client.
 //
-// For direct use you can select a Redis database with either `s.Select(12); s.Get("foo")` or `s.DB(12).Get("foo")`.
+// For direct use you can select a Redis database with either `s.Select(12);
+// s.Get("foo")` or `s.DB(12).Get("foo")`.
+
 package miniredis
 
 import (
@@ -115,7 +117,8 @@ func (m *Miniredis) Restart() error {
 	return nil
 }
 
-// Start starts a server. It listens on a random port on localhost. See also Addr().
+// Start starts a server. It listens on a random port on localhost. See also
+// Addr().
 func (m *Miniredis) Start() error {
 	m.Lock()
 	defer m.Unlock()
@@ -195,7 +198,7 @@ func (m *Miniredis) Addr() string {
 	return m.listenAddr
 }
 
-// Host returns the host part of Addr()
+// Host returns the host part of Addr().
 func (m *Miniredis) Host() string {
 	m.Lock()
 	defer m.Unlock()
