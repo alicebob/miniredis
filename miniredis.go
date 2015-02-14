@@ -108,9 +108,7 @@ func (m *Miniredis) Restart() error {
 	m.listen = l
 
 	go func() {
-		e := make(chan error)
-		go m.srv.Serve(e, m.listen)
-		<-e
+		m.srv.Serve(m.listen)
 		m.closed <- struct{}{}
 	}()
 
@@ -142,9 +140,7 @@ func (m *Miniredis) Start() error {
 	commandsTransaction(m, m.srv)
 
 	go func() {
-		e := make(chan error)
-		go m.srv.Serve(e, m.listen)
-		<-e
+		m.srv.Serve(m.listen)
 		m.closed <- struct{}{}
 	}()
 	return nil
