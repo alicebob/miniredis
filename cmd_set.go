@@ -536,7 +536,7 @@ func (m *Miniredis) cmdSscan(out *redeo.Responder, r *redeo.Request) error {
 
 // shuffle shuffles a string. Kinda.
 func shuffle(m []string) {
-	for range m {
+	for _ = range m {
 		i := rand.Intn(len(m))
 		j := rand.Intn(len(m))
 		m[i], m[j] = m[j], m[i]
