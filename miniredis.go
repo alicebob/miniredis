@@ -166,6 +166,7 @@ func (m *Miniredis) Close() {
 	if m.listen.Close() != nil {
 		return
 	}
+	m.srv.Close()
 	<-m.closed
 	m.listen = nil
 }
