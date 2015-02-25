@@ -11,7 +11,7 @@
 //
 // For direct use you can select a Redis database with either `s.Select(12);
 // s.Get("foo")` or `s.DB(12).Get("foo")`.
-
+//
 package miniredis
 
 import (
