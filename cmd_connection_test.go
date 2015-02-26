@@ -13,8 +13,20 @@ func TestAuth(t *testing.T) {
 	c, err := redis.Dial("tcp", s.Addr())
 	ok(t, err)
 
-	// We accept all AUTH
 	_, err = c.Do("AUTH", "foo", "bar")
+	assert(t, err != nil, "no password set")
+
+	s.RequireAuth("nocomment")
+	_, err = c.Do("PING", "foo", "bar")
+	assert(t, err != nil, "need AUTH")
+
+	_, err = c.Do("AUTH", "wrongpasswd")
+	assert(t, err != nil, "wrong password")
+
+	_, err = c.Do("AUTH", "nocomment")
+	ok(t, err)
+
+	_, err = c.Do("PING")
 	ok(t, err)
 }
 

@@ -18,12 +18,33 @@ func commandsConnection(m *Miniredis, srv *redeo.Server) {
 
 // PING
 func (m *Miniredis) cmdPing(out *redeo.Responder, r *redeo.Request) error {
+	if !m.handleAuth(r.Client(), out) {
+		return nil
+	}
 	out.WriteInlineString("PONG")
 	return nil
 }
 
 // AUTH
 func (m *Miniredis) cmdAuth(out *redeo.Responder, r *redeo.Request) error {
+	if len(r.Args) != 1 {
+		setDirty(r.Client())
+		return r.WrongNumberOfArgs()
+	}
+	pw := r.Args[0]
+
+	m.Lock()
+	defer m.Unlock()
+	if m.password == "" {
+		out.WriteErrorString("ERR Client sent AUTH, but no password is set")
+		return nil
+	}
+	if m.password != pw {
+		out.WriteErrorString("ERR invalid password")
+		return nil
+	}
+
+	setAuthenticated(r.Client())
 	out.WriteOK()
 	return nil
 }

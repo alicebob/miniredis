@@ -38,6 +38,9 @@ func commandsString(m *Miniredis, srv *redeo.Server) {
 
 // SET
 func (m *Miniredis) cmdSet(out *redeo.Responder, r *redeo.Request) error {
+	if !m.handleAuth(r.Client(), out) {
+		return nil
+	}
 	if len(r.Args) < 2 {
 		setDirty(r.Client())
 		return r.WrongNumberOfArgs()
@@ -246,6 +249,9 @@ func (m *Miniredis) cmdMsetnx(out *redeo.Responder, r *redeo.Request) error {
 
 // GET
 func (m *Miniredis) cmdGet(out *redeo.Responder, r *redeo.Request) error {
+	if !m.handleAuth(r.Client(), out) {
+		return nil
+	}
 	if len(r.Args) != 1 {
 		setDirty(r.Client())
 		return r.WrongNumberOfArgs()

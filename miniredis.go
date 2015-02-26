@@ -45,6 +45,7 @@ type Miniredis struct {
 	sync.Mutex
 	srv        *redeo.Server
 	listenAddr string
+	password   string
 	closed     chan struct{}
 	listen     net.Listener
 	dbs        map[int]*RedisDB
@@ -62,6 +63,7 @@ type dbKey struct {
 // connCtx has all state for a single connection.
 type connCtx struct {
 	selectedDB       int            // selected DB
+	authenticated    bool           // auth enabled and a valid AUTH seen
 	transaction      []txCmd        // transaction callbacks. Or nil.
 	dirtyTransaction bool           // any error during QUEUEing.
 	watch            map[dbKey]uint // WATCHed keys.
@@ -96,26 +98,6 @@ func Run() (*Miniredis, error) {
 	return m, m.Start()
 }
 
-// Restart restarts a Close()d server on the same port. Values will be
-// preserved.
-func (m *Miniredis) Restart() error {
-	m.Lock()
-	defer m.Unlock()
-
-	l, err := listen(m.listenAddr)
-	if err != nil {
-		return err
-	}
-	m.listen = l
-
-	go func() {
-		m.srv.Serve(m.listen)
-		m.closed <- struct{}{}
-	}()
-
-	return nil
-}
-
 // Start starts a server. It listens on a random port on localhost. See also
 // Addr().
 func (m *Miniredis) Start() error {
@@ -146,6 +128,26 @@ func (m *Miniredis) Start() error {
 	return nil
 }
 
+// Restart restarts a Close()d server on the same port. Values will be
+// preserved.
+func (m *Miniredis) Restart() error {
+	m.Lock()
+	defer m.Unlock()
+
+	l, err := listen(m.listenAddr)
+	if err != nil {
+		return err
+	}
+	m.listen = l
+
+	go func() {
+		m.srv.Serve(m.listen)
+		m.closed <- struct{}{}
+	}()
+
+	return nil
+}
+
 func listen(addr string) (net.Listener, error) {
 	l, err := net.Listen("tcp", addr)
 	if err != nil {
@@ -169,6 +171,14 @@ func (m *Miniredis) Close() {
 	m.srv.Close()
 	<-m.closed
 	m.listen = nil
+}
+
+// RequireAuth makes every connection need to AUTH first. Disable again by
+// setting an empty string.
+func (m *Miniredis) RequireAuth(pw string) {
+	m.Lock()
+	defer m.Unlock()
+	m.password = pw
 }
 
 // DB returns a DB by ID.
@@ -233,6 +243,20 @@ func (m *Miniredis) TotalConnectionCount() int {
 	return int(m.srv.Info().TotalConnections())
 }
 
+// handleAuth returns false if connection has no access. It sends the reply.
+func (m *Miniredis) handleAuth(cl *redeo.Client, out *redeo.Responder) bool {
+	m.Lock()
+	defer m.Unlock()
+	if m.password == "" {
+		return true
+	}
+	if cl.Ctx == nil || !getCtx(cl).authenticated {
+		out.WriteErrorString("NOAUTH Authentication required.")
+		return false
+	}
+	return true
+}
+
 func getCtx(cl *redeo.Client) *connCtx {
 	if cl.Ctx == nil {
 		cl.Ctx = &connCtx{}
@@ -280,4 +304,8 @@ func setDirty(cl *redeo.Client) {
 		return
 	}
 	getCtx(cl).dirtyTransaction = true
+}
+
+func setAuthenticated(cl *redeo.Client) {
+	getCtx(cl).authenticated = true
 }
