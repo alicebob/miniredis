@@ -22,7 +22,7 @@ There are no dependencies on external binaries, so you can easily integrate it i
 Implemented commands:
 
  - Connection (complete)
-   - AUTH -- we accept every password
+   - AUTH -- see RequireAuth()
    - ECHO
    - PING
    - SELECT
