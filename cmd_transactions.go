@@ -20,6 +20,10 @@ func (m *Miniredis) cmdMulti(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) != 0 {
 		return r.WrongNumberOfArgs()
 	}
+	if !m.handleAuth(r.Client(), out) {
+		return nil
+	}
+
 	ctx := getCtx(r.Client())
 
 	if inTx(ctx) {
@@ -37,6 +41,9 @@ func (m *Miniredis) cmdExec(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) != 0 {
 		setDirty(r.Client())
 		return r.WrongNumberOfArgs()
+	}
+	if !m.handleAuth(r.Client(), out) {
+		return nil
 	}
 
 	ctx := getCtx(r.Client())
@@ -78,6 +85,9 @@ func (m *Miniredis) cmdDiscard(out *redeo.Responder, r *redeo.Request) error {
 		setDirty(r.Client())
 		return r.WrongNumberOfArgs()
 	}
+	if !m.handleAuth(r.Client(), out) {
+		return nil
+	}
 
 	ctx := getCtx(r.Client())
 	if !inTx(ctx) {
@@ -94,6 +104,9 @@ func (m *Miniredis) cmdWatch(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) == 0 {
 		setDirty(r.Client())
 		return r.WrongNumberOfArgs()
+	}
+	if !m.handleAuth(r.Client(), out) {
+		return nil
 	}
 
 	ctx := getCtx(r.Client())
@@ -117,6 +130,9 @@ func (m *Miniredis) cmdUnwatch(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) != 0 {
 		setDirty(r.Client())
 		return r.WrongNumberOfArgs()
+	}
+	if !m.handleAuth(r.Client(), out) {
+		return nil
 	}
 
 	// Doesn't matter if UNWATCH is in a TX or not. Looks like a Redis bug to me.

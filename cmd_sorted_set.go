@@ -45,6 +45,9 @@ func (m *Miniredis) cmdZadd(out *redeo.Responder, r *redeo.Request) error {
 		setDirty(r.Client())
 		return r.WrongNumberOfArgs()
 	}
+	if !m.handleAuth(r.Client(), out) {
+		return nil
+	}
 
 	key := r.Args[0]
 	args := r.Args[1:]
@@ -90,6 +93,9 @@ func (m *Miniredis) cmdZcard(out *redeo.Responder, r *redeo.Request) error {
 		setDirty(r.Client())
 		return r.WrongNumberOfArgs()
 	}
+	if !m.handleAuth(r.Client(), out) {
+		return nil
+	}
 
 	key := r.Args[0]
 
@@ -115,6 +121,9 @@ func (m *Miniredis) cmdZcount(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) != 3 {
 		setDirty(r.Client())
 		return r.WrongNumberOfArgs()
+	}
+	if !m.handleAuth(r.Client(), out) {
+		return nil
 	}
 
 	key := r.Args[0]
@@ -156,6 +165,9 @@ func (m *Miniredis) cmdZincrby(out *redeo.Responder, r *redeo.Request) error {
 		setDirty(r.Client())
 		return r.WrongNumberOfArgs()
 	}
+	if !m.handleAuth(r.Client(), out) {
+		return nil
+	}
 
 	key := r.Args[0]
 	delta, err := strconv.ParseFloat(r.Args[1], 64)
@@ -183,6 +195,9 @@ func (m *Miniredis) cmdZinterstore(out *redeo.Responder, r *redeo.Request) error
 	if len(r.Args) < 3 {
 		setDirty(r.Client())
 		return r.WrongNumberOfArgs()
+	}
+	if !m.handleAuth(r.Client(), out) {
+		return nil
 	}
 
 	destination := r.Args[0]
@@ -308,6 +323,9 @@ func (m *Miniredis) cmdZlexcount(out *redeo.Responder, r *redeo.Request) error {
 		setDirty(r.Client())
 		return r.WrongNumberOfArgs()
 	}
+	if !m.handleAuth(r.Client(), out) {
+		return nil
+	}
 
 	key := r.Args[0]
 	min, minIncl, err := parseLexrange(r.Args[1])
@@ -350,6 +368,9 @@ func (m *Miniredis) makeCmdZrange(cmd string, reverse bool) redeo.HandlerFunc {
 		if len(r.Args) < 3 {
 			setDirty(r.Client())
 			return r.WrongNumberOfArgs()
+		}
+		if !m.handleAuth(r.Client(), out) {
+			return nil
 		}
 
 		key := r.Args[0]
@@ -418,6 +439,9 @@ func (m *Miniredis) cmdZrangebylex(out *redeo.Responder, r *redeo.Request) error
 	if len(r.Args) < 3 {
 		setDirty(r.Client())
 		return r.WrongNumberOfArgs()
+	}
+	if !m.handleAuth(r.Client(), out) {
+		return nil
 	}
 
 	key := r.Args[0]
@@ -517,6 +541,9 @@ func (m *Miniredis) makeCmdZrangebyscore(cmd string, reverse bool) redeo.Handler
 		if len(r.Args) < 3 {
 			setDirty(r.Client())
 			return r.WrongNumberOfArgs()
+		}
+		if !m.handleAuth(r.Client(), out) {
+			return nil
 		}
 
 		key := r.Args[0]
@@ -636,6 +663,9 @@ func (m *Miniredis) makeCmdZrank(cmd string, reverse bool) redeo.HandlerFunc {
 			setDirty(r.Client())
 			return r.WrongNumberOfArgs()
 		}
+		if !m.handleAuth(r.Client(), out) {
+			return nil
+		}
 
 		key := r.Args[0]
 		member := r.Args[1]
@@ -673,6 +703,9 @@ func (m *Miniredis) cmdZrem(out *redeo.Responder, r *redeo.Request) error {
 		setDirty(r.Client())
 		return r.WrongNumberOfArgs()
 	}
+	if !m.handleAuth(r.Client(), out) {
+		return nil
+	}
 
 	key := r.Args[0]
 	members := r.Args[1:]
@@ -705,6 +738,9 @@ func (m *Miniredis) cmdZremrangebylex(out *redeo.Responder, r *redeo.Request) er
 	if len(r.Args) != 3 {
 		setDirty(r.Client())
 		return r.WrongNumberOfArgs()
+	}
+	if !m.handleAuth(r.Client(), out) {
+		return nil
 	}
 
 	key := r.Args[0]
@@ -752,6 +788,9 @@ func (m *Miniredis) cmdZremrangebyrank(out *redeo.Responder, r *redeo.Request) e
 		setDirty(r.Client())
 		return r.WrongNumberOfArgs()
 	}
+	if !m.handleAuth(r.Client(), out) {
+		return nil
+	}
 
 	key := r.Args[0]
 	start, err := strconv.Atoi(r.Args[1])
@@ -794,6 +833,9 @@ func (m *Miniredis) cmdZremrangebyscore(out *redeo.Responder, r *redeo.Request) 
 	if len(r.Args) != 3 {
 		setDirty(r.Client())
 		return r.WrongNumberOfArgs()
+	}
+	if !m.handleAuth(r.Client(), out) {
+		return nil
 	}
 
 	key := r.Args[0]
@@ -838,6 +880,9 @@ func (m *Miniredis) cmdZscore(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) != 2 {
 		setDirty(r.Client())
 		return r.WrongNumberOfArgs()
+	}
+	if !m.handleAuth(r.Client(), out) {
+		return nil
 	}
 
 	key := r.Args[0]
@@ -1003,6 +1048,9 @@ func (m *Miniredis) cmdZunionstore(out *redeo.Responder, r *redeo.Request) error
 		setDirty(r.Client())
 		return r.WrongNumberOfArgs()
 	}
+	if !m.handleAuth(r.Client(), out) {
+		return nil
+	}
 
 	destination := r.Args[0]
 	numKeys, err := strconv.Atoi(r.Args[1])
@@ -1117,6 +1165,9 @@ func (m *Miniredis) cmdZscan(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) < 2 {
 		setDirty(r.Client())
 		return r.WrongNumberOfArgs()
+	}
+	if !m.handleAuth(r.Client(), out) {
+		return nil
 	}
 
 	key := r.Args[0]

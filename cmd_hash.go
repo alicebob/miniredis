@@ -33,9 +33,15 @@ func (m *Miniredis) cmdHset(out *redeo.Responder, r *redeo.Request) error {
 		setDirty(r.Client())
 		return r.WrongNumberOfArgs()
 	}
-	key := r.Args[0]
-	field := r.Args[1]
-	value := r.Args[2]
+	if !m.handleAuth(r.Client(), out) {
+		return nil
+	}
+
+	var (
+		key   = r.Args[0]
+		field = r.Args[1]
+		value = r.Args[2]
+	)
 
 	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
@@ -59,9 +65,15 @@ func (m *Miniredis) cmdHsetnx(out *redeo.Responder, r *redeo.Request) error {
 		setDirty(r.Client())
 		return r.WrongNumberOfArgs()
 	}
-	key := r.Args[0]
-	field := r.Args[1]
-	value := r.Args[2]
+	if !m.handleAuth(r.Client(), out) {
+		return nil
+	}
+
+	var (
+		key   = r.Args[0]
+		field = r.Args[1]
+		value = r.Args[2]
+	)
 
 	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
@@ -92,6 +104,10 @@ func (m *Miniredis) cmdHmset(out *redeo.Responder, r *redeo.Request) error {
 		setDirty(r.Client())
 		return r.WrongNumberOfArgs()
 	}
+	if !m.handleAuth(r.Client(), out) {
+		return nil
+	}
+
 	key := r.Args[0]
 	args := r.Args[1:]
 	if len(args)%2 != 0 {
@@ -125,6 +141,10 @@ func (m *Miniredis) cmdHget(out *redeo.Responder, r *redeo.Request) error {
 		setDirty(r.Client())
 		return r.WrongNumberOfArgs()
 	}
+	if !m.handleAuth(r.Client(), out) {
+		return nil
+	}
+
 	key := r.Args[0]
 	field := r.Args[1]
 
@@ -155,6 +175,10 @@ func (m *Miniredis) cmdHdel(out *redeo.Responder, r *redeo.Request) error {
 		setDirty(r.Client())
 		return r.WrongNumberOfArgs()
 	}
+	if !m.handleAuth(r.Client(), out) {
+		return nil
+	}
+
 	key := r.Args[0]
 	fields := r.Args[1:]
 
@@ -196,6 +220,10 @@ func (m *Miniredis) cmdHexists(out *redeo.Responder, r *redeo.Request) error {
 		setDirty(r.Client())
 		return r.WrongNumberOfArgs()
 	}
+	if !m.handleAuth(r.Client(), out) {
+		return nil
+	}
+
 	key := r.Args[0]
 	field := r.Args[1]
 
@@ -226,6 +254,10 @@ func (m *Miniredis) cmdHgetall(out *redeo.Responder, r *redeo.Request) error {
 		setDirty(r.Client())
 		return r.WrongNumberOfArgs()
 	}
+	if !m.handleAuth(r.Client(), out) {
+		return nil
+	}
+
 	key := r.Args[0]
 
 	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
@@ -255,6 +287,10 @@ func (m *Miniredis) cmdHkeys(out *redeo.Responder, r *redeo.Request) error {
 		setDirty(r.Client())
 		return r.WrongNumberOfArgs()
 	}
+	if !m.handleAuth(r.Client(), out) {
+		return nil
+	}
+
 	key := r.Args[0]
 
 	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
@@ -283,6 +319,10 @@ func (m *Miniredis) cmdHvals(out *redeo.Responder, r *redeo.Request) error {
 		setDirty(r.Client())
 		return r.WrongNumberOfArgs()
 	}
+	if !m.handleAuth(r.Client(), out) {
+		return nil
+	}
+
 	key := r.Args[0]
 
 	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
@@ -311,6 +351,10 @@ func (m *Miniredis) cmdHlen(out *redeo.Responder, r *redeo.Request) error {
 		setDirty(r.Client())
 		return r.WrongNumberOfArgs()
 	}
+	if !m.handleAuth(r.Client(), out) {
+		return nil
+	}
+
 	key := r.Args[0]
 
 	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
@@ -336,6 +380,10 @@ func (m *Miniredis) cmdHmget(out *redeo.Responder, r *redeo.Request) error {
 		setDirty(r.Client())
 		return r.WrongNumberOfArgs()
 	}
+	if !m.handleAuth(r.Client(), out) {
+		return nil
+	}
+
 	key := r.Args[0]
 
 	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
@@ -369,9 +417,15 @@ func (m *Miniredis) cmdHincrby(out *redeo.Responder, r *redeo.Request) error {
 		setDirty(r.Client())
 		return r.WrongNumberOfArgs()
 	}
-	key := r.Args[0]
-	field := r.Args[1]
-	delta, err := strconv.Atoi(r.Args[2])
+	if !m.handleAuth(r.Client(), out) {
+		return nil
+	}
+
+	var (
+		key        = r.Args[0]
+		field      = r.Args[1]
+		delta, err = strconv.Atoi(r.Args[2])
+	)
 	if err != nil {
 		setDirty(r.Client())
 		out.WriteErrorString(msgInvalidInt)
@@ -401,9 +455,15 @@ func (m *Miniredis) cmdHincrbyfloat(out *redeo.Responder, r *redeo.Request) erro
 		setDirty(r.Client())
 		return r.WrongNumberOfArgs()
 	}
-	key := r.Args[0]
-	field := r.Args[1]
-	delta, err := strconv.ParseFloat(r.Args[2], 64)
+	if !m.handleAuth(r.Client(), out) {
+		return nil
+	}
+
+	var (
+		key        = r.Args[0]
+		field      = r.Args[1]
+		delta, err = strconv.ParseFloat(r.Args[2], 64)
+	)
 	if err != nil {
 		setDirty(r.Client())
 		out.WriteErrorString(msgInvalidFloat)
@@ -432,6 +492,9 @@ func (m *Miniredis) cmdHscan(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) < 2 {
 		setDirty(r.Client())
 		return r.WrongNumberOfArgs()
+	}
+	if !m.handleAuth(r.Client(), out) {
+		return nil
 	}
 
 	key := r.Args[0]

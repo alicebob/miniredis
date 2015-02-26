@@ -35,6 +35,9 @@ func (m *Miniredis) cmdSadd(out *redeo.Responder, r *redeo.Request) error {
 		setDirty(r.Client())
 		return r.WrongNumberOfArgs()
 	}
+	if !m.handleAuth(r.Client(), out) {
+		return nil
+	}
 
 	key := r.Args[0]
 	elems := r.Args[1:]
@@ -57,6 +60,9 @@ func (m *Miniredis) cmdScard(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) != 1 {
 		setDirty(r.Client())
 		return r.WrongNumberOfArgs()
+	}
+	if !m.handleAuth(r.Client(), out) {
+		return nil
 	}
 
 	key := r.Args[0]
@@ -85,6 +91,9 @@ func (m *Miniredis) cmdSdiff(out *redeo.Responder, r *redeo.Request) error {
 		setDirty(r.Client())
 		return r.WrongNumberOfArgs()
 	}
+	if !m.handleAuth(r.Client(), out) {
+		return nil
+	}
 
 	keys := r.Args
 
@@ -109,6 +118,9 @@ func (m *Miniredis) cmdSdiffstore(out *redeo.Responder, r *redeo.Request) error 
 	if len(r.Args) < 2 {
 		setDirty(r.Client())
 		return r.WrongNumberOfArgs()
+	}
+	if !m.handleAuth(r.Client(), out) {
+		return nil
 	}
 
 	dest := r.Args[0]
@@ -135,6 +147,9 @@ func (m *Miniredis) cmdSinter(out *redeo.Responder, r *redeo.Request) error {
 		setDirty(r.Client())
 		return r.WrongNumberOfArgs()
 	}
+	if !m.handleAuth(r.Client(), out) {
+		return nil
+	}
 
 	keys := r.Args
 
@@ -160,6 +175,9 @@ func (m *Miniredis) cmdSinterstore(out *redeo.Responder, r *redeo.Request) error
 		setDirty(r.Client())
 		return r.WrongNumberOfArgs()
 	}
+	if !m.handleAuth(r.Client(), out) {
+		return nil
+	}
 
 	dest := r.Args[0]
 	keys := r.Args[1:]
@@ -184,6 +202,9 @@ func (m *Miniredis) cmdSismember(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) != 2 {
 		setDirty(r.Client())
 		return r.WrongNumberOfArgs()
+	}
+	if !m.handleAuth(r.Client(), out) {
+		return nil
 	}
 
 	key := r.Args[0]
@@ -216,6 +237,9 @@ func (m *Miniredis) cmdSmembers(out *redeo.Responder, r *redeo.Request) error {
 		setDirty(r.Client())
 		return r.WrongNumberOfArgs()
 	}
+	if !m.handleAuth(r.Client(), out) {
+		return nil
+	}
 
 	key := r.Args[0]
 
@@ -246,6 +270,9 @@ func (m *Miniredis) cmdSmove(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) != 3 {
 		setDirty(r.Client())
 		return r.WrongNumberOfArgs()
+	}
+	if !m.handleAuth(r.Client(), out) {
+		return nil
 	}
 
 	src := r.Args[0]
@@ -286,6 +313,9 @@ func (m *Miniredis) cmdSpop(out *redeo.Responder, r *redeo.Request) error {
 		setDirty(r.Client())
 		return r.WrongNumberOfArgs()
 	}
+	if !m.handleAuth(r.Client(), out) {
+		return nil
+	}
 
 	key := r.Args[0]
 
@@ -318,6 +348,9 @@ func (m *Miniredis) cmdSrandmember(out *redeo.Responder, r *redeo.Request) error
 	if len(r.Args) > 2 {
 		setDirty(r.Client())
 		out.WriteErrorString(msgSyntaxError)
+		return nil
+	}
+	if !m.handleAuth(r.Client(), out) {
 		return nil
 	}
 
@@ -382,6 +415,9 @@ func (m *Miniredis) cmdSrem(out *redeo.Responder, r *redeo.Request) error {
 		setDirty(r.Client())
 		return r.WrongNumberOfArgs()
 	}
+	if !m.handleAuth(r.Client(), out) {
+		return nil
+	}
 
 	key := r.Args[0]
 	fields := r.Args[1:]
@@ -409,6 +445,9 @@ func (m *Miniredis) cmdSunion(out *redeo.Responder, r *redeo.Request) error {
 		setDirty(r.Client())
 		return r.WrongNumberOfArgs()
 	}
+	if !m.handleAuth(r.Client(), out) {
+		return nil
+	}
 
 	keys := r.Args
 
@@ -434,6 +473,9 @@ func (m *Miniredis) cmdSunionstore(out *redeo.Responder, r *redeo.Request) error
 		setDirty(r.Client())
 		return r.WrongNumberOfArgs()
 	}
+	if !m.handleAuth(r.Client(), out) {
+		return nil
+	}
 
 	dest := r.Args[0]
 	keys := r.Args[1:]
@@ -458,6 +500,9 @@ func (m *Miniredis) cmdSscan(out *redeo.Responder, r *redeo.Request) error {
 	if len(r.Args) < 2 {
 		setDirty(r.Client())
 		return r.WrongNumberOfArgs()
+	}
+	if !m.handleAuth(r.Client(), out) {
+		return nil
 	}
 
 	key := r.Args[0]
