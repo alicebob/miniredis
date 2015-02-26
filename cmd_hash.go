@@ -242,9 +242,9 @@ func (m *Miniredis) cmdHgetall(out *redeo.Responder, r *redeo.Request) error {
 		}
 
 		out.WriteBulkLen(len(db.hashKeys[key]) * 2)
-		for f, v := range db.hashKeys[key] {
-			out.WriteString(f)
-			out.WriteString(v)
+		for _, k := range db.hashFields(key) {
+			out.WriteString(k)
+			out.WriteString(db.hashGet(key, k))
 		}
 	})
 }
