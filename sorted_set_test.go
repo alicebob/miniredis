@@ -47,7 +47,7 @@ func TestSortedSetImpl(t *testing.T) {
 		assert(t, found, "Found 3pi")
 		equals(t, 2, rank)
 
-		rank, found = s.rankByScore("nosuch", asc)
+		_, found = s.rankByScore("nosuch", asc)
 		assert(t, !found, "Did not find nosuch")
 	}
 }

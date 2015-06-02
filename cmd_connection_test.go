@@ -88,4 +88,5 @@ func TestQuit(t *testing.T) {
 
 	v, err = redis.String(c.Do("PING"))
 	assert(t, err != nil, "QUIT closed the client")
+	equals(t, "", v)
 }

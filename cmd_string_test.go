@@ -855,6 +855,7 @@ func TestSetrange(t *testing.T) {
 		_, err = redis.Int(c.Do("SETRANGE", "key", -1, ""))
 		assert(t, err != nil, "do SETRANGE error")
 		_, err = redis.Int(c.Do("SETRANGE", "many", 12, "keys", "here"))
+		assert(t, err != nil, "do SETRANGE error")
 	}
 }
 

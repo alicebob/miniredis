@@ -59,7 +59,7 @@ func TestWatch(t *testing.T) {
 	{
 		_, err = redis.String(c.Do("MULTI"))
 		ok(t, err)
-		r, err = redis.String(c.Do("WATCH", "foo"))
+		_, err = redis.String(c.Do("WATCH", "foo"))
 		assert(t, err != nil, "do WATCH error")
 	}
 }
