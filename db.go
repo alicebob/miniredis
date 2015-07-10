@@ -430,7 +430,7 @@ func (db *RedisDB) ssetIncrby(k, m string, delta float64) float64 {
 		db.sortedsetKeys[k] = ss
 	}
 
-	v, ok := ss.get(m)
+	v, _ := ss.get(m)
 	v += delta
 	ss.set(v, m)
 	db.keyVersion[k]++
