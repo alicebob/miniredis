@@ -269,7 +269,7 @@ func (db *RedisDB) setIsMember(k, v string) bool {
 	return ok
 }
 
-// hashFields returns all keys ('fields') for a hash key.
+// hashFields returns all (sorted) keys ('fields') for a hash key.
 func (db *RedisDB) hashFields(k string) []string {
 	v := db.hashKeys[k]
 	r := make([]string, 0, len(v))

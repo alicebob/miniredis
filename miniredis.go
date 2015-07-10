@@ -243,6 +243,54 @@ func (m *Miniredis) TotalConnectionCount() int {
 	return int(m.srv.Info().TotalConnections())
 }
 
+// Dump returns a text version of the selected DB, usable for debugging.
+func (m *Miniredis) Dump() string {
+	m.Lock()
+	defer m.Unlock()
+
+	var (
+		maxLen = 60
+		indent = "   "
+		db     = m.db(m.selectedDB)
+		r      = ""
+		v      = func(s string) string {
+			suffix := ""
+			if len(s) > maxLen {
+				suffix = fmt.Sprintf("...(%d)", len(s))
+				s = s[:maxLen-len(suffix)]
+			}
+			return fmt.Sprintf("%q%s", s, suffix)
+		}
+	)
+	for _, k := range db.allKeys() {
+		r += fmt.Sprintf("- %s\n", k)
+		t := db.t(k)
+		switch t {
+		case "string":
+			r += fmt.Sprintf("%s%s\n", indent, v(db.stringKeys[k]))
+		case "hash":
+			for _, hk := range db.hashFields(k) {
+				r += fmt.Sprintf("%s%s: %s\n", indent, hk, v(db.hashGet(k, hk)))
+			}
+		case "list":
+			for _, lk := range db.listKeys[k] {
+				r += fmt.Sprintf("%s%s\n", indent, v(lk))
+			}
+		case "set":
+			for _, mk := range db.setMembers(k) {
+				r += fmt.Sprintf("%s%s\n", indent, v(mk))
+			}
+		case "zset":
+			for _, el := range db.ssetElements(k) {
+				r += fmt.Sprintf("%s%f: %s\n", indent, el.score, v(el.member))
+			}
+		default:
+			r += fmt.Sprintf("%s(a %s, fixme!)\n", indent, t)
+		}
+	}
+	return r
+}
+
 // handleAuth returns false if connection has no access. It sends the reply.
 func (m *Miniredis) handleAuth(cl *redeo.Client, out *redeo.Responder) bool {
 	m.Lock()

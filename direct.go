@@ -240,12 +240,12 @@ func (db *RedisDB) IsMember(k, v string) (bool, error) {
 	return db.setIsMember(k, v), nil
 }
 
-// HKeys returns all keys ('fields') for a hash key.
+// HKeys returns all (sorted) keys ('fields') for a hash key.
 func (m *Miniredis) HKeys(k string) ([]string, error) {
 	return m.DB(m.selectedDB).HKeys(k)
 }
 
-// HKeys returns all keys ('fields') for a hash key.
+// HKeys returns all (sorted) keys ('fields') for a hash key.
 func (db *RedisDB) HKeys(key string) ([]string, error) {
 	db.master.Lock()
 	defer db.master.Unlock()
