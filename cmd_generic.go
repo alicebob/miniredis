@@ -209,7 +209,7 @@ func (m *Miniredis) cmdType(out *redeo.Responder, r *redeo.Request) error {
 
 // EXISTS
 func (m *Miniredis) cmdExists(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) != 1 {
+	if len(r.Args) < 1 {
 		setDirty(r.Client())
 		return r.WrongNumberOfArgs()
 	}
@@ -217,16 +217,16 @@ func (m *Miniredis) cmdExists(out *redeo.Responder, r *redeo.Request) error {
 		return nil
 	}
 
-	key := r.Args[0]
-
 	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
-		if _, ok := db.keys[key]; !ok {
-			out.WriteZero()
-			return
+		found := 0
+		for _, k := range r.Args {
+			if db.exists(k) {
+				found++
+			}
 		}
-		out.WriteOne()
+		out.WriteInt(found)
 	})
 }
 

@@ -264,6 +264,17 @@ func TestExists(t *testing.T) {
 		equals(t, 1, v)
 	}
 
+	// Multiple keys
+	{
+		v, err := redis.Int(c.Do("EXISTS", "foo", "aap"))
+		ok(t, err)
+		equals(t, 2, v)
+
+		v, err = redis.Int(c.Do("EXISTS", "foo", "noot", "aap"))
+		ok(t, err)
+		equals(t, 2, v)
+	}
+
 	// New key
 	{
 		v, err := redis.Int(c.Do("EXISTS", "nosuch"))
@@ -274,8 +285,6 @@ func TestExists(t *testing.T) {
 	// Wrong usage
 	{
 		_, err := redis.Int(c.Do("EXISTS"))
-		assert(t, err != nil, "do EXISTS error")
-		_, err = redis.Int(c.Do("EXISTS", "spurious", "arguments"))
 		assert(t, err != nil, "do EXISTS error")
 	}
 
