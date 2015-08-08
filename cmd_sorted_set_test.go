@@ -116,17 +116,6 @@ func TestSortedSet(t *testing.T) {
 		_, err := redis.String(c.Do("SET", "str", "value"))
 		ok(t, err)
 
-		_, err = redis.Int(c.Do("ZADD", "str", 1.0, "hi"))
-		assert(t, err != nil, "ZADD error")
-		_, err = redis.String(c.Do("ZADD"))
-		assert(t, err != nil, "ZADD error")
-		_, err = redis.String(c.Do("ZADD", "set"))
-		assert(t, err != nil, "ZADD error")
-		_, err = redis.String(c.Do("ZADD", "set", 1.0))
-		assert(t, err != nil, "ZADD error")
-		_, err = redis.String(c.Do("ZADD", "set", 1.0, "foo", 1.0)) // odd
-		assert(t, err != nil, "ZADD error")
-
 		_, err = redis.Int(c.Do("ZRANK", "str"))
 		assert(t, err != nil, "ZRANK error")
 		_, err = redis.String(c.Do("ZRANK"))
@@ -144,7 +133,68 @@ func TestSortedSet(t *testing.T) {
 		_, err = redis.String(c.Do("ZCARD", "set", "spurious"))
 		assert(t, err != nil, "ZCARD error")
 	}
+}
 
+// Test ZADD
+func TestSortedSetAdd(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	{
+		b, err := redis.Int(c.Do("ZADD", "z", 1, "one", 2, "two", 3, "three"))
+		ok(t, err)
+		equals(t, 3, b) // New elements.
+
+		b, err = redis.Int(c.Do("ZADD", "z", 1, "one", 2.1, "two", 3, "three"))
+		ok(t, err)
+		equals(t, 0, b) // no new elements
+
+		b, err = redis.Int(c.Do("ZADD", "z", "CH", 1, "one", 2.2, "two", 3, "three"))
+		ok(t, err)
+		equals(t, 1, b)
+
+		b, err = redis.Int(c.Do("ZADD", "z", "NX", 1, "one", 2.2, "two", 3, "three"))
+		ok(t, err)
+		equals(t, 0, b)
+
+		b, err = redis.Int(c.Do("ZADD", "z", "NX", 1, "one", 4, "four"))
+		ok(t, err)
+		equals(t, 1, b)
+
+		b, err = redis.Int(c.Do("ZADD", "z", "XX", 1.1, "one", 4, "four"))
+		ok(t, err)
+		equals(t, 0, b)
+
+		b, err = redis.Int(c.Do("ZADD", "z", "XX", "CH", 1.2, "one", 4, "four"))
+		ok(t, err)
+		equals(t, 1, b)
+
+	}
+
+	// Error cases
+	{
+		// Wrong type of key
+		_, err := redis.String(c.Do("SET", "str", "value"))
+		ok(t, err)
+
+		_, err = redis.Int(c.Do("ZADD", "str", 1.0, "hi"))
+		assert(t, err != nil, "ZADD error")
+		_, err = redis.String(c.Do("ZADD"))
+		assert(t, err != nil, "ZADD error")
+		_, err = redis.String(c.Do("ZADD", "set"))
+		assert(t, err != nil, "ZADD error")
+		_, err = redis.String(c.Do("ZADD", "set", 1.0))
+		assert(t, err != nil, "ZADD error")
+		_, err = redis.String(c.Do("ZADD", "set", 1.0, "foo", 1.0)) // odd
+		assert(t, err != nil, "ZADD error")
+		_, err = redis.String(c.Do("ZADD", "set", "MX", 1.0))
+		assert(t, err != nil, "ZADD error")
+		_, err = redis.String(c.Do("ZADD", "set", "MX", "XX", 1.0, "foo"))
+		assert(t, err != nil, "ZADD error")
+	}
 }
 
 // Test ZRANGE and ZREVRANGE

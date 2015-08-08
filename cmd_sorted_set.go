@@ -51,22 +51,48 @@ func (m *Miniredis) cmdZadd(out *redeo.Responder, r *redeo.Request) error {
 
 	key := r.Args[0]
 	args := r.Args[1:]
-	if len(args)%2 != 0 {
-		setDirty(r.Client())
-		out.WriteErrorString(msgSyntaxError)
-		return nil
+	var (
+		nx    = false
+		xx    = false
+		ch    = false
+		elems = map[string]float64{}
+	)
+
+	for len(args) > 0 {
+		switch strings.ToUpper(args[0]) {
+		case "NX":
+			nx = true
+			args = args[1:]
+			continue
+		case "XX":
+			xx = true
+			args = args[1:]
+			continue
+		case "CH":
+			ch = true
+			args = args[1:]
+			continue
+		default:
+			if len(args) < 2 {
+				setDirty(r.Client())
+				out.WriteErrorString(msgSyntaxError)
+				return nil
+			}
+			score, err := strconv.ParseFloat(args[0], 64)
+			if err != nil {
+				setDirty(r.Client())
+				out.WriteErrorString(msgInvalidFloat)
+				return nil
+			}
+			elems[args[1]] = score
+			args = args[2:]
+		}
 	}
 
-	elems := map[string]float64{}
-	for len(args) > 0 {
-		score, err := strconv.ParseFloat(args[0], 64)
-		if err != nil {
-			setDirty(r.Client())
-			out.WriteErrorString(msgInvalidFloat)
-			return nil
-		}
-		elems[args[1]] = score
-		args = args[2:]
+	if xx && nx {
+		setDirty(r.Client())
+		out.WriteErrorString(msgXXandNX)
+		return nil
 	}
 
 	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
@@ -77,13 +103,25 @@ func (m *Miniredis) cmdZadd(out *redeo.Responder, r *redeo.Request) error {
 			return
 		}
 
-		added := 0
+		res := 0
 		for member, score := range elems {
+			if nx && db.ssetExists(key, member) {
+				continue
+			}
+			if xx && !db.ssetExists(key, member) {
+				continue
+			}
+			old := db.ssetScore(key, member)
 			if db.ssetAdd(key, score, member) {
-				added++
+				res++
+			} else {
+				if ch && old != score {
+					// if 'CH' is specified, only count changed keys
+					res++
+				}
 			}
 		}
-		out.WriteInt(added)
+		out.WriteInt(res)
 	})
 }
 

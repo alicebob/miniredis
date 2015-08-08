@@ -18,6 +18,7 @@ const (
 	msgKeyNotFound      = "ERR no such key"
 	msgOutOfRange       = "ERR index out of range"
 	msgInvalidCursor    = "ERR invalid cursor"
+	msgXXandNX          = "ERR XX and NX options at the same time are not compatible"
 )
 
 // withTx wraps the non-argument-checking part of command handling code in
