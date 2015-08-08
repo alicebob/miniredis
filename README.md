@@ -202,6 +202,7 @@ Commands which will probably not be implemented:
     - ~~MIGRATE~~
     - ~~OBJECT~~
     - ~~RESTORE~~
+    - ~~WAIT~~
  - List keys
     - ~~BLPOP~~
     - ~~BRPOP~~
