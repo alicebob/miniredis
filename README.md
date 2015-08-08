@@ -180,26 +180,62 @@ func TestSomething(t *testing.T) {
 
 Commands which will probably not be implemented:
 
+ - CLUSTER (all)
+    - ~~CLUSTER *~~
+ - GEO (all) -- unless someone needs these
+    - ~~GEOADD~~
+    - ~~GEODIST~~
+    - ~~GEOHASH~~
+    - ~~GEOPOS~~
+    - ~~GEORADIUS~~
+    - ~~GEORADIUSBYMEMBER~~
+ - HyperLogLog (all) -- unless someone needs these
+    - ~~PFADD~~
+    - ~~PFCOUNT~~
+    - ~~PFMERGE~~
  - Key
     - ~~DUMP~~
     - ~~MIGRATE~~
     - ~~OBJECT~~
     - ~~RESTORE~~
+ - List keys
+    - ~~BLPOP~~
+    - ~~BRPOP~~
+    - ~~BRPOPLPUSH~~
+ - Pub/Sub (all)
+    - ~~PSUBSCRIBE~~
+    - ~~PUBLISH~~
+    - ~~PUBSUB~~
+    - ~~PUNSUBSCRIBE~~
+    - ~~SUBSCRIBE~~
+    - ~~UNSUBSCRIBE~~
  - Scripting (all)
     - ~~EVAL~~
     - ~~EVALSHA~~
     - ~~SCRIPT *~~
  - Server
+    - ~~BGSAVE~~
+    - ~~BGWRITEAOF~~
     - ~~CLIENT *~~
     - ~~COMMAND *~~
     - ~~CONFIG *~~
     - ~~DEBUG *~~
+    - ~~INFO~~
+    - ~~LASTSAVE~~
+    - ~~MONITOR~~
+    - ~~ROLE~~
+    - ~~SAVE~~
+    - ~~SHUTDOWN~~
+    - ~~SLAVEOF~~
+    - ~~SLOWLOG~~
+    - ~~SYNC~~
+    - ~~TIME~~
     
 
 ## &c.
 
 See https://github.com/alicebob/miniredis_vs_redis for tests comparing
-miniredis against the real thing. Tests are run against Redis 2.8.14 and 3.0.2 (Debian).
+miniredis against the real thing. Tests are run against Redis 3.0.3 (Debian).
 
 
 [![Build Status](https://travis-ci.org/alicebob/miniredis.svg?branch=master)](https://travis-ci.org/alicebob/miniredis) 
