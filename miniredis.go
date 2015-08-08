@@ -114,6 +114,7 @@ func (m *Miniredis) Start() error {
 
 	commandsConnection(m, m.srv)
 	commandsGeneric(m, m.srv)
+	commandsServer(m, m.srv)
 	commandsString(m, m.srv)
 	commandsHash(m, m.srv)
 	commandsList(m, m.srv)

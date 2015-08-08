@@ -50,6 +50,10 @@ Implemented commands:
    - MULTI
    - UNWATCH
    - WATCH
+ - Server
+   - DBSIZE
+   - FLUSHALL
+   - FLUSHDB
  - String keys (complete)
    - APPEND
    - BITCOUNT
