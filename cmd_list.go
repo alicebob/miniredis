@@ -352,7 +352,7 @@ func (m *Miniredis) cmdLrem(out *redeo.Responder, r *redeo.Request) error {
 			reverseSlice(newL)
 		}
 		if len(newL) == 0 {
-			delete(db.listKeys, key)
+			db.del(key, true)
 		} else {
 			db.listKeys[key] = newL
 			db.keyVersion[key]++
@@ -447,7 +447,7 @@ func (m *Miniredis) cmdLtrim(out *redeo.Responder, r *redeo.Request) error {
 		rs, re := redisRange(len(l), start, end, false)
 		l = l[rs:re]
 		if len(l) == 0 {
-			delete(db.listKeys, key)
+			db.del(key, true)
 		} else {
 			db.listKeys[key] = l
 			db.keyVersion[key]++

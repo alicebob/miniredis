@@ -379,6 +379,14 @@ func TestLtrim(t *testing.T) {
 		equals(t, []string{"aap", "noot", "mies"}, l)
 	}
 
+	// Delete key on empty list
+	{
+		el, err := redis.String(c.Do("LTRIM", "l", 0, -99))
+		ok(t, err)
+		equals(t, "OK", el)
+		equals(t, false, s.Exists("l"))
+	}
+
 	// Non exising key
 	{
 		el, err := redis.String(c.Do("LTRIM", "nonexisting", 0, 1))
@@ -455,6 +463,15 @@ func TestLrem(t *testing.T) {
 		l, err := s.List("l4")
 		ok(t, err)
 		equals(t, []string{"aap", "mies", "vuur"}, l)
+	}
+
+	// Delete key on empty list
+	{
+		s.Push("l5", "noot", "noot", "noot")
+		n, err := redis.Int(c.Do("LREM", "l5", 99, "noot"))
+		ok(t, err)
+		equals(t, 3, n)
+		equals(t, false, s.Exists("l5"))
 	}
 
 	// Non exising key
