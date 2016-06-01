@@ -327,6 +327,16 @@ func TestMove(t *testing.T) {
 		s.CheckGet(t, "two", "orig")
 	}
 
+	// TTL is also moved
+	{
+		s.DB(0).Set("one", "two")
+		s.DB(0).SetExpire("one", 4242)
+		v, err := redis.Int(c.Do("MOVE", "one", 1))
+		ok(t, err)
+		equals(t, 1, v)
+		equals(t, s.DB(1).Expire("one"), 4242)
+	}
+
 	// Wrong usage
 	{
 		_, err := redis.Int(c.Do("MOVE"))

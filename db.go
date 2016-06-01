@@ -51,6 +51,9 @@ func (db *RedisDB) move(key string, to *RedisDB) bool {
 		panic("unhandled key type")
 	}
 	to.keyVersion[key]++
+	if exp, ok := db.expire[key]; ok {
+		to.expire[key] = exp
+	}
 	db.del(key, true)
 	return true
 }
