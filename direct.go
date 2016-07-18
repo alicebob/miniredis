@@ -24,12 +24,49 @@ func (m *Miniredis) Select(i int) {
 	m.selectedDB = i
 }
 
+// Keys returns all keys from the selected database, sorted.
+func (m *Miniredis) Keys() []string {
+	return m.DB(m.selectedDB).Keys()
+}
+
+// Keys returns all keys, sorted.
+func (db *RedisDB) Keys() []string {
+	db.master.Lock()
+	defer db.master.Unlock()
+	return db.allKeys()
+}
+
+// FlushAll removes all keys from all databases.
+func (m *Miniredis) FlushAll() {
+	m.Lock()
+	defer m.Unlock()
+	m.flushAll()
+}
+
+func (m *Miniredis) flushAll() {
+	for _, db := range m.dbs {
+		db.flush()
+	}
+}
+
+// FlushDB removes all keys from the selected database.
+func (m *Miniredis) FlushDB() {
+	m.DB(m.selectedDB).FlushDB()
+}
+
+// FlushDB removes all keys.
+func (db *RedisDB) FlushDB() {
+	db.master.Lock()
+	defer db.master.Unlock()
+	db.flush()
+}
+
 // Get returns string keys added with SET.
 func (m *Miniredis) Get(k string) (string, error) {
 	return m.DB(m.selectedDB).Get(k)
 }
 
-// Get returns a string key
+// Get returns a string key.
 func (db *RedisDB) Get(k string) (string, error) {
 	db.master.Lock()
 	defer db.master.Unlock()

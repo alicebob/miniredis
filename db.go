@@ -25,6 +25,17 @@ func (db *RedisDB) allKeys() []string {
 	return res
 }
 
+// flush removes all keys and values.
+func (db *RedisDB) flush() {
+	db.keys = map[string]string{}
+	db.stringKeys = map[string]string{}
+	db.hashKeys = map[string]hashKey{}
+	db.listKeys = map[string]listKey{}
+	db.setKeys = map[string]setKey{}
+	db.sortedsetKeys = map[string]sortedSet{}
+	db.expire = map[string]int{}
+}
+
 // move something to another db. Will return ok. Or not.
 func (db *RedisDB) move(key string, to *RedisDB) bool {
 	if _, ok := to.keys[key]; ok {

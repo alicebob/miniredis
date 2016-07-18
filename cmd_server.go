@@ -40,7 +40,7 @@ func (m *Miniredis) cmdFlushall(out *redeo.Responder, r *redeo.Request) error {
 	}
 
 	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
-		m.dbs = map[int]*RedisDB{}
+		m.flushAll()
 		out.WriteOK()
 	})
 }
@@ -56,7 +56,7 @@ func (m *Miniredis) cmdFlushdb(out *redeo.Responder, r *redeo.Request) error {
 	}
 
 	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
-		delete(m.dbs, ctx.selectedDB)
+		m.db(ctx.selectedDB).flush()
 		out.WriteOK()
 	})
 }
