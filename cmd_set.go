@@ -309,7 +309,7 @@ func (m *Miniredis) cmdSmove(out *redeo.Responder, r *redeo.Request) error {
 
 // SPOP
 func (m *Miniredis) cmdSpop(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) != 1 {
+	if len(r.Args) == 0 {
 		setDirty(r.Client())
 		return r.WrongNumberOfArgs()
 	}
@@ -317,13 +317,36 @@ func (m *Miniredis) cmdSpop(out *redeo.Responder, r *redeo.Request) error {
 		return nil
 	}
 
-	key := r.Args[0]
+	key, args := r.Args[0], r.Args[1:]
 
 	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
+		withCount := false
+		count := 1
+		if len(args) > 0 {
+			v, err := strconv.Atoi(args[0])
+			if err != nil {
+				setDirty(r.Client())
+				out.WriteErrorString(msgInvalidInt)
+				return
+			}
+			count = v
+			withCount = true
+			args = args[1:]
+		}
+		if len(args) > 0 {
+			setDirty(r.Client())
+			out.WriteErrorString(msgInvalidInt)
+			return
+		}
+
 		if !db.exists(key) {
-			out.WriteNil()
+			if !withCount {
+				out.WriteNil()
+				return
+			}
+			out.WriteBulkLen(0)
 			return
 		}
 
@@ -332,10 +355,30 @@ func (m *Miniredis) cmdSpop(out *redeo.Responder, r *redeo.Request) error {
 			return
 		}
 
-		members := db.setMembers(key)
-		member := members[rand.Intn(len(members))]
-		db.setRem(key, member)
-		out.WriteString(member)
+		var deleted []string
+		for i := 0; i < count; i++ {
+			members := db.setMembers(key)
+			if len(members) == 0 {
+				break
+			}
+			member := members[rand.Intn(len(members))]
+			db.setRem(key, member)
+			deleted = append(deleted, member)
+		}
+		// without `count` return a single value...
+		if !withCount {
+			if len(deleted) == 0 {
+				out.WriteNil()
+				return
+			}
+			out.WriteString(deleted[0])
+			return
+		}
+		// ... with `count` return a list
+		out.WriteBulkLen(len(deleted))
+		for _, v := range deleted {
+			out.WriteString(v)
+		}
 	})
 }
 

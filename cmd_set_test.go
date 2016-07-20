@@ -295,7 +295,7 @@ func TestSpop(t *testing.T) {
 		equals(t, nil, b)
 	}
 
-	// Various errors
+	// various errors
 	{
 		s.SetAdd("chk", "aap", "noot")
 		s.Set("str", "value")
@@ -307,6 +307,17 @@ func TestSpop(t *testing.T) {
 
 		_, err = c.Do("SPOP", "str")
 		assert(t, err != nil, "SPOP error")
+	}
+
+	// count argument
+	{
+		s.SetAdd("s", "aap", "noot", "mies", "vuur")
+		el, err := redis.Strings(c.Do("SPOP", "s", 2))
+		ok(t, err)
+		assert(t, len(el) == 2, "SPOP s 2")
+		members, err := s.Members("s")
+		ok(t, err)
+		assert(t, len(members) == 2, "SPOP s 2")
 	}
 }
 
