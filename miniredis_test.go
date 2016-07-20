@@ -162,3 +162,29 @@ func TestDumpSortedSet(t *testing.T) {
 		t.Errorf("have: %q, want: %q", have, want)
 	}
 }
+
+func TestKeysAndFlush(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	s.Set("aap", "noot")
+	s.Set("vuur", "mies")
+	s.Set("muur", "oom")
+	s.HSet("hash", "key", "value")
+	equals(t, []string{"aap", "hash", "muur", "vuur"}, s.Keys())
+
+	s.Select(1)
+	s.Set("1aap", "1noot")
+	equals(t, []string{"1aap"}, s.Keys())
+
+	s.Select(0)
+	s.FlushDB()
+	equals(t, []string{}, s.Keys())
+	s.Select(1)
+	equals(t, []string{"1aap"}, s.Keys())
+
+	s.Select(0)
+	s.FlushAll()
+	equals(t, []string{}, s.Keys())
+	s.Select(1)
+	equals(t, []string{}, s.Keys())
+}
