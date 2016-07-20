@@ -186,6 +186,8 @@ Commands which will probably not be implemented:
 
  - CLUSTER (all)
     - ~~CLUSTER *~~
+    - ~~READONLY~~
+    - ~~READWRITE~~
  - GEO (all) -- unless someone needs these
     - ~~GEOADD~~
     - ~~GEODIST~~
@@ -240,7 +242,7 @@ Commands which will probably not be implemented:
 ## &c.
 
 See https://github.com/alicebob/miniredis_vs_redis for tests comparing
-miniredis against the real thing. Tests are run against Redis 3.0.3 (Debian).
+miniredis against the real thing. Tests are run against Redis 3.2.1 (Debian).
 
 
 [![Build Status](https://travis-ci.org/alicebob/miniredis.svg?branch=master)](https://travis-ci.org/alicebob/miniredis) 
