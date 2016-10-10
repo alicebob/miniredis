@@ -335,9 +335,17 @@ func TestSortedSetRangeByScore(t *testing.T) {
 		ok(t, err)
 		equals(t, []string{"two", "zwei", "drei", "three"}, b)
 
+		b, err = redis.Strings(c.Do("ZRANGEBYSCORE", "z", "4", "4"))
+		ok(t, err)
+		equals(t, []string{}, b)
+
 		b, err = redis.Strings(c.Do("ZREVRANGEBYSCORE", "z", "3", "2"))
 		ok(t, err)
 		equals(t, []string{"three", "drei", "zwei", "two"}, b)
+
+		b, err = redis.Strings(c.Do("ZREVRANGEBYSCORE", "z", "4", "4"))
+		ok(t, err)
+		equals(t, []string{}, b)
 
 		i, err := redis.Int(c.Do("ZCOUNT", "z", "2", "3"))
 		ok(t, err)
@@ -463,6 +471,24 @@ func TestSortedSetRangeByScore(t *testing.T) {
 		_, err = redis.String(c.Do("ZCOUNT"))
 		assert(t, err != nil, "ZCOUNT error")
 	}
+}
+
+func TestIssue10(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	s.ZAdd("key", 3.3, "element")
+
+	b, err := redis.Strings(c.Do("ZRANGEBYSCORE", "key", "3.3", "3.3"))
+	ok(t, err)
+	equals(t, []string{"element"}, b)
+
+	b, err = redis.Strings(c.Do("ZRANGEBYSCORE", "key", "4.3", "4.3"))
+	ok(t, err)
+	equals(t, []string{}, b)
 }
 
 // Test ZREM
@@ -1222,5 +1248,82 @@ func TestZinterstore(t *testing.T) {
 		assert(t, err != nil, "do ZINTERSTORE error")
 		_, err = redis.Int(c.Do("ZINTERSTORE", "set", 2, "set", "str"))
 		assert(t, err != nil, "do ZINTERSTORE error")
+	}
+}
+
+func TestSSRange(t *testing.T) {
+	ss := newSortedSet()
+	ss.set(1.0, "key1")
+	ss.set(5.0, "key5")
+	elems := ss.byScore(asc)
+	type cas struct {
+		min, max       float64
+		minInc, maxInc bool
+		want           []string
+	}
+	for _, c := range []cas{
+		{
+			min:    2.0,
+			minInc: true,
+			max:    3.0,
+			maxInc: true,
+			want:   []string(nil),
+		},
+		{
+			min:    -2.0,
+			minInc: true,
+			max:    -3.0,
+			maxInc: true,
+			want:   []string(nil),
+		},
+		{
+			min:    12.0,
+			minInc: true,
+			max:    13.0,
+			maxInc: true,
+			want:   []string(nil),
+		},
+		{
+			min:    1.0,
+			minInc: false,
+			max:    3.0,
+			maxInc: true,
+			want:   []string(nil),
+		},
+		{
+			min:    2.0,
+			minInc: true,
+			max:    5.0,
+			maxInc: false,
+			want:   []string(nil),
+		},
+		{
+			min:  0.0,
+			max:  2.0,
+			want: []string{"key1"},
+		},
+		{
+			min:  2.0,
+			max:  7.0,
+			want: []string{"key5"},
+		},
+		{
+			min:  0.0,
+			max:  7.0,
+			want: []string{"key1", "key5"},
+		},
+		{
+			min:    1.0,
+			minInc: false,
+			max:    5.0,
+			maxInc: false,
+			want:   []string(nil),
+		},
+	} {
+		var have []string
+		for _, v := range withSSRange(elems, c.min, c.minInc, c.max, c.maxInc) {
+			have = append(have, v.member)
+		}
+		equals(t, have, c.want)
 	}
 }

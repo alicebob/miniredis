@@ -1001,38 +1001,34 @@ func parseLexrange(s string) (string, bool, error) {
 // withSSRange limits a list of sorted set elements by the ZRANGEBYSCORE range
 // logic.
 func withSSRange(members ssElems, min float64, minIncl bool, max float64, maxIncl bool) ssElems {
+	gt := func(a, b float64) bool { return a > b }
+	gteq := func(a, b float64) bool { return a >= b }
+
+	mincmp := gt
 	if minIncl {
-		for i, m := range members {
-			if m.score >= min {
-				members = members[i:]
-				break
-			}
-		}
-	} else {
-		// Excluding min
-		for i, m := range members {
-			if m.score > min {
-				members = members[i:]
-				break
-			}
+		mincmp = gteq
+	}
+	for i, m := range members {
+		if mincmp(m.score, min) {
+			members = members[i:]
+			goto checkmax
 		}
 	}
+	// all elements were smaller
+	return nil
+
+checkmax:
+	maxcmp := gteq
 	if maxIncl {
-		for i, m := range members {
-			if m.score > max {
-				members = members[:i]
-				break
-			}
-		}
-	} else {
-		// Excluding max
-		for i, m := range members {
-			if m.score >= max {
-				members = members[:i]
-				break
-			}
+		maxcmp = gt
+	}
+	for i, m := range members {
+		if maxcmp(m.score, max) {
+			members = members[:i]
+			break
 		}
 	}
+
 	return members
 }
 
