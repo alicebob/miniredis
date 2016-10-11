@@ -33,7 +33,6 @@ func commandsList(m *Miniredis, srv *redeo.Server) {
 
 // BRPOP
 func (m *Miniredis) cmdBrpop(out *redeo.Responder, r *redeo.Request) error {
-	// TODO: brpop in a transaction doesn't really work yet
 	if len(r.Args) < 2 {
 		setDirty(r.Client())
 		return r.WrongNumberOfArgs()
@@ -52,30 +51,37 @@ func (m *Miniredis) cmdBrpop(out *redeo.Responder, r *redeo.Request) error {
 		return nil
 	}
 
-	if !blocking(m, r, time.Duration(timeout)*time.Second, func(ctx *connCtx) bool {
-		db := m.db(ctx.selectedDB)
-		for _, key := range keys {
-			if !db.exists(key) {
-				continue
-			}
-			if db.t(key) != "list" {
-				out.WriteErrorString(msgWrongType)
+	blocking(
+		m,
+		out,
+		r,
+		time.Duration(timeout)*time.Second,
+		func(out *redeo.Responder, ctx *connCtx) bool {
+			db := m.db(ctx.selectedDB)
+			for _, key := range keys {
+				if !db.exists(key) {
+					continue
+				}
+				if db.t(key) != "list" {
+					out.WriteErrorString(msgWrongType)
+					return true
+				}
+
+				if len(db.listKeys[key]) == 0 {
+					continue
+				}
+				out.WriteBulkLen(2)
+				out.WriteString(key)
+				out.WriteString(db.listPop(key))
 				return true
 			}
-
-			if len(db.listKeys[key]) == 0 {
-				continue
-			}
-			out.WriteBulkLen(2)
-			out.WriteString(key)
-			out.WriteString(db.listPop(key))
-			return true
-		}
-		return false
-	}) {
-		// timeout
-		out.WriteNil()
-	}
+			return false
+		},
+		func(out *redeo.Responder) {
+			// timeout
+			out.WriteNil()
+		},
+	)
 	return nil
 }
 

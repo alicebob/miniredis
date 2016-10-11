@@ -45,21 +45,32 @@ func withTx(
 }
 
 // blockCmd is executed returns whether it is done
-type blockCmd func(*connCtx) bool
+type blockCmd func(*redeo.Responder, *connCtx) bool
 
-// blocking keeps trying a command until the callback returns true. Returns
-// whether the command was executed (otherwise it was a timeout)
+// blocking keeps trying a command until the callback returns true. Calls
+// onTimeout after the timeout (or when we call this in a transaction).
 func blocking(
 	m *Miniredis,
+	out *redeo.Responder,
 	r *redeo.Request,
 	timeout time.Duration,
 	cb blockCmd,
-) bool {
+	onTimeout func(out *redeo.Responder),
+) {
 	var (
 		ctx = getCtx(r.Client())
 		dl  *time.Timer
 		dlc <-chan time.Time
 	)
+	if inTx(ctx) {
+		addTxCmd(ctx, func(out *redeo.Responder, ctx *connCtx) {
+			if !cb(out, ctx) {
+				onTimeout(out)
+			}
+		})
+		out.WriteInlineString("QUEUED")
+		return
+	}
 	if timeout != 0 {
 		dl = time.NewTimer(timeout)
 		defer dl.Stop()
@@ -68,21 +79,23 @@ func blocking(
 
 	for {
 		m.Lock()
-		done := cb(ctx)
+		done := cb(out, ctx)
 		m.Unlock()
 		if done {
-			return true
+			return
 		}
 		wakeup := make(chan struct{}, 1)
 		go func() {
 			m.signalM.Lock()
+			defer m.signalM.Unlock()
 			m.signal.Wait()
 			wakeup <- struct{}{}
 		}()
 		select {
 		case <-wakeup:
 		case <-dlc:
-			return false
+			onTimeout(out)
+			return
 		}
 	}
 }

@@ -809,7 +809,7 @@ func TestBrpop(t *testing.T) {
 	select {
 	case have := <-got:
 		equals(t, []string{"mylist", "e3"}, have)
-	case <-time.After(50 * time.Millisecond):
+	case <-time.After(500 * time.Millisecond):
 		t.Error("BRPOP took too long")
 	}
 }
@@ -829,7 +829,7 @@ func TestBrpopMulti(t *testing.T) {
 	select {
 	case have := <-got:
 		equals(t, []string{"l2", "e21"}, have)
-	case <-time.After(50 * time.Millisecond):
+	case <-time.After(500 * time.Millisecond):
 		t.Error("BRPOP took too long")
 	}
 
@@ -837,7 +837,7 @@ func TestBrpopMulti(t *testing.T) {
 	select {
 	case have := <-got:
 		equals(t, []string{"l3", "e31"}, have)
-	case <-time.After(50 * time.Millisecond):
+	case <-time.After(500 * time.Millisecond):
 		t.Error("BRPOP took too long")
 	}
 }
@@ -850,7 +850,51 @@ func TestBrpopTimeout(t *testing.T) {
 	select {
 	case have := <-got:
 		equals(t, []string(nil), have)
-	case <-time.After(1050 * time.Millisecond):
+	case <-time.After(1500 * time.Millisecond):
 		t.Error("BRPOP took too long")
+	}
+}
+
+func TestBrpopTx(t *testing.T) {
+	// BRPOP in a transaction behaves as if the timeout triggers right away
+	m, c, done := setup(t)
+	defer done()
+
+	{
+		_, err := c.Do("MULTI")
+		ok(t, err)
+		s, err := redis.String(c.Do("BRPOP", "l1", 3))
+		ok(t, err)
+		equals(t, "QUEUED", s)
+		s, err = redis.String(c.Do("SET", "foo", "bar"))
+		ok(t, err)
+		equals(t, "QUEUED", s)
+
+		v, err := redis.Values(c.Do("EXEC"))
+		ok(t, err)
+		equals(t, 2, len(redis.Args(v)))
+		equals(t, nil, v[0])
+		equals(t, "OK", v[1])
+	}
+
+	// Now set something
+	m.Push("l1", "e1")
+
+	{
+		_, err := c.Do("MULTI")
+		ok(t, err)
+		s, err := redis.String(c.Do("BRPOP", "l1", 3))
+		ok(t, err)
+		equals(t, "QUEUED", s)
+		s, err = redis.String(c.Do("SET", "foo", "bar"))
+		ok(t, err)
+		equals(t, "QUEUED", s)
+
+		v, err := redis.Values(c.Do("EXEC"))
+		ok(t, err)
+		equals(t, 2, len(redis.Args(v)))
+		equals(t, "l1", string(v[0].([]interface{})[0].([]uint8)))
+		equals(t, "e1", string(v[0].([]interface{})[1].([]uint8)))
+		equals(t, "OK", v[1])
 	}
 }
