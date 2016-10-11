@@ -76,7 +76,6 @@ func TestDump(t *testing.T) {
 	s.Set("vuur", "mies")
 	s.HSet("ahash", "aap", "noot")
 	s.HSet("ahash", "vuur", "mies")
-	t.Log("db: \n" + s.Dump())
 	if have, want := s.Dump(), `- aap
    "noot"
 - ahash
@@ -91,7 +90,6 @@ func TestDump(t *testing.T) {
 	// Tricky whitespace
 	s.Select(1)
 	s.Set("whitespace", "foo\nbar\tbaz!")
-	t.Log("db: \n" + s.Dump())
 	if have, want := s.Dump(), `- whitespace
    "foo\nbar\tbaz!"
 `; have != want {
@@ -103,7 +101,6 @@ func TestDump(t *testing.T) {
 	s.Set("long", "This is a rather long key, with some fox jumping over a fence or something.")
 	s.Set("countonme", "0123456789012345678901234567890123456789012345678901234567890123456789")
 	s.HSet("hlong", "long", "This is another rather long key, with some fox jumping over a fence or something.")
-	t.Log("db: \n" + s.Dump())
 	if have, want := s.Dump(), `- countonme
    "01234567890123456789012345678901234567890123456789012"...(70)
 - hlong
@@ -121,7 +118,6 @@ func TestDumpList(t *testing.T) {
 	s.Push("elements", "earth")
 	s.Push("elements", "wind")
 	s.Push("elements", "fire")
-	t.Log("db: \n" + s.Dump())
 	if have, want := s.Dump(), `- elements
    "earth"
    "wind"
@@ -137,7 +133,6 @@ func TestDumpSet(t *testing.T) {
 	s.SetAdd("elements", "earth")
 	s.SetAdd("elements", "wind")
 	s.SetAdd("elements", "fire")
-	t.Log("db: \n" + s.Dump())
 	if have, want := s.Dump(), `- elements
    "earth"
    "fire"
@@ -153,7 +148,6 @@ func TestDumpSortedSet(t *testing.T) {
 	s.ZAdd("elements", 2.0, "wind")
 	s.ZAdd("elements", 3.0, "earth")
 	s.ZAdd("elements", 1.0, "fire")
-	t.Log("db: \n" + s.Dump())
 	if have, want := s.Dump(), `- elements
    1.000000: "fire"
    2.000000: "wind"

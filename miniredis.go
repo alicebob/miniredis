@@ -50,6 +50,8 @@ type Miniredis struct {
 	listen     net.Listener
 	dbs        map[int]*RedisDB
 	selectedDB int // DB id used in the direct Get(), Set() &c.
+	signalM    *sync.Mutex
+	signal     *sync.Cond
 }
 
 type txCmd func(*redeo.Responder, *connCtx)
@@ -71,9 +73,12 @@ type connCtx struct {
 
 // NewMiniRedis makes a new, non-started, Miniredis object.
 func NewMiniRedis() *Miniredis {
+	sl := sync.Mutex{}
 	return &Miniredis{
-		closed: make(chan struct{}),
-		dbs:    map[int]*RedisDB{},
+		closed:  make(chan struct{}),
+		dbs:     map[int]*RedisDB{},
+		signalM: &sl,
+		signal:  sync.NewCond(&sl),
 	}
 }
 

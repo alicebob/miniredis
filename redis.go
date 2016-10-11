@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"strings"
+	"time"
 
 	"github.com/bsm/redeo"
 )
@@ -36,9 +37,54 @@ func withTx(
 		return nil
 	}
 	m.Lock()
-	defer m.Unlock()
 	cb(out, ctx)
+	m.Unlock()
+	// done, wake up anyone who waits on anything.
+	m.signal.Broadcast()
 	return nil
+}
+
+// blockCmd is executed returns whether it is done
+type blockCmd func(*connCtx) bool
+
+// blocking keeps trying a command until the callback returns true. Returns
+// whether the command was executed (otherwise it was a timeout)
+func blocking(
+	m *Miniredis,
+	r *redeo.Request,
+	timeout time.Duration,
+	cb blockCmd,
+) bool {
+	var (
+		ctx = getCtx(r.Client())
+		dl  *time.Timer
+		dlc <-chan time.Time
+	)
+	if timeout != 0 {
+		dl = time.NewTimer(timeout)
+		defer dl.Stop()
+		dlc = dl.C
+	}
+
+	for {
+		m.Lock()
+		done := cb(ctx)
+		m.Unlock()
+		if done {
+			return true
+		}
+		wakeup := make(chan struct{}, 1)
+		go func() {
+			m.signalM.Lock()
+			m.signal.Wait()
+			wakeup <- struct{}{}
+		}()
+		select {
+		case <-wakeup:
+		case <-dlc:
+			return false
+		}
+	}
 }
 
 // formatFloat formats a float the way redis does (sort-of)

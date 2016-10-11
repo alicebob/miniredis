@@ -5,6 +5,7 @@ package miniredis
 import (
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/bsm/redeo"
 )
@@ -12,7 +13,7 @@ import (
 // commandsList handles list commands (mostly L*)
 func commandsList(m *Miniredis, srv *redeo.Server) {
 	// BLPOP key [key ...] timeout
-	// BRPOP key [key ...] timeout
+	srv.HandleFunc("BRPOP", m.cmdBrpop)
 	// BRPOPLPUSH source destination timeout
 	srv.HandleFunc("LINDEX", m.cmdLindex)
 	srv.HandleFunc("LINSERT", m.cmdLinsert)
@@ -28,6 +29,54 @@ func commandsList(m *Miniredis, srv *redeo.Server) {
 	srv.HandleFunc("RPOPLPUSH", m.cmdRpoplpush)
 	srv.HandleFunc("RPUSH", m.cmdRpush)
 	srv.HandleFunc("RPUSHX", m.cmdRpushx)
+}
+
+// BRPOP
+func (m *Miniredis) cmdBrpop(out *redeo.Responder, r *redeo.Request) error {
+	// TODO: brpop in a transaction doesn't really work yet
+	if len(r.Args) < 2 {
+		setDirty(r.Client())
+		return r.WrongNumberOfArgs()
+	}
+	if !m.handleAuth(r.Client(), out) {
+		return nil
+	}
+	args := r.Args
+	timeoutS := args[len(r.Args)-1]
+	keys := args[:len(r.Args)-1]
+
+	timeout, err := strconv.Atoi(timeoutS)
+	if err != nil {
+		setDirty(r.Client())
+		out.WriteErrorString(msgInvalidInt)
+		return nil
+	}
+
+	if !blocking(m, r, time.Duration(timeout)*time.Second, func(ctx *connCtx) bool {
+		db := m.db(ctx.selectedDB)
+		for _, key := range keys {
+			if !db.exists(key) {
+				continue
+			}
+			if db.t(key) != "list" {
+				out.WriteErrorString(msgWrongType)
+				return true
+			}
+
+			if len(db.listKeys[key]) == 0 {
+				continue
+			}
+			out.WriteBulkLen(2)
+			out.WriteString(key)
+			out.WriteString(db.listPop(key))
+			return true
+		}
+		return false
+	}) {
+		// timeout
+		out.WriteNil()
+	}
+	return nil
 }
 
 // LINDEX
