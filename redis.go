@@ -15,11 +15,13 @@ const (
 	msgInvalidFloat     = "ERR value is not a valid float"
 	msgInvalidMinMax    = "ERR min or max is not a float"
 	msgInvalidRangeItem = "ERR min or max not valid string range item"
+	msgInvalidTimeout   = "ERR timeout is not an integer or out of range"
 	msgSyntaxError      = "ERR syntax error"
 	msgKeyNotFound      = "ERR no such key"
 	msgOutOfRange       = "ERR index out of range"
 	msgInvalidCursor    = "ERR invalid cursor"
 	msgXXandNX          = "ERR XX and NX options at the same time are not compatible"
+	msgNegTimeout       = "ERR timeout is negative"
 )
 
 // withTx wraps the non-argument-checking part of command handling code in

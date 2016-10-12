@@ -47,7 +47,11 @@ func (m *Miniredis) cmdBrpop(out *redeo.Responder, r *redeo.Request) error {
 	timeout, err := strconv.Atoi(timeoutS)
 	if err != nil {
 		setDirty(r.Client())
-		out.WriteErrorString(msgInvalidInt)
+		out.WriteErrorString(msgInvalidTimeout)
+		return nil
+	}
+	if timeout < 0 {
+		out.WriteErrorString(msgNegTimeout)
 		return nil
 	}
 

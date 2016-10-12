@@ -771,7 +771,6 @@ func TestRpushx(t *testing.T) {
 		_, err = redis.String(c.Do("RPUSHX", "str", "value"))
 		assert(t, err != nil, "RPUSHX error")
 	}
-
 }
 
 // execute command in a go routine. Used to test blocking commands.
@@ -796,6 +795,35 @@ func goStrings(t *testing.T, c redis.Conn, cmds ...interface{}) <-chan []string 
 }
 
 func TestBrpop(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	// Simple cases
+	{
+		s.Push("ll", "aap", "noot", "mies")
+		v, err := redis.Strings(c.Do("BRPOP", "ll", 1))
+		ok(t, err)
+		equals(t, []string{"ll", "mies"}, v)
+	}
+
+	// Error cases
+	{
+		_, err = redis.String(c.Do("BRPOP"))
+		assert(t, err != nil, "BRPOP error")
+		_, err = redis.String(c.Do("BRPOP", "key"))
+		assert(t, err != nil, "BRPOP error")
+		_, err = redis.String(c.Do("BRPOP", "key", -1))
+		assert(t, err != nil, "BRPOP error")
+		_, err = redis.String(c.Do("BRPOP", "key", "inf"))
+		assert(t, err != nil, "BRPOP error")
+	}
+
+}
+
+func TestBrpopSimple(t *testing.T) {
 	_, c1, c2, done := setup2(t)
 	defer done()
 
