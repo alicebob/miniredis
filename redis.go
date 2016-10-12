@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"strings"
+	"time"
 
 	"github.com/bsm/redeo"
 )
@@ -14,11 +15,13 @@ const (
 	msgInvalidFloat     = "ERR value is not a valid float"
 	msgInvalidMinMax    = "ERR min or max is not a float"
 	msgInvalidRangeItem = "ERR min or max not valid string range item"
+	msgInvalidTimeout   = "ERR timeout is not an integer or out of range"
 	msgSyntaxError      = "ERR syntax error"
 	msgKeyNotFound      = "ERR no such key"
 	msgOutOfRange       = "ERR index out of range"
 	msgInvalidCursor    = "ERR invalid cursor"
 	msgXXandNX          = "ERR XX and NX options at the same time are not compatible"
+	msgNegTimeout       = "ERR timeout is negative"
 )
 
 // withTx wraps the non-argument-checking part of command handling code in
@@ -36,9 +39,67 @@ func withTx(
 		return nil
 	}
 	m.Lock()
-	defer m.Unlock()
 	cb(out, ctx)
+	m.Unlock()
+	// done, wake up anyone who waits on anything.
+	m.signal.Broadcast()
 	return nil
+}
+
+// blockCmd is executed returns whether it is done
+type blockCmd func(*redeo.Responder, *connCtx) bool
+
+// blocking keeps trying a command until the callback returns true. Calls
+// onTimeout after the timeout (or when we call this in a transaction).
+func blocking(
+	m *Miniredis,
+	out *redeo.Responder,
+	r *redeo.Request,
+	timeout time.Duration,
+	cb blockCmd,
+	onTimeout func(out *redeo.Responder),
+) {
+	var (
+		ctx = getCtx(r.Client())
+		dl  *time.Timer
+		dlc <-chan time.Time
+	)
+	if inTx(ctx) {
+		addTxCmd(ctx, func(out *redeo.Responder, ctx *connCtx) {
+			if !cb(out, ctx) {
+				onTimeout(out)
+			}
+		})
+		out.WriteInlineString("QUEUED")
+		return
+	}
+	if timeout != 0 {
+		dl = time.NewTimer(timeout)
+		defer dl.Stop()
+		dlc = dl.C
+	}
+
+	for {
+		m.Lock()
+		done := cb(out, ctx)
+		m.Unlock()
+		if done {
+			return
+		}
+		wakeup := make(chan struct{}, 1)
+		go func() {
+			m.signalM.Lock()
+			defer m.signalM.Unlock()
+			m.signal.Wait()
+			wakeup <- struct{}{}
+		}()
+		select {
+		case <-wakeup:
+		case <-dlc:
+			onTimeout(out)
+			return
+		}
+	}
 }
 
 // formatFloat formats a float the way redis does (sort-of)

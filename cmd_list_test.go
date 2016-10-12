@@ -2,16 +2,31 @@ package miniredis
 
 import (
 	"testing"
+	"time"
 
 	"github.com/garyburd/redigo/redis"
 )
 
-func TestLpush(t *testing.T) {
+func setup(t *testing.T) (*Miniredis, redis.Conn, func()) {
 	s, err := Run()
 	ok(t, err)
-	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c1, err := redis.Dial("tcp", s.Addr())
 	ok(t, err)
+	return s, c1, func() { s.Close() }
+}
+func setup2(t *testing.T) (*Miniredis, redis.Conn, redis.Conn, func()) {
+	s, err := Run()
+	ok(t, err)
+	c1, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+	c2, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+	return s, c1, c2, func() { s.Close() }
+}
+
+func TestLpush(t *testing.T) {
+	s, c, done := setup(t)
+	defer done()
 
 	{
 		b, err := redis.Int(c.Do("LPUSH", "l", "aap", "noot", "mies"))
@@ -66,11 +81,11 @@ func TestLpush(t *testing.T) {
 
 	// Various errors
 	{
-		_, err = redis.Int(c.Do("LPUSH"))
+		_, err := redis.Int(c.Do("LPUSH"))
 		assert(t, err != nil, "LPUSH error")
 		_, err = redis.Int(c.Do("LPUSH", "l"))
 		assert(t, err != nil, "LPUSH error")
-		_, err := redis.String(c.Do("SET", "str", "value"))
+		_, err = redis.String(c.Do("SET", "str", "value"))
 		ok(t, err)
 		_, err = redis.Int(c.Do("LPUSH", "str", "noot", "mies"))
 		assert(t, err != nil, "LPUSH error")
@@ -756,5 +771,158 @@ func TestRpushx(t *testing.T) {
 		_, err = redis.String(c.Do("RPUSHX", "str", "value"))
 		assert(t, err != nil, "RPUSHX error")
 	}
+}
 
+// execute command in a go routine. Used to test blocking commands.
+func goStrings(t *testing.T, c redis.Conn, cmds ...interface{}) <-chan []string {
+	var (
+		got = make(chan []string, 1)
+	)
+	go func() {
+		res, err := c.Do(cmds[0].(string), cmds[1:]...)
+		if err != nil {
+			got <- []string{err.Error()}
+			return
+		}
+		if res == nil {
+			got <- nil
+		} else {
+			st, _ := redis.Strings(res, err)
+			got <- st
+		}
+	}()
+	return got
+}
+
+func TestBrpop(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	// Simple cases
+	{
+		s.Push("ll", "aap", "noot", "mies")
+		v, err := redis.Strings(c.Do("BRPOP", "ll", 1))
+		ok(t, err)
+		equals(t, []string{"ll", "mies"}, v)
+	}
+
+	// Error cases
+	{
+		_, err = redis.String(c.Do("BRPOP"))
+		assert(t, err != nil, "BRPOP error")
+		_, err = redis.String(c.Do("BRPOP", "key"))
+		assert(t, err != nil, "BRPOP error")
+		_, err = redis.String(c.Do("BRPOP", "key", -1))
+		assert(t, err != nil, "BRPOP error")
+		_, err = redis.String(c.Do("BRPOP", "key", "inf"))
+		assert(t, err != nil, "BRPOP error")
+	}
+
+}
+
+func TestBrpopSimple(t *testing.T) {
+	_, c1, c2, done := setup2(t)
+	defer done()
+
+	got := goStrings(t, c2, "BRPOP", "mylist", "0")
+	time.Sleep(30 * time.Millisecond)
+
+	b, err := redis.Int(c1.Do("RPUSH", "mylist", "e1", "e2", "e3"))
+	ok(t, err)
+	equals(t, 3, b)
+
+	select {
+	case have := <-got:
+		equals(t, []string{"mylist", "e3"}, have)
+	case <-time.After(500 * time.Millisecond):
+		t.Error("BRPOP took too long")
+	}
+}
+
+func TestBrpopMulti(t *testing.T) {
+	_, c1, c2, done := setup2(t)
+	defer done()
+
+	got := goStrings(t, c2, "BRPOP", "l1", "l2", "l3", 0)
+	_, err := redis.Int(c1.Do("RPUSH", "l0", "e01"))
+	ok(t, err)
+	_, err = redis.Int(c1.Do("RPUSH", "l2", "e21"))
+	ok(t, err)
+	_, err = redis.Int(c1.Do("RPUSH", "l3", "e31"))
+	ok(t, err)
+
+	select {
+	case have := <-got:
+		equals(t, []string{"l2", "e21"}, have)
+	case <-time.After(500 * time.Millisecond):
+		t.Error("BRPOP took too long")
+	}
+
+	got = goStrings(t, c2, "BRPOP", "l1", "l2", "l3", 0)
+	select {
+	case have := <-got:
+		equals(t, []string{"l3", "e31"}, have)
+	case <-time.After(500 * time.Millisecond):
+		t.Error("BRPOP took too long")
+	}
+}
+
+func TestBrpopTimeout(t *testing.T) {
+	_, c, done := setup(t)
+	defer done()
+
+	got := goStrings(t, c, "BRPOP", "l1", 1)
+	select {
+	case have := <-got:
+		equals(t, []string(nil), have)
+	case <-time.After(1500 * time.Millisecond):
+		t.Error("BRPOP took too long")
+	}
+}
+
+func TestBrpopTx(t *testing.T) {
+	// BRPOP in a transaction behaves as if the timeout triggers right away
+	m, c, done := setup(t)
+	defer done()
+
+	{
+		_, err := c.Do("MULTI")
+		ok(t, err)
+		s, err := redis.String(c.Do("BRPOP", "l1", 3))
+		ok(t, err)
+		equals(t, "QUEUED", s)
+		s, err = redis.String(c.Do("SET", "foo", "bar"))
+		ok(t, err)
+		equals(t, "QUEUED", s)
+
+		v, err := redis.Values(c.Do("EXEC"))
+		ok(t, err)
+		equals(t, 2, len(redis.Args(v)))
+		equals(t, nil, v[0])
+		equals(t, "OK", v[1])
+	}
+
+	// Now set something
+	m.Push("l1", "e1")
+
+	{
+		_, err := c.Do("MULTI")
+		ok(t, err)
+		s, err := redis.String(c.Do("BRPOP", "l1", 3))
+		ok(t, err)
+		equals(t, "QUEUED", s)
+		s, err = redis.String(c.Do("SET", "foo", "bar"))
+		ok(t, err)
+		equals(t, "QUEUED", s)
+
+		v, err := redis.Values(c.Do("EXEC"))
+		ok(t, err)
+		equals(t, 2, len(redis.Args(v)))
+		equals(t, "l1", string(v[0].([]interface{})[0].([]uint8)))
+		equals(t, "e1", string(v[0].([]interface{})[1].([]uint8)))
+		equals(t, "OK", v[1])
+	}
 }
