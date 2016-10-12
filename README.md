@@ -94,6 +94,9 @@ Implemented commands:
    - HVALS
    - HSCAN
  - List keys
+   - ~~BLPOP~~
+   - BRPOP
+   - ~~BRPOPLPUSH~~
    - LINDEX
    - LINSERT
    - LLEN
@@ -205,10 +208,6 @@ Commands which will probably not be implemented:
     - ~~OBJECT~~
     - ~~RESTORE~~
     - ~~WAIT~~
- - List keys
-    - ~~BLPOP~~
-    - ~~BRPOP~~
-    - ~~BRPOPLPUSH~~
  - Pub/Sub (all)
     - ~~PSUBSCRIBE~~
     - ~~PUBLISH~~
