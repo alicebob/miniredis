@@ -74,7 +74,9 @@ func (m *Miniredis) cmdExec(out *redeo.Responder, r *redeo.Request) error {
 	for _, cb := range ctx.transaction {
 		cb(out, ctx)
 	}
-	// We're done
+	// wake up anyone who waits on anything.
+	m.signal.Broadcast()
+
 	stopTx(ctx)
 	return nil
 }
