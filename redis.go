@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/bsm/redeo"
@@ -40,9 +41,9 @@ func withTx(
 	}
 	m.Lock()
 	cb(out, ctx)
-	m.Unlock()
 	// done, wake up anyone who waits on anything.
 	m.signal.Broadcast()
+	m.Unlock()
 	return nil
 }
 
@@ -79,26 +80,34 @@ func blocking(
 		dlc = dl.C
 	}
 
+	m.Lock()
+	defer m.Unlock()
 	for {
-		m.Lock()
 		done := cb(out, ctx)
-		m.Unlock()
 		if done {
 			return
 		}
-		wakeup := make(chan struct{}, 1)
+		// there is no cond.WaitTimeout(), so hence the the goroutine to wait
+		// for a timeout
+		var (
+			wg     sync.WaitGroup
+			wakeup = make(chan struct{}, 1)
+		)
+		wg.Add(1)
 		go func() {
-			m.signalM.Lock()
-			defer m.signalM.Unlock()
 			m.signal.Wait()
 			wakeup <- struct{}{}
+			wg.Done()
 		}()
 		select {
 		case <-wakeup:
 		case <-dlc:
 			onTimeout(out)
+			m.signal.Broadcast() // to kill the wakeup go routine
+			wg.Wait()
 			return
 		}
+		wg.Wait()
 	}
 }
 
