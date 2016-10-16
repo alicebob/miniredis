@@ -21,7 +21,7 @@ const (
 func commandsList(m *Miniredis, srv *redeo.Server) {
 	srv.HandleFunc("BLPOP", m.cmdBlpop)
 	srv.HandleFunc("BRPOP", m.cmdBrpop)
-	// BRPOPLPUSH source destination timeout
+	srv.HandleFunc("BRPOPLPUSH", m.cmdBrpoplpush)
 	srv.HandleFunc("LINDEX", m.cmdLindex)
 	srv.HandleFunc("LINSERT", m.cmdLinsert)
 	srv.HandleFunc("LLEN", m.cmdLlen)
@@ -67,6 +67,7 @@ func (m *Miniredis) cmdBXpop(out *redeo.Responder, r *redeo.Request, lr leftrigh
 		return nil
 	}
 	if timeout < 0 {
+		setDirty(r.Client())
 		out.WriteErrorString(msgNegTimeout)
 		return nil
 	}
@@ -609,4 +610,58 @@ func (m *Miniredis) cmdRpoplpush(out *redeo.Responder, r *redeo.Request) error {
 		db.listLpush(dst, elem)
 		out.WriteString(elem)
 	})
+}
+
+// BRPOPLPUSH
+func (m *Miniredis) cmdBrpoplpush(out *redeo.Responder, r *redeo.Request) error {
+	if len(r.Args) != 3 {
+		setDirty(r.Client())
+		return r.WrongNumberOfArgs()
+	}
+	if !m.handleAuth(r.Client(), out) {
+		return nil
+	}
+	src := r.Args[0]
+	dst := r.Args[1]
+	timeout, err := strconv.Atoi(r.Args[2])
+	if err != nil {
+		setDirty(r.Client())
+		out.WriteErrorString(msgInvalidTimeout)
+		return nil
+	}
+	if timeout < 0 {
+		setDirty(r.Client())
+		out.WriteErrorString(msgNegTimeout)
+		return nil
+	}
+
+	blocking(
+		m,
+		out,
+		r,
+		time.Duration(timeout)*time.Second,
+		func(out *redeo.Responder, ctx *connCtx) bool {
+			db := m.db(ctx.selectedDB)
+
+			if !db.exists(src) {
+				return false
+			}
+			if db.t(src) != "list" || (db.exists(dst) && db.t(dst) != "list") {
+				out.WriteErrorString(msgWrongType)
+				return true
+			}
+			if len(db.listKeys[src]) == 0 {
+				return false
+			}
+			elem := db.listPop(src)
+			db.listLpush(dst, elem)
+			out.WriteString(elem)
+			return true
+		},
+		func(out *redeo.Responder) {
+			// timeout
+			out.WriteNil()
+		},
+	)
+	return nil
 }

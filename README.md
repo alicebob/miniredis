@@ -93,10 +93,10 @@ Implemented commands:
    - HSETNX
    - HVALS
    - HSCAN
- - List keys
+ - List keys (complete)
    - BLPOP
    - BRPOP
-   - ~~BRPOPLPUSH~~
+   - BRPOPLPUSH
    - LINDEX
    - LINSERT
    - LLEN

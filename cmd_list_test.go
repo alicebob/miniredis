@@ -953,3 +953,84 @@ func TestBlpop(t *testing.T) {
 		assert(t, err != nil, "BLPOP error")
 	}
 }
+
+func TestBrpoplpush(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	// Simple cases
+	{
+		s.Push("l1", "aap", "noot", "mies")
+		v, err := redis.String(c.Do("BRPOPLPUSH", "l1", "l2", "1"))
+		ok(t, err)
+		equals(t, "mies", v)
+
+		lv, err := s.List("l2")
+		ok(t, err)
+		equals(t, []string{"mies"}, lv)
+	}
+
+	// Error cases
+	{
+		_, err = redis.String(c.Do("BRPOPLPUSH"))
+		assert(t, err != nil, "BRPOPLPUSH error")
+		_, err = redis.String(c.Do("BRPOPLPUSH", "key"))
+		assert(t, err != nil, "BRPOPLPUSH error")
+		_, err = redis.String(c.Do("BRPOPLPUSH", "key", "bar"))
+		assert(t, err != nil, "BRPOPLPUSH error")
+		_, err = redis.String(c.Do("BRPOPLPUSH", "key", "foo", -1))
+		assert(t, err != nil, "BRPOPLPUSH error")
+		_, err = redis.String(c.Do("BRPOPLPUSH", "key", "foo", "inf"))
+		assert(t, err != nil, "BRPOPLPUSH error")
+		_, err = redis.String(c.Do("BRPOPLPUSH", "key", "foo", 1, "baz"))
+		assert(t, err != nil, "BRPOPLPUSH error")
+	}
+}
+
+func TestBrpoplpushSimple(t *testing.T) {
+	s, c1, c2, done := setup2(t)
+	defer done()
+
+	got := make(chan string, 1)
+	go func() {
+		b, err := redis.String(c2.Do("BRPOPLPUSH", "from", "to", "1"))
+		ok(t, err)
+		got <- b
+	}()
+
+	time.Sleep(30 * time.Millisecond)
+
+	b, err := redis.Int(c1.Do("RPUSH", "from", "e1", "e2", "e3"))
+	ok(t, err)
+	equals(t, 3, b)
+
+	select {
+	case have := <-got:
+		equals(t, "e3", have)
+	case <-time.After(500 * time.Millisecond):
+		t.Error("BRPOP took too long")
+	}
+
+	lv, err := s.List("from")
+	ok(t, err)
+	equals(t, []string{"e1", "e2"}, lv)
+	lv, err = s.List("to")
+	ok(t, err)
+	equals(t, []string{"e3"}, lv)
+}
+
+func TestBrpoplpushTimeout(t *testing.T) {
+	_, c, done := setup(t)
+	defer done()
+
+	got := goStrings(t, c, "BRPOPLPUSH", "l1", "l2", 1)
+	select {
+	case have := <-got:
+		equals(t, []string(nil), have)
+	case <-time.After(1500 * time.Millisecond):
+		t.Error("BRPOPLPUSH took too long")
+	}
+}
