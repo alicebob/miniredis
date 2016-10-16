@@ -94,7 +94,7 @@ Implemented commands:
    - HVALS
    - HSCAN
  - List keys
-   - ~~BLPOP~~
+   - BLPOP
    - BRPOP
    - ~~BRPOPLPUSH~~
    - LINDEX

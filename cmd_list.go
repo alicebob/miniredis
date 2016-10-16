@@ -10,9 +10,16 @@ import (
 	"github.com/bsm/redeo"
 )
 
+type leftright int
+
+const (
+	left leftright = iota
+	right
+)
+
 // commandsList handles list commands (mostly L*)
 func commandsList(m *Miniredis, srv *redeo.Server) {
-	// BLPOP key [key ...] timeout
+	srv.HandleFunc("BLPOP", m.cmdBlpop)
 	srv.HandleFunc("BRPOP", m.cmdBrpop)
 	// BRPOPLPUSH source destination timeout
 	srv.HandleFunc("LINDEX", m.cmdLindex)
@@ -31,8 +38,17 @@ func commandsList(m *Miniredis, srv *redeo.Server) {
 	srv.HandleFunc("RPUSHX", m.cmdRpushx)
 }
 
+// BLPOP
+func (m *Miniredis) cmdBlpop(out *redeo.Responder, r *redeo.Request) error {
+	return m.cmdBXpop(out, r, left)
+}
+
 // BRPOP
 func (m *Miniredis) cmdBrpop(out *redeo.Responder, r *redeo.Request) error {
+	return m.cmdBXpop(out, r, right)
+}
+
+func (m *Miniredis) cmdBXpop(out *redeo.Responder, r *redeo.Request, lr leftright) error {
 	if len(r.Args) < 2 {
 		setDirty(r.Client())
 		return r.WrongNumberOfArgs()
@@ -76,7 +92,14 @@ func (m *Miniredis) cmdBrpop(out *redeo.Responder, r *redeo.Request) error {
 				}
 				out.WriteBulkLen(2)
 				out.WriteString(key)
-				out.WriteString(db.listPop(key))
+				var v string
+				switch lr {
+				case left:
+					v = db.listLpop(key)
+				case right:
+					v = db.listPop(key)
+				}
+				out.WriteString(v)
 				return true
 			}
 			return false

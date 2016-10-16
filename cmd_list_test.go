@@ -820,7 +820,6 @@ func TestBrpop(t *testing.T) {
 		_, err = redis.String(c.Do("BRPOP", "key", "inf"))
 		assert(t, err != nil, "BRPOP error")
 	}
-
 }
 
 func TestBrpopSimple(t *testing.T) {
@@ -924,5 +923,33 @@ func TestBrpopTx(t *testing.T) {
 		equals(t, "l1", string(v[0].([]interface{})[0].([]uint8)))
 		equals(t, "e1", string(v[0].([]interface{})[1].([]uint8)))
 		equals(t, "OK", v[1])
+	}
+}
+
+func TestBlpop(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	// Simple cases
+	{
+		s.Push("ll", "aap", "noot", "mies")
+		v, err := redis.Strings(c.Do("BLPOP", "ll", 1))
+		ok(t, err)
+		equals(t, []string{"ll", "aap"}, v)
+	}
+
+	// Error cases
+	{
+		_, err = redis.String(c.Do("BLPOP"))
+		assert(t, err != nil, "BLPOP error")
+		_, err = redis.String(c.Do("BLPOP", "key"))
+		assert(t, err != nil, "BLPOP error")
+		_, err = redis.String(c.Do("BLPOP", "key", -1))
+		assert(t, err != nil, "BLPOP error")
+		_, err = redis.String(c.Do("BLPOP", "key", "inf"))
+		assert(t, err != nil, "BLPOP error")
 	}
 }
