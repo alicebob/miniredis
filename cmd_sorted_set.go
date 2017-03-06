@@ -23,17 +23,17 @@ func commandsSortedSet(m *Miniredis, srv *redeo.Server) {
 	srv.HandleFunc("ZINCRBY", m.cmdZincrby)
 	srv.HandleFunc("ZINTERSTORE", m.cmdZinterstore)
 	srv.HandleFunc("ZLEXCOUNT", m.cmdZlexcount)
-	srv.HandleFunc("ZRANGE", m.makeCmdZrange("zrange", false))
+	srv.HandleFunc("ZRANGE", m.makeCmdZrange(false))
 	srv.HandleFunc("ZRANGEBYLEX", m.cmdZrangebylex)
-	srv.HandleFunc("ZRANGEBYSCORE", m.makeCmdZrangebyscore("zrangebyscore", false))
-	srv.HandleFunc("ZRANK", m.makeCmdZrank("zrank", false))
+	srv.HandleFunc("ZRANGEBYSCORE", m.makeCmdZrangebyscore(false))
+	srv.HandleFunc("ZRANK", m.makeCmdZrank(false))
 	srv.HandleFunc("ZREM", m.cmdZrem)
 	srv.HandleFunc("ZREMRANGEBYLEX", m.cmdZremrangebylex)
 	srv.HandleFunc("ZREMRANGEBYRANK", m.cmdZremrangebyrank)
 	srv.HandleFunc("ZREMRANGEBYSCORE", m.cmdZremrangebyscore)
-	srv.HandleFunc("ZREVRANGE", m.makeCmdZrange("zrevrange", true))
-	srv.HandleFunc("ZREVRANGEBYSCORE", m.makeCmdZrangebyscore("zrevrangebyscore", true))
-	srv.HandleFunc("ZREVRANK", m.makeCmdZrank("zrevrank", true))
+	srv.HandleFunc("ZREVRANGE", m.makeCmdZrange(true))
+	srv.HandleFunc("ZREVRANGEBYSCORE", m.makeCmdZrangebyscore(true))
+	srv.HandleFunc("ZREVRANK", m.makeCmdZrank(true))
 	srv.HandleFunc("ZSCORE", m.cmdZscore)
 	srv.HandleFunc("ZUNIONSTORE", m.cmdZunionstore)
 	srv.HandleFunc("ZSCAN", m.cmdZscan)
@@ -401,7 +401,7 @@ func (m *Miniredis) cmdZlexcount(out *redeo.Responder, r *redeo.Request) error {
 }
 
 // ZRANGE and ZREVRANGE
-func (m *Miniredis) makeCmdZrange(cmd string, reverse bool) redeo.HandlerFunc {
+func (m *Miniredis) makeCmdZrange(reverse bool) redeo.HandlerFunc {
 	return func(out *redeo.Responder, r *redeo.Request) error {
 		if len(r.Args) < 3 {
 			setDirty(r.Client())
@@ -574,7 +574,7 @@ func (m *Miniredis) cmdZrangebylex(out *redeo.Responder, r *redeo.Request) error
 }
 
 // ZRANGEBYSCORE and ZREVRANGEBYSCORE
-func (m *Miniredis) makeCmdZrangebyscore(cmd string, reverse bool) redeo.HandlerFunc {
+func (m *Miniredis) makeCmdZrangebyscore(reverse bool) redeo.HandlerFunc {
 	return func(out *redeo.Responder, r *redeo.Request) error {
 		if len(r.Args) < 3 {
 			setDirty(r.Client())
@@ -695,7 +695,7 @@ func (m *Miniredis) makeCmdZrangebyscore(cmd string, reverse bool) redeo.Handler
 }
 
 // ZRANK and ZREVRANK
-func (m *Miniredis) makeCmdZrank(cmd string, reverse bool) redeo.HandlerFunc {
+func (m *Miniredis) makeCmdZrank(reverse bool) redeo.HandlerFunc {
 	return func(out *redeo.Responder, r *redeo.Request) error {
 		if len(r.Args) != 2 {
 			setDirty(r.Client())

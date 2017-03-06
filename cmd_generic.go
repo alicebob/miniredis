@@ -36,7 +36,7 @@ func commandsGeneric(m *Miniredis, srv *redeo.Server) {
 }
 
 // generic expire command for EXPIRE, PEXPIRE, EXPIREAT, PEXPIREAT
-func makeCmdExpire(m *Miniredis, cmd string) func(*redeo.Responder, *redeo.Request) error {
+func makeCmdExpire(m *Miniredis, _ string) func(*redeo.Responder, *redeo.Request) error {
 	return func(out *redeo.Responder, r *redeo.Request) error {
 		if len(r.Args) != 2 {
 			setDirty(r.Client())
