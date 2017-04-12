@@ -249,6 +249,12 @@ func (m *Miniredis) TotalConnectionCount() int {
 	return int(m.srv.Info().TotalConnections())
 }
 
+// FastForward proceeds the time of selected db by duration.
+func (m *Miniredis) FastForward(duration time.Duration) () {
+	db := m.db(m.selectedDB)
+	db.fastForward(duration)
+}
+
 // Dump returns a text version of the selected DB, usable for debugging.
 func (m *Miniredis) Dump() string {
 	m.Lock()

@@ -182,3 +182,14 @@ func TestKeysAndFlush(t *testing.T) {
 	s.Select(1)
 	equals(t, []string{}, s.Keys())
 }
+
+func TestExpireWithFastForward(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	s.Set("aap", "noot")
+	equals(t, []string{"aap"}, s.Keys())
+	s.SetExpire("aap", 10)
+
+	s.FastForward(10)
+	equals(t, []string{}, s.Keys())
+}
