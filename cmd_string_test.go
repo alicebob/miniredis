@@ -2,6 +2,7 @@ package miniredis
 
 import (
 	"testing"
+	"time"
 
 	"github.com/garyburd/redigo/redis"
 )
@@ -124,19 +125,19 @@ func TestSet(t *testing.T) {
 		s.CheckGet(t, "eleven", "fourteen")
 	}
 
-	// EX or PX argument. Expire values.
+	// EX or PX argument. TTL values.
 	{
 		v, err := c.Do("SET", "one", "two", "EX", 1299)
 		ok(t, err)
 		equals(t, "OK", v)
 		s.CheckGet(t, "one", "two")
-		equals(t, 1299, s.Expire("one"))
+		equals(t, time.Second*1299, s.TTL("one"))
 
 		v, err = c.Do("SET", "three", "four", "PX", 8888)
 		ok(t, err)
 		equals(t, "OK", v)
 		s.CheckGet(t, "three", "four")
-		equals(t, 8888, s.Expire("three"))
+		equals(t, time.Millisecond*8888, s.TTL("three"))
 
 		_, err = c.Do("SET", "one", "two", "EX", "notimestamp")
 		assert(t, err != nil, "no SET error on invalid EX")
@@ -217,13 +218,13 @@ func TestMset(t *testing.T) {
 	{
 		s.Set("foo", "bar")
 		s.HSet("aap", "foo", "bar") // even for weird keys.
-		s.SetExpire("aap", 999)
-		s.SetExpire("foo", 999)
+		s.SetTTL("aap", time.Second*999)
+		s.SetTTL("foo", time.Second*999)
 		v, err := redis.String(c.Do("MSET", "aap", "noot", "foo", "baz"))
 		ok(t, err)
 		equals(t, "OK", v)
-		equals(t, 0, s.Expire("aap"))
-		equals(t, 0, s.Expire("foo"))
+		equals(t, time.Duration(0), s.TTL("aap"))
+		equals(t, time.Duration(0), s.TTL("foo"))
 	}
 }
 
@@ -240,7 +241,7 @@ func TestSetex(t *testing.T) {
 		ok(t, err)
 		equals(t, "OK", v)
 		s.CheckGet(t, "aap", "noot")
-		equals(t, 1234, s.Expire("aap"))
+		equals(t, time.Second*1234, s.TTL("aap"))
 	}
 
 	// Same thing
@@ -275,7 +276,7 @@ func TestPsetex(t *testing.T) {
 		ok(t, err)
 		equals(t, "OK", v)
 		s.CheckGet(t, "aap", "noot")
-		equals(t, 1234, s.Expire("aap")) // We set Milliseconds in Expire.
+		equals(t, time.Millisecond*1234, s.TTL("aap"))
 	}
 
 	// Same thing
@@ -646,12 +647,12 @@ func TestGetSet(t *testing.T) {
 	// TTL needs to be cleared
 	{
 		s.Set("one", "two")
-		s.SetExpire("one", 1234)
+		s.SetTTL("one", time.Second*1234)
 		v, err := redis.String(c.Do("GETSET", "one", "three"))
 		ok(t, err)
 		equals(t, "two", v)
 		s.CheckGet(t, "bar", "bak")
-		equals(t, 0, s.Expire("one"))
+		equals(t, time.Duration(0), s.TTL("one"))
 	}
 
 	// Wrong type of existing key

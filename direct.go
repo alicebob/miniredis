@@ -4,6 +4,7 @@ package miniredis
 
 import (
 	"errors"
+	"time"
 )
 
 var (
@@ -311,30 +312,32 @@ func (db *RedisDB) Del(k string) bool {
 	return true
 }
 
-// Expire value. As set by the client (via EXPIRE, PEXPIRE, EXPIREAT, PEXPIREAT and
-// similar commands). 0 if not set.
-func (m *Miniredis) Expire(k string) int {
-	return m.DB(m.selectedDB).Expire(k)
+// TTL is the left over time to live. As set via EXPIRE, PEXPIRE, EXPIREAT,
+// PEXPIREAT.
+// 0 if not set.
+func (m *Miniredis) TTL(k string) time.Duration {
+	return m.DB(m.selectedDB).TTL(k)
 }
 
-// Expire value. As set by the client (via EXPIRE, PEXPIRE, EXPIREAT, PEXPIREAT and
-// similar commands). 0 if not set.
-func (db *RedisDB) Expire(k string) int {
+// TTL is the left over time to live. As set via EXPIRE, PEXPIRE, EXPIREAT,
+// PEXPIREAT.
+// 0 if not set.
+func (db *RedisDB) TTL(k string) time.Duration {
 	db.master.Lock()
 	defer db.master.Unlock()
-	return db.expire[k]
+	return db.ttl[k]
 }
 
-// SetExpire sets expiration of a key.
-func (m *Miniredis) SetExpire(k string, ex int) {
-	m.DB(m.selectedDB).SetExpire(k, ex)
+// SetTTL sets the TTL of a key.
+func (m *Miniredis) SetTTL(k string, ttl time.Duration) {
+	m.DB(m.selectedDB).SetTTL(k, ttl)
 }
 
-// SetExpire sets expiration of a key.
-func (db *RedisDB) SetExpire(k string, ex int) {
+// SetTTL sets the time to live of a key.
+func (db *RedisDB) SetTTL(k string, ttl time.Duration) {
 	db.master.Lock()
 	defer db.master.Unlock()
-	db.expire[k] = ex
+	db.ttl[k] = ttl
 	db.keyVersion[k]++
 }
 

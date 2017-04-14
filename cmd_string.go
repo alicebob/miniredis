@@ -5,6 +5,7 @@ package miniredis
 import (
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/bsm/redeo"
 )
@@ -47,15 +48,16 @@ func (m *Miniredis) cmdSet(out *redeo.Responder, r *redeo.Request) error {
 	}
 
 	var (
-		nx     = false // set iff not exists
-		xx     = false // set iff exists
-		expire = 0     // For seconds and milliseconds.
+		nx  = false // set iff not exists
+		xx  = false // set iff exists
+		ttl time.Duration
 	)
 
 	key := r.Args[0]
 	value := r.Args[1]
 	r.Args = r.Args[2:]
 	for len(r.Args) > 0 {
+		timeUnit := time.Second
 		switch strings.ToUpper(r.Args[0]) {
 		case "NX":
 			nx = true
@@ -65,19 +67,23 @@ func (m *Miniredis) cmdSet(out *redeo.Responder, r *redeo.Request) error {
 			xx = true
 			r.Args = r.Args[1:]
 			continue
-		case "EX", "PX":
+		case "PX":
+			timeUnit = time.Millisecond
+			fallthrough
+		case "EX":
 			if len(r.Args) < 2 {
 				setDirty(r.Client())
 				out.WriteErrorString(msgInvalidInt)
 				return nil
 			}
-			var err error
-			expire, err = strconv.Atoi(r.Args[1])
+			expire, err := strconv.Atoi(r.Args[1])
 			if err != nil {
 				setDirty(r.Client())
 				out.WriteErrorString(msgInvalidInt)
 				return nil
 			}
+			ttl = time.Duration(expire) * timeUnit
+
 			r.Args = r.Args[2:]
 			continue
 		default:
@@ -106,8 +112,8 @@ func (m *Miniredis) cmdSet(out *redeo.Responder, r *redeo.Request) error {
 		db.del(key, true) // be sure to remove existing values of other type keys.
 		// a vanilla SET clears the expire
 		db.stringSet(key, value)
-		if expire != 0 {
-			db.expire[key] = expire
+		if ttl != 0 {
+			db.ttl[key] = ttl
 		}
 		out.WriteOK()
 	})
@@ -136,7 +142,7 @@ func (m *Miniredis) cmdSetex(out *redeo.Responder, r *redeo.Request) error {
 
 		db.del(key, true) // Clear any existing keys.
 		db.stringSet(key, value)
-		db.expire[key] = ttl
+		db.ttl[key] = time.Duration(ttl) * time.Second
 		out.WriteOK()
 	})
 }
@@ -164,7 +170,7 @@ func (m *Miniredis) cmdPsetex(out *redeo.Responder, r *redeo.Request) error {
 
 		db.del(key, true) // Clear any existing keys.
 		db.stringSet(key, value)
-		db.expire[key] = ttl // We put millisecond keys in with the second keys.
+		db.ttl[key] = time.Duration(ttl) * time.Millisecond
 		out.WriteOK()
 	})
 }
@@ -315,8 +321,8 @@ func (m *Miniredis) cmdGetset(out *redeo.Responder, r *redeo.Request) error {
 
 		old, ok := db.stringKeys[key]
 		db.stringSet(key, value)
-		// a GETSET clears the expire
-		delete(db.expire, key)
+		// a GETSET clears the ttl
+		delete(db.ttl, key)
 
 		if !ok {
 			out.WriteNil()

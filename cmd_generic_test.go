@@ -2,12 +2,13 @@ package miniredis
 
 import (
 	"testing"
+	"time"
 
 	"github.com/garyburd/redigo/redis"
 )
 
 // Test EXPIRE. Keys with an expiration are called volatile in Redis parlance.
-func TestExpire(t *testing.T) {
+func TestTTL(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
@@ -16,7 +17,7 @@ func TestExpire(t *testing.T) {
 
 	// Not volatile yet
 	{
-		equals(t, 0, s.Expire("foo"))
+		equals(t, time.Duration(0), s.TTL("foo"))
 		b, err := redis.Int(c.Do("TTL", "foo"))
 		ok(t, err)
 		equals(t, -2, b)
@@ -26,16 +27,16 @@ func TestExpire(t *testing.T) {
 	{
 		_, err := c.Do("SET", "foo", "bar")
 		ok(t, err)
-		// Key exists, but no Expire set yet.
+		// key exists, but no Expire set yet
 		b, err := redis.Int(c.Do("TTL", "foo"))
 		ok(t, err)
 		equals(t, -1, b)
 
 		n, err := redis.Int(c.Do("EXPIRE", "foo", "1200"))
 		ok(t, err)
-		equals(t, 1, n) // EXPIRE returns 1 on success.
+		equals(t, 1, n) // EXPIRE returns 1 on success
 
-		equals(t, 1200, s.Expire("foo"))
+		equals(t, 1200*time.Second, s.TTL("foo"))
 		b, err = redis.Int(c.Do("TTL", "foo"))
 		ok(t, err)
 		equals(t, 1200, b)
@@ -106,7 +107,7 @@ func TestExpireat(t *testing.T) {
 
 	// Not volatile yet
 	{
-		equals(t, 0, s.Expire("foo"))
+		equals(t, time.Duration(0), s.TTL("foo"))
 		b, err := redis.Int(c.Do("TTL", "foo"))
 		ok(t, err)
 		equals(t, -2, b)
@@ -116,20 +117,21 @@ func TestExpireat(t *testing.T) {
 	{
 		_, err := c.Do("SET", "foo", "bar")
 		ok(t, err)
-		// Key exists, but no Expire set yet.
+		// Key exists, but no ttl set.
 		b, err := redis.Int(c.Do("TTL", "foo"))
 		ok(t, err)
 		equals(t, -1, b)
 
-		n, err := redis.Int(c.Do("EXPIREAT", "foo", 1234567890))
+		s.SetTime(time.Unix(1234567890, 0))
+		n, err := redis.Int(c.Do("EXPIREAT", "foo", 1234567890+100))
 		ok(t, err)
 		equals(t, 1, n) // EXPIREAT returns 1 on success.
 
-		equals(t, 1234567890, s.Expire("foo"))
+		equals(t, 100*time.Second, s.TTL("foo"))
 		b, err = redis.Int(c.Do("TTL", "foo"))
 		ok(t, err)
-		equals(t, 1234567890, b)
-		equals(t, 1234567890, s.Expire("foo"))
+		equals(t, 100, b)
+		equals(t, 100*time.Second, s.TTL("foo"))
 	}
 }
 
@@ -150,6 +152,8 @@ func TestPexpire(t *testing.T) {
 		e, err := redis.Int(c.Do("PTTL", "foo"))
 		ok(t, err)
 		equals(t, 12, e)
+
+		equals(t, 12*time.Millisecond, s.TTL("foo"))
 	}
 	// Key doesn't exist
 	{
@@ -181,12 +185,12 @@ func TestDel(t *testing.T) {
 	s.Set("foo", "bar")
 	s.HSet("aap", "noot", "mies")
 	s.Set("one", "two")
-	s.SetExpire("one", 1234)
+	s.SetTTL("one", time.Second*1234)
 	s.Set("three", "four")
 	r, err := redis.Int(c.Do("DEL", "one", "aap", "nosuch"))
 	ok(t, err)
 	equals(t, 2, r)
-	equals(t, 0, s.Expire("one"))
+	equals(t, time.Duration(0), s.TTL("one"))
 
 	// Direct also works:
 	s.Set("foo", "bar")
@@ -330,11 +334,11 @@ func TestMove(t *testing.T) {
 	// TTL is also moved
 	{
 		s.DB(0).Set("one", "two")
-		s.DB(0).SetExpire("one", 4242)
+		s.DB(0).SetTTL("one", time.Second*4242)
 		v, err := redis.Int(c.Do("MOVE", "one", 1))
 		ok(t, err)
 		equals(t, 1, v)
-		equals(t, s.DB(1).Expire("one"), 4242)
+		equals(t, s.DB(1).TTL("one"), time.Second*4242)
 	}
 
 	// Wrong usage
@@ -474,7 +478,7 @@ func TestRename(t *testing.T) {
 	{
 		s.Set("from", "string value")
 		s.HSet("to", "key", "value")
-		s.SetExpire("from", 999999)
+		s.SetTTL("from", time.Second*999999)
 
 		str, err := redis.String(c.Do("RENAME", "from", "to"))
 		ok(t, err)
@@ -482,8 +486,8 @@ func TestRename(t *testing.T) {
 		equals(t, false, s.Exists("from"))
 		equals(t, true, s.Exists("to"))
 		s.CheckGet(t, "to", "string value")
-		equals(t, 0, s.Expire("from"))
-		equals(t, 999999, s.Expire("to"))
+		equals(t, time.Duration(0), s.TTL("from"))
+		equals(t, time.Second*999999, s.TTL("to"))
 	}
 
 	// Wrong usage

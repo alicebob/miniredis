@@ -3,6 +3,7 @@ package miniredis
 import (
 	"sort"
 	"testing"
+	"time"
 
 	"github.com/garyburd/redigo/redis"
 )
@@ -118,11 +119,11 @@ func TestHashMSet(t *testing.T) {
 
 	// Doesn't touch ttl.
 	{
-		s.SetExpire("hash", 999)
+		s.SetTTL("hash", time.Second*999)
 		v, err := redis.String(c.Do("HMSET", "hash", "gijs", "lam"))
 		ok(t, err)
 		equals(t, "OK", v)
-		equals(t, 999, s.Expire("hash"))
+		equals(t, time.Second*999, s.TTL("hash"))
 	}
 
 	{

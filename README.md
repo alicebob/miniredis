@@ -150,10 +150,12 @@ Implemented commands:
    - ZSCAN
 
 
-Since miniredis is intended to be used in unittests timeouts are not implemented.
-You can use `Expire()` to see if an expiration is set. The value returned will
-be that what the client set, without any interpretation. This is to keep things
-testable.
+Since miniredis is intended to be used in unittests TTLs don't decrease
+automatically. You can use `TTL()` to get the TTL (as a time.Duration) of a
+key. It will return 0 when no TTL is set. EXPIREAT and PEXPIREAT values will be
+converted to a duration. For that you can either set m.SetTime(t) to use that
+time as the base for the (P)EXPIREAT conversion, or don't call SetTime(), in
+which case time.Now() will be used.
 
 ## Example
 

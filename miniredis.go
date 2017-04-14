@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"net"
 	"sync"
+	"time"
 
 	"github.com/bsm/redeo"
 )
@@ -28,16 +29,16 @@ type setKey map[string]struct{}
 
 // RedisDB holds a single (numbered) Redis database.
 type RedisDB struct {
-	master        *sync.Mutex          // pointer to the lock in Miniredis
-	id            int                  // db id
-	keys          map[string]string    // Master map of keys with their type
-	stringKeys    map[string]string    // GET/SET &c. keys
-	hashKeys      map[string]hashKey   // MGET/MSET &c. keys
-	listKeys      map[string]listKey   // LPUSH &c. keys
-	setKeys       map[string]setKey    // SADD &c. keys
-	sortedsetKeys map[string]sortedSet // ZADD &c. keys
-	expire        map[string]int       // EXPIRE values
-	keyVersion    map[string]uint      // used to watch values
+	master        *sync.Mutex              // pointer to the lock in Miniredis
+	id            int                      // db id
+	keys          map[string]string        // Master map of keys with their type
+	stringKeys    map[string]string        // GET/SET &c. keys
+	hashKeys      map[string]hashKey       // MGET/MSET &c. keys
+	listKeys      map[string]listKey       // LPUSH &c. keys
+	setKeys       map[string]setKey        // SADD &c. keys
+	sortedsetKeys map[string]sortedSet     // ZADD &c. keys
+	ttl           map[string]time.Duration // effective TTL values
+	keyVersion    map[string]uint          // used to watch values
 }
 
 // Miniredis is a Redis server implementation.
@@ -51,6 +52,7 @@ type Miniredis struct {
 	dbs        map[int]*RedisDB
 	selectedDB int // DB id used in the direct Get(), Set() &c.
 	signal     *sync.Cond
+	now        time.Time // used to make a duration from EXPIREAT. time.Now() if not set.
 }
 
 type txCmd func(*redeo.Responder, *connCtx)
@@ -90,7 +92,7 @@ func newRedisDB(id int, l *sync.Mutex) RedisDB {
 		listKeys:      map[string]listKey{},
 		setKeys:       map[string]setKey{},
 		sortedsetKeys: map[string]sortedSet{},
-		expire:        map[string]int{},
+		ttl:           map[string]time.Duration{},
 		keyVersion:    map[string]uint{},
 	}
 }
@@ -293,6 +295,12 @@ func (m *Miniredis) Dump() string {
 		}
 	}
 	return r
+}
+
+// SetTime sets the time against which EXPIREAT values are compared. EXPIREAT
+// will use time.Now() if this is not set.
+func (m *Miniredis) SetTime(t time.Time) {
+	m.now = t
 }
 
 // handleAuth returns false if connection has no access. It sends the reply.

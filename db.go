@@ -3,6 +3,7 @@ package miniredis
 import (
 	"sort"
 	"strconv"
+	"time"
 )
 
 func (db *RedisDB) exists(k string) bool {
@@ -33,7 +34,7 @@ func (db *RedisDB) flush() {
 	db.listKeys = map[string]listKey{}
 	db.setKeys = map[string]setKey{}
 	db.sortedsetKeys = map[string]sortedSet{}
-	db.expire = map[string]int{}
+	db.ttl = map[string]time.Duration{}
 }
 
 // move something to another db. Will return ok. Or not.
@@ -62,8 +63,8 @@ func (db *RedisDB) move(key string, to *RedisDB) bool {
 		panic("unhandled key type")
 	}
 	to.keyVersion[key]++
-	if exp, ok := db.expire[key]; ok {
-		to.expire[key] = exp
+	if v, ok := db.ttl[key]; ok {
+		to.ttl[key] = v
 	}
 	db.del(key, true)
 	return true
@@ -87,7 +88,7 @@ func (db *RedisDB) rename(from, to string) {
 	}
 	db.keys[to] = db.keys[from]
 	db.keyVersion[to]++
-	db.expire[to] = db.expire[from]
+	db.ttl[to] = db.ttl[from]
 
 	db.del(from, true)
 }
@@ -100,7 +101,7 @@ func (db *RedisDB) del(k string, delTTL bool) {
 	delete(db.keys, k)
 	db.keyVersion[k]++
 	if delTTL {
-		delete(db.expire, k)
+		delete(db.ttl, k)
 	}
 	switch t {
 	case "string":

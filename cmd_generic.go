@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/bsm/redeo"
 )
@@ -15,15 +16,15 @@ func commandsGeneric(m *Miniredis, srv *redeo.Server) {
 	srv.HandleFunc("DEL", m.cmdDel)
 	// DUMP
 	srv.HandleFunc("EXISTS", m.cmdExists)
-	srv.HandleFunc("EXPIRE", makeCmdExpire(m, "expire"))
-	srv.HandleFunc("EXPIREAT", makeCmdExpire(m, "expireat"))
+	srv.HandleFunc("EXPIRE", makeCmdExpire(m, false, time.Second))
+	srv.HandleFunc("EXPIREAT", makeCmdExpire(m, true, time.Second))
 	srv.HandleFunc("KEYS", m.cmdKeys)
 	// MIGRATE
 	srv.HandleFunc("MOVE", m.cmdMove)
 	// OBJECT
 	srv.HandleFunc("PERSIST", m.cmdPersist)
-	srv.HandleFunc("PEXPIRE", makeCmdExpire(m, "pexpire"))
-	srv.HandleFunc("PEXPIREAT", makeCmdExpire(m, "pexpireat"))
+	srv.HandleFunc("PEXPIRE", makeCmdExpire(m, false, time.Millisecond))
+	srv.HandleFunc("PEXPIREAT", makeCmdExpire(m, true, time.Millisecond))
 	srv.HandleFunc("PTTL", m.cmdPTTL)
 	srv.HandleFunc("RANDOMKEY", m.cmdRandomkey)
 	srv.HandleFunc("RENAME", m.cmdRename)
@@ -36,7 +37,9 @@ func commandsGeneric(m *Miniredis, srv *redeo.Server) {
 }
 
 // generic expire command for EXPIRE, PEXPIRE, EXPIREAT, PEXPIREAT
-func makeCmdExpire(m *Miniredis, _ string) func(*redeo.Responder, *redeo.Request) error {
+// d is the time unit. If unix is set it'll be seen as a unixtimestamp and
+// converted to a duration.
+func makeCmdExpire(m *Miniredis, unix bool, d time.Duration) func(*redeo.Responder, *redeo.Request) error {
 	return func(out *redeo.Responder, r *redeo.Request) error {
 		if len(r.Args) != 2 {
 			setDirty(r.Client())
@@ -63,7 +66,24 @@ func makeCmdExpire(m *Miniredis, _ string) func(*redeo.Responder, *redeo.Request
 				out.WriteZero()
 				return
 			}
-			db.expire[key] = i
+			if unix {
+				var ts time.Time
+				switch d {
+				case time.Millisecond:
+					ts = time.Unix(0, int64(i))
+				case time.Second:
+					ts = time.Unix(int64(i), 0)
+				default:
+					panic("invalid time unit (d). Fixme!")
+				}
+				now := m.now
+				if now.IsZero() {
+					now = time.Now().UTC()
+				}
+				db.ttl[key] = ts.Sub(now)
+			} else {
+				db.ttl[key] = time.Duration(i) * d
+			}
 			db.keyVersion[key]++
 			out.WriteOne()
 		})
@@ -90,13 +110,13 @@ func (m *Miniredis) cmdTTL(out *redeo.Responder, r *redeo.Request) error {
 			return
 		}
 
-		value, ok := db.expire[key]
+		v, ok := db.ttl[key]
 		if !ok {
 			// No expire value
 			out.WriteInt(-1)
 			return
 		}
-		out.WriteInt(value)
+		out.WriteInt(int(v.Seconds()))
 	})
 }
 
@@ -115,18 +135,18 @@ func (m *Miniredis) cmdPTTL(out *redeo.Responder, r *redeo.Request) error {
 		db := m.db(ctx.selectedDB)
 
 		if _, ok := db.keys[key]; !ok {
-			// No such key
+			// no such key
 			out.WriteInt(-2)
 			return
 		}
 
-		value, ok := db.expire[key]
+		v, ok := db.ttl[key]
 		if !ok {
-			// No expire value
+			// no expire value
 			out.WriteInt(-1)
 			return
 		}
-		out.WriteInt(value)
+		out.WriteInt(int(v.Nanoseconds() / 1000000))
 	})
 }
 
@@ -145,18 +165,17 @@ func (m *Miniredis) cmdPersist(out *redeo.Responder, r *redeo.Request) error {
 		db := m.db(ctx.selectedDB)
 
 		if _, ok := db.keys[key]; !ok {
-			// No such key
+			// no such key
 			out.WriteInt(0)
 			return
 		}
 
-		_, ok := db.expire[key]
-		if !ok {
-			// No expire value
+		if _, ok := db.ttl[key]; !ok {
+			// no expire value
 			out.WriteInt(0)
 			return
 		}
-		delete(db.expire, key)
+		delete(db.ttl, key)
 		db.keyVersion[key]++
 		out.WriteInt(1)
 	})
