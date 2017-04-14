@@ -300,6 +300,8 @@ func (m *Miniredis) Dump() string {
 // SetTime sets the time against which EXPIREAT values are compared. EXPIREAT
 // will use time.Now() if this is not set.
 func (m *Miniredis) SetTime(t time.Time) {
+	m.Lock()
+	defer m.Unlock()
 	m.now = t
 }
 
