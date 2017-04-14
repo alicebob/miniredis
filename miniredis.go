@@ -250,7 +250,7 @@ func (m *Miniredis) TotalConnectionCount() int {
 }
 
 // FastForward proceeds the time of selected db by duration.
-func (m *Miniredis) FastForward(duration time.Duration) () {
+func (m *Miniredis) FastForward(duration time.Duration) {
 	for _, db := range m.dbs {
 		db.fastForward(duration)
 	}

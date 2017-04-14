@@ -32,6 +32,14 @@ func Example() {
 	if _, err := s.DB(42).Get("foo"); err != miniredis.ErrKeyNotFound {
 		panic("Didn't use a different DB")
 	}
+
+	// Test key with expiration
+	s.SetTTL("foo", 60)
+	s.FastForward(60)
+	if _, err := s.Get("foo"); err == nil {
+		panic("Expect key expired, but still get value.")
+	}
+
 	// Or use a Check* function which Fail()s if the key is not what we expect
 	// (checks for existence, key type and the value)
 	// s.CheckGet(t, "foo", "bar")
