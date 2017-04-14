@@ -536,10 +536,10 @@ func (db *RedisDB) setUnion(keys []string) (setKey, error) {
 // fastForward proceeds the current timestamp with duration, works as a time machine
 func (db *RedisDB) fastForward(duration time.Duration) () {
 	for _, key := range db.allKeys() {
-		value, ok := db.expire[key]
+		value, ok := db.ttl[key]
 		if ok {
-			db.expire[key] = value - int(duration)
-			if db.expire[key] <= 0 {
+			db.ttl[key] = value - duration
+			if db.ttl[key] <= 0 {
 				db.del(key, true)
 			}
 		}

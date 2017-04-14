@@ -188,7 +188,7 @@ func TestExpireWithFastForward(t *testing.T) {
 	ok(t, err)
 	s.Set("aap", "noot")
 	equals(t, []string{"aap"}, s.Keys())
-	s.SetExpire("aap", 10)
+	s.SetTTL("aap", 10)
 
 	s.FastForward(10)
 	equals(t, []string{}, s.Keys())
