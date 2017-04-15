@@ -156,6 +156,8 @@ key. It will return 0 when no TTL is set. EXPIREAT and PEXPIREAT values will be
 converted to a duration. For that you can either set m.SetTime(t) to use that
 time as the base for the (P)EXPIREAT conversion, or don't call SetTime(), in
 which case time.Now() will be used.
+`m.FastForward(d)` can be used to decrement all TTLs. All TTLs which become <=
+0 will be removed.
 
 ## Example
 
@@ -182,6 +184,14 @@ func TestSomething(t *testing.T) {
     }
     // ... or use a helper for that:
     s.CheckGet(t, "foo", "bar")
+
+    // TTL and expiration:
+    s.Set("foo", "bar")
+    s.SetTTL("foo", 10 * time.Second)
+    s.FastForward(11 * time.Second)
+    if s.Exists("foo") {
+        t.Fatal("'foo' should not have existed anymore")
+    }
 }
 ```
 
@@ -243,7 +253,7 @@ Commands which will probably not be implemented:
 ## &c.
 
 See https://github.com/alicebob/miniredis_vs_redis for tests comparing
-miniredis against the real thing. Tests are run against Redis 3.2.1 (Debian).
+miniredis against the real thing. Tests are run against Redis 3.2.5 (Debian).
 
 
 [![Build Status](https://travis-ci.org/alicebob/miniredis.svg?branch=master)](https://travis-ci.org/alicebob/miniredis) 

@@ -1,6 +1,8 @@
 package miniredis_test
 
 import (
+	"time"
+
 	"github.com/alicebob/miniredis"
 	"github.com/garyburd/redigo/redis"
 )
@@ -34,10 +36,10 @@ func Example() {
 	}
 
 	// Test key with expiration
-	s.SetTTL("foo", 60)
-	s.FastForward(60)
-	if _, err := s.Get("foo"); err == nil {
-		panic("Expect key expired, but still get value.")
+	s.SetTTL("foo", 60*time.Second)
+	s.FastForward(60 * time.Second)
+	if s.Exists("foo") {
+		panic("Expect key to be expired")
 	}
 
 	// Or use a Check* function which Fail()s if the key is not what we expect
