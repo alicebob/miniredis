@@ -96,6 +96,14 @@ func TestTTL(t *testing.T) {
 		ok(t, err)
 		equals(t, 1, b)
 	}
+
+	{
+		_, err = c.Do("SET", "wim", "zus")
+		ok(t, err)
+		_, err = redis.Int(c.Do("EXPIRE", "wim", -1200))
+		ok(t, err)
+		equals(t, false, s.Exists("wim"))
+	}
 }
 
 func TestExpireat(t *testing.T) {

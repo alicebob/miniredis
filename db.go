@@ -538,9 +538,13 @@ func (db *RedisDB) fastForward(duration time.Duration) {
 	for _, key := range db.allKeys() {
 		if value, ok := db.ttl[key]; ok {
 			db.ttl[key] = value - duration
-			if db.ttl[key] <= 0 {
-				db.del(key, true)
-			}
+			db.checkTTL(key)
 		}
+	}
+}
+
+func (db *RedisDB) checkTTL(key string) {
+	if v, ok := db.ttl[key]; ok && v <= 0 {
+		db.del(key, true)
 	}
 }

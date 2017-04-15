@@ -187,6 +187,7 @@ func TestKeysAndFlush(t *testing.T) {
 func TestExpireWithFastForward(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
+
 	s.Set("aap", "noot")
 	s.Set("noot", "aap")
 	s.SetTTL("aap", 10*time.Second)

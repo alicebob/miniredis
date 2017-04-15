@@ -144,6 +144,11 @@ func TestSet(t *testing.T) {
 
 		_, err = c.Do("SET", "one", "two", "EX")
 		assert(t, err != nil, "no SET error on missing EX argument")
+
+		_, err = redis.String(c.Do("SET", "aap", "noot", "EX", 0))
+		assert(t, err != nil, "no SET EX error")
+		_, err = redis.String(c.Do("SET", "aap", "noot", "EX", -100))
+		assert(t, err != nil, "no SET EX error")
 	}
 
 	// Invalid argument
@@ -260,6 +265,10 @@ func TestSetex(t *testing.T) {
 		assert(t, err != nil, "no SETEX error")
 		_, err = redis.String(c.Do("SETEX", "aap", 12, "noot", "toomuch"))
 		assert(t, err != nil, "no SETEX error")
+		_, err = redis.String(c.Do("SETEX", "aap", 0, "noot"))
+		assert(t, err != nil, "no SETEX error")
+		_, err = redis.String(c.Do("SETEX", "aap", -10, "noot"))
+		assert(t, err != nil, "no SETEX error")
 	}
 }
 
@@ -294,6 +303,10 @@ func TestPsetex(t *testing.T) {
 		_, err = redis.String(c.Do("PSETEX", "aap", 12))
 		assert(t, err != nil, "no PSETEX error")
 		_, err = redis.String(c.Do("PSETEX", "aap", 12, "noot", "toomuch"))
+		assert(t, err != nil, "no PSETEX error")
+		_, err = redis.String(c.Do("PSETEX", "aap", 0, "noot"))
+		assert(t, err != nil, "no PSETEX error")
+		_, err = redis.String(c.Do("PSETEX", "aap", -10, "noot"))
 		assert(t, err != nil, "no PSETEX error")
 	}
 }

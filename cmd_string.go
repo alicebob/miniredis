@@ -83,6 +83,11 @@ func (m *Miniredis) cmdSet(out *redeo.Responder, r *redeo.Request) error {
 				return nil
 			}
 			ttl = time.Duration(expire) * timeUnit
+			if ttl <= 0 {
+				setDirty(r.Client())
+				out.WriteErrorString(msgInvalidSETime)
+				return nil
+			}
 
 			r.Args = r.Args[2:]
 			continue
@@ -135,6 +140,11 @@ func (m *Miniredis) cmdSetex(out *redeo.Responder, r *redeo.Request) error {
 		out.WriteErrorString(msgInvalidInt)
 		return nil
 	}
+	if ttl <= 0 {
+		setDirty(r.Client())
+		out.WriteErrorString(msgInvalidSETEXTime)
+		return nil
+	}
 	value := r.Args[2]
 
 	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
@@ -161,6 +171,11 @@ func (m *Miniredis) cmdPsetex(out *redeo.Responder, r *redeo.Request) error {
 	if err != nil {
 		setDirty(r.Client())
 		out.WriteErrorString(msgInvalidInt)
+		return nil
+	}
+	if ttl <= 0 {
+		setDirty(r.Client())
+		out.WriteErrorString(msgInvalidPSETEXTime)
 		return nil
 	}
 	value := r.Args[2]

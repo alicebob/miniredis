@@ -85,6 +85,7 @@ func makeCmdExpire(m *Miniredis, unix bool, d time.Duration) func(*redeo.Respond
 				db.ttl[key] = time.Duration(i) * d
 			}
 			db.keyVersion[key]++
+			db.checkTTL(key)
 			out.WriteOne()
 		})
 	}
