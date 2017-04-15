@@ -2,6 +2,7 @@ package miniredis
 
 import (
 	"testing"
+	"time"
 
 	"github.com/garyburd/redigo/redis"
 )
@@ -187,9 +188,12 @@ func TestExpireWithFastForward(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	s.Set("aap", "noot")
-	equals(t, []string{"aap"}, s.Keys())
-	s.SetTTL("aap", 10)
+	s.Set("noot", "aap")
+	s.SetTTL("aap", 10*time.Second)
 
-	s.FastForward(10)
-	equals(t, []string{}, s.Keys())
+	s.FastForward(5 * time.Second)
+	equals(t, 2, len(s.Keys()))
+
+	s.FastForward(5 * time.Second)
+	equals(t, 1, len(s.Keys()))
 }

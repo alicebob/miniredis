@@ -249,8 +249,11 @@ func (m *Miniredis) TotalConnectionCount() int {
 	return int(m.srv.Info().TotalConnections())
 }
 
-// FastForward proceeds the time of selected db by duration.
+// FastForward decreases all TTLs by the given duration. All TTLs <= 0 will be
+// expired.
 func (m *Miniredis) FastForward(duration time.Duration) {
+	m.Lock()
+	defer m.Unlock()
 	for _, db := range m.dbs {
 		db.fastForward(duration)
 	}
