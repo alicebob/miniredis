@@ -16,6 +16,11 @@ stack.
 
 There are no dependencies on external binaries, so you can easily integrate it in automated build processes.
 
+## 2.0.0 incompatiliby notice
+
+2.0.0 improves TTLs to be `time.Duration` values. `.Expire()` is removed and
+replaced by `.TTL()`, which returns the TTL as a `time.Duration`. `SetTime() is added to help with `EXPIREAT` commands. `.FastForward()` is introduced to test keys expiration.
+The `1.0.0` tag is the last commit before this change.
 
 ## Commands
 
