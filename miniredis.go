@@ -15,12 +15,14 @@
 package miniredis
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"sync"
 	"time"
 
 	"github.com/bsm/redeo"
+	"github.com/bsm/redeo/resp"
 )
 
 type hashKey map[string]string
@@ -55,7 +57,7 @@ type Miniredis struct {
 	now        time.Time // used to make a duration from EXPIREAT. time.Now() if not set.
 }
 
-type txCmd func(*redeo.Responder, *connCtx)
+type txCmd func(resp.ResponseWriter, *connCtx)
 
 // database id + key combo
 type dbKey struct {
@@ -115,7 +117,7 @@ func (m *Miniredis) Start() error {
 	}
 	m.listen = l
 	m.listenAddr = l.Addr().String()
-	m.srv = redeo.NewServer(&redeo.Config{Addr: m.listenAddr})
+	m.srv = redeo.NewServer(nil)
 
 	commandsConnection(m, m.srv)
 	commandsGeneric(m, m.srv)
@@ -174,7 +176,6 @@ func (m *Miniredis) Close() {
 	if m.listen.Close() != nil {
 		return
 	}
-	m.srv.Close()
 	<-m.closed
 	m.listen = nil
 }
@@ -239,7 +240,7 @@ func (m *Miniredis) CommandCount() int {
 func (m *Miniredis) CurrentConnectionCount() int {
 	m.Lock()
 	defer m.Unlock()
-	return m.srv.Info().ClientsLen()
+	return m.srv.Info().NumClients()
 }
 
 // TotalConnectionCount returns the number of client connections since server start.
@@ -316,24 +317,28 @@ func (m *Miniredis) SetTime(t time.Time) {
 }
 
 // handleAuth returns false if connection has no access. It sends the reply.
-func (m *Miniredis) handleAuth(cl *redeo.Client, out *redeo.Responder) bool {
+func (m *Miniredis) handleAuth(cl *redeo.Client, out resp.ResponseWriter) bool {
 	m.Lock()
 	defer m.Unlock()
 	if m.password == "" {
 		return true
 	}
-	if cl.Ctx == nil || !getCtx(cl).authenticated {
-		out.WriteErrorString("NOAUTH Authentication required.")
+	if !getCtx(cl).authenticated {
+		out.AppendError("NOAUTH Authentication required.")
 		return false
 	}
 	return true
 }
 
+type ctxKeyState struct{}
+
 func getCtx(cl *redeo.Client) *connCtx {
-	if cl.Ctx == nil {
-		cl.Ctx = &connCtx{}
+	ctx := cl.Context().Value(ctxKeyState{})
+	if ctx == nil {
+		ctx = &connCtx{}
+		cl.SetContext(context.WithValue(cl.Context(), ctxKeyState{}, ctx))
 	}
-	return cl.Ctx.(*connCtx)
+	return ctx.(*connCtx)
 }
 
 func startTx(ctx *connCtx) {
@@ -354,10 +359,6 @@ func addTxCmd(ctx *connCtx, cb txCmd) {
 	ctx.transaction = append(ctx.transaction, cb)
 }
 
-func dirtyTx(ctx *connCtx) bool {
-	return ctx.dirtyTransaction
-}
-
 func watch(db *RedisDB, ctx *connCtx, key string) {
 	if ctx.watch == nil {
 		ctx.watch = map[dbKey]uint{}
@@ -371,13 +372,22 @@ func unwatch(ctx *connCtx) {
 
 // setDirty can be called even when not in an tx. Is an no-op then.
 func setDirty(cl *redeo.Client) {
-	if cl.Ctx == nil {
+	ctx := getCtx(cl)
+	if ctx.transaction == nil {
 		// No transaction. Not relevant.
 		return
 	}
-	getCtx(cl).dirtyTransaction = true
+	ctx.dirtyTransaction = true
 }
 
 func setAuthenticated(cl *redeo.Client) {
 	getCtx(cl).authenticated = true
+}
+
+func asString(in []resp.CommandArgument) []string {
+	var ks []string
+	for _, k := range in {
+		ks = append(ks, k.String())
+	}
+	return ks
 }

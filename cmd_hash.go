@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/bsm/redeo"
+	"github.com/bsm/redeo/resp"
 )
 
 // commandsHash handles all hash value operations.
@@ -28,58 +29,60 @@ func commandsHash(m *Miniredis, srv *redeo.Server) {
 }
 
 // HSET
-func (m *Miniredis) cmdHset(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) != 3 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdHset(out resp.ResponseWriter, r *resp.Command) {
+	if r.ArgN() != 3 {
+		setDirty(redeo.GetClient(r.Context()))
+		out.AppendError(msgNumberOfArgs(r.Name))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
+	if !m.handleAuth(redeo.GetClient(r.Context()), out) {
+		return
 	}
 
 	var (
-		key   = r.Args[0]
-		field = r.Args[1]
-		value = r.Args[2]
+		key   = r.Arg(0).String()
+		field = r.Arg(1).String()
+		value = r.Arg(2).String()
 	)
 
-	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+	withTx(m, out, r, func(out resp.ResponseWriter, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
 		if t, ok := db.keys[key]; ok && t != "hash" {
-			out.WriteErrorString(msgWrongType)
+			out.AppendError(msgWrongType)
 			return
 		}
 
 		if db.hashSet(key, field, value) {
-			out.WriteZero()
+			out.AppendInt(0)
 		} else {
-			out.WriteOne()
+			out.AppendInt(1)
 		}
 	})
 }
 
 // HSETNX
-func (m *Miniredis) cmdHsetnx(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) != 3 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdHsetnx(out resp.ResponseWriter, r *resp.Command) {
+	if r.ArgN() != 3 {
+		setDirty(redeo.GetClient(r.Context()))
+		out.AppendError(msgNumberOfArgs(r.Name))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
+	if !m.handleAuth(redeo.GetClient(r.Context()), out) {
+		return
 	}
 
 	var (
-		key   = r.Args[0]
-		field = r.Args[1]
-		value = r.Args[2]
+		key   = r.Arg(0).String()
+		field = r.Arg(1).String()
+		value = r.Arg(2).String()
 	)
 
-	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+	withTx(m, out, r, func(out resp.ResponseWriter, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
 		if t, ok := db.keys[key]; ok && t != "hash" {
-			out.WriteErrorString(msgWrongType)
+			out.AppendError(msgWrongType)
 			return
 		}
 
@@ -89,38 +92,39 @@ func (m *Miniredis) cmdHsetnx(out *redeo.Responder, r *redeo.Request) error {
 		}
 		_, ok := db.hashKeys[key][field]
 		if ok {
-			out.WriteZero()
+			out.AppendInt(0)
 			return
 		}
 		db.hashKeys[key][field] = value
 		db.keyVersion[key]++
-		out.WriteOne()
+		out.AppendInt(1)
 	})
 }
 
 // HMSET
-func (m *Miniredis) cmdHmset(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) < 3 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdHmset(out resp.ResponseWriter, r *resp.Command) {
+	if r.ArgN() < 3 {
+		setDirty(redeo.GetClient(r.Context()))
+		out.AppendError(msgNumberOfArgs(r.Name))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
+	if !m.handleAuth(redeo.GetClient(r.Context()), out) {
+		return
 	}
 
-	key := r.Args[0]
-	args := r.Args[1:]
+	key := r.Arg(0).String()
+	args := asString(r.Args()[1:])
 	if len(args)%2 != 0 {
-		setDirty(r.Client())
+		setDirty(redeo.GetClient(r.Context()))
 		// non-default error message
-		out.WriteErrorString("ERR wrong number of arguments for HMSET")
-		return nil
+		out.AppendError("ERR wrong number of arguments for HMSET")
+		return
 	}
-	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+	withTx(m, out, r, func(out resp.ResponseWriter, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
 		if t, ok := db.keys[key]; ok && t != "hash" {
-			out.WriteErrorString(msgWrongType)
+			out.AppendError(msgWrongType)
 			return
 		}
 
@@ -131,68 +135,70 @@ func (m *Miniredis) cmdHmset(out *redeo.Responder, r *redeo.Request) error {
 
 			db.hashSet(key, field, value)
 		}
-		out.WriteOK()
+		out.AppendOK()
 	})
 }
 
 // HGET
-func (m *Miniredis) cmdHget(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) != 2 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdHget(out resp.ResponseWriter, r *resp.Command) {
+	if r.ArgN() != 2 {
+		setDirty(redeo.GetClient(r.Context()))
+		out.AppendError(msgNumberOfArgs(r.Name))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
+	if !m.handleAuth(redeo.GetClient(r.Context()), out) {
+		return
 	}
 
-	key := r.Args[0]
-	field := r.Args[1]
+	key := r.Arg(0).String()
+	field := r.Arg(1).String()
 
-	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+	withTx(m, out, r, func(out resp.ResponseWriter, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
 		t, ok := db.keys[key]
 		if !ok {
-			out.WriteNil()
+			out.AppendNil()
 			return
 		}
 		if t != "hash" {
-			out.WriteErrorString(msgWrongType)
+			out.AppendError(msgWrongType)
 			return
 		}
 		value, ok := db.hashKeys[key][field]
 		if !ok {
-			out.WriteNil()
+			out.AppendNil()
 			return
 		}
-		out.WriteString(value)
+		out.AppendBulkString(value)
 	})
 }
 
 // HDEL
-func (m *Miniredis) cmdHdel(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) < 2 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdHdel(out resp.ResponseWriter, r *resp.Command) {
+	if r.ArgN() < 2 {
+		setDirty(redeo.GetClient(r.Context()))
+		out.AppendError(msgNumberOfArgs(r.Name))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
+	if !m.handleAuth(redeo.GetClient(r.Context()), out) {
+		return
 	}
 
-	key := r.Args[0]
-	fields := r.Args[1:]
+	key := r.Arg(0).String()
+	fields := asString(r.Args()[1:])
 
-	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+	withTx(m, out, r, func(out resp.ResponseWriter, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
 		t, ok := db.keys[key]
 		if !ok {
 			// No key is zero deleted
-			out.WriteInt(0)
+			out.AppendInt(0)
 			return
 		}
 		if t != "hash" {
-			out.WriteErrorString(msgWrongType)
+			out.AppendError(msgWrongType)
 			return
 		}
 
@@ -205,7 +211,7 @@ func (m *Miniredis) cmdHdel(out *redeo.Responder, r *redeo.Request) error {
 			delete(db.hashKeys[key], f)
 			deleted++
 		}
-		out.WriteInt(deleted)
+		out.AppendInt(int64(deleted))
 
 		// Nothing left. Remove the whole key.
 		if len(db.hashKeys[key]) == 0 {
@@ -215,182 +221,189 @@ func (m *Miniredis) cmdHdel(out *redeo.Responder, r *redeo.Request) error {
 }
 
 // HEXISTS
-func (m *Miniredis) cmdHexists(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) != 2 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdHexists(out resp.ResponseWriter, r *resp.Command) {
+	if r.ArgN() != 2 {
+		setDirty(redeo.GetClient(r.Context()))
+		out.AppendError(msgNumberOfArgs(r.Name))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
+	if !m.handleAuth(redeo.GetClient(r.Context()), out) {
+		return
 	}
 
-	key := r.Args[0]
-	field := r.Args[1]
+	key := r.Arg(0).String()
+	field := r.Arg(1).String()
 
-	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+	withTx(m, out, r, func(out resp.ResponseWriter, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
 		t, ok := db.keys[key]
 		if !ok {
-			out.WriteInt(0)
+			out.AppendInt(0)
 			return
 		}
 		if t != "hash" {
-			out.WriteErrorString(msgWrongType)
+			out.AppendError(msgWrongType)
 			return
 		}
 
 		if _, ok := db.hashKeys[key][field]; !ok {
-			out.WriteInt(0)
+			out.AppendInt(0)
 			return
 		}
-		out.WriteInt(1)
+		out.AppendInt(1)
 	})
 }
 
 // HGETALL
-func (m *Miniredis) cmdHgetall(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) != 1 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdHgetall(out resp.ResponseWriter, r *resp.Command) {
+	if r.ArgN() != 1 {
+		setDirty(redeo.GetClient(r.Context()))
+		out.AppendError(msgNumberOfArgs(r.Name))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
+	if !m.handleAuth(redeo.GetClient(r.Context()), out) {
+		return
 	}
 
-	key := r.Args[0]
+	key := r.Arg(0).String()
 
-	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+	withTx(m, out, r, func(out resp.ResponseWriter, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
 		t, ok := db.keys[key]
 		if !ok {
-			out.WriteBulkLen(0)
+			out.AppendArrayLen(0)
 			return
 		}
 		if t != "hash" {
-			out.WriteErrorString(msgWrongType)
+			out.AppendError(msgWrongType)
 			return
 		}
 
-		out.WriteBulkLen(len(db.hashKeys[key]) * 2)
+		out.AppendArrayLen(len(db.hashKeys[key]) * 2)
 		for _, k := range db.hashFields(key) {
-			out.WriteString(k)
-			out.WriteString(db.hashGet(key, k))
+			out.AppendBulkString(k)
+			out.AppendBulkString(db.hashGet(key, k))
 		}
 	})
 }
 
 // HKEYS
-func (m *Miniredis) cmdHkeys(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) != 1 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdHkeys(out resp.ResponseWriter, r *resp.Command) {
+	if r.ArgN() != 1 {
+		setDirty(redeo.GetClient(r.Context()))
+		out.AppendError(msgNumberOfArgs(r.Name))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
+	if !m.handleAuth(redeo.GetClient(r.Context()), out) {
+		return
 	}
 
-	key := r.Args[0]
+	key := r.Arg(0).String()
 
-	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+	withTx(m, out, r, func(out resp.ResponseWriter, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
 		if !db.exists(key) {
-			out.WriteBulkLen(0)
+			out.AppendArrayLen(0)
 			return
 		}
 		if db.t(key) != "hash" {
-			out.WriteErrorString(msgWrongType)
+			out.AppendError(msgWrongType)
 			return
 		}
 
 		fields := db.hashFields(key)
-		out.WriteBulkLen(len(fields))
+		out.AppendArrayLen(len(fields))
 		for _, f := range fields {
-			out.WriteString(f)
+			out.AppendBulkString(f)
 		}
 	})
 }
 
 // HVALS
-func (m *Miniredis) cmdHvals(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) != 1 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdHvals(out resp.ResponseWriter, r *resp.Command) {
+	if r.ArgN() != 1 {
+		setDirty(redeo.GetClient(r.Context()))
+		out.AppendError(msgNumberOfArgs(r.Name))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
+	if !m.handleAuth(redeo.GetClient(r.Context()), out) {
+		return
 	}
 
-	key := r.Args[0]
+	key := r.Arg(0).String()
 
-	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+	withTx(m, out, r, func(out resp.ResponseWriter, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
 		t, ok := db.keys[key]
 		if !ok {
-			out.WriteBulkLen(0)
+			out.AppendArrayLen(0)
 			return
 		}
 		if t != "hash" {
-			out.WriteErrorString(msgWrongType)
+			out.AppendError(msgWrongType)
 			return
 		}
 
-		out.WriteBulkLen(len(db.hashKeys[key]))
+		out.AppendArrayLen(len(db.hashKeys[key]))
 		for _, v := range db.hashKeys[key] {
-			out.WriteString(v)
+			out.AppendBulkString(v)
 		}
 	})
 }
 
 // HLEN
-func (m *Miniredis) cmdHlen(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) != 1 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdHlen(out resp.ResponseWriter, r *resp.Command) {
+	if r.ArgN() != 1 {
+		setDirty(redeo.GetClient(r.Context()))
+		out.AppendError(msgNumberOfArgs(r.Name))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
+	if !m.handleAuth(redeo.GetClient(r.Context()), out) {
+		return
 	}
 
-	key := r.Args[0]
+	key := r.Arg(0).String()
 
-	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+	withTx(m, out, r, func(out resp.ResponseWriter, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
 		t, ok := db.keys[key]
 		if !ok {
-			out.WriteInt(0)
+			out.AppendInt(0)
 			return
 		}
 		if t != "hash" {
-			out.WriteErrorString(msgWrongType)
+			out.AppendError(msgWrongType)
 			return
 		}
 
-		out.WriteInt(len(db.hashKeys[key]))
+		out.AppendInt(int64(len(db.hashKeys[key])))
 	})
 }
 
 // HMGET
-func (m *Miniredis) cmdHmget(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) < 2 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdHmget(out resp.ResponseWriter, r *resp.Command) {
+	if r.ArgN() < 2 {
+		setDirty(redeo.GetClient(r.Context()))
+		out.AppendError(msgNumberOfArgs(r.Name))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
+	if !m.handleAuth(redeo.GetClient(r.Context()), out) {
+		return
 	}
 
-	key := r.Args[0]
+	key := r.Arg(0).String()
+	args := asString(r.Args()[1:])
 
-	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+	withTx(m, out, r, func(out resp.ResponseWriter, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
 		if t, ok := db.keys[key]; ok && t != "hash" {
-			out.WriteErrorString(msgWrongType)
+			out.AppendError(msgWrongType)
 			return
 		}
 
@@ -399,127 +412,130 @@ func (m *Miniredis) cmdHmget(out *redeo.Responder, r *redeo.Request) error {
 			f = map[string]string{}
 		}
 
-		out.WriteBulkLen(len(r.Args) - 1)
-		for _, k := range r.Args[1:] {
+		out.AppendArrayLen(len(args))
+		for _, k := range args {
 			v, ok := f[k]
 			if !ok {
-				out.WriteNil()
+				out.AppendNil()
 				continue
 			}
-			out.WriteString(v)
+			out.AppendBulkString(v)
 		}
 	})
 }
 
 // HINCRBY
-func (m *Miniredis) cmdHincrby(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) != 3 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdHincrby(out resp.ResponseWriter, r *resp.Command) {
+	if r.ArgN() != 3 {
+		setDirty(redeo.GetClient(r.Context()))
+		out.AppendError(msgNumberOfArgs(r.Name))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
+	if !m.handleAuth(redeo.GetClient(r.Context()), out) {
+		return
 	}
 
 	var (
-		key        = r.Args[0]
-		field      = r.Args[1]
-		delta, err = strconv.Atoi(r.Args[2])
+		key        = r.Arg(0).String()
+		field      = r.Arg(1).String()
+		delta, err = strconv.Atoi(r.Arg(2).String())
 	)
 	if err != nil {
-		setDirty(r.Client())
-		out.WriteErrorString(msgInvalidInt)
-		return nil
+		setDirty(redeo.GetClient(r.Context()))
+		out.AppendError(msgInvalidInt)
+		return
 	}
 
-	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+	withTx(m, out, r, func(out resp.ResponseWriter, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
 		if t, ok := db.keys[key]; ok && t != "hash" {
-			out.WriteErrorString(msgWrongType)
+			out.AppendError(msgWrongType)
 			return
 		}
 
 		v, err := db.hashIncr(key, field, delta)
 		if err != nil {
-			out.WriteErrorString(err.Error())
+			out.AppendError(err.Error())
 			return
 		}
-		out.WriteInt(v)
+		out.AppendInt(int64(v))
 	})
 }
 
 // HINCRBYFLOAT
-func (m *Miniredis) cmdHincrbyfloat(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) != 3 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdHincrbyfloat(out resp.ResponseWriter, r *resp.Command) {
+	if r.ArgN() != 3 {
+		setDirty(redeo.GetClient(r.Context()))
+		out.AppendError(msgNumberOfArgs(r.Name))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
+	if !m.handleAuth(redeo.GetClient(r.Context()), out) {
+		return
 	}
 
 	var (
-		key        = r.Args[0]
-		field      = r.Args[1]
-		delta, err = strconv.ParseFloat(r.Args[2], 64)
+		key        = r.Arg(0).String()
+		field      = r.Arg(1).String()
+		delta, err = r.Arg(2).Float()
 	)
 	if err != nil {
-		setDirty(r.Client())
-		out.WriteErrorString(msgInvalidFloat)
-		return nil
+		setDirty(redeo.GetClient(r.Context()))
+		out.AppendError(msgInvalidFloat)
+		return
 	}
 
-	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+	withTx(m, out, r, func(out resp.ResponseWriter, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
 		if t, ok := db.keys[key]; ok && t != "hash" {
-			out.WriteErrorString(msgWrongType)
+			out.AppendError(msgWrongType)
 			return
 		}
 
 		v, err := db.hashIncrfloat(key, field, delta)
 		if err != nil {
-			out.WriteErrorString(err.Error())
+			out.AppendError(err.Error())
 			return
 		}
-		out.WriteString(formatFloat(v))
+		out.AppendBulkString(formatFloat(v))
 	})
 }
 
 // HSCAN
-func (m *Miniredis) cmdHscan(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) < 2 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdHscan(out resp.ResponseWriter, r *resp.Command) {
+	if r.ArgN() < 2 {
+		setDirty(redeo.GetClient(r.Context()))
+		out.AppendError(msgNumberOfArgs(r.Name))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
+	if !m.handleAuth(redeo.GetClient(r.Context()), out) {
+		return
 	}
 
-	key := r.Args[0]
-	cursor, err := strconv.Atoi(r.Args[1])
+	key := r.Arg(0).String()
+	cursor, err := strconv.Atoi(r.Arg(1).String())
 	if err != nil {
-		setDirty(r.Client())
-		out.WriteErrorString(msgInvalidCursor)
-		return nil
+		setDirty(redeo.GetClient(r.Context()))
+		out.AppendError(msgInvalidCursor)
+		return
 	}
 	// MATCH and COUNT options
 	var withMatch bool
 	var match string
-	args := r.Args[2:]
+	args := asString(r.Args()[2:])
 	for len(args) > 0 {
 		if strings.ToLower(args[0]) == "count" {
 			if len(args) < 2 {
-				setDirty(r.Client())
-				out.WriteErrorString(msgSyntaxError)
-				return nil
+				setDirty(redeo.GetClient(r.Context()))
+				out.AppendError(msgSyntaxError)
+				return
 			}
 			_, err := strconv.Atoi(args[1])
 			if err != nil {
-				setDirty(r.Client())
-				out.WriteErrorString(msgInvalidInt)
-				return nil
+				setDirty(redeo.GetClient(r.Context()))
+				out.AppendError(msgInvalidInt)
+				return
 			}
 			// We do nothing with count.
 			args = args[2:]
@@ -527,33 +543,33 @@ func (m *Miniredis) cmdHscan(out *redeo.Responder, r *redeo.Request) error {
 		}
 		if strings.ToLower(args[0]) == "match" {
 			if len(args) < 2 {
-				setDirty(r.Client())
-				out.WriteErrorString(msgSyntaxError)
-				return nil
+				setDirty(redeo.GetClient(r.Context()))
+				out.AppendError(msgSyntaxError)
+				return
 			}
 			withMatch = true
 			match = args[1]
 			args = args[2:]
 			continue
 		}
-		setDirty(r.Client())
-		out.WriteErrorString(msgSyntaxError)
-		return nil
+		setDirty(redeo.GetClient(r.Context()))
+		out.AppendError(msgSyntaxError)
+		return
 	}
 
-	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+	withTx(m, out, r, func(out resp.ResponseWriter, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 		// We return _all_ (matched) keys every time.
 
 		if cursor != 0 {
 			// Invalid cursor.
-			out.WriteBulkLen(2)
-			out.WriteString("0") // no next cursor
-			out.WriteBulkLen(0)  // no elements
+			out.AppendArrayLen(2)
+			out.AppendBulkString("0") // no next cursor
+			out.AppendArrayLen(0)     // no elements
 			return
 		}
 		if db.exists(key) && db.t(key) != "hash" {
-			out.WriteErrorString(ErrWrongType.Error())
+			out.AppendError(ErrWrongType.Error())
 			return
 		}
 
@@ -562,13 +578,13 @@ func (m *Miniredis) cmdHscan(out *redeo.Responder, r *redeo.Request) error {
 			members = matchKeys(members, match)
 		}
 
-		out.WriteBulkLen(2)
-		out.WriteString("0") // no next cursor
+		out.AppendArrayLen(2)
+		out.AppendBulkString("0") // no next cursor
 		// HSCAN gives key, values.
-		out.WriteBulkLen(len(members) * 2)
+		out.AppendArrayLen(len(members) * 2)
 		for _, k := range members {
-			out.WriteString(k)
-			out.WriteString(db.hashGet(key, k))
+			out.AppendBulkString(k)
+			out.AppendBulkString(db.hashGet(key, k))
 		}
 	})
 }

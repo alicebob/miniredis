@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/bsm/redeo"
+	"github.com/bsm/redeo/resp"
 )
 
 const (
@@ -28,53 +29,57 @@ const (
 	msgInvalidPSETEXTime = "ERR invalid expire time in psetex"
 )
 
+func msgNumberOfArgs(n string) string {
+	return redeo.WrongNumberOfArgs(strings.ToLower(n))
+}
+
 // withTx wraps the non-argument-checking part of command handling code in
 // transaction logic.
 func withTx(
 	m *Miniredis,
-	out *redeo.Responder,
-	r *redeo.Request,
+	out resp.ResponseWriter,
+	r *resp.Command,
 	cb txCmd,
-) error {
-	ctx := getCtx(r.Client())
+) {
+	ctx := getCtx(redeo.GetClient(r.Context()))
 	if inTx(ctx) {
 		addTxCmd(ctx, cb)
-		out.WriteInlineString("QUEUED")
-		return nil
+		out.AppendInlineString("QUEUED")
+		return
 	}
 	m.Lock()
 	cb(out, ctx)
 	// done, wake up anyone who waits on anything.
 	m.signal.Broadcast()
 	m.Unlock()
-	return nil
+	return
 }
 
 // blockCmd is executed returns whether it is done
-type blockCmd func(*redeo.Responder, *connCtx) bool
+type blockCmd func(resp.ResponseWriter, *connCtx) bool
 
 // blocking keeps trying a command until the callback returns true. Calls
 // onTimeout after the timeout (or when we call this in a transaction).
 func blocking(
 	m *Miniredis,
-	out *redeo.Responder,
-	r *redeo.Request,
+	out resp.ResponseWriter,
+	r *resp.Command,
 	timeout time.Duration,
 	cb blockCmd,
-	onTimeout func(out *redeo.Responder),
+	onTimeout func(out resp.ResponseWriter),
 ) {
 	var (
-		ctx = getCtx(r.Client())
+		ctx = getCtx(redeo.GetClient(r.Context()))
 		dl  *time.Timer
 		dlc <-chan time.Time
 	)
 	if inTx(ctx) {
-		addTxCmd(ctx, func(out *redeo.Responder, ctx *connCtx) {
+		addTxCmd(ctx, func(out resp.ResponseWriter, ctx *connCtx) {
 			if !cb(out, ctx) {
 				onTimeout(out)
 			}
 		})
-		out.WriteInlineString("QUEUED")
+		out.AppendInlineString("QUEUED")
 		return
 	}
 	if timeout != 0 {

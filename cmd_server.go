@@ -4,6 +4,7 @@ package miniredis
 
 import (
 	"github.com/bsm/redeo"
+	"github.com/bsm/redeo/resp"
 )
 
 func commandsServer(m *Miniredis, srv *redeo.Server) {
@@ -13,50 +14,53 @@ func commandsServer(m *Miniredis, srv *redeo.Server) {
 }
 
 // DBSIZE
-func (m *Miniredis) cmdDbsize(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) > 0 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdDbsize(out resp.ResponseWriter, r *resp.Command) {
+	if r.ArgN() > 0 {
+		setDirty(redeo.GetClient(r.Context()))
+		out.AppendError(msgNumberOfArgs(r.Name))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
+	if !m.handleAuth(redeo.GetClient(r.Context()), out) {
+		return
 	}
 
-	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+	withTx(m, out, r, func(out resp.ResponseWriter, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
-		out.WriteInt(len(db.keys))
+		out.AppendInt(int64(len(db.keys)))
 	})
 }
 
 // FLUSHALL
-func (m *Miniredis) cmdFlushall(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) > 0 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdFlushall(out resp.ResponseWriter, r *resp.Command) {
+	if r.ArgN() > 0 {
+		setDirty(redeo.GetClient(r.Context()))
+		out.AppendError(msgNumberOfArgs(r.Name))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
+	if !m.handleAuth(redeo.GetClient(r.Context()), out) {
+		return
 	}
 
-	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+	withTx(m, out, r, func(out resp.ResponseWriter, ctx *connCtx) {
 		m.flushAll()
-		out.WriteOK()
+		out.AppendOK()
 	})
 }
 
 // FLUSHDB
-func (m *Miniredis) cmdFlushdb(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) > 0 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdFlushdb(out resp.ResponseWriter, r *resp.Command) {
+	if r.ArgN() > 0 {
+		setDirty(redeo.GetClient(r.Context()))
+		out.AppendError(msgNumberOfArgs(r.Name))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
+	if !m.handleAuth(redeo.GetClient(r.Context()), out) {
+		return
 	}
 
-	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+	withTx(m, out, r, func(out resp.ResponseWriter, ctx *connCtx) {
 		m.db(ctx.selectedDB).flush()
-		out.WriteOK()
+		out.AppendOK()
 	})
 }
