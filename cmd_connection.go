@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"github.com/bsm/redeo"
+	"github.com/bsm/redeo/resp"
 )
 
 func commandsConnection(m *Miniredis, srv *redeo.Server) {
@@ -17,63 +18,63 @@ func commandsConnection(m *Miniredis, srv *redeo.Server) {
 }
 
 // PING
-func (m *Miniredis) cmdPing(out *redeo.Responder, r *redeo.Request) error {
-	if !m.handleAuth(r.Client(), out) {
-		return nil
+func (m *Miniredis) cmdPing(out resp.ResponseWriter, r *resp.Command) {
+	if !m.handleAuth(redeo.GetClient(r.Context()), out) {
+		return
 	}
-	out.WriteInlineString("PONG")
-	return nil
+	out.AppendInlineString("PONG")
 }
 
 // AUTH
-func (m *Miniredis) cmdAuth(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) != 1 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdAuth(out resp.ResponseWriter, r *resp.Command) {
+	if r.ArgN() != 1 {
+		setDirty(redeo.GetClient(r.Context()))
+		out.AppendError(msgNumberOfArgs(r.Name))
+		return
 	}
-	pw := r.Args[0]
+	pw := r.Arg(0).String()
 
 	m.Lock()
 	defer m.Unlock()
 	if m.password == "" {
-		out.WriteErrorString("ERR Client sent AUTH, but no password is set")
-		return nil
+		out.AppendError("ERR Client sent AUTH, but no password is set")
+		return
 	}
 	if m.password != pw {
-		out.WriteErrorString("ERR invalid password")
-		return nil
+		out.AppendError("ERR invalid password")
+		return
 	}
 
-	setAuthenticated(r.Client())
-	out.WriteOK()
-	return nil
+	setAuthenticated(redeo.GetClient(r.Context()))
+	out.AppendOK()
 }
 
 // ECHO
-func (m *Miniredis) cmdEcho(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) != 1 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdEcho(out resp.ResponseWriter, r *resp.Command) {
+	if r.ArgN() != 1 {
+		setDirty(redeo.GetClient(r.Context()))
+		out.AppendError(msgNumberOfArgs(r.Name))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
+	if !m.handleAuth(redeo.GetClient(r.Context()), out) {
+		return
 	}
-	msg := r.Args[0]
-	out.WriteString(msg)
-	return nil
+	msg := r.Arg(0).String()
+	out.AppendBulkString(msg)
 }
 
 // SELECT
-func (m *Miniredis) cmdSelect(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) != 1 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdSelect(out resp.ResponseWriter, r *resp.Command) {
+	if r.ArgN() != 1 {
+		setDirty(redeo.GetClient(r.Context()))
+		out.AppendError(msgNumberOfArgs(r.Name))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
+	if !m.handleAuth(redeo.GetClient(r.Context()), out) {
+		return
 	}
 
-	id, err := strconv.Atoi(r.Args[0])
+	id, err := strconv.Atoi(r.Arg(0).String())
 	if err != nil {
 		id = 0
 	}
@@ -81,17 +82,15 @@ func (m *Miniredis) cmdSelect(out *redeo.Responder, r *redeo.Request) error {
 	m.Lock()
 	defer m.Unlock()
 
-	ctx := getCtx(r.Client())
+	ctx := getCtx(redeo.GetClient(r.Context()))
 	ctx.selectedDB = id
 
-	out.WriteOK()
-	return nil
+	out.AppendOK()
 }
 
 // QUIT
-func (m *Miniredis) cmdQuit(out *redeo.Responder, r *redeo.Request) error {
+func (m *Miniredis) cmdQuit(out resp.ResponseWriter, r *resp.Command) {
 	// QUIT isn't transactionfied and accepts any arguments.
-	out.WriteOK()
-	r.Client().Close()
-	return nil
+	out.AppendOK()
+	redeo.GetClient(r.Context()).Close()
 }

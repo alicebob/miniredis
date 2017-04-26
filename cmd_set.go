@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/bsm/redeo"
+	"github.com/bsm/redeo/resp"
 )
 
 // commandsSet handles all set value operations.
@@ -30,296 +31,308 @@ func commandsSet(m *Miniredis, srv *redeo.Server) {
 }
 
 // SADD
-func (m *Miniredis) cmdSadd(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) < 2 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdSadd(out resp.ResponseWriter, r *resp.Command) {
+	if r.ArgN() < 2 {
+		setDirty(redeo.GetClient(r.Context()))
+		out.AppendError(msgNumberOfArgs(r.Name))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
+	if !m.handleAuth(redeo.GetClient(r.Context()), out) {
+		return
 	}
 
-	key := r.Args[0]
-	elems := r.Args[1:]
+	key := r.Arg(0).String()
+	elems := asString(r.Args()[1:])
 
-	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+	withTx(m, out, r, func(out resp.ResponseWriter, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
 		if db.exists(key) && db.t(key) != "set" {
-			out.WriteErrorString(ErrWrongType.Error())
+			out.AppendError(ErrWrongType.Error())
 			return
 		}
 
 		added := db.setAdd(key, elems...)
-		out.WriteInt(added)
+		out.AppendInt(int64(added))
 	})
 }
 
 // SCARD
-func (m *Miniredis) cmdScard(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) != 1 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdScard(out resp.ResponseWriter, r *resp.Command) {
+	if r.ArgN() != 1 {
+		setDirty(redeo.GetClient(r.Context()))
+		out.AppendError(msgNumberOfArgs(r.Name))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
+	if !m.handleAuth(redeo.GetClient(r.Context()), out) {
+		return
 	}
 
-	key := r.Args[0]
+	key := r.Arg(0).String()
 
-	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+	withTx(m, out, r, func(out resp.ResponseWriter, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
 		if !db.exists(key) {
-			out.WriteZero()
+			out.AppendInt(0)
 			return
 		}
 
 		if db.t(key) != "set" {
-			out.WriteErrorString(ErrWrongType.Error())
+			out.AppendError(ErrWrongType.Error())
 			return
 		}
 
 		members := db.setMembers(key)
-		out.WriteInt(len(members))
+		out.AppendInt(int64(len(members)))
 	})
 }
 
 // SDIFF
-func (m *Miniredis) cmdSdiff(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) < 1 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdSdiff(out resp.ResponseWriter, r *resp.Command) {
+	if r.ArgN() < 1 {
+		setDirty(redeo.GetClient(r.Context()))
+		out.AppendError(msgNumberOfArgs(r.Name))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
+	if !m.handleAuth(redeo.GetClient(r.Context()), out) {
+		return
 	}
 
-	keys := r.Args
+	keys := asString(r.Args())
 
-	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+	withTx(m, out, r, func(out resp.ResponseWriter, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
 		set, err := db.setDiff(keys)
 		if err != nil {
-			out.WriteErrorString(err.Error())
+			out.AppendError(err.Error())
 			return
 		}
 
-		out.WriteBulkLen(len(set))
+		out.AppendArrayLen(len(set))
 		for k := range set {
-			out.WriteString(k)
+			out.AppendBulkString(k)
 		}
 	})
 }
 
 // SDIFFSTORE
-func (m *Miniredis) cmdSdiffstore(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) < 2 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdSdiffstore(out resp.ResponseWriter, r *resp.Command) {
+	if r.ArgN() < 2 {
+		setDirty(redeo.GetClient(r.Context()))
+		out.AppendError(msgNumberOfArgs(r.Name))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
+	if !m.handleAuth(redeo.GetClient(r.Context()), out) {
+		return
 	}
 
-	dest := r.Args[0]
-	keys := r.Args[1:]
+	dest := r.Arg(0).String()
+	keys := asString(r.Args()[1:])
 
-	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+	withTx(m, out, r, func(out resp.ResponseWriter, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
 		set, err := db.setDiff(keys)
 		if err != nil {
-			out.WriteErrorString(err.Error())
+			out.AppendError(err.Error())
 			return
 		}
 
 		db.del(dest, true)
 		db.setSet(dest, set)
-		out.WriteInt(len(set))
+		out.AppendInt(int64(len(set)))
 	})
 }
 
 // SINTER
-func (m *Miniredis) cmdSinter(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) < 1 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdSinter(out resp.ResponseWriter, r *resp.Command) {
+	if r.ArgN() < 1 {
+		setDirty(redeo.GetClient(r.Context()))
+		out.AppendError(msgNumberOfArgs(r.Name))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
+	if !m.handleAuth(redeo.GetClient(r.Context()), out) {
+		return
 	}
 
-	keys := r.Args
+	keys := asString(r.Args())
 
-	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+	withTx(m, out, r, func(out resp.ResponseWriter, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
 		set, err := db.setInter(keys)
 		if err != nil {
-			out.WriteErrorString(err.Error())
+			out.AppendError(err.Error())
 			return
 		}
 
-		out.WriteBulkLen(len(set))
+		out.AppendArrayLen(len(set))
 		for k := range set {
-			out.WriteString(k)
+			out.AppendBulkString(k)
 		}
 	})
 }
 
 // SINTERSTORE
-func (m *Miniredis) cmdSinterstore(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) < 2 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdSinterstore(out resp.ResponseWriter, r *resp.Command) {
+	if r.ArgN() < 2 {
+		setDirty(redeo.GetClient(r.Context()))
+		out.AppendError(msgNumberOfArgs(r.Name))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
+	if !m.handleAuth(redeo.GetClient(r.Context()), out) {
+		return
 	}
 
-	dest := r.Args[0]
-	keys := r.Args[1:]
+	dest := r.Arg(0).String()
+	keys := asString(r.Args()[1:])
 
-	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+	withTx(m, out, r, func(out resp.ResponseWriter, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
 		set, err := db.setInter(keys)
 		if err != nil {
-			out.WriteErrorString(err.Error())
+			out.AppendError(err.Error())
 			return
 		}
 
 		db.del(dest, true)
 		db.setSet(dest, set)
-		out.WriteInt(len(set))
+		out.AppendInt(int64(len(set)))
 	})
 }
 
 // SISMEMBER
-func (m *Miniredis) cmdSismember(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) != 2 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdSismember(out resp.ResponseWriter, r *resp.Command) {
+	if r.ArgN() != 2 {
+		setDirty(redeo.GetClient(r.Context()))
+		out.AppendError(msgNumberOfArgs(r.Name))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
+	if !m.handleAuth(redeo.GetClient(r.Context()), out) {
+		return
 	}
 
-	key := r.Args[0]
-	value := r.Args[1]
+	key := r.Arg(0).String()
+	value := r.Arg(1).String()
 
-	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+	withTx(m, out, r, func(out resp.ResponseWriter, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
 		if !db.exists(key) {
-			out.WriteZero()
+			out.AppendInt(0)
 			return
 		}
 
 		if db.t(key) != "set" {
-			out.WriteErrorString(ErrWrongType.Error())
+			out.AppendError(ErrWrongType.Error())
 			return
 		}
 
 		if db.setIsMember(key, value) {
-			out.WriteOne()
+			out.AppendInt(1)
 			return
 		}
-		out.WriteZero()
+		out.AppendInt(0)
 	})
 }
 
 // SMEMBERS
-func (m *Miniredis) cmdSmembers(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) != 1 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdSmembers(out resp.ResponseWriter, r *resp.Command) {
+	if r.ArgN() != 1 {
+		setDirty(redeo.GetClient(r.Context()))
+		out.AppendError(msgNumberOfArgs(r.Name))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
+	if !m.handleAuth(redeo.GetClient(r.Context()), out) {
+		return
 	}
 
-	key := r.Args[0]
+	key := r.Arg(0).String()
 
-	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+	withTx(m, out, r, func(out resp.ResponseWriter, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
 		if !db.exists(key) {
-			out.WriteBulkLen(0)
+			out.AppendArrayLen(0)
 			return
 		}
 
 		if db.t(key) != "set" {
-			out.WriteErrorString(ErrWrongType.Error())
+			out.AppendError(ErrWrongType.Error())
 			return
 		}
 
 		members := db.setMembers(key)
 
-		out.WriteBulkLen(len(members))
+		out.AppendArrayLen(len(members))
 		for _, elem := range members {
-			out.WriteString(elem)
+			out.AppendBulkString(elem)
 		}
 	})
 }
 
 // SMOVE
-func (m *Miniredis) cmdSmove(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) != 3 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdSmove(out resp.ResponseWriter, r *resp.Command) {
+	if r.ArgN() != 3 {
+		setDirty(redeo.GetClient(r.Context()))
+		out.AppendError(msgNumberOfArgs(r.Name))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
+	if !m.handleAuth(redeo.GetClient(r.Context()), out) {
+		return
 	}
 
-	src := r.Args[0]
-	dst := r.Args[1]
-	member := r.Args[2]
+	src := r.Arg(0).String()
+	dst := r.Arg(1).String()
+	member := r.Arg(2).String()
 
-	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+	withTx(m, out, r, func(out resp.ResponseWriter, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
 		if !db.exists(src) {
-			out.WriteInt(0)
+			out.AppendInt(0)
 			return
 		}
 
 		if db.t(src) != "set" {
-			out.WriteErrorString(ErrWrongType.Error())
+			out.AppendError(ErrWrongType.Error())
 			return
 		}
 
 		if db.exists(dst) && db.t(dst) != "set" {
-			out.WriteErrorString(ErrWrongType.Error())
+			out.AppendError(ErrWrongType.Error())
 			return
 		}
 
 		if !db.setIsMember(src, member) {
-			out.WriteInt(0)
+			out.AppendInt(0)
 			return
 		}
 		db.setRem(src, member)
 		db.setAdd(dst, member)
-		out.WriteInt(1)
+		out.AppendInt(1)
 	})
 }
 
 // SPOP
-func (m *Miniredis) cmdSpop(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) == 0 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdSpop(out resp.ResponseWriter, r *resp.Command) {
+	if r.ArgN() == 0 {
+		setDirty(redeo.GetClient(r.Context()))
+		out.AppendError(msgNumberOfArgs(r.Name))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
+	if !m.handleAuth(redeo.GetClient(r.Context()), out) {
+		return
 	}
 
-	key, args := r.Args[0], r.Args[1:]
+	args := asString(r.Args())
+	key := args[0]
+	args = args[1:]
 
-	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+	withTx(m, out, r, func(out resp.ResponseWriter, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
 		withCount := false
@@ -327,8 +340,8 @@ func (m *Miniredis) cmdSpop(out *redeo.Responder, r *redeo.Request) error {
 		if len(args) > 0 {
 			v, err := strconv.Atoi(args[0])
 			if err != nil {
-				setDirty(r.Client())
-				out.WriteErrorString(msgInvalidInt)
+				setDirty(redeo.GetClient(r.Context()))
+				out.AppendError(msgInvalidInt)
 				return
 			}
 			count = v
@@ -336,22 +349,22 @@ func (m *Miniredis) cmdSpop(out *redeo.Responder, r *redeo.Request) error {
 			args = args[1:]
 		}
 		if len(args) > 0 {
-			setDirty(r.Client())
-			out.WriteErrorString(msgInvalidInt)
+			setDirty(redeo.GetClient(r.Context()))
+			out.AppendError(msgInvalidInt)
 			return
 		}
 
 		if !db.exists(key) {
 			if !withCount {
-				out.WriteNil()
+				out.AppendNil()
 				return
 			}
-			out.WriteBulkLen(0)
+			out.AppendArrayLen(0)
 			return
 		}
 
 		if db.t(key) != "set" {
-			out.WriteErrorString(ErrWrongType.Error())
+			out.AppendError(ErrWrongType.Error())
 			return
 		}
 
@@ -368,69 +381,70 @@ func (m *Miniredis) cmdSpop(out *redeo.Responder, r *redeo.Request) error {
 		// without `count` return a single value...
 		if !withCount {
 			if len(deleted) == 0 {
-				out.WriteNil()
+				out.AppendNil()
 				return
 			}
-			out.WriteString(deleted[0])
+			out.AppendBulkString(deleted[0])
 			return
 		}
 		// ... with `count` return a list
-		out.WriteBulkLen(len(deleted))
+		out.AppendArrayLen(len(deleted))
 		for _, v := range deleted {
-			out.WriteString(v)
+			out.AppendBulkString(v)
 		}
 	})
 }
 
 // SRANDMEMBER
-func (m *Miniredis) cmdSrandmember(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) < 1 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdSrandmember(out resp.ResponseWriter, r *resp.Command) {
+	if r.ArgN() < 1 {
+		setDirty(redeo.GetClient(r.Context()))
+		out.AppendError(msgNumberOfArgs(r.Name))
+		return
 	}
-	if len(r.Args) > 2 {
-		setDirty(r.Client())
-		out.WriteErrorString(msgSyntaxError)
-		return nil
+	if r.ArgN() > 2 {
+		setDirty(redeo.GetClient(r.Context()))
+		out.AppendError(msgSyntaxError)
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
+	if !m.handleAuth(redeo.GetClient(r.Context()), out) {
+		return
 	}
 
-	key := r.Args[0]
+	key := r.Arg(0).String()
 	count := 0
 	withCount := false
-	if len(r.Args) == 2 {
+	if r.ArgN() == 2 {
 		var err error
-		count, err = strconv.Atoi(r.Args[1])
+		count, err = strconv.Atoi(r.Arg(1).String())
 		if err != nil {
-			setDirty(r.Client())
-			out.WriteErrorString(msgInvalidInt)
-			return nil
+			setDirty(redeo.GetClient(r.Context()))
+			out.AppendError(msgInvalidInt)
+			return
 		}
 		withCount = true
 	}
 
-	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+	withTx(m, out, r, func(out resp.ResponseWriter, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
 		if !db.exists(key) {
-			out.WriteNil()
+			out.AppendNil()
 			return
 		}
 
 		if db.t(key) != "set" {
-			out.WriteErrorString(ErrWrongType.Error())
+			out.AppendError(ErrWrongType.Error())
 			return
 		}
 
 		members := db.setMembers(key)
 		if count < 0 {
 			// Non-unique elements is allowed with negative count.
-			out.WriteBulkLen(-count)
+			out.AppendArrayLen(-count)
 			for count != 0 {
 				member := members[rand.Intn(len(members))]
-				out.WriteString(member)
+				out.AppendBulkString(member)
 				count++
 			}
 			return
@@ -442,135 +456,139 @@ func (m *Miniredis) cmdSrandmember(out *redeo.Responder, r *redeo.Request) error
 			count = len(members)
 		}
 		if !withCount {
-			out.WriteString(members[0])
+			out.AppendBulkString(members[0])
 			return
 		}
-		out.WriteBulkLen(count)
+		out.AppendArrayLen(count)
 		for i := range make([]struct{}, count) {
-			out.WriteString(members[i])
+			out.AppendBulkString(members[i])
 		}
 	})
 }
 
 // SREM
-func (m *Miniredis) cmdSrem(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) < 2 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdSrem(out resp.ResponseWriter, r *resp.Command) {
+	if r.ArgN() < 2 {
+		setDirty(redeo.GetClient(r.Context()))
+		out.AppendError(msgNumberOfArgs(r.Name))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
+	if !m.handleAuth(redeo.GetClient(r.Context()), out) {
+		return
 	}
 
-	key := r.Args[0]
-	fields := r.Args[1:]
+	key := r.Arg(0).String()
+	fields := asString(r.Args()[1:])
 
-	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+	withTx(m, out, r, func(out resp.ResponseWriter, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
 		if !db.exists(key) {
-			out.WriteInt(0)
+			out.AppendInt(0)
 			return
 		}
 
 		if db.t(key) != "set" {
-			out.WriteErrorString(ErrWrongType.Error())
+			out.AppendError(ErrWrongType.Error())
 			return
 		}
 
-		out.WriteInt(db.setRem(key, fields...))
+		out.AppendInt(int64(db.setRem(key, fields...)))
 	})
 }
 
 // SUNION
-func (m *Miniredis) cmdSunion(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) < 1 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdSunion(out resp.ResponseWriter, r *resp.Command) {
+	if r.ArgN() < 1 {
+		setDirty(redeo.GetClient(r.Context()))
+		out.AppendError(msgNumberOfArgs(r.Name))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
+	if !m.handleAuth(redeo.GetClient(r.Context()), out) {
+		return
 	}
 
-	keys := r.Args
+	keys := asString(r.Args())
 
-	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+	withTx(m, out, r, func(out resp.ResponseWriter, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
 		set, err := db.setUnion(keys)
 		if err != nil {
-			out.WriteErrorString(err.Error())
+			out.AppendError(err.Error())
 			return
 		}
 
-		out.WriteBulkLen(len(set))
+		out.AppendArrayLen(len(set))
 		for k := range set {
-			out.WriteString(k)
+			out.AppendBulkString(k)
 		}
 	})
 }
 
 // SUNIONSTORE
-func (m *Miniredis) cmdSunionstore(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) < 2 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdSunionstore(out resp.ResponseWriter, r *resp.Command) {
+	if r.ArgN() < 2 {
+		setDirty(redeo.GetClient(r.Context()))
+		out.AppendError(msgNumberOfArgs(r.Name))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
+	if !m.handleAuth(redeo.GetClient(r.Context()), out) {
+		return
 	}
 
-	dest := r.Args[0]
-	keys := r.Args[1:]
+	dest := r.Arg(0).String()
+	keys := asString(r.Args()[1:])
 
-	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+	withTx(m, out, r, func(out resp.ResponseWriter, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
 		set, err := db.setUnion(keys)
 		if err != nil {
-			out.WriteErrorString(err.Error())
+			out.AppendError(err.Error())
 			return
 		}
 
 		db.del(dest, true)
 		db.setSet(dest, set)
-		out.WriteInt(len(set))
+		out.AppendInt(int64(len(set)))
 	})
 }
 
 // SSCAN
-func (m *Miniredis) cmdSscan(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) < 2 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdSscan(out resp.ResponseWriter, r *resp.Command) {
+	if r.ArgN() < 2 {
+		setDirty(redeo.GetClient(r.Context()))
+		out.AppendError(msgNumberOfArgs(r.Name))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
+	if !m.handleAuth(redeo.GetClient(r.Context()), out) {
+		return
 	}
 
-	key := r.Args[0]
-	cursor, err := strconv.Atoi(r.Args[1])
+	key := r.Arg(0).String()
+	cursor, err := strconv.Atoi(r.Arg(1).String())
 	if err != nil {
-		setDirty(r.Client())
-		out.WriteErrorString(msgInvalidCursor)
-		return nil
+		setDirty(redeo.GetClient(r.Context()))
+		out.AppendError(msgInvalidCursor)
+		return
 	}
 	// MATCH and COUNT options
 	var withMatch bool
 	var match string
-	args := r.Args[2:]
+	args := asString(r.Args()[2:])
 	for len(args) > 0 {
 		if strings.ToLower(args[0]) == "count" {
 			if len(args) < 2 {
-				setDirty(r.Client())
-				out.WriteErrorString(msgSyntaxError)
-				return nil
+				setDirty(redeo.GetClient(r.Context()))
+				out.AppendError(msgSyntaxError)
+				return
 			}
 			_, err := strconv.Atoi(args[1])
 			if err != nil {
-				setDirty(r.Client())
-				out.WriteErrorString(msgInvalidInt)
-				return nil
+				setDirty(redeo.GetClient(r.Context()))
+				out.AppendError(msgInvalidInt)
+				return
 			}
 			// We do nothing with count.
 			args = args[2:]
@@ -578,33 +596,33 @@ func (m *Miniredis) cmdSscan(out *redeo.Responder, r *redeo.Request) error {
 		}
 		if strings.ToLower(args[0]) == "match" {
 			if len(args) < 2 {
-				setDirty(r.Client())
-				out.WriteErrorString(msgSyntaxError)
-				return nil
+				setDirty(redeo.GetClient(r.Context()))
+				out.AppendError(msgSyntaxError)
+				return
 			}
 			withMatch = true
 			match = args[1]
 			args = args[2:]
 			continue
 		}
-		setDirty(r.Client())
-		out.WriteErrorString(msgSyntaxError)
-		return nil
+		setDirty(redeo.GetClient(r.Context()))
+		out.AppendError(msgSyntaxError)
+		return
 	}
 
-	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+	withTx(m, out, r, func(out resp.ResponseWriter, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 		// We return _all_ (matched) keys every time.
 
 		if cursor != 0 {
 			// Invalid cursor.
-			out.WriteBulkLen(2)
-			out.WriteString("0") // no next cursor
-			out.WriteBulkLen(0)  // no elements
+			out.AppendArrayLen(2)
+			out.AppendBulkString("0") // no next cursor
+			out.AppendArrayLen(0)     // no elements
 			return
 		}
 		if db.exists(key) && db.t(key) != "set" {
-			out.WriteErrorString(ErrWrongType.Error())
+			out.AppendError(ErrWrongType.Error())
 			return
 		}
 
@@ -613,11 +631,11 @@ func (m *Miniredis) cmdSscan(out *redeo.Responder, r *redeo.Request) error {
 			members = matchKeys(members, match)
 		}
 
-		out.WriteBulkLen(2)
-		out.WriteString("0") // no next cursor
-		out.WriteBulkLen(len(members))
+		out.AppendArrayLen(2)
+		out.AppendBulkString("0") // no next cursor
+		out.AppendArrayLen(len(members))
 		for _, k := range members {
-			out.WriteString(k)
+			out.AppendBulkString(k)
 		}
 	})
 }
