@@ -3,60 +3,63 @@
 package miniredis
 
 import (
-	"github.com/bsm/redeo"
+	"github.com/alicebob/miniredis/server"
 )
 
-func commandsServer(m *Miniredis, srv *redeo.Server) {
-	srv.HandleFunc("DBSIZE", m.cmdDbsize)
-	srv.HandleFunc("FLUSHALL", m.cmdFlushall)
-	srv.HandleFunc("FLUSHDB", m.cmdFlushdb)
+func commandsServer(m *Miniredis) {
+	m.srv.Register("DBSIZE", m.cmdDbsize)
+	m.srv.Register("FLUSHALL", m.cmdFlushall)
+	m.srv.Register("FLUSHDB", m.cmdFlushdb)
 }
 
 // DBSIZE
-func (m *Miniredis) cmdDbsize(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) > 0 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdDbsize(c *server.Peer, cmd string, args []string) {
+	if len(args) > 0 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
+	if !m.handleAuth(c) {
+		return
 	}
 
-	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
-		out.WriteInt(len(db.keys))
+		c.WriteInt(len(db.keys))
 	})
 }
 
 // FLUSHALL
-func (m *Miniredis) cmdFlushall(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) > 0 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdFlushall(c *server.Peer, cmd string, args []string) {
+	if len(args) > 0 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
+	if !m.handleAuth(c) {
+		return
 	}
 
-	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		m.flushAll()
-		out.WriteOK()
+		c.WriteOK()
 	})
 }
 
 // FLUSHDB
-func (m *Miniredis) cmdFlushdb(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) > 0 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdFlushdb(c *server.Peer, cmd string, args []string) {
+	if len(args) > 0 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
+	if !m.handleAuth(c) {
+		return
 	}
 
-	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		m.db(ctx.selectedDB).flush()
-		out.WriteOK()
+		c.WriteOK()
 	})
 }

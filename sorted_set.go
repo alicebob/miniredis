@@ -81,3 +81,17 @@ func (ss *sortedSet) rankByScore(member string, d direction) (int, bool) {
 	// Can't happen
 	return 0, false
 }
+
+func reverseSlice(o []string) {
+	for i := range make([]struct{}, len(o)/2) {
+		other := len(o) - 1 - i
+		o[i], o[other] = o[other], o[i]
+	}
+}
+
+func reverseElems(o ssElems) {
+	for i := range make([]struct{}, len(o)/2) {
+		other := len(o) - 1 - i
+		o[i], o[other] = o[other], o[i]
+	}
+}

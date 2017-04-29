@@ -9,7 +9,7 @@ import (
 
 // patternRE compiles a KEYS argument to a regexp. Returns nil if the given
 // pattern will never match anything.
-// The general strategy is to all non-meta characters between \Q...\E.
+// The general strategy is to sandwich all non-meta characters between \Q...\E.
 func patternRE(k string) *regexp.Regexp {
 	re := bytes.Buffer{}
 	re.WriteString(`^\Q`)

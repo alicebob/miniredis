@@ -3,58 +3,61 @@
 package miniredis
 
 import (
-	"github.com/bsm/redeo"
+	"github.com/alicebob/miniredis/server"
 )
 
 // commandsTransaction handles MULTI &c.
-func commandsTransaction(m *Miniredis, srv *redeo.Server) {
-	srv.HandleFunc("DISCARD", m.cmdDiscard)
-	srv.HandleFunc("EXEC", m.cmdExec)
-	srv.HandleFunc("MULTI", m.cmdMulti)
-	srv.HandleFunc("UNWATCH", m.cmdUnwatch)
-	srv.HandleFunc("WATCH", m.cmdWatch)
+func commandsTransaction(m *Miniredis) {
+	m.srv.Register("DISCARD", m.cmdDiscard)
+	m.srv.Register("EXEC", m.cmdExec)
+	m.srv.Register("MULTI", m.cmdMulti)
+	m.srv.Register("UNWATCH", m.cmdUnwatch)
+	m.srv.Register("WATCH", m.cmdWatch)
 }
 
 // MULTI
-func (m *Miniredis) cmdMulti(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) != 0 {
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdMulti(c *server.Peer, cmd string, args []string) {
+	if len(args) != 0 {
+		c.WriteError(errWrongNumber(cmd))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
+	if !m.handleAuth(c) {
+		return
 	}
 
-	ctx := getCtx(r.Client())
+	ctx := getCtx(c)
 
 	if inTx(ctx) {
-		return redeo.ClientError("MULTI calls can not be nested")
+		c.WriteError("ERR MULTI calls can not be nested")
+		return
 	}
 
 	startTx(ctx)
 
-	out.WriteOK()
-	return nil
+	c.WriteOK()
 }
 
 // EXEC
-func (m *Miniredis) cmdExec(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) != 0 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdExec(c *server.Peer, cmd string, args []string) {
+	if len(args) != 0 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
+	if !m.handleAuth(c) {
+		return
 	}
 
-	ctx := getCtx(r.Client())
+	ctx := getCtx(c)
 
 	if !inTx(ctx) {
-		return redeo.ClientError("EXEC without MULTI")
+		c.WriteError("ERR EXEC without MULTI")
+		return
 	}
 
-	if dirtyTx(ctx) {
-		out.WriteErrorString("EXECABORT Transaction discarded because of previous errors.")
-		return nil
+	if ctx.dirtyTransaction {
+		c.WriteError("EXECABORT Transaction discarded because of previous errors.")
+		return
 	}
 
 	m.Lock()
@@ -65,83 +68,85 @@ func (m *Miniredis) cmdExec(out *redeo.Responder, r *redeo.Request) error {
 		if m.db(t.db).keyVersion[t.key] > version {
 			// Abort! Abort!
 			stopTx(ctx)
-			out.WriteBulkLen(0)
-			return nil
+			c.WriteLen(0)
+			return
 		}
 	}
 
-	out.WriteBulkLen(len(ctx.transaction))
+	c.WriteLen(len(ctx.transaction))
 	for _, cb := range ctx.transaction {
-		cb(out, ctx)
+		cb(c, ctx)
 	}
 	// wake up anyone who waits on anything.
 	m.signal.Broadcast()
 
 	stopTx(ctx)
-	return nil
 }
 
 // DISCARD
-func (m *Miniredis) cmdDiscard(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) != 0 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdDiscard(c *server.Peer, cmd string, args []string) {
+	if len(args) != 0 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
+	if !m.handleAuth(c) {
+		return
 	}
 
-	ctx := getCtx(r.Client())
+	ctx := getCtx(c)
 	if !inTx(ctx) {
-		return redeo.ClientError("DISCARD without MULTI")
+		c.WriteError("ERR DISCARD without MULTI")
+		return
 	}
 
 	stopTx(ctx)
-	out.WriteOK()
-	return nil
+	c.WriteOK()
 }
 
 // WATCH
-func (m *Miniredis) cmdWatch(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) == 0 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdWatch(c *server.Peer, cmd string, args []string) {
+	if len(args) == 0 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
+	if !m.handleAuth(c) {
+		return
 	}
 
-	ctx := getCtx(r.Client())
+	ctx := getCtx(c)
 	if inTx(ctx) {
-		return redeo.ClientError("WATCH in MULTI")
+		c.WriteError("ERR WATCH in MULTI")
+		return
 	}
 
 	m.Lock()
 	defer m.Unlock()
 	db := m.db(ctx.selectedDB)
 
-	for _, key := range r.Args {
+	for _, key := range args {
 		watch(db, ctx, key)
 	}
-	out.WriteOK()
-	return nil
+	c.WriteOK()
 }
 
 // UNWATCH
-func (m *Miniredis) cmdUnwatch(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) != 0 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdUnwatch(c *server.Peer, cmd string, args []string) {
+	if len(args) != 0 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
+	if !m.handleAuth(c) {
+		return
 	}
 
 	// Doesn't matter if UNWATCH is in a TX or not. Looks like a Redis bug to me.
-	unwatch(getCtx(r.Client()))
+	unwatch(getCtx(c))
 
-	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		// Do nothing if it's called in a transaction.
-		out.WriteOK()
+		c.WriteOK()
 	})
 }

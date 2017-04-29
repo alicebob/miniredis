@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/bsm/redeo"
+	"github.com/alicebob/miniredis/server"
 )
 
 const (
@@ -28,53 +28,54 @@ const (
 	msgInvalidPSETEXTime = "ERR invalid expire time in psetex"
 )
 
+func errWrongNumber(cmd string) string {
+	return fmt.Sprintf("ERR wrong number of arguments for '%s' command", strings.ToLower(cmd))
+}
+
 // withTx wraps the non-argument-checking part of command handling code in
 // transaction logic.
 func withTx(
 	m *Miniredis,
-	out *redeo.Responder,
-	r *redeo.Request,
+	c *server.Peer,
 	cb txCmd,
-) error {
-	ctx := getCtx(r.Client())
+) {
+	ctx := getCtx(c)
 	if inTx(ctx) {
 		addTxCmd(ctx, cb)
-		out.WriteInlineString("QUEUED")
-		return nil
+		c.WriteInline("QUEUED")
+		return
 	}
 	m.Lock()
-	cb(out, ctx)
+	cb(c, ctx)
 	// done, wake up anyone who waits on anything.
 	m.signal.Broadcast()
 	m.Unlock()
-	return nil
 }
 
 // blockCmd is executed returns whether it is done
-type blockCmd func(*redeo.Responder, *connCtx) bool
+type blockCmd func(*server.Peer, *connCtx) bool
 
 // blocking keeps trying a command until the callback returns true. Calls
 // onTimeout after the timeout (or when we call this in a transaction).
 func blocking(
 	m *Miniredis,
-	out *redeo.Responder,
-	r *redeo.Request,
+	c *server.Peer,
 	timeout time.Duration,
 	cb blockCmd,
-	onTimeout func(out *redeo.Responder),
+	onTimeout func(*server.Peer),
 ) {
 	var (
-		ctx = getCtx(r.Client())
+		ctx = getCtx(c)
 		dl  *time.Timer
 		dlc <-chan time.Time
 	)
 	if inTx(ctx) {
-		addTxCmd(ctx, func(out *redeo.Responder, ctx *connCtx) {
-			if !cb(out, ctx) {
-				onTimeout(out)
+		addTxCmd(ctx, func(c *server.Peer, ctx *connCtx) {
+			if !cb(c, ctx) {
+				onTimeout(c)
 			}
 		})
-		out.WriteInlineString("QUEUED")
+		c.WriteInline("QUEUED")
 		return
 	}
 	if timeout != 0 {
@@ -86,7 +87,7 @@ func blocking(
 	m.Lock()
 	defer m.Unlock()
 	for {
-		done := cb(out, ctx)
+		done := cb(c, ctx)
 		if done {
 			return
 		}
@@ -105,7 +106,7 @@ func blocking(
 		select {
 		case <-wakeup:
 		case <-dlc:
-			onTimeout(out)
+			onTimeout(c)
 			m.signal.Broadcast() // to kill the wakeup go routine
 			wg.Wait()
 			return

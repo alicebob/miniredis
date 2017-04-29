@@ -21,8 +21,7 @@ func Example() {
 	if err != nil {
 		panic(err)
 	}
-	_, err = c.Do("SET", "foo", "bar")
-	if err != nil {
+	if _, err = c.Do("SET", "foo", "bar"); err != nil {
 		panic(err)
 	}
 
@@ -32,14 +31,14 @@ func Example() {
 	}
 	// Or with a DB id
 	if _, err := s.DB(42).Get("foo"); err != miniredis.ErrKeyNotFound {
-		panic("Didn't use a different DB")
+		panic("didn't use a different database")
 	}
 
 	// Test key with expiration
 	s.SetTTL("foo", 60*time.Second)
 	s.FastForward(60 * time.Second)
 	if s.Exists("foo") {
-		panic("Expect key to be expired")
+		panic("expect key to be expired")
 	}
 
 	// Or use a Check* function which Fail()s if the key is not what we expect
@@ -48,7 +47,7 @@ func Example() {
 
 	// Check if there really was only one connection.
 	if s.TotalConnectionCount() != 1 {
-		panic("Too many connections made")
+		panic("too many connections made")
 	}
 
 	// Output:

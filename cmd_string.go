@@ -7,44 +7,45 @@ import (
 	"strings"
 	"time"
 
-	"github.com/bsm/redeo"
+	"github.com/alicebob/miniredis/server"
 )
 
 // commandsString handles all string value operations.
-func commandsString(m *Miniredis, srv *redeo.Server) {
-	srv.HandleFunc("APPEND", m.cmdAppend)
-	srv.HandleFunc("BITCOUNT", m.cmdBitcount)
-	srv.HandleFunc("BITOP", m.cmdBitop)
-	srv.HandleFunc("BITPOS", m.cmdBitpos)
-	srv.HandleFunc("DECRBY", m.cmdDecrby)
-	srv.HandleFunc("DECR", m.cmdDecr)
-	srv.HandleFunc("GETBIT", m.cmdGetbit)
-	srv.HandleFunc("GET", m.cmdGet)
-	srv.HandleFunc("GETRANGE", m.cmdGetrange)
-	srv.HandleFunc("GETSET", m.cmdGetset)
-	srv.HandleFunc("INCRBYFLOAT", m.cmdIncrbyfloat)
-	srv.HandleFunc("INCRBY", m.cmdIncrby)
-	srv.HandleFunc("INCR", m.cmdIncr)
-	srv.HandleFunc("MGET", m.cmdMget)
-	srv.HandleFunc("MSET", m.cmdMset)
-	srv.HandleFunc("MSETNX", m.cmdMsetnx)
-	srv.HandleFunc("PSETEX", m.cmdPsetex)
-	srv.HandleFunc("SETBIT", m.cmdSetbit)
-	srv.HandleFunc("SETEX", m.cmdSetex)
-	srv.HandleFunc("SET", m.cmdSet)
-	srv.HandleFunc("SETNX", m.cmdSetnx)
-	srv.HandleFunc("SETRANGE", m.cmdSetrange)
-	srv.HandleFunc("STRLEN", m.cmdStrlen)
+func commandsString(m *Miniredis) {
+	m.srv.Register("APPEND", m.cmdAppend)
+	m.srv.Register("BITCOUNT", m.cmdBitcount)
+	m.srv.Register("BITOP", m.cmdBitop)
+	m.srv.Register("BITPOS", m.cmdBitpos)
+	m.srv.Register("DECRBY", m.cmdDecrby)
+	m.srv.Register("DECR", m.cmdDecr)
+	m.srv.Register("GETBIT", m.cmdGetbit)
+	m.srv.Register("GET", m.cmdGet)
+	m.srv.Register("GETRANGE", m.cmdGetrange)
+	m.srv.Register("GETSET", m.cmdGetset)
+	m.srv.Register("INCRBYFLOAT", m.cmdIncrbyfloat)
+	m.srv.Register("INCRBY", m.cmdIncrby)
+	m.srv.Register("INCR", m.cmdIncr)
+	m.srv.Register("MGET", m.cmdMget)
+	m.srv.Register("MSET", m.cmdMset)
+	m.srv.Register("MSETNX", m.cmdMsetnx)
+	m.srv.Register("PSETEX", m.cmdPsetex)
+	m.srv.Register("SETBIT", m.cmdSetbit)
+	m.srv.Register("SETEX", m.cmdSetex)
+	m.srv.Register("SET", m.cmdSet)
+	m.srv.Register("SETNX", m.cmdSetnx)
+	m.srv.Register("SETRANGE", m.cmdSetrange)
+	m.srv.Register("STRLEN", m.cmdStrlen)
 }
 
 // SET
-func (m *Miniredis) cmdSet(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) < 2 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdSet(c *server.Peer, cmd string, args []string) {
+	if len(args) < 2 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
+	if !m.handleAuth(c) {
+		return
 	}
 
 	var (
@@ -53,63 +54,61 @@ func (m *Miniredis) cmdSet(out *redeo.Responder, r *redeo.Request) error {
 		ttl time.Duration
 	)
 
-	key := r.Args[0]
-	value := r.Args[1]
-	r.Args = r.Args[2:]
-	for len(r.Args) > 0 {
+	key, value, args := args[0], args[1], args[2:]
+	for len(args) > 0 {
 		timeUnit := time.Second
-		switch strings.ToUpper(r.Args[0]) {
+		switch strings.ToUpper(args[0]) {
 		case "NX":
 			nx = true
-			r.Args = r.Args[1:]
+			args = args[1:]
 			continue
 		case "XX":
 			xx = true
-			r.Args = r.Args[1:]
+			args = args[1:]
 			continue
 		case "PX":
 			timeUnit = time.Millisecond
 			fallthrough
 		case "EX":
-			if len(r.Args) < 2 {
-				setDirty(r.Client())
-				out.WriteErrorString(msgInvalidInt)
-				return nil
+			if len(args) < 2 {
+				setDirty(c)
+				c.WriteError(msgInvalidInt)
+				return
 			}
-			expire, err := strconv.Atoi(r.Args[1])
+			expire, err := strconv.Atoi(args[1])
 			if err != nil {
-				setDirty(r.Client())
-				out.WriteErrorString(msgInvalidInt)
-				return nil
+				setDirty(c)
+				c.WriteError(msgInvalidInt)
+				return
 			}
 			ttl = time.Duration(expire) * timeUnit
 			if ttl <= 0 {
-				setDirty(r.Client())
-				out.WriteErrorString(msgInvalidSETime)
-				return nil
+				setDirty(c)
+				c.WriteError(msgInvalidSETime)
+				return
 			}
 
-			r.Args = r.Args[2:]
+			args = args[2:]
 			continue
 		default:
-			setDirty(r.Client())
-			out.WriteErrorString(msgSyntaxError)
-			return nil
+			setDirty(c)
+			c.WriteError(msgSyntaxError)
+			return
 		}
 	}
 
-	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
 		if nx {
 			if db.exists(key) {
-				out.WriteNil()
+				c.WriteNull()
 				return
 			}
 		}
 		if xx {
 			if !db.exists(key) {
-				out.WriteNil()
+				c.WriteNull()
 				return
 			}
 		}
@@ -120,155 +119,165 @@ func (m *Miniredis) cmdSet(out *redeo.Responder, r *redeo.Request) error {
 		if ttl != 0 {
 			db.ttl[key] = ttl
 		}
-		out.WriteOK()
+		c.WriteOK()
 	})
 }
 
 // SETEX
-func (m *Miniredis) cmdSetex(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) != 3 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdSetex(c *server.Peer, cmd string, args []string) {
+	if len(args) != 3 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
+	if !m.handleAuth(c) {
+		return
 	}
-	key := r.Args[0]
-	ttl, err := strconv.Atoi(r.Args[1])
+
+	key := args[0]
+	ttl, err := strconv.Atoi(args[1])
 	if err != nil {
-		setDirty(r.Client())
-		out.WriteErrorString(msgInvalidInt)
-		return nil
+		setDirty(c)
+		c.WriteError(msgInvalidInt)
+		return
 	}
 	if ttl <= 0 {
-		setDirty(r.Client())
-		out.WriteErrorString(msgInvalidSETEXTime)
-		return nil
+		setDirty(c)
+		c.WriteError(msgInvalidSETEXTime)
+		return
 	}
-	value := r.Args[2]
+	value := args[2]
 
-	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
 		db.del(key, true) // Clear any existing keys.
 		db.stringSet(key, value)
 		db.ttl[key] = time.Duration(ttl) * time.Second
-		out.WriteOK()
+		c.WriteOK()
 	})
 }
 
 // PSETEX
-func (m *Miniredis) cmdPsetex(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) != 3 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdPsetex(c *server.Peer, cmd string, args []string) {
+	if len(args) != 3 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
+	if !m.handleAuth(c) {
+		return
 	}
-	key := r.Args[0]
-	ttl, err := strconv.Atoi(r.Args[1])
+
+	key := args[0]
+	ttl, err := strconv.Atoi(args[1])
 	if err != nil {
-		setDirty(r.Client())
-		out.WriteErrorString(msgInvalidInt)
-		return nil
+		setDirty(c)
+		c.WriteError(msgInvalidInt)
+		return
 	}
 	if ttl <= 0 {
-		setDirty(r.Client())
-		out.WriteErrorString(msgInvalidPSETEXTime)
-		return nil
+		setDirty(c)
+		c.WriteError(msgInvalidPSETEXTime)
+		return
 	}
-	value := r.Args[2]
+	value := args[2]
 
-	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
 		db.del(key, true) // Clear any existing keys.
 		db.stringSet(key, value)
 		db.ttl[key] = time.Duration(ttl) * time.Millisecond
-		out.WriteOK()
+		c.WriteOK()
 	})
 }
 
 // SETNX
-func (m *Miniredis) cmdSetnx(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) != 2 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdSetnx(c *server.Peer, cmd string, args []string) {
+	if len(args) != 2 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
+	if !m.handleAuth(c) {
+		return
 	}
-	key := r.Args[0]
-	value := r.Args[1]
 
-	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+	key, value := args[0], args[1]
+
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
 		if _, ok := db.keys[key]; ok {
-			out.WriteZero()
+			c.WriteInt(0)
 			return
 		}
 
 		db.stringSet(key, value)
-		out.WriteOne()
+		c.WriteInt(1)
 	})
 }
 
 // MSET
-func (m *Miniredis) cmdMset(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) < 2 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdMset(c *server.Peer, cmd string, args []string) {
+	if len(args) < 2 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
+	if !m.handleAuth(c) {
+		return
 	}
-	if len(r.Args)%2 != 0 {
-		setDirty(r.Client())
+
+	if len(args)%2 != 0 {
+		setDirty(c)
 		// non-default error message
-		out.WriteErrorString("ERR wrong number of arguments for MSET")
-		return nil
+		c.WriteError("ERR wrong number of arguments for MSET")
+		return
 	}
-	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
-		for len(r.Args) > 0 {
-			key := r.Args[0]
-			value := r.Args[1]
-			r.Args = r.Args[2:]
+		for len(args) > 0 {
+			key, value := args[0], args[1]
+			args = args[2:]
 
 			db.del(key, true) // clear TTL
 			db.stringSet(key, value)
 		}
-		out.WriteOK()
+		c.WriteOK()
 	})
 }
 
 // MSETNX
-func (m *Miniredis) cmdMsetnx(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) < 2 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdMsetnx(c *server.Peer, cmd string, args []string) {
+	if len(args) < 2 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
+	if !m.handleAuth(c) {
+		return
 	}
-	if len(r.Args)%2 != 0 {
-		setDirty(r.Client())
+
+	if len(args)%2 != 0 {
+		setDirty(c)
 		// non-default error message (yes, with 'MSET').
-		out.WriteErrorString("ERR wrong number of arguments for MSET")
-		return nil
+		c.WriteError("ERR wrong number of arguments for MSET")
+		return
 	}
-	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
 		keys := map[string]string{}
 		existing := false
-		for len(r.Args) > 0 {
-			key := r.Args[0]
-			value := r.Args[1]
-			r.Args = r.Args[2:]
+		for len(args) > 0 {
+			key := args[0]
+			value := args[1]
+			args = args[2:]
 			keys[key] = value
 			if _, ok := db.keys[key]; ok {
 				existing = true
@@ -283,54 +292,57 @@ func (m *Miniredis) cmdMsetnx(out *redeo.Responder, r *redeo.Request) error {
 				db.stringSet(k, v)
 			}
 		}
-		out.WriteInt(res)
+		c.WriteInt(res)
 	})
 }
 
 // GET
-func (m *Miniredis) cmdGet(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) != 1 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdGet(c *server.Peer, cmd string, args []string) {
+	if len(args) != 1 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
+	if !m.handleAuth(c) {
+		return
 	}
-	key := r.Args[0]
 
-	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+	key := args[0]
+
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
 		if !db.exists(key) {
-			out.WriteNil()
+			c.WriteNull()
 			return
 		}
 		if db.t(key) != "string" {
-			out.WriteErrorString(msgWrongType)
+			c.WriteError(msgWrongType)
 			return
 		}
 
-		out.WriteString(db.stringGet(key))
+		c.WriteBulk(db.stringGet(key))
 	})
 }
 
 // GETSET
-func (m *Miniredis) cmdGetset(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) != 2 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdGetset(c *server.Peer, cmd string, args []string) {
+	if len(args) != 2 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
+	if !m.handleAuth(c) {
+		return
 	}
-	key := r.Args[0]
-	value := r.Args[1]
 
-	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+	key, value := args[0], args[1]
+
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
 		if t, ok := db.keys[key]; ok && t != "string" {
-			out.WriteErrorString(msgWrongType)
+			c.WriteError(msgWrongType)
 			return
 		}
 
@@ -340,325 +352,335 @@ func (m *Miniredis) cmdGetset(out *redeo.Responder, r *redeo.Request) error {
 		delete(db.ttl, key)
 
 		if !ok {
-			out.WriteNil()
+			c.WriteNull()
 			return
 		}
-		out.WriteString(old)
+		c.WriteBulk(old)
 		return
 	})
 }
 
 // MGET
-func (m *Miniredis) cmdMget(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) < 1 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdMget(c *server.Peer, cmd string, args []string) {
+	if len(args) < 1 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
+	if !m.handleAuth(c) {
+		return
 	}
 
-	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
-		out.WriteBulkLen(len(r.Args))
-		for _, k := range r.Args {
+		c.WriteLen(len(args))
+		for _, k := range args {
 			if t, ok := db.keys[k]; !ok || t != "string" {
-				out.WriteNil()
+				c.WriteNull()
 				continue
 			}
 			v, ok := db.stringKeys[k]
 			if !ok {
 				// Should not happen, we just checked keys[]
-				out.WriteNil()
+				c.WriteNull()
 				continue
 			}
-			out.WriteString(v)
+			c.WriteBulk(v)
 		}
 	})
 }
 
 // INCR
-func (m *Miniredis) cmdIncr(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) != 1 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdIncr(c *server.Peer, cmd string, args []string) {
+	if len(args) != 1 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
+	if !m.handleAuth(c) {
+		return
 	}
 
-	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
-		key := r.Args[0]
+		key := args[0]
 		if t, ok := db.keys[key]; ok && t != "string" {
-			out.WriteErrorString(msgWrongType)
+			c.WriteError(msgWrongType)
 			return
 		}
 		v, err := db.stringIncr(key, +1)
 		if err != nil {
-			out.WriteErrorString(err.Error())
+			c.WriteError(err.Error())
 			return
 		}
 		// Don't touch TTL
-		out.WriteInt(v)
+		c.WriteInt(v)
 	})
 }
 
 // INCRBY
-func (m *Miniredis) cmdIncrby(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) != 2 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdIncrby(c *server.Peer, cmd string, args []string) {
+	if len(args) != 2 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
+	if !m.handleAuth(c) {
+		return
 	}
 
-	key := r.Args[0]
-	delta, err := strconv.Atoi(r.Args[1])
+	key := args[0]
+	delta, err := strconv.Atoi(args[1])
 	if err != nil {
-		setDirty(r.Client())
-		out.WriteErrorString(msgInvalidInt)
-		return nil
+		setDirty(c)
+		c.WriteError(msgInvalidInt)
+		return
 	}
 
-	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
 		if t, ok := db.keys[key]; ok && t != "string" {
-			out.WriteErrorString(msgWrongType)
+			c.WriteError(msgWrongType)
 			return
 		}
 
 		v, err := db.stringIncr(key, delta)
 		if err != nil {
-			out.WriteErrorString(err.Error())
+			c.WriteError(err.Error())
 			return
 		}
 		// Don't touch TTL
-		out.WriteInt(v)
+		c.WriteInt(v)
 	})
 }
 
 // INCRBYFLOAT
-func (m *Miniredis) cmdIncrbyfloat(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) != 2 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdIncrbyfloat(c *server.Peer, cmd string, args []string) {
+	if len(args) != 2 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
+	if !m.handleAuth(c) {
+		return
 	}
 
-	key := r.Args[0]
-	delta, err := strconv.ParseFloat(r.Args[1], 64)
+	key := args[0]
+	delta, err := strconv.ParseFloat(args[1], 64)
 	if err != nil {
-		setDirty(r.Client())
-		out.WriteErrorString(msgInvalidFloat)
-		return nil
+		setDirty(c)
+		c.WriteError(msgInvalidFloat)
+		return
 	}
 
-	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
 		if t, ok := db.keys[key]; ok && t != "string" {
-			out.WriteErrorString(msgWrongType)
+			c.WriteError(msgWrongType)
 			return
 		}
 
 		v, err := db.stringIncrfloat(key, delta)
 		if err != nil {
-			out.WriteErrorString(err.Error())
+			c.WriteError(err.Error())
 			return
 		}
 		// Don't touch TTL
-		out.WriteString(formatFloat(v))
+		c.WriteBulk(formatFloat(v))
 	})
 }
 
 // DECR
-func (m *Miniredis) cmdDecr(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) != 1 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdDecr(c *server.Peer, cmd string, args []string) {
+	if len(args) != 1 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
+	if !m.handleAuth(c) {
+		return
 	}
 
-	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
-		key := r.Args[0]
+		key := args[0]
 		if t, ok := db.keys[key]; ok && t != "string" {
-			out.WriteErrorString(msgWrongType)
+			c.WriteError(msgWrongType)
 			return
 		}
 		v, err := db.stringIncr(key, -1)
 		if err != nil {
-			out.WriteErrorString(err.Error())
+			c.WriteError(err.Error())
 			return
 		}
 		// Don't touch TTL
-		out.WriteInt(v)
+		c.WriteInt(v)
 	})
 }
 
 // DECRBY
-func (m *Miniredis) cmdDecrby(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) != 2 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdDecrby(c *server.Peer, cmd string, args []string) {
+	if len(args) != 2 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
+	if !m.handleAuth(c) {
+		return
 	}
 
-	key := r.Args[0]
-	delta, err := strconv.Atoi(r.Args[1])
+	key := args[0]
+	delta, err := strconv.Atoi(args[1])
 	if err != nil {
-		setDirty(r.Client())
-		out.WriteErrorString(msgInvalidInt)
-		return nil
+		setDirty(c)
+		c.WriteError(msgInvalidInt)
+		return
 	}
 
-	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
 		if t, ok := db.keys[key]; ok && t != "string" {
-			out.WriteErrorString(msgWrongType)
+			c.WriteError(msgWrongType)
 			return
 		}
 
 		v, err := db.stringIncr(key, -delta)
 		if err != nil {
-			out.WriteErrorString(err.Error())
+			c.WriteError(err.Error())
 			return
 		}
 		// Don't touch TTL
-		out.WriteInt(v)
+		c.WriteInt(v)
 	})
 }
 
 // STRLEN
-func (m *Miniredis) cmdStrlen(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) != 1 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdStrlen(c *server.Peer, cmd string, args []string) {
+	if len(args) != 1 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
+	if !m.handleAuth(c) {
+		return
 	}
 
-	key := r.Args[0]
+	key := args[0]
 
-	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
 		if t, ok := db.keys[key]; ok && t != "string" {
-			out.WriteErrorString(msgWrongType)
+			c.WriteError(msgWrongType)
 			return
 		}
 
-		out.WriteInt(len(db.stringKeys[key]))
+		c.WriteInt(len(db.stringKeys[key]))
 	})
 }
 
 // APPEND
-func (m *Miniredis) cmdAppend(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) != 2 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdAppend(c *server.Peer, cmd string, args []string) {
+	if len(args) != 2 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
+	if !m.handleAuth(c) {
+		return
 	}
 
-	key := r.Args[0]
-	value := r.Args[1]
+	key, value := args[0], args[1]
 
-	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
 		if t, ok := db.keys[key]; ok && t != "string" {
-			out.WriteErrorString(msgWrongType)
+			c.WriteError(msgWrongType)
 			return
 		}
 
 		newValue := db.stringKeys[key] + value
 		db.stringSet(key, newValue)
 
-		out.WriteInt(len(newValue))
+		c.WriteInt(len(newValue))
 	})
 }
 
 // GETRANGE
-func (m *Miniredis) cmdGetrange(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) != 3 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdGetrange(c *server.Peer, cmd string, args []string) {
+	if len(args) != 3 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
-	}
-
-	key := r.Args[0]
-	start, err := strconv.Atoi(r.Args[1])
-	if err != nil {
-		setDirty(r.Client())
-		out.WriteErrorString(msgInvalidInt)
-		return nil
-	}
-	end, err := strconv.Atoi(r.Args[2])
-	if err != nil {
-		setDirty(r.Client())
-		out.WriteErrorString(msgInvalidInt)
-		return nil
+	if !m.handleAuth(c) {
+		return
 	}
 
-	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+	key := args[0]
+	start, err := strconv.Atoi(args[1])
+	if err != nil {
+		setDirty(c)
+		c.WriteError(msgInvalidInt)
+		return
+	}
+	end, err := strconv.Atoi(args[2])
+	if err != nil {
+		setDirty(c)
+		c.WriteError(msgInvalidInt)
+		return
+	}
+
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
 		if t, ok := db.keys[key]; ok && t != "string" {
-			out.WriteErrorString(msgWrongType)
+			c.WriteError(msgWrongType)
 			return
 		}
 
 		v := db.stringKeys[key]
-		out.WriteString(withRange(v, start, end))
+		c.WriteBulk(withRange(v, start, end))
 	})
 }
 
 // SETRANGE
-func (m *Miniredis) cmdSetrange(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) != 3 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdSetrange(c *server.Peer, cmd string, args []string) {
+	if len(args) != 3 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
+	if !m.handleAuth(c) {
+		return
 	}
 
-	key := r.Args[0]
-	pos, err := strconv.Atoi(r.Args[1])
+	key := args[0]
+	pos, err := strconv.Atoi(args[1])
 	if err != nil {
-		setDirty(r.Client())
-		out.WriteErrorString(msgInvalidInt)
-		return nil
+		setDirty(c)
+		c.WriteError(msgInvalidInt)
+		return
 	}
 	if pos < 0 {
-		setDirty(r.Client())
-		return redeo.ClientError("offset is out of range")
+		setDirty(c)
+		c.WriteError("ERR offset is out of range")
+		return
 	}
-	subst := r.Args[2]
+	subst := args[2]
 
-	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
 		if t, ok := db.keys[key]; ok && t != "string" {
-			out.WriteErrorString(msgWrongType)
+			c.WriteError(msgWrongType)
 			return
 		}
 
@@ -670,59 +692,60 @@ func (m *Miniredis) cmdSetrange(out *redeo.Responder, r *redeo.Request) error {
 		}
 		copy(v[pos:pos+len(subst)], subst)
 		db.stringSet(key, string(v))
-		out.WriteInt(len(v))
+		c.WriteInt(len(v))
 	})
 }
 
 // BITCOUNT
-func (m *Miniredis) cmdBitcount(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) < 1 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdBitcount(c *server.Peer, cmd string, args []string) {
+	if len(args) < 1 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
+	if !m.handleAuth(c) {
+		return
 	}
 
 	var (
-		key        = r.Args[0]
 		useRange   = false
 		start, end = 0, 0
-		args       = r.Args[1:]
+		key        = args[0]
 	)
+	args = args[1:]
 	if len(args) >= 2 {
 		useRange = true
 		var err error
 		start, err = strconv.Atoi(args[0])
 		if err != nil {
-			setDirty(r.Client())
-			out.WriteErrorString(msgInvalidInt)
-			return nil
+			setDirty(c)
+			c.WriteError(msgInvalidInt)
+			return
 		}
 		end, err = strconv.Atoi(args[1])
 		if err != nil {
-			setDirty(r.Client())
-			out.WriteErrorString(msgInvalidInt)
-			return nil
+			setDirty(c)
+			c.WriteError(msgInvalidInt)
+			return
 		}
 		args = args[2:]
 	}
 
-	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
 		if !db.exists(key) {
-			out.WriteZero()
+			c.WriteInt(0)
 			return
 		}
 		if db.t(key) != "string" {
-			out.WriteErrorString(msgWrongType)
+			c.WriteError(msgWrongType)
 			return
 		}
 
 		// Real redis only checks after it knows the key is there and a string.
 		if len(args) != 0 {
-			out.WriteErrorString(msgSyntaxError)
+			c.WriteError(msgSyntaxError)
 			return
 		}
 
@@ -731,41 +754,42 @@ func (m *Miniredis) cmdBitcount(out *redeo.Responder, r *redeo.Request) error {
 			v = withRange(v, start, end)
 		}
 
-		out.WriteInt(countBits([]byte(v)))
+		c.WriteInt(countBits([]byte(v)))
 	})
 }
 
 // BITOP
-func (m *Miniredis) cmdBitop(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) < 3 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdBitop(c *server.Peer, cmd string, args []string) {
+	if len(args) < 3 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
+	if !m.handleAuth(c) {
+		return
 	}
 
 	var (
-		op     = strings.ToUpper(r.Args[0])
-		target = r.Args[1]
-		input  = r.Args[2:]
+		op     = strings.ToUpper(args[0])
+		target = args[1]
+		input  = args[2:]
 	)
 
 	// 'op' is tested when the transaction is executed.
-	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
 		switch op {
 		case "AND", "OR", "XOR":
 			first := input[0]
 			if t, ok := db.keys[first]; ok && t != "string" {
-				out.WriteErrorString(msgWrongType)
+				c.WriteError(msgWrongType)
 				return
 			}
 			res := []byte(db.stringKeys[first])
 			for _, vk := range input[1:] {
 				if t, ok := db.keys[vk]; ok && t != "string" {
-					out.WriteErrorString(msgWrongType)
+					c.WriteError(msgWrongType)
 					return
 				}
 				v := db.stringKeys[vk]
@@ -782,16 +806,16 @@ func (m *Miniredis) cmdBitop(out *redeo.Responder, r *redeo.Request) error {
 			} else {
 				db.stringSet(target, string(res))
 			}
-			out.WriteInt(len(res))
+			c.WriteInt(len(res))
 		case "NOT":
 			// NOT only takes a single argument.
 			if len(input) != 1 {
-				out.WriteErrorString("ERR BITOP NOT must be called with a single source key.")
+				c.WriteError("ERR BITOP NOT must be called with a single source key.")
 				return
 			}
 			key := input[0]
 			if t, ok := db.keys[key]; ok && t != "string" {
-				out.WriteErrorString(msgWrongType)
+				c.WriteError(msgWrongType)
 				return
 			}
 			value := []byte(db.stringKeys[key])
@@ -804,55 +828,56 @@ func (m *Miniredis) cmdBitop(out *redeo.Responder, r *redeo.Request) error {
 			} else {
 				db.stringSet(target, string(value))
 			}
-			out.WriteInt(len(value))
+			c.WriteInt(len(value))
 		default:
-			out.WriteErrorString(msgSyntaxError)
+			c.WriteError(msgSyntaxError)
 		}
 	})
 }
 
 // BITPOS
-func (m *Miniredis) cmdBitpos(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) < 2 || len(r.Args) > 4 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdBitpos(c *server.Peer, cmd string, args []string) {
+	if len(args) < 2 || len(args) > 4 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
+	if !m.handleAuth(c) {
+		return
 	}
 
-	key := r.Args[0]
-	bit, err := strconv.Atoi(r.Args[1])
+	key := args[0]
+	bit, err := strconv.Atoi(args[1])
 	if err != nil {
-		setDirty(r.Client())
-		out.WriteErrorString(msgInvalidInt)
-		return nil
+		setDirty(c)
+		c.WriteError(msgInvalidInt)
+		return
 	}
 	var start, end int
 	withEnd := false
-	if len(r.Args) > 2 {
-		start, err = strconv.Atoi(r.Args[2])
+	if len(args) > 2 {
+		start, err = strconv.Atoi(args[2])
 		if err != nil {
-			setDirty(r.Client())
-			out.WriteErrorString(msgInvalidInt)
-			return nil
+			setDirty(c)
+			c.WriteError(msgInvalidInt)
+			return
 		}
 	}
-	if len(r.Args) > 3 {
-		end, err = strconv.Atoi(r.Args[3])
+	if len(args) > 3 {
+		end, err = strconv.Atoi(args[3])
 		if err != nil {
-			setDirty(r.Client())
-			out.WriteErrorString(msgInvalidInt)
-			return nil
+			setDirty(c)
+			c.WriteError(msgInvalidInt)
+			return
 		}
 		withEnd = true
 	}
 
-	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
 		if t, ok := db.keys[key]; ok && t != "string" {
-			out.WriteErrorString(msgWrongType)
+			c.WriteError(msgWrongType)
 			return
 		}
 		value := db.stringKeys[key]
@@ -888,32 +913,34 @@ func (m *Miniredis) cmdBitpos(out *redeo.Responder, r *redeo.Request) error {
 		if bit == 0 && pos == -1 && !withEnd {
 			pos = start*8 + len(value)*8
 		}
-		out.WriteInt(pos)
+		c.WriteInt(pos)
 	})
 }
 
 // GETBIT
-func (m *Miniredis) cmdGetbit(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) != 2 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdGetbit(c *server.Peer, cmd string, args []string) {
+	if len(args) != 2 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
+	if !m.handleAuth(c) {
+		return
 	}
 
-	key := r.Args[0]
-	bit, err := strconv.Atoi(r.Args[1])
+	key := args[0]
+	bit, err := strconv.Atoi(args[1])
 	if err != nil {
-		setDirty(r.Client())
-		return redeo.ClientError("bit offset is not an integer or out of range")
+		setDirty(c)
+		c.WriteError("ERR bit offset is not an integer or out of range")
+		return
 	}
 
-	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
 		if t, ok := db.keys[key]; ok && t != "string" {
-			out.WriteErrorString(msgWrongType)
+			c.WriteError(msgWrongType)
 			return
 		}
 		value := db.stringKeys[key]
@@ -929,37 +956,40 @@ func (m *Miniredis) cmdGetbit(out *redeo.Responder, r *redeo.Request) error {
 		if toBits(ourByte)[bit%8] {
 			res = 1
 		}
-		out.WriteInt(res)
+		c.WriteInt(res)
 	})
 }
 
 // SETBIT
-func (m *Miniredis) cmdSetbit(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) != 3 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdSetbit(c *server.Peer, cmd string, args []string) {
+	if len(args) != 3 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
+	if !m.handleAuth(c) {
+		return
 	}
 
-	key := r.Args[0]
-	bit, err := strconv.Atoi(r.Args[1])
+	key := args[0]
+	bit, err := strconv.Atoi(args[1])
 	if err != nil || bit < 0 {
-		setDirty(r.Client())
-		return redeo.ClientError("bit offset is not an integer or out of range")
+		setDirty(c)
+		c.WriteError("ERR bit offset is not an integer or out of range")
+		return
 	}
-	newBit, err := strconv.Atoi(r.Args[2])
+	newBit, err := strconv.Atoi(args[2])
 	if err != nil || (newBit != 0 && newBit != 1) {
-		setDirty(r.Client())
-		return redeo.ClientError("bit is not an integer or out of range")
+		setDirty(c)
+		c.WriteError("ERR bit is not an integer or out of range")
+		return
 	}
 
-	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
 		if t, ok := db.keys[key]; ok && t != "string" {
-			out.WriteErrorString(msgWrongType)
+			c.WriteError(msgWrongType)
 			return
 		}
 		value := []byte(db.stringKeys[key])
@@ -983,7 +1013,7 @@ func (m *Miniredis) cmdSetbit(out *redeo.Responder, r *redeo.Request) error {
 		}
 		db.stringSet(key, string(value))
 
-		out.WriteInt(old)
+		c.WriteInt(old)
 	})
 }
 

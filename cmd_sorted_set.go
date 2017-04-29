@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/bsm/redeo"
+	"github.com/alicebob/miniredis/server"
 )
 
 var (
@@ -16,48 +16,47 @@ var (
 )
 
 // commandsSortedSet handles all sorted set operations.
-func commandsSortedSet(m *Miniredis, srv *redeo.Server) {
-	srv.HandleFunc("ZADD", m.cmdZadd)
-	srv.HandleFunc("ZCARD", m.cmdZcard)
-	srv.HandleFunc("ZCOUNT", m.cmdZcount)
-	srv.HandleFunc("ZINCRBY", m.cmdZincrby)
-	srv.HandleFunc("ZINTERSTORE", m.cmdZinterstore)
-	srv.HandleFunc("ZLEXCOUNT", m.cmdZlexcount)
-	srv.HandleFunc("ZRANGE", m.makeCmdZrange(false))
-	srv.HandleFunc("ZRANGEBYLEX", m.cmdZrangebylex)
-	srv.HandleFunc("ZRANGEBYSCORE", m.makeCmdZrangebyscore(false))
-	srv.HandleFunc("ZRANK", m.makeCmdZrank(false))
-	srv.HandleFunc("ZREM", m.cmdZrem)
-	srv.HandleFunc("ZREMRANGEBYLEX", m.cmdZremrangebylex)
-	srv.HandleFunc("ZREMRANGEBYRANK", m.cmdZremrangebyrank)
-	srv.HandleFunc("ZREMRANGEBYSCORE", m.cmdZremrangebyscore)
-	srv.HandleFunc("ZREVRANGE", m.makeCmdZrange(true))
-	srv.HandleFunc("ZREVRANGEBYSCORE", m.makeCmdZrangebyscore(true))
-	srv.HandleFunc("ZREVRANK", m.makeCmdZrank(true))
-	srv.HandleFunc("ZSCORE", m.cmdZscore)
-	srv.HandleFunc("ZUNIONSTORE", m.cmdZunionstore)
-	srv.HandleFunc("ZSCAN", m.cmdZscan)
+func commandsSortedSet(m *Miniredis) {
+	m.srv.Register("ZADD", m.cmdZadd)
+	m.srv.Register("ZCARD", m.cmdZcard)
+	m.srv.Register("ZCOUNT", m.cmdZcount)
+	m.srv.Register("ZINCRBY", m.cmdZincrby)
+	m.srv.Register("ZINTERSTORE", m.cmdZinterstore)
+	m.srv.Register("ZLEXCOUNT", m.cmdZlexcount)
+	m.srv.Register("ZRANGE", m.makeCmdZrange(false))
+	m.srv.Register("ZRANGEBYLEX", m.cmdZrangebylex)
+	m.srv.Register("ZRANGEBYSCORE", m.makeCmdZrangebyscore(false))
+	m.srv.Register("ZRANK", m.makeCmdZrank(false))
+	m.srv.Register("ZREM", m.cmdZrem)
+	m.srv.Register("ZREMRANGEBYLEX", m.cmdZremrangebylex)
+	m.srv.Register("ZREMRANGEBYRANK", m.cmdZremrangebyrank)
+	m.srv.Register("ZREMRANGEBYSCORE", m.cmdZremrangebyscore)
+	m.srv.Register("ZREVRANGE", m.makeCmdZrange(true))
+	m.srv.Register("ZREVRANGEBYSCORE", m.makeCmdZrangebyscore(true))
+	m.srv.Register("ZREVRANK", m.makeCmdZrank(true))
+	m.srv.Register("ZSCORE", m.cmdZscore)
+	m.srv.Register("ZUNIONSTORE", m.cmdZunionstore)
+	m.srv.Register("ZSCAN", m.cmdZscan)
 }
 
 // ZADD
-func (m *Miniredis) cmdZadd(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) < 3 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdZadd(c *server.Peer, cmd string, args []string) {
+	if len(args) < 3 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
+	if !m.handleAuth(c) {
+		return
 	}
 
-	key := r.Args[0]
-	args := r.Args[1:]
+	key, args := args[0], args[1:]
 	var (
 		nx    = false
 		xx    = false
 		ch    = false
 		elems = map[string]float64{}
 	)
-
 	for len(args) > 0 {
 		switch strings.ToUpper(args[0]) {
 		case "NX":
@@ -74,15 +73,15 @@ func (m *Miniredis) cmdZadd(out *redeo.Responder, r *redeo.Request) error {
 			continue
 		default:
 			if len(args) < 2 {
-				setDirty(r.Client())
-				out.WriteErrorString(msgSyntaxError)
-				return nil
+				setDirty(c)
+				c.WriteError(msgSyntaxError)
+				return
 			}
 			score, err := strconv.ParseFloat(args[0], 64)
 			if err != nil {
-				setDirty(r.Client())
-				out.WriteErrorString(msgInvalidFloat)
-				return nil
+				setDirty(c)
+				c.WriteError(msgInvalidFloat)
+				return
 			}
 			elems[args[1]] = score
 			args = args[2:]
@@ -90,16 +89,16 @@ func (m *Miniredis) cmdZadd(out *redeo.Responder, r *redeo.Request) error {
 	}
 
 	if xx && nx {
-		setDirty(r.Client())
-		out.WriteErrorString(msgXXandNX)
-		return nil
+		setDirty(c)
+		c.WriteError(msgXXandNX)
+		return
 	}
 
-	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
 		if db.exists(key) && db.t(key) != "zset" {
-			out.WriteErrorString(ErrWrongType.Error())
+			c.WriteError(ErrWrongType.Error())
 			return
 		}
 
@@ -121,139 +120,144 @@ func (m *Miniredis) cmdZadd(out *redeo.Responder, r *redeo.Request) error {
 				}
 			}
 		}
-		out.WriteInt(res)
+		c.WriteInt(res)
 	})
 }
 
 // ZCARD
-func (m *Miniredis) cmdZcard(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) != 1 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdZcard(c *server.Peer, cmd string, args []string) {
+	if len(args) != 1 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
+	if !m.handleAuth(c) {
+		return
 	}
 
-	key := r.Args[0]
+	key := args[0]
 
-	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
 		if !db.exists(key) {
-			out.WriteZero()
+			c.WriteInt(0)
 			return
 		}
 
 		if db.t(key) != "zset" {
-			out.WriteErrorString(ErrWrongType.Error())
+			c.WriteError(ErrWrongType.Error())
 			return
 		}
 
-		out.WriteInt(db.ssetCard(key))
+		c.WriteInt(db.ssetCard(key))
 	})
 }
 
 // ZCOUNT
-func (m *Miniredis) cmdZcount(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) != 3 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdZcount(c *server.Peer, cmd string, args []string) {
+	if len(args) != 3 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
-	}
-
-	key := r.Args[0]
-	min, minIncl, err := parseFloatRange(r.Args[1])
-	if err != nil {
-		setDirty(r.Client())
-		out.WriteErrorString(msgInvalidMinMax)
-		return nil
-	}
-	max, maxIncl, err := parseFloatRange(r.Args[2])
-	if err != nil {
-		setDirty(r.Client())
-		out.WriteErrorString(msgInvalidMinMax)
-		return nil
+	if !m.handleAuth(c) {
+		return
 	}
 
-	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+	key := args[0]
+	min, minIncl, err := parseFloatRange(args[1])
+	if err != nil {
+		setDirty(c)
+		c.WriteError(msgInvalidMinMax)
+		return
+	}
+	max, maxIncl, err := parseFloatRange(args[2])
+	if err != nil {
+		setDirty(c)
+		c.WriteError(msgInvalidMinMax)
+		return
+	}
+
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
 		if !db.exists(key) {
-			out.WriteZero()
+			c.WriteInt(0)
 			return
 		}
 
 		if db.t(key) != "zset" {
-			out.WriteErrorString(ErrWrongType.Error())
+			c.WriteError(ErrWrongType.Error())
 			return
 		}
 
 		members := db.ssetElements(key)
 		members = withSSRange(members, min, minIncl, max, maxIncl)
-		out.WriteInt(len(members))
+		c.WriteInt(len(members))
 	})
 }
 
 // ZINCRBY
-func (m *Miniredis) cmdZincrby(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) != 3 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdZincrby(c *server.Peer, cmd string, args []string) {
+	if len(args) != 3 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
+	if !m.handleAuth(c) {
+		return
 	}
 
-	key := r.Args[0]
-	delta, err := strconv.ParseFloat(r.Args[1], 64)
+	key := args[0]
+	delta, err := strconv.ParseFloat(args[1], 64)
 	if err != nil {
-		setDirty(r.Client())
-		out.WriteErrorString(msgInvalidFloat)
-		return nil
+		setDirty(c)
+		c.WriteError(msgInvalidFloat)
+		return
 	}
-	member := r.Args[2]
+	member := args[2]
 
-	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
 		if db.exists(key) && db.t(key) != "zset" {
-			out.WriteErrorString(msgWrongType)
+			c.WriteError(msgWrongType)
 			return
 		}
 		newScore := db.ssetIncrby(key, member, delta)
-		out.WriteString(formatFloat(newScore))
+		c.WriteBulk(formatFloat(newScore))
 	})
 }
 
 // ZINTERSTORE
-func (m *Miniredis) cmdZinterstore(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) < 3 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdZinterstore(c *server.Peer, cmd string, args []string) {
+	if len(args) < 3 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
+	if !m.handleAuth(c) {
+		return
 	}
 
-	destination := r.Args[0]
-	numKeys, err := strconv.Atoi(r.Args[1])
+	destination := args[0]
+	numKeys, err := strconv.Atoi(args[1])
 	if err != nil {
-		setDirty(r.Client())
-		out.WriteErrorString(msgInvalidInt)
-		return nil
+		setDirty(c)
+		c.WriteError(msgInvalidInt)
+		return
 	}
-	args := r.Args[2:]
+	args = args[2:]
 	if len(args) < numKeys {
-		setDirty(r.Client())
-		out.WriteErrorString(msgSyntaxError)
-		return nil
+		setDirty(c)
+		c.WriteError(msgSyntaxError)
+		return
 	}
 	if numKeys <= 0 {
-		setDirty(r.Client())
-		return redeo.ClientError("at least 1 input key is needed for ZUNIONSTORE/ZINTERSTORE")
+		setDirty(c)
+		c.WriteError("ERR at least 1 input key is needed for ZUNIONSTORE/ZINTERSTORE")
+		return
 	}
 	keys := args[:numKeys]
 	args = args[numKeys:]
@@ -264,15 +268,16 @@ func (m *Miniredis) cmdZinterstore(out *redeo.Responder, r *redeo.Request) error
 	for len(args) > 0 {
 		if strings.ToLower(args[0]) == "weights" {
 			if len(args) < numKeys+1 {
-				setDirty(r.Client())
-				out.WriteErrorString(msgSyntaxError)
-				return nil
+				setDirty(c)
+				c.WriteError(msgSyntaxError)
+				return
 			}
 			for i := 0; i < numKeys; i++ {
 				f, err := strconv.ParseFloat(args[i+1], 64)
 				if err != nil {
-					setDirty(r.Client())
-					return redeo.ClientError("weight value is not a float")
+					setDirty(c)
+					c.WriteError("ERR weight value is not a float")
+					return
 				}
 				weights = append(weights, f)
 			}
@@ -282,27 +287,27 @@ func (m *Miniredis) cmdZinterstore(out *redeo.Responder, r *redeo.Request) error
 		}
 		if strings.ToLower(args[0]) == "aggregate" {
 			if len(args) < 2 {
-				setDirty(r.Client())
-				out.WriteErrorString(msgSyntaxError)
-				return nil
+				setDirty(c)
+				c.WriteError(msgSyntaxError)
+				return
 			}
 			aggregate = strings.ToLower(args[1])
 			switch aggregate {
 			default:
-				setDirty(r.Client())
-				out.WriteErrorString(msgSyntaxError)
-				return nil
+				setDirty(c)
+				c.WriteError(msgSyntaxError)
+				return
 			case "sum", "min", "max":
 			}
 			args = args[2:]
 			continue
 		}
-		setDirty(r.Client())
-		out.WriteErrorString(msgSyntaxError)
-		return nil
+		setDirty(c)
+		c.WriteError(msgSyntaxError)
+		return
 	}
 
-	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 		db.del(destination, true)
 
@@ -315,7 +320,7 @@ func (m *Miniredis) cmdZinterstore(out *redeo.Responder, r *redeo.Request) error
 				continue
 			}
 			if db.t(key) != "zset" {
-				out.WriteErrorString(msgWrongType)
+				c.WriteError(msgWrongType)
 				return
 			}
 			for _, el := range db.ssetElements(key) {
@@ -351,43 +356,45 @@ func (m *Miniredis) cmdZinterstore(out *redeo.Responder, r *redeo.Request) error
 			}
 		}
 		db.ssetSet(destination, sset)
-		out.WriteInt(len(sset))
+		c.WriteInt(len(sset))
 	})
 }
 
 // ZLEXCOUNT
-func (m *Miniredis) cmdZlexcount(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) != 3 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdZlexcount(c *server.Peer, cmd string, args []string) {
+	if len(args) != 3 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
+	if !m.handleAuth(c) {
+		return
 	}
 
-	key := r.Args[0]
-	min, minIncl, err := parseLexrange(r.Args[1])
+	key := args[0]
+	min, minIncl, err := parseLexrange(args[1])
 	if err != nil {
-		setDirty(r.Client())
-		out.WriteErrorString(err.Error())
-		return nil
+		setDirty(c)
+		c.WriteError(err.Error())
+		return
 	}
-	max, maxIncl, err := parseLexrange(r.Args[2])
+	max, maxIncl, err := parseLexrange(args[2])
 	if err != nil {
-		setDirty(r.Client())
-		out.WriteErrorString(err.Error())
-		return nil
+		setDirty(c)
+		c.WriteError(err.Error())
+		return
 	}
-	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
 		if !db.exists(key) {
-			out.WriteInt(0)
+			c.WriteInt(0)
 			return
 		}
 
 		if db.t(key) != "zset" {
-			out.WriteErrorString(ErrWrongType.Error())
+			c.WriteError(ErrWrongType.Error())
 			return
 		}
 
@@ -396,59 +403,60 @@ func (m *Miniredis) cmdZlexcount(out *redeo.Responder, r *redeo.Request) error {
 		sort.Strings(members)
 		members = withLexRange(members, min, minIncl, max, maxIncl)
 
-		out.WriteInt(len(members))
+		c.WriteInt(len(members))
 	})
 }
 
 // ZRANGE and ZREVRANGE
-func (m *Miniredis) makeCmdZrange(reverse bool) redeo.HandlerFunc {
-	return func(out *redeo.Responder, r *redeo.Request) error {
-		if len(r.Args) < 3 {
-			setDirty(r.Client())
-			return r.WrongNumberOfArgs()
+func (m *Miniredis) makeCmdZrange(reverse bool) server.Cmd {
+	return func(c *server.Peer, cmd string, args []string) {
+		if len(args) < 3 {
+			setDirty(c)
+			c.WriteError(errWrongNumber(cmd))
+			return
 		}
-		if !m.handleAuth(r.Client(), out) {
-			return nil
+		if !m.handleAuth(c) {
+			return
 		}
 
-		key := r.Args[0]
-		start, err := strconv.Atoi(r.Args[1])
+		key := args[0]
+		start, err := strconv.Atoi(args[1])
 		if err != nil {
-			setDirty(r.Client())
-			out.WriteErrorString(msgInvalidInt)
-			return nil
+			setDirty(c)
+			c.WriteError(msgInvalidInt)
+			return
 		}
-		end, err := strconv.Atoi(r.Args[2])
+		end, err := strconv.Atoi(args[2])
 		if err != nil {
-			setDirty(r.Client())
-			out.WriteErrorString(msgInvalidInt)
-			return nil
+			setDirty(c)
+			c.WriteError(msgInvalidInt)
+			return
 		}
 
 		withScores := false
-		if len(r.Args) > 4 {
-			out.WriteErrorString(msgSyntaxError)
-			return nil
+		if len(args) > 4 {
+			c.WriteError(msgSyntaxError)
+			return
 		}
-		if len(r.Args) == 4 {
-			if strings.ToLower(r.Args[3]) != "withscores" {
-				setDirty(r.Client())
-				out.WriteErrorString(msgSyntaxError)
-				return nil
+		if len(args) == 4 {
+			if strings.ToLower(args[3]) != "withscores" {
+				setDirty(c)
+				c.WriteError(msgSyntaxError)
+				return
 			}
 			withScores = true
 		}
 
-		return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+		withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 			db := m.db(ctx.selectedDB)
 
 			if !db.exists(key) {
-				out.WriteBulkLen(0)
+				c.WriteLen(0)
 				return
 			}
 
 			if db.t(key) != "zset" {
-				out.WriteErrorString(ErrWrongType.Error())
+				c.WriteError(ErrWrongType.Error())
 				return
 			}
 
@@ -458,14 +466,14 @@ func (m *Miniredis) makeCmdZrange(reverse bool) redeo.HandlerFunc {
 			}
 			rs, re := redisRange(len(members), start, end, false)
 			if withScores {
-				out.WriteBulkLen((re - rs) * 2)
+				c.WriteLen((re - rs) * 2)
 			} else {
-				out.WriteBulkLen(re - rs)
+				c.WriteLen(re - rs)
 			}
 			for _, el := range members[rs:re] {
-				out.WriteString(el)
+				c.WriteBulk(el)
 				if withScores {
-					out.WriteString(formatFloat(db.ssetScore(key, el)))
+					c.WriteBulk(formatFloat(db.ssetScore(key, el)))
 				}
 			}
 		})
@@ -473,30 +481,31 @@ func (m *Miniredis) makeCmdZrange(reverse bool) redeo.HandlerFunc {
 }
 
 // ZRANGEBYLEX
-func (m *Miniredis) cmdZrangebylex(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) < 3 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdZrangebylex(c *server.Peer, cmd string, args []string) {
+	if len(args) < 3 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
-	}
-
-	key := r.Args[0]
-	min, minIncl, err := parseLexrange(r.Args[1])
-	if err != nil {
-		setDirty(r.Client())
-		out.WriteErrorString(err.Error())
-		return nil
-	}
-	max, maxIncl, err := parseLexrange(r.Args[2])
-	if err != nil {
-		setDirty(r.Client())
-		out.WriteErrorString(err.Error())
-		return nil
+	if !m.handleAuth(c) {
+		return
 	}
 
-	args := r.Args[3:]
+	key := args[0]
+	min, minIncl, err := parseLexrange(args[1])
+	if err != nil {
+		setDirty(c)
+		c.WriteError(err.Error())
+		return
+	}
+	max, maxIncl, err := parseLexrange(args[2])
+	if err != nil {
+		setDirty(c)
+		c.WriteError(err.Error())
+		return
+	}
+	args = args[3:]
+
 	withLimit := false
 	limitStart := 0
 	limitEnd := 0
@@ -505,40 +514,40 @@ func (m *Miniredis) cmdZrangebylex(out *redeo.Responder, r *redeo.Request) error
 			withLimit = true
 			args = args[1:]
 			if len(args) < 2 {
-				out.WriteErrorString(msgSyntaxError)
-				return nil
+				c.WriteError(msgSyntaxError)
+				return
 			}
 			limitStart, err = strconv.Atoi(args[0])
 			if err != nil {
-				setDirty(r.Client())
-				out.WriteErrorString(msgInvalidInt)
-				return nil
+				setDirty(c)
+				c.WriteError(msgInvalidInt)
+				return
 			}
 			limitEnd, err = strconv.Atoi(args[1])
 			if err != nil {
-				setDirty(r.Client())
-				out.WriteErrorString(msgInvalidInt)
-				return nil
+				setDirty(c)
+				c.WriteError(msgInvalidInt)
+				return
 			}
 			args = args[2:]
 			continue
 		}
 		// Syntax error
-		setDirty(r.Client())
-		out.WriteErrorString(msgSyntaxError)
-		return nil
+		setDirty(c)
+		c.WriteError(msgSyntaxError)
+		return
 	}
 
-	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
 		if !db.exists(key) {
-			out.WriteBulkLen(0)
+			c.WriteLen(0)
 			return
 		}
 
 		if db.t(key) != "zset" {
-			out.WriteErrorString(ErrWrongType.Error())
+			c.WriteError(ErrWrongType.Error())
 			return
 		}
 
@@ -566,39 +575,40 @@ func (m *Miniredis) cmdZrangebylex(out *redeo.Responder, r *redeo.Request) error
 			}
 		}
 
-		out.WriteBulkLen(len(members))
+		c.WriteLen(len(members))
 		for _, el := range members {
-			out.WriteString(el)
+			c.WriteBulk(el)
 		}
 	})
 }
 
 // ZRANGEBYSCORE and ZREVRANGEBYSCORE
-func (m *Miniredis) makeCmdZrangebyscore(reverse bool) redeo.HandlerFunc {
-	return func(out *redeo.Responder, r *redeo.Request) error {
-		if len(r.Args) < 3 {
-			setDirty(r.Client())
-			return r.WrongNumberOfArgs()
+func (m *Miniredis) makeCmdZrangebyscore(reverse bool) server.Cmd {
+	return func(c *server.Peer, cmd string, args []string) {
+		if len(args) < 3 {
+			setDirty(c)
+			c.WriteError(errWrongNumber(cmd))
+			return
 		}
-		if !m.handleAuth(r.Client(), out) {
-			return nil
-		}
-
-		key := r.Args[0]
-		min, minIncl, err := parseFloatRange(r.Args[1])
-		if err != nil {
-			setDirty(r.Client())
-			out.WriteErrorString(msgInvalidMinMax)
-			return nil
-		}
-		max, maxIncl, err := parseFloatRange(r.Args[2])
-		if err != nil {
-			setDirty(r.Client())
-			out.WriteErrorString(msgInvalidMinMax)
-			return nil
+		if !m.handleAuth(c) {
+			return
 		}
 
-		args := r.Args[3:]
+		key := args[0]
+		min, minIncl, err := parseFloatRange(args[1])
+		if err != nil {
+			setDirty(c)
+			c.WriteError(msgInvalidMinMax)
+			return
+		}
+		max, maxIncl, err := parseFloatRange(args[2])
+		if err != nil {
+			setDirty(c)
+			c.WriteError(msgInvalidMinMax)
+			return
+		}
+		args = args[3:]
+
 		withScores := false
 		withLimit := false
 		limitStart := 0
@@ -608,20 +618,20 @@ func (m *Miniredis) makeCmdZrangebyscore(reverse bool) redeo.HandlerFunc {
 				withLimit = true
 				args = args[1:]
 				if len(args) < 2 {
-					out.WriteErrorString(msgSyntaxError)
-					return nil
+					c.WriteError(msgSyntaxError)
+					return
 				}
 				limitStart, err = strconv.Atoi(args[0])
 				if err != nil {
-					setDirty(r.Client())
-					out.WriteErrorString(msgInvalidInt)
-					return nil
+					setDirty(c)
+					c.WriteError(msgInvalidInt)
+					return
 				}
 				limitEnd, err = strconv.Atoi(args[1])
 				if err != nil {
-					setDirty(r.Client())
-					out.WriteErrorString(msgInvalidInt)
-					return nil
+					setDirty(c)
+					c.WriteError(msgInvalidInt)
+					return
 				}
 				args = args[2:]
 				continue
@@ -631,22 +641,21 @@ func (m *Miniredis) makeCmdZrangebyscore(reverse bool) redeo.HandlerFunc {
 				args = args[1:]
 				continue
 			}
-			// Syntax error
-			setDirty(r.Client())
-			out.WriteErrorString(msgSyntaxError)
-			return nil
+			setDirty(c)
+			c.WriteError(msgSyntaxError)
+			return
 		}
 
-		return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+		withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 			db := m.db(ctx.selectedDB)
 
 			if !db.exists(key) {
-				out.WriteBulkLen(0)
+				c.WriteLen(0)
 				return
 			}
 
 			if db.t(key) != "zset" {
-				out.WriteErrorString(ErrWrongType.Error())
+				c.WriteError(ErrWrongType.Error())
 				return
 			}
 
@@ -680,14 +689,14 @@ func (m *Miniredis) makeCmdZrangebyscore(reverse bool) redeo.HandlerFunc {
 			}
 
 			if withScores {
-				out.WriteBulkLen(len(members) * 2)
+				c.WriteLen(len(members) * 2)
 			} else {
-				out.WriteBulkLen(len(members))
+				c.WriteLen(len(members))
 			}
 			for _, el := range members {
-				out.WriteString(el.member)
+				c.WriteBulk(el.member)
 				if withScores {
-					out.WriteString(formatFloat(el.score))
+					c.WriteBulk(formatFloat(el.score))
 				}
 			}
 		})
@@ -695,29 +704,29 @@ func (m *Miniredis) makeCmdZrangebyscore(reverse bool) redeo.HandlerFunc {
 }
 
 // ZRANK and ZREVRANK
-func (m *Miniredis) makeCmdZrank(reverse bool) redeo.HandlerFunc {
-	return func(out *redeo.Responder, r *redeo.Request) error {
-		if len(r.Args) != 2 {
-			setDirty(r.Client())
-			return r.WrongNumberOfArgs()
+func (m *Miniredis) makeCmdZrank(reverse bool) server.Cmd {
+	return func(c *server.Peer, cmd string, args []string) {
+		if len(args) != 2 {
+			setDirty(c)
+			c.WriteError(errWrongNumber(cmd))
+			return
 		}
-		if !m.handleAuth(r.Client(), out) {
-			return nil
+		if !m.handleAuth(c) {
+			return
 		}
 
-		key := r.Args[0]
-		member := r.Args[1]
+		key, member := args[0], args[1]
 
-		return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+		withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 			db := m.db(ctx.selectedDB)
 
 			if !db.exists(key) {
-				out.WriteNil()
+				c.WriteNull()
 				return
 			}
 
 			if db.t(key) != "zset" {
-				out.WriteErrorString(ErrWrongType.Error())
+				c.WriteError(ErrWrongType.Error())
 				return
 			}
 
@@ -727,37 +736,37 @@ func (m *Miniredis) makeCmdZrank(reverse bool) redeo.HandlerFunc {
 			}
 			rank, ok := db.ssetRank(key, member, direction)
 			if !ok {
-				out.WriteNil()
+				c.WriteNull()
 				return
 			}
-			out.WriteInt(rank)
+			c.WriteInt(rank)
 		})
 	}
 }
 
 // ZREM
-func (m *Miniredis) cmdZrem(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) < 2 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdZrem(c *server.Peer, cmd string, args []string) {
+	if len(args) < 2 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
+	if !m.handleAuth(c) {
+		return
 	}
 
-	key := r.Args[0]
-	members := r.Args[1:]
+	key, members := args[0], args[1:]
 
-	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
 		if !db.exists(key) {
-			out.WriteZero()
+			c.WriteInt(0)
 			return
 		}
 
 		if db.t(key) != "zset" {
-			out.WriteErrorString(ErrWrongType.Error())
+			c.WriteError(ErrWrongType.Error())
 			return
 		}
 
@@ -767,44 +776,45 @@ func (m *Miniredis) cmdZrem(out *redeo.Responder, r *redeo.Request) error {
 				deleted++
 			}
 		}
-		out.WriteInt(deleted)
+		c.WriteInt(deleted)
 	})
 }
 
 // ZREMRANGEBYLEX
-func (m *Miniredis) cmdZremrangebylex(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) != 3 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdZremrangebylex(c *server.Peer, cmd string, args []string) {
+	if len(args) != 3 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
-	}
-
-	key := r.Args[0]
-	min, minIncl, err := parseLexrange(r.Args[1])
-	if err != nil {
-		setDirty(r.Client())
-		out.WriteErrorString(err.Error())
-		return nil
-	}
-	max, maxIncl, err := parseLexrange(r.Args[2])
-	if err != nil {
-		setDirty(r.Client())
-		out.WriteErrorString(err.Error())
-		return nil
+	if !m.handleAuth(c) {
+		return
 	}
 
-	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+	key := args[0]
+	min, minIncl, err := parseLexrange(args[1])
+	if err != nil {
+		setDirty(c)
+		c.WriteError(err.Error())
+		return
+	}
+	max, maxIncl, err := parseLexrange(args[2])
+	if err != nil {
+		setDirty(c)
+		c.WriteError(err.Error())
+		return
+	}
+
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
 		if !db.exists(key) {
-			out.WriteInt(0)
+			c.WriteInt(0)
 			return
 		}
 
 		if db.t(key) != "zset" {
-			out.WriteErrorString(ErrWrongType.Error())
+			c.WriteError(ErrWrongType.Error())
 			return
 		}
 
@@ -816,44 +826,45 @@ func (m *Miniredis) cmdZremrangebylex(out *redeo.Responder, r *redeo.Request) er
 		for _, el := range members {
 			db.ssetRem(key, el)
 		}
-		out.WriteInt(len(members))
+		c.WriteInt(len(members))
 	})
 }
 
 // ZREMRANGEBYRANK
-func (m *Miniredis) cmdZremrangebyrank(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) != 3 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdZremrangebyrank(c *server.Peer, cmd string, args []string) {
+	if len(args) != 3 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
-	}
-
-	key := r.Args[0]
-	start, err := strconv.Atoi(r.Args[1])
-	if err != nil {
-		setDirty(r.Client())
-		out.WriteErrorString(msgInvalidInt)
-		return nil
-	}
-	end, err := strconv.Atoi(r.Args[2])
-	if err != nil {
-		setDirty(r.Client())
-		out.WriteErrorString(msgInvalidInt)
-		return nil
+	if !m.handleAuth(c) {
+		return
 	}
 
-	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+	key := args[0]
+	start, err := strconv.Atoi(args[1])
+	if err != nil {
+		setDirty(c)
+		c.WriteError(msgInvalidInt)
+		return
+	}
+	end, err := strconv.Atoi(args[2])
+	if err != nil {
+		setDirty(c)
+		c.WriteError(msgInvalidInt)
+		return
+	}
+
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
 		if !db.exists(key) {
-			out.WriteInt(0)
+			c.WriteInt(0)
 			return
 		}
 
 		if db.t(key) != "zset" {
-			out.WriteErrorString(ErrWrongType.Error())
+			c.WriteError(ErrWrongType.Error())
 			return
 		}
 
@@ -862,44 +873,45 @@ func (m *Miniredis) cmdZremrangebyrank(out *redeo.Responder, r *redeo.Request) e
 		for _, el := range members[rs:re] {
 			db.ssetRem(key, el)
 		}
-		out.WriteInt(re - rs)
+		c.WriteInt(re - rs)
 	})
 }
 
 // ZREMRANGEBYSCORE
-func (m *Miniredis) cmdZremrangebyscore(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) != 3 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdZremrangebyscore(c *server.Peer, cmd string, args []string) {
+	if len(args) != 3 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
-	}
-
-	key := r.Args[0]
-	min, minIncl, err := parseFloatRange(r.Args[1])
-	if err != nil {
-		setDirty(r.Client())
-		out.WriteErrorString(msgInvalidMinMax)
-		return nil
-	}
-	max, maxIncl, err := parseFloatRange(r.Args[2])
-	if err != nil {
-		setDirty(r.Client())
-		out.WriteErrorString(msgInvalidMinMax)
-		return nil
+	if !m.handleAuth(c) {
+		return
 	}
 
-	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+	key := args[0]
+	min, minIncl, err := parseFloatRange(args[1])
+	if err != nil {
+		setDirty(c)
+		c.WriteError(msgInvalidMinMax)
+		return
+	}
+	max, maxIncl, err := parseFloatRange(args[2])
+	if err != nil {
+		setDirty(c)
+		c.WriteError(msgInvalidMinMax)
+		return
+	}
+
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
 		if !db.exists(key) {
-			out.WriteInt(0)
+			c.WriteInt(0)
 			return
 		}
 
 		if db.t(key) != "zset" {
-			out.WriteErrorString(ErrWrongType.Error())
+			c.WriteError(ErrWrongType.Error())
 			return
 		}
 
@@ -909,57 +921,43 @@ func (m *Miniredis) cmdZremrangebyscore(out *redeo.Responder, r *redeo.Request) 
 		for _, el := range members {
 			db.ssetRem(key, el.member)
 		}
-		out.WriteInt(len(members))
+		c.WriteInt(len(members))
 	})
 }
 
 // ZSCORE
-func (m *Miniredis) cmdZscore(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) != 2 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdZscore(c *server.Peer, cmd string, args []string) {
+	if len(args) != 2 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
+	if !m.handleAuth(c) {
+		return
 	}
 
-	key := r.Args[0]
-	member := r.Args[1]
+	key, member := args[0], args[1]
 
-	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
 		if !db.exists(key) {
-			out.WriteNil()
+			c.WriteNull()
 			return
 		}
 
 		if db.t(key) != "zset" {
-			out.WriteErrorString(ErrWrongType.Error())
+			c.WriteError(ErrWrongType.Error())
 			return
 		}
 
 		if !db.ssetExists(key, member) {
-			out.WriteNil()
+			c.WriteNull()
 			return
 		}
 
-		out.WriteString(formatFloat(db.ssetScore(key, member)))
+		c.WriteBulk(formatFloat(db.ssetScore(key, member)))
 	})
-}
-
-func reverseSlice(o []string) {
-	for i := range make([]struct{}, len(o)/2) {
-		other := len(o) - 1 - i
-		o[i], o[other] = o[other], o[i]
-	}
-}
-
-func reverseElems(o ssElems) {
-	for i := range make([]struct{}, len(o)/2) {
-		other := len(o) - 1 - i
-		o[i], o[other] = o[other], o[i]
-	}
 }
 
 // parseFloatRange handles ZRANGEBYSCORE floats. They are inclusive unless the
@@ -1077,31 +1075,33 @@ func withLexRange(members []string, min string, minIncl bool, max string, maxInc
 }
 
 // ZUNIONSTORE
-func (m *Miniredis) cmdZunionstore(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) < 3 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdZunionstore(c *server.Peer, cmd string, args []string) {
+	if len(args) < 3 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
+	if !m.handleAuth(c) {
+		return
 	}
 
-	destination := r.Args[0]
-	numKeys, err := strconv.Atoi(r.Args[1])
+	destination := args[0]
+	numKeys, err := strconv.Atoi(args[1])
 	if err != nil {
-		setDirty(r.Client())
-		out.WriteErrorString(msgInvalidInt)
-		return nil
+		setDirty(c)
+		c.WriteError(msgInvalidInt)
+		return
 	}
-	args := r.Args[2:]
+	args = args[2:]
 	if len(args) < numKeys {
-		setDirty(r.Client())
-		out.WriteErrorString(msgSyntaxError)
-		return nil
+		setDirty(c)
+		c.WriteError(msgSyntaxError)
+		return
 	}
 	if numKeys <= 0 {
-		setDirty(r.Client())
-		return redeo.ClientError("at least 1 input key is needed for ZUNIONSTORE/ZINTERSTORE")
+		setDirty(c)
+		c.WriteError("ERR at least 1 input key is needed for ZUNIONSTORE/ZINTERSTORE")
+		return
 	}
 	keys := args[:numKeys]
 	args = args[numKeys:]
@@ -1112,15 +1112,16 @@ func (m *Miniredis) cmdZunionstore(out *redeo.Responder, r *redeo.Request) error
 	for len(args) > 0 {
 		if strings.ToLower(args[0]) == "weights" {
 			if len(args) < numKeys+1 {
-				setDirty(r.Client())
-				out.WriteErrorString(msgSyntaxError)
-				return nil
+				setDirty(c)
+				c.WriteError(msgSyntaxError)
+				return
 			}
 			for i := 0; i < numKeys; i++ {
 				f, err := strconv.ParseFloat(args[i+1], 64)
 				if err != nil {
-					setDirty(r.Client())
-					return redeo.ClientError("weight value is not a float")
+					setDirty(c)
+					c.WriteError("ERR weight value is not a float")
+					return
 				}
 				weights = append(weights, f)
 			}
@@ -1130,27 +1131,27 @@ func (m *Miniredis) cmdZunionstore(out *redeo.Responder, r *redeo.Request) error
 		}
 		if strings.ToLower(args[0]) == "aggregate" {
 			if len(args) < 2 {
-				setDirty(r.Client())
-				out.WriteErrorString(msgSyntaxError)
-				return nil
+				setDirty(c)
+				c.WriteError(msgSyntaxError)
+				return
 			}
 			aggregate = strings.ToLower(args[1])
 			switch aggregate {
 			default:
-				setDirty(r.Client())
-				out.WriteErrorString(msgSyntaxError)
-				return nil
+				setDirty(c)
+				c.WriteError(msgSyntaxError)
+				return
 			case "sum", "min", "max":
 			}
 			args = args[2:]
 			continue
 		}
-		setDirty(r.Client())
-		out.WriteErrorString(msgSyntaxError)
-		return nil
+		setDirty(c)
+		c.WriteError(msgSyntaxError)
+		return
 	}
 
-	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 		db.del(destination, true)
 
@@ -1160,7 +1161,7 @@ func (m *Miniredis) cmdZunionstore(out *redeo.Responder, r *redeo.Request) error
 				continue
 			}
 			if db.t(key) != "zset" {
-				out.WriteErrorString(msgWrongType)
+				c.WriteError(msgWrongType)
 				return
 			}
 			for _, el := range db.ssetElements(key) {
@@ -1190,43 +1191,44 @@ func (m *Miniredis) cmdZunionstore(out *redeo.Responder, r *redeo.Request) error
 			}
 		}
 		db.ssetSet(destination, sset)
-		out.WriteInt(sset.card())
+		c.WriteInt(sset.card())
 	})
 }
 
 // ZSCAN
-func (m *Miniredis) cmdZscan(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) < 2 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdZscan(c *server.Peer, cmd string, args []string) {
+	if len(args) < 2 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
+	if !m.handleAuth(c) {
+		return
 	}
 
-	key := r.Args[0]
-	cursor, err := strconv.Atoi(r.Args[1])
+	key := args[0]
+	cursor, err := strconv.Atoi(args[1])
 	if err != nil {
-		setDirty(r.Client())
-		out.WriteErrorString(msgInvalidCursor)
-		return nil
+		setDirty(c)
+		c.WriteError(msgInvalidCursor)
+		return
 	}
+	args = args[2:]
 	// MATCH and COUNT options
 	var withMatch bool
 	var match string
-	args := r.Args[2:]
 	for len(args) > 0 {
 		if strings.ToLower(args[0]) == "count" {
 			if len(args) < 2 {
-				setDirty(r.Client())
-				out.WriteErrorString(msgSyntaxError)
-				return nil
+				setDirty(c)
+				c.WriteError(msgSyntaxError)
+				return
 			}
 			_, err := strconv.Atoi(args[1])
 			if err != nil {
-				setDirty(r.Client())
-				out.WriteErrorString(msgInvalidInt)
-				return nil
+				setDirty(c)
+				c.WriteError(msgInvalidInt)
+				return
 			}
 			// We do nothing with count.
 			args = args[2:]
@@ -1234,33 +1236,33 @@ func (m *Miniredis) cmdZscan(out *redeo.Responder, r *redeo.Request) error {
 		}
 		if strings.ToLower(args[0]) == "match" {
 			if len(args) < 2 {
-				setDirty(r.Client())
-				out.WriteErrorString(msgSyntaxError)
-				return nil
+				setDirty(c)
+				c.WriteError(msgSyntaxError)
+				return
 			}
 			withMatch = true
 			match = args[1]
 			args = args[2:]
 			continue
 		}
-		setDirty(r.Client())
-		out.WriteErrorString(msgSyntaxError)
-		return nil
+		setDirty(c)
+		c.WriteError(msgSyntaxError)
+		return
 	}
 
-	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 		// We return _all_ (matched) keys every time.
 
 		if cursor != 0 {
 			// Invalid cursor.
-			out.WriteBulkLen(2)
-			out.WriteString("0") // no next cursor
-			out.WriteBulkLen(0)  // no elements
+			c.WriteLen(2)
+			c.WriteBulk("0") // no next cursor
+			c.WriteLen(0)    // no elements
 			return
 		}
 		if db.exists(key) && db.t(key) != "zset" {
-			out.WriteErrorString(ErrWrongType.Error())
+			c.WriteError(ErrWrongType.Error())
 			return
 		}
 
@@ -1269,13 +1271,13 @@ func (m *Miniredis) cmdZscan(out *redeo.Responder, r *redeo.Request) error {
 			members = matchKeys(members, match)
 		}
 
-		out.WriteBulkLen(2)
-		out.WriteString("0") // no next cursor
+		c.WriteLen(2)
+		c.WriteBulk("0") // no next cursor
 		// HSCAN gives key, values.
-		out.WriteBulkLen(len(members) * 2)
+		c.WriteLen(len(members) * 2)
 		for _, k := range members {
-			out.WriteString(k)
-			out.WriteString(formatFloat(db.ssetScore(key, k)))
+			c.WriteBulk(k)
+			c.WriteBulk(formatFloat(db.ssetScore(key, k)))
 		}
 	})
 }

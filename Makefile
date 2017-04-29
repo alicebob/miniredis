@@ -6,8 +6,8 @@ install:
 	go install
 
 test:
-	go test
+	go test ./...
 
 vet:
-	go vet
-	golint .
+	go vet ./...
+	golint ./...

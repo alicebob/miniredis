@@ -54,8 +54,8 @@ func TestRestart(t *testing.T) {
 	s.Close()
 	err = s.Restart()
 	ok(t, err)
-	if s.Addr() != addr {
-		t.Fatal("should be the same address")
+	if have, want := s.Addr(), addr; have != want {
+		t.Fatalf("have: %s, want: %s", have, want)
 	}
 
 	c, err := redis.Dial("tcp", s.Addr())

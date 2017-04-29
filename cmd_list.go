@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/bsm/redeo"
+	"github.com/alicebob/miniredis/server"
 )
 
 type leftright int
@@ -18,81 +18,80 @@ const (
 )
 
 // commandsList handles list commands (mostly L*)
-func commandsList(m *Miniredis, srv *redeo.Server) {
-	srv.HandleFunc("BLPOP", m.cmdBlpop)
-	srv.HandleFunc("BRPOP", m.cmdBrpop)
-	srv.HandleFunc("BRPOPLPUSH", m.cmdBrpoplpush)
-	srv.HandleFunc("LINDEX", m.cmdLindex)
-	srv.HandleFunc("LINSERT", m.cmdLinsert)
-	srv.HandleFunc("LLEN", m.cmdLlen)
-	srv.HandleFunc("LPOP", m.cmdLpop)
-	srv.HandleFunc("LPUSH", m.cmdLpush)
-	srv.HandleFunc("LPUSHX", m.cmdLpushx)
-	srv.HandleFunc("LRANGE", m.cmdLrange)
-	srv.HandleFunc("LREM", m.cmdLrem)
-	srv.HandleFunc("LSET", m.cmdLset)
-	srv.HandleFunc("LTRIM", m.cmdLtrim)
-	srv.HandleFunc("RPOP", m.cmdRpop)
-	srv.HandleFunc("RPOPLPUSH", m.cmdRpoplpush)
-	srv.HandleFunc("RPUSH", m.cmdRpush)
-	srv.HandleFunc("RPUSHX", m.cmdRpushx)
+func commandsList(m *Miniredis) {
+	m.srv.Register("BLPOP", m.cmdBlpop)
+	m.srv.Register("BRPOP", m.cmdBrpop)
+	m.srv.Register("BRPOPLPUSH", m.cmdBrpoplpush)
+	m.srv.Register("LINDEX", m.cmdLindex)
+	m.srv.Register("LINSERT", m.cmdLinsert)
+	m.srv.Register("LLEN", m.cmdLlen)
+	m.srv.Register("LPOP", m.cmdLpop)
+	m.srv.Register("LPUSH", m.cmdLpush)
+	m.srv.Register("LPUSHX", m.cmdLpushx)
+	m.srv.Register("LRANGE", m.cmdLrange)
+	m.srv.Register("LREM", m.cmdLrem)
+	m.srv.Register("LSET", m.cmdLset)
+	m.srv.Register("LTRIM", m.cmdLtrim)
+	m.srv.Register("RPOP", m.cmdRpop)
+	m.srv.Register("RPOPLPUSH", m.cmdRpoplpush)
+	m.srv.Register("RPUSH", m.cmdRpush)
+	m.srv.Register("RPUSHX", m.cmdRpushx)
 }
 
 // BLPOP
-func (m *Miniredis) cmdBlpop(out *redeo.Responder, r *redeo.Request) error {
-	return m.cmdBXpop(out, r, left)
+func (m *Miniredis) cmdBlpop(c *server.Peer, cmd string, args []string) {
+	m.cmdBXpop(c, cmd, args, left)
 }
 
 // BRPOP
-func (m *Miniredis) cmdBrpop(out *redeo.Responder, r *redeo.Request) error {
-	return m.cmdBXpop(out, r, right)
+func (m *Miniredis) cmdBrpop(c *server.Peer, cmd string, args []string) {
+	m.cmdBXpop(c, cmd, args, right)
 }
 
-func (m *Miniredis) cmdBXpop(out *redeo.Responder, r *redeo.Request, lr leftright) error {
-	if len(r.Args) < 2 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdBXpop(c *server.Peer, cmd string, args []string, lr leftright) {
+	if len(args) < 2 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
+	if !m.handleAuth(c) {
+		return
 	}
-	args := r.Args
-	timeoutS := args[len(r.Args)-1]
-	keys := args[:len(r.Args)-1]
+	timeoutS := args[len(args)-1]
+	keys := args[:len(args)-1]
 
 	timeout, err := strconv.Atoi(timeoutS)
 	if err != nil {
-		setDirty(r.Client())
-		out.WriteErrorString(msgInvalidTimeout)
-		return nil
+		setDirty(c)
+		c.WriteError(msgInvalidTimeout)
+		return
 	}
 	if timeout < 0 {
-		setDirty(r.Client())
-		out.WriteErrorString(msgNegTimeout)
-		return nil
+		setDirty(c)
+		c.WriteError(msgNegTimeout)
+		return
 	}
 
 	blocking(
 		m,
-		out,
-		r,
+		c,
 		time.Duration(timeout)*time.Second,
-		func(out *redeo.Responder, ctx *connCtx) bool {
+		func(c *server.Peer, ctx *connCtx) bool {
 			db := m.db(ctx.selectedDB)
 			for _, key := range keys {
 				if !db.exists(key) {
 					continue
 				}
 				if db.t(key) != "list" {
-					out.WriteErrorString(msgWrongType)
+					c.WriteError(msgWrongType)
 					return true
 				}
 
 				if len(db.listKeys[key]) == 0 {
 					continue
 				}
-				out.WriteBulkLen(2)
-				out.WriteString(key)
+				c.WriteLen(2)
+				c.WriteBulk(key)
 				var v string
 				switch lr {
 				case left:
@@ -100,47 +99,50 @@ func (m *Miniredis) cmdBXpop(out *redeo.Responder, r *redeo.Request, lr leftrigh
 				case right:
 					v = db.listPop(key)
 				}
-				out.WriteString(v)
+				c.WriteBulk(v)
 				return true
 			}
 			return false
 		},
-		func(out *redeo.Responder) {
+		func(c *server.Peer) {
 			// timeout
-			out.WriteNil()
+			c.WriteNull()
 		},
 	)
-	return nil
+	return
 }
 
 // LINDEX
-func (m *Miniredis) cmdLindex(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) != 2 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdLindex(c *server.Peer, cmd string, args []string) {
+	if len(args) != 2 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
-	}
-	key := r.Args[0]
-	offset, err := strconv.Atoi(r.Args[1])
-	if err != nil {
-		setDirty(r.Client())
-		out.WriteErrorString(msgInvalidInt)
-		return nil
+	if !m.handleAuth(c) {
+		return
 	}
 
-	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+	key, offsets := args[0], args[1]
+
+	offset, err := strconv.Atoi(offsets)
+	if err != nil {
+		setDirty(c)
+		c.WriteError(msgInvalidInt)
+		return
+	}
+
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
 		t, ok := db.keys[key]
 		if !ok {
 			// No such key
-			out.WriteNil()
+			c.WriteNull()
 			return
 		}
 		if t != "list" {
-			out.WriteErrorString(msgWrongType)
+			c.WriteError(msgWrongType)
 			return
 		}
 
@@ -149,48 +151,50 @@ func (m *Miniredis) cmdLindex(out *redeo.Responder, r *redeo.Request) error {
 			offset = len(l) + offset
 		}
 		if offset < 0 || offset > len(l)-1 {
-			out.WriteNil()
+			c.WriteNull()
 			return
 		}
-		out.WriteString(l[offset])
+		c.WriteBulk(l[offset])
 	})
 }
 
 // LINSERT
-func (m *Miniredis) cmdLinsert(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) != 4 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdLinsert(c *server.Peer, cmd string, args []string) {
+	if len(args) != 4 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
+	if !m.handleAuth(c) {
+		return
 	}
-	key := r.Args[0]
+
+	key := args[0]
 	where := 0
-	switch strings.ToLower(r.Args[1]) {
+	switch strings.ToLower(args[1]) {
 	case "before":
 		where = -1
 	case "after":
 		where = +1
 	default:
-		setDirty(r.Client())
-		out.WriteErrorString(msgSyntaxError)
-		return nil
+		setDirty(c)
+		c.WriteError(msgSyntaxError)
+		return
 	}
-	pivot := r.Args[2]
-	value := r.Args[3]
+	pivot := args[2]
+	value := args[3]
 
-	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
 		t, ok := db.keys[key]
 		if !ok {
 			// No such key
-			out.WriteZero()
+			c.WriteInt(0)
 			return
 		}
 		if t != "list" {
-			out.WriteErrorString(msgWrongType)
+			c.WriteError(msgWrongType)
 			return
 		}
 
@@ -211,72 +215,76 @@ func (m *Miniredis) cmdLinsert(out *redeo.Responder, r *redeo.Request) error {
 			}
 			db.listKeys[key] = l
 			db.keyVersion[key]++
-			out.WriteInt(len(l))
+			c.WriteInt(len(l))
 			return
 		}
-		out.WriteInt(-1)
+		c.WriteInt(-1)
 	})
 }
 
 // LLEN
-func (m *Miniredis) cmdLlen(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) != 1 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdLlen(c *server.Peer, cmd string, args []string) {
+	if len(args) != 1 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
+	if !m.handleAuth(c) {
+		return
 	}
-	key := r.Args[0]
 
-	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+	key := args[0]
+
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
 		t, ok := db.keys[key]
 		if !ok {
 			// No such key. That's zero length.
-			out.WriteZero()
+			c.WriteInt(0)
 			return
 		}
 		if t != "list" {
-			out.WriteErrorString(msgWrongType)
+			c.WriteError(msgWrongType)
 			return
 		}
 
-		out.WriteInt(len(db.listKeys[key]))
+		c.WriteInt(len(db.listKeys[key]))
 	})
 }
 
 // LPOP
-func (m *Miniredis) cmdLpop(out *redeo.Responder, r *redeo.Request) error {
-	return m.cmdXpop(out, r, left)
+func (m *Miniredis) cmdLpop(c *server.Peer, cmd string, args []string) {
+	m.cmdXpop(c, cmd, args, left)
 }
 
 // RPOP
-func (m *Miniredis) cmdRpop(out *redeo.Responder, r *redeo.Request) error {
-	return m.cmdXpop(out, r, right)
+func (m *Miniredis) cmdRpop(c *server.Peer, cmd string, args []string) {
+	m.cmdXpop(c, cmd, args, right)
 }
 
-func (m *Miniredis) cmdXpop(out *redeo.Responder, r *redeo.Request, lr leftright) error {
-	if len(r.Args) != 1 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdXpop(c *server.Peer, cmd string, args []string, lr leftright) {
+	if len(args) != 1 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
+	if !m.handleAuth(c) {
+		return
 	}
-	key := r.Args[0]
 
-	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+	key := args[0]
+
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
 		if !db.exists(key) {
-			// Non-existing key is fine.
-			out.WriteNil()
+			// non-existing key is fine
+			c.WriteNull()
 			return
 		}
 		if db.t(key) != "list" {
-			out.WriteErrorString(msgWrongType)
+			c.WriteError(msgWrongType)
 			return
 		}
 
@@ -287,36 +295,37 @@ func (m *Miniredis) cmdXpop(out *redeo.Responder, r *redeo.Request, lr leftright
 		case right:
 			elem = db.listPop(key)
 		}
-		out.WriteString(elem)
+		c.WriteBulk(elem)
 	})
 }
 
 // LPUSH
-func (m *Miniredis) cmdLpush(out *redeo.Responder, r *redeo.Request) error {
-	return m.cmdXpush(out, r, left)
+func (m *Miniredis) cmdLpush(c *server.Peer, cmd string, args []string) {
+	m.cmdXpush(c, cmd, args, left)
 }
 
 // RPUSH
-func (m *Miniredis) cmdRpush(out *redeo.Responder, r *redeo.Request) error {
-	return m.cmdXpush(out, r, right)
+func (m *Miniredis) cmdRpush(c *server.Peer, cmd string, args []string) {
+	m.cmdXpush(c, cmd, args, right)
 }
 
-func (m *Miniredis) cmdXpush(out *redeo.Responder, r *redeo.Request, lr leftright) error {
-	if len(r.Args) < 2 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdXpush(c *server.Peer, cmd string, args []string, lr leftright) {
+	if len(args) < 2 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
+	if !m.handleAuth(c) {
+		return
 	}
-	key := r.Args[0]
-	args := r.Args[1:]
 
-	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+	key, args := args[0], args[1:]
+
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
 		if db.exists(key) && db.t(key) != "list" {
-			out.WriteErrorString(msgWrongType)
+			c.WriteError(msgWrongType)
 			return
 		}
 
@@ -329,40 +338,41 @@ func (m *Miniredis) cmdXpush(out *redeo.Responder, r *redeo.Request, lr leftrigh
 				newLen = db.listPush(key, value)
 			}
 		}
-		out.WriteInt(newLen)
+		c.WriteInt(newLen)
 	})
 }
 
 // LPUSHX
-func (m *Miniredis) cmdLpushx(out *redeo.Responder, r *redeo.Request) error {
-	return m.cmdXpushx(out, r, left)
+func (m *Miniredis) cmdLpushx(c *server.Peer, cmd string, args []string) {
+	m.cmdXpushx(c, cmd, args, left)
 }
 
 // RPUSHX
-func (m *Miniredis) cmdRpushx(out *redeo.Responder, r *redeo.Request) error {
-	return m.cmdXpushx(out, r, right)
+func (m *Miniredis) cmdRpushx(c *server.Peer, cmd string, args []string) {
+	m.cmdXpushx(c, cmd, args, right)
 }
 
-func (m *Miniredis) cmdXpushx(out *redeo.Responder, r *redeo.Request, lr leftright) error {
-	if len(r.Args) != 2 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdXpushx(c *server.Peer, cmd string, args []string, lr leftright) {
+	if len(args) != 2 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
+	if !m.handleAuth(c) {
+		return
 	}
-	key := r.Args[0]
-	value := r.Args[1]
 
-	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+	key, value := args[0], args[1]
+
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
 		if !db.exists(key) {
-			out.WriteZero()
+			c.WriteInt(0)
 			return
 		}
 		if db.t(key) != "list" {
-			out.WriteErrorString(msgWrongType)
+			c.WriteError(msgWrongType)
 			return
 		}
 
@@ -373,82 +383,86 @@ func (m *Miniredis) cmdXpushx(out *redeo.Responder, r *redeo.Request, lr leftrig
 		case right:
 			newLen = db.listPush(key, value)
 		}
-		out.WriteInt(newLen)
+		c.WriteInt(newLen)
 	})
 }
 
 // LRANGE
-func (m *Miniredis) cmdLrange(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) != 3 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdLrange(c *server.Peer, cmd string, args []string) {
+	if len(args) != 3 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
-	}
-	key := r.Args[0]
-	start, err := strconv.Atoi(r.Args[1])
-	if err != nil {
-		setDirty(r.Client())
-		out.WriteErrorString(msgInvalidInt)
-		return nil
-	}
-	end, err := strconv.Atoi(r.Args[2])
-	if err != nil {
-		setDirty(r.Client())
-		out.WriteErrorString(msgInvalidInt)
-		return nil
+	if !m.handleAuth(c) {
+		return
 	}
 
-	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+	key := args[0]
+	start, err := strconv.Atoi(args[1])
+	if err != nil {
+		setDirty(c)
+		c.WriteError(msgInvalidInt)
+		return
+	}
+	end, err := strconv.Atoi(args[2])
+	if err != nil {
+		setDirty(c)
+		c.WriteError(msgInvalidInt)
+		return
+	}
+
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
 		if t, ok := db.keys[key]; ok && t != "list" {
-			out.WriteErrorString(msgWrongType)
+			c.WriteError(msgWrongType)
 			return
 		}
 
 		l := db.listKeys[key]
 		if len(l) == 0 {
-			out.WriteBulkLen(0)
+			c.WriteLen(0)
 			return
 		}
 
 		rs, re := redisRange(len(l), start, end, false)
-		out.WriteBulkLen(re - rs)
+		c.WriteLen(re - rs)
 		for _, el := range l[rs:re] {
-			out.WriteString(el)
+			c.WriteBulk(el)
 		}
 	})
 }
 
 // LREM
-func (m *Miniredis) cmdLrem(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) != 3 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdLrem(c *server.Peer, cmd string, args []string) {
+	if len(args) != 3 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
+	if !m.handleAuth(c) {
+		return
 	}
-	key := r.Args[0]
-	count, err := strconv.Atoi(r.Args[1])
-	if err != nil {
-		setDirty(r.Client())
-		out.WriteErrorString(msgInvalidInt)
-		return nil
-	}
-	value := r.Args[2]
 
-	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+	key := args[0]
+	count, err := strconv.Atoi(args[1])
+	if err != nil {
+		setDirty(c)
+		c.WriteError(msgInvalidInt)
+		return
+	}
+	value := args[2]
+
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
 		if !db.exists(key) {
-			out.WriteZero()
+			c.WriteInt(0)
 			return
 		}
 		if db.t(key) != "list" {
-			out.WriteErrorString(msgWrongType)
+			c.WriteError(msgWrongType)
 			return
 		}
 
@@ -485,37 +499,39 @@ func (m *Miniredis) cmdLrem(out *redeo.Responder, r *redeo.Request) error {
 			db.keyVersion[key]++
 		}
 
-		out.WriteInt(deleted)
+		c.WriteInt(deleted)
 	})
 }
 
 // LSET
-func (m *Miniredis) cmdLset(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) != 3 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdLset(c *server.Peer, cmd string, args []string) {
+	if len(args) != 3 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
+	if !m.handleAuth(c) {
+		return
 	}
-	key := r.Args[0]
-	index, err := strconv.Atoi(r.Args[1])
-	if err != nil {
-		setDirty(r.Client())
-		out.WriteErrorString(msgInvalidInt)
-		return nil
-	}
-	value := r.Args[2]
 
-	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+	key := args[0]
+	index, err := strconv.Atoi(args[1])
+	if err != nil {
+		setDirty(c)
+		c.WriteError(msgInvalidInt)
+		return
+	}
+	value := args[2]
+
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
 		if !db.exists(key) {
-			out.WriteErrorString(msgKeyNotFound)
+			c.WriteError(msgKeyNotFound)
 			return
 		}
 		if db.t(key) != "list" {
-			out.WriteErrorString(msgWrongType)
+			c.WriteError(msgWrongType)
 			return
 		}
 
@@ -524,49 +540,51 @@ func (m *Miniredis) cmdLset(out *redeo.Responder, r *redeo.Request) error {
 			index = len(l) + index
 		}
 		if index < 0 || index > len(l)-1 {
-			out.WriteErrorString(msgOutOfRange)
+			c.WriteError(msgOutOfRange)
 			return
 		}
 		l[index] = value
 		db.keyVersion[key]++
 
-		out.WriteOK()
+		c.WriteOK()
 	})
 }
 
 // LTRIM
-func (m *Miniredis) cmdLtrim(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) != 3 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdLtrim(c *server.Peer, cmd string, args []string) {
+	if len(args) != 3 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
-	}
-	key := r.Args[0]
-	start, err := strconv.Atoi(r.Args[1])
-	if err != nil {
-		setDirty(r.Client())
-		out.WriteErrorString(msgInvalidInt)
-		return nil
-	}
-	end, err := strconv.Atoi(r.Args[2])
-	if err != nil {
-		setDirty(r.Client())
-		out.WriteErrorString(msgInvalidInt)
-		return nil
+	if !m.handleAuth(c) {
+		return
 	}
 
-	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+	key := args[0]
+	start, err := strconv.Atoi(args[1])
+	if err != nil {
+		setDirty(c)
+		c.WriteError(msgInvalidInt)
+		return
+	}
+	end, err := strconv.Atoi(args[2])
+	if err != nil {
+		setDirty(c)
+		c.WriteError(msgInvalidInt)
+		return
+	}
+
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
 		t, ok := db.keys[key]
 		if !ok {
-			out.WriteOK()
+			c.WriteOK()
 			return
 		}
 		if t != "list" {
-			out.WriteErrorString(msgWrongType)
+			c.WriteError(msgWrongType)
 			return
 		}
 
@@ -579,75 +597,77 @@ func (m *Miniredis) cmdLtrim(out *redeo.Responder, r *redeo.Request) error {
 			db.listKeys[key] = l
 			db.keyVersion[key]++
 		}
-		out.WriteOK()
+		c.WriteOK()
 	})
 }
 
 // RPOPLPUSH
-func (m *Miniredis) cmdRpoplpush(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) != 2 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdRpoplpush(c *server.Peer, cmd string, args []string) {
+	if len(args) != 2 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
+	if !m.handleAuth(c) {
+		return
 	}
-	src := r.Args[0]
-	dst := r.Args[1]
 
-	return withTx(m, out, r, func(out *redeo.Responder, ctx *connCtx) {
+	src, dst := args[0], args[1]
+
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
 		if !db.exists(src) {
-			out.WriteNil()
+			c.WriteNull()
 			return
 		}
 		if db.t(src) != "list" || (db.exists(dst) && db.t(dst) != "list") {
-			out.WriteErrorString(msgWrongType)
+			c.WriteError(msgWrongType)
 			return
 		}
 		elem := db.listPop(src)
 		db.listLpush(dst, elem)
-		out.WriteString(elem)
+		c.WriteBulk(elem)
 	})
 }
 
 // BRPOPLPUSH
-func (m *Miniredis) cmdBrpoplpush(out *redeo.Responder, r *redeo.Request) error {
-	if len(r.Args) != 3 {
-		setDirty(r.Client())
-		return r.WrongNumberOfArgs()
+func (m *Miniredis) cmdBrpoplpush(c *server.Peer, cmd string, args []string) {
+	if len(args) != 3 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
 	}
-	if !m.handleAuth(r.Client(), out) {
-		return nil
+	if !m.handleAuth(c) {
+		return
 	}
-	src := r.Args[0]
-	dst := r.Args[1]
-	timeout, err := strconv.Atoi(r.Args[2])
+
+	src := args[0]
+	dst := args[1]
+	timeout, err := strconv.Atoi(args[2])
 	if err != nil {
-		setDirty(r.Client())
-		out.WriteErrorString(msgInvalidTimeout)
-		return nil
+		setDirty(c)
+		c.WriteError(msgInvalidTimeout)
+		return
 	}
 	if timeout < 0 {
-		setDirty(r.Client())
-		out.WriteErrorString(msgNegTimeout)
-		return nil
+		setDirty(c)
+		c.WriteError(msgNegTimeout)
+		return
 	}
 
 	blocking(
 		m,
-		out,
-		r,
+		c,
 		time.Duration(timeout)*time.Second,
-		func(out *redeo.Responder, ctx *connCtx) bool {
+		func(c *server.Peer, ctx *connCtx) bool {
 			db := m.db(ctx.selectedDB)
 
 			if !db.exists(src) {
 				return false
 			}
 			if db.t(src) != "list" || (db.exists(dst) && db.t(dst) != "list") {
-				out.WriteErrorString(msgWrongType)
+				c.WriteError(msgWrongType)
 				return true
 			}
 			if len(db.listKeys[src]) == 0 {
@@ -655,13 +675,13 @@ func (m *Miniredis) cmdBrpoplpush(out *redeo.Responder, r *redeo.Request) error 
 			}
 			elem := db.listPop(src)
 			db.listLpush(dst, elem)
-			out.WriteString(elem)
+			c.WriteBulk(elem)
 			return true
 		},
-		func(out *redeo.Responder) {
+		func(c *server.Peer) {
 			// timeout
-			out.WriteNil()
+			c.WriteNull()
 		},
 	)
-	return nil
+	return
 }

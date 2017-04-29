@@ -17,10 +17,11 @@ package miniredis
 import (
 	"fmt"
 	"net"
+	"strconv"
 	"sync"
 	"time"
 
-	"github.com/bsm/redeo"
+	"github.com/alicebob/miniredis/server"
 )
 
 type hashKey map[string]string
@@ -44,10 +45,9 @@ type RedisDB struct {
 // Miniredis is a Redis server implementation.
 type Miniredis struct {
 	sync.Mutex
-	srv        *redeo.Server
-	listenAddr string
+	srv        *server.Server
+	port       int
 	password   string
-	closed     chan struct{}
 	listen     net.Listener
 	dbs        map[int]*RedisDB
 	selectedDB int // DB id used in the direct Get(), Set() &c.
@@ -55,7 +55,7 @@ type Miniredis struct {
 	now        time.Time // used to make a duration from EXPIREAT. time.Now() if not set.
 }
 
-type txCmd func(*redeo.Responder, *connCtx)
+type txCmd func(*server.Peer, *connCtx)
 
 // database id + key combo
 type dbKey struct {
@@ -75,8 +75,7 @@ type connCtx struct {
 // NewMiniRedis makes a new, non-started, Miniredis object.
 func NewMiniRedis() *Miniredis {
 	m := Miniredis{
-		closed: make(chan struct{}),
-		dbs:    map[int]*RedisDB{},
+		dbs: map[int]*RedisDB{},
 	}
 	m.signal = sync.NewCond(&m)
 	return &m
@@ -109,74 +108,41 @@ func (m *Miniredis) Start() error {
 	m.Lock()
 	defer m.Unlock()
 
-	l, err := listen("127.0.0.1:0")
+	s, err := server.NewServer(fmt.Sprintf("127.0.0.1:%d", m.port))
 	if err != nil {
 		return err
 	}
-	m.listen = l
-	m.listenAddr = l.Addr().String()
-	m.srv = redeo.NewServer(&redeo.Config{Addr: m.listenAddr})
+	m.srv = s
+	m.port = s.Addr().Port
 
-	commandsConnection(m, m.srv)
-	commandsGeneric(m, m.srv)
-	commandsServer(m, m.srv)
-	commandsString(m, m.srv)
-	commandsHash(m, m.srv)
-	commandsList(m, m.srv)
-	commandsSet(m, m.srv)
-	commandsSortedSet(m, m.srv)
-	commandsTransaction(m, m.srv)
+	commandsConnection(m)
+	commandsGeneric(m)
+	commandsServer(m)
+	commandsString(m)
+	commandsHash(m)
+	commandsList(m)
+	commandsSet(m)
+	commandsSortedSet(m)
+	commandsTransaction(m)
 
-	go func() {
-		m.srv.Serve(m.listen)
-		m.closed <- struct{}{}
-	}()
 	return nil
 }
 
 // Restart restarts a Close()d server on the same port. Values will be
 // preserved.
 func (m *Miniredis) Restart() error {
-	m.Lock()
-	defer m.Unlock()
-
-	l, err := listen(m.listenAddr)
-	if err != nil {
-		return err
-	}
-	m.listen = l
-
-	go func() {
-		m.srv.Serve(m.listen)
-		m.closed <- struct{}{}
-	}()
-
-	return nil
-}
-
-func listen(addr string) (net.Listener, error) {
-	l, err := net.Listen("tcp", addr)
-	if err != nil {
-		if l, err = net.Listen("tcp6", addr); err != nil {
-			return nil, fmt.Errorf("failed to listen on a port: %v", err)
-		}
-	}
-	return l, nil
+	return m.Start()
 }
 
 // Close shuts down a Miniredis.
 func (m *Miniredis) Close() {
 	m.Lock()
 	defer m.Unlock()
-	if m.listen == nil {
-		return
-	}
-	if m.listen.Close() != nil {
+	if m.srv == nil {
 		return
 	}
 	m.srv.Close()
-	<-m.closed
-	m.listen = nil
+	m.srv = nil
 }
 
 // RequireAuth makes every connection need to AUTH first. Disable again by
@@ -209,44 +175,42 @@ func (m *Miniredis) db(i int) *RedisDB {
 func (m *Miniredis) Addr() string {
 	m.Lock()
 	defer m.Unlock()
-	return m.listenAddr
+	return m.srv.Addr().String()
 }
 
 // Host returns the host part of Addr().
 func (m *Miniredis) Host() string {
 	m.Lock()
 	defer m.Unlock()
-	host, _, _ := net.SplitHostPort(m.listenAddr)
-	return host
+	return m.srv.Addr().IP.String()
 }
 
 // Port returns the (random) port part of Addr().
 func (m *Miniredis) Port() string {
 	m.Lock()
 	defer m.Unlock()
-	_, port, _ := net.SplitHostPort(m.listenAddr)
-	return port
+	return strconv.Itoa(m.srv.Addr().Port)
 }
 
 // CommandCount returns the number of processed commands.
 func (m *Miniredis) CommandCount() int {
 	m.Lock()
 	defer m.Unlock()
-	return int(m.srv.Info().TotalCommands())
+	return int(m.srv.TotalCommands())
 }
 
 // CurrentConnectionCount returns the number of currently connected clients.
 func (m *Miniredis) CurrentConnectionCount() int {
 	m.Lock()
 	defer m.Unlock()
-	return m.srv.Info().ClientsLen()
+	return m.srv.ClientsLen()
 }
 
 // TotalConnectionCount returns the number of client connections since server start.
 func (m *Miniredis) TotalConnectionCount() int {
 	m.Lock()
 	defer m.Unlock()
-	return int(m.srv.Info().TotalConnections())
+	return int(m.srv.TotalConnections())
 }
 
 // FastForward decreases all TTLs by the given duration. All TTLs <= 0 will be
@@ -316,24 +280,24 @@ func (m *Miniredis) SetTime(t time.Time) {
 }
 
 // handleAuth returns false if connection has no access. It sends the reply.
-func (m *Miniredis) handleAuth(cl *redeo.Client, out *redeo.Responder) bool {
+func (m *Miniredis) handleAuth(c *server.Peer) bool {
 	m.Lock()
 	defer m.Unlock()
 	if m.password == "" {
 		return true
 	}
-	if cl.Ctx == nil || !getCtx(cl).authenticated {
-		out.WriteErrorString("NOAUTH Authentication required.")
+	if !getCtx(c).authenticated {
+		c.WriteError("NOAUTH Authentication required.")
 		return false
 	}
 	return true
 }
 
-func getCtx(cl *redeo.Client) *connCtx {
-	if cl.Ctx == nil {
-		cl.Ctx = &connCtx{}
+func getCtx(c *server.Peer) *connCtx {
+	if c.Ctx == nil {
+		c.Ctx = &connCtx{}
 	}
-	return cl.Ctx.(*connCtx)
+	return c.Ctx.(*connCtx)
 }
 
 func startTx(ctx *connCtx) {
@@ -354,10 +318,6 @@ func addTxCmd(ctx *connCtx, cb txCmd) {
 	ctx.transaction = append(ctx.transaction, cb)
 }
 
-func dirtyTx(ctx *connCtx) bool {
-	return ctx.dirtyTransaction
-}
-
 func watch(db *RedisDB, ctx *connCtx, key string) {
 	if ctx.watch == nil {
 		ctx.watch = map[dbKey]uint{}
@@ -370,14 +330,14 @@ func unwatch(ctx *connCtx) {
 }
 
 // setDirty can be called even when not in an tx. Is an no-op then.
-func setDirty(cl *redeo.Client) {
-	if cl.Ctx == nil {
+func setDirty(c *server.Peer) {
+	if c.Ctx == nil {
 		// No transaction. Not relevant.
 		return
 	}
-	getCtx(cl).dirtyTransaction = true
+	getCtx(c).dirtyTransaction = true
 }
 
-func setAuthenticated(cl *redeo.Client) {
-	getCtx(cl).authenticated = true
+func setAuthenticated(c *server.Peer) {
+	getCtx(c).authenticated = true
 }
