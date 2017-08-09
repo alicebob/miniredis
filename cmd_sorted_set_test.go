@@ -1,6 +1,7 @@
 package miniredis
 
 import (
+	"fmt"
 	"math"
 	"testing"
 
@@ -206,30 +207,33 @@ func TestSortedSetRange(t *testing.T) {
 	c, err := redis.Dial("tcp", s.Addr())
 	ok(t, err)
 
+	s.ZAdd("z", math.Float64frombits(1), "small float")
 	s.ZAdd("z", 1, "one")
+	s.ZAdd("z", 1.1, "one point one")
 	s.ZAdd("z", 2, "two")
 	s.ZAdd("z", 2, "zwei")
 	s.ZAdd("z", 3, "three")
 	s.ZAdd("z", 3, "drei")
+	s.ZAdd("z", math.Float64frombits(0x7fe0000000000000), "large float")
 	s.ZAdd("z", math.Inf(+1), "inf")
 
 	{
 		b, err := redis.Strings(c.Do("ZRANGE", "z", 0, -1))
 		ok(t, err)
-		equals(t, []string{"one", "two", "zwei", "drei", "three", "inf"}, b)
+		equals(t, []string{"small float", "one", "one point one", "two", "zwei", "drei", "three", "large float", "inf"}, b)
 
 		b, err = redis.Strings(c.Do("ZREVRANGE", "z", 0, -1))
 		ok(t, err)
-		equals(t, []string{"inf", "three", "drei", "zwei", "two", "one"}, b)
+		equals(t, []string{"inf", "large float", "three", "drei", "zwei", "two", "one point one", "one", "small float"}, b)
 	}
 	{
 		b, err := redis.Strings(c.Do("ZRANGE", "z", 0, 1))
 		ok(t, err)
-		equals(t, []string{"one", "two"}, b)
+		equals(t, []string{"small float", "one"}, b)
 
 		b, err = redis.Strings(c.Do("ZREVRANGE", "z", 0, 1))
 		ok(t, err)
-		equals(t, []string{"inf", "three"}, b)
+		equals(t, []string{"inf", "large float"}, b)
 	}
 	{
 		b, err := redis.Strings(c.Do("ZRANGE", "z", -1, -1))
@@ -238,7 +242,7 @@ func TestSortedSetRange(t *testing.T) {
 
 		b, err = redis.Strings(c.Do("ZREVRANGE", "z", -1, -1))
 		ok(t, err)
-		equals(t, []string{"one"}, b)
+		equals(t, []string{"small float"}, b)
 	}
 
 	// weird cases.
@@ -261,19 +265,42 @@ func TestSortedSetRange(t *testing.T) {
 
 	// With scores
 	{
-		b, err := redis.Strings(c.Do("ZRANGE", "z", 1, 2, "WITHSCORES"))
+		b, err := redis.ByteSlices(c.Do("ZRANGE", "z", 3, 4, "WITHSCORES"))
 		ok(t, err)
-		equals(t, []string{"two", "2", "zwei", "2"}, b)
+		values, scores, err := unzipScores(b)
+		ok(t, err)
+		equals(t, []string{"two", "zwei"}, values)
+		equals(t, []float64{2, 2}, scores)
 
-		b, err = redis.Strings(c.Do("ZREVRANGE", "z", 1, 2, "WITHSCORES"))
+		b, err = redis.ByteSlices(c.Do("ZREVRANGE", "z", 2, 3, "WITHSCORES"))
 		ok(t, err)
-		equals(t, []string{"three", "3", "drei", "3"}, b)
+		values, scores, err = unzipScores(b)
+		ok(t, err)
+		equals(t, []string{"three", "drei"}, values)
+		equals(t, []float64{3, 3}, scores)
+
+		b, err = redis.ByteSlices(c.Do("ZRANGE", "z", 0, 3, "WITHSCORES"))
+		ok(t, err)
+		values, scores, err = unzipScores(b)
+		ok(t, err)
+		equals(t, []string{"small float", "one", "one point one", "two"}, values)
+		equals(t, []float64{math.Float64frombits(1), 1, 1.1, 2}, scores)
+
+		b, err = redis.ByteSlices(c.Do("ZREVRANGE", "z", 1, 2, "WITHSCORES"))
+		ok(t, err)
+		values, scores, err = unzipScores(b)
+		ok(t, err)
+		equals(t, []string{"large float", "three"}, values)
+		equals(t, []float64{math.Float64frombits(0x7fe0000000000000), 3}, scores)
 	}
 	// INF in WITHSCORES
 	{
-		b, err := redis.Strings(c.Do("ZRANGE", "z", 4, -1, "WITHSCORES"))
+		b, err := redis.ByteSlices(c.Do("ZRANGE", "z", 6, -1, "WITHSCORES"))
 		ok(t, err)
-		equals(t, []string{"three", "3", "inf", "inf"}, b)
+		values, scores, err := unzipScores(b)
+		ok(t, err)
+		equals(t, []string{"three", "large float", "inf"}, values)
+		equals(t, []float64{3, math.Float64frombits(0x7fe0000000000000), math.Inf(+1)}, scores)
 	}
 
 	// Error cases
@@ -299,7 +326,33 @@ func TestSortedSetRange(t *testing.T) {
 	}
 }
 
-// Test ZRANGEBYSCORE,  ZREVRANGEBYSCORE, and ZCOUNT
+// Unzip WITHSCORES replies into values and scores slices.
+func unzipScores(reply [][]byte) (values []string, scores []float64, err error) {
+	values = []string{}
+	scores = []float64{}
+	if len(reply) == 0 {
+		return
+	}
+	if int(len(reply)%2) != 0 {
+		fmt.Printf("relies: %d", int(len(reply)/2))
+		return nil, nil, fmt.Errorf("Expected even number of replies: %d", len(reply))
+	}
+	for i := 0; i < len(reply); i += 2 {
+		value, err := redis.String(reply[i], nil)
+		if err != nil {
+			return nil, nil, err
+		}
+		score, err := redis.Float64(reply[i+1], nil)
+		if err != nil {
+			return nil, nil, err
+		}
+		values = append(values, value)
+		scores = append(scores, score)
+	}
+	return
+}
+
+// Test ZRANGEBYSCORE, ZREVRANGEBYSCORE, and ZCOUNT
 func TestSortedSetRangeByScore(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
@@ -393,9 +446,12 @@ func TestSortedSetRangeByScore(t *testing.T) {
 
 	// With scores
 	{
-		b, err := redis.Strings(c.Do("ZRANGEBYSCORE", "z", "(1", 2, "WITHSCORES"))
+		b, err := redis.ByteSlices(c.Do("ZRANGEBYSCORE", "z", "(1", 2, "WITHSCORES"))
 		ok(t, err)
-		equals(t, []string{"two", "2", "zwei", "2"}, b)
+		values, scores, err := unzipScores(b)
+		ok(t, err)
+		equals(t, []string{"two", "zwei"}, values)
+		equals(t, []float64{2, 2}, scores)
 	}
 
 	// With LIMIT
@@ -429,13 +485,19 @@ func TestSortedSetRangeByScore(t *testing.T) {
 	}
 	// Everything
 	{
-		b, err := redis.Strings(c.Do("ZRANGEBYSCORE", "z", "-inf", "inf", "WITHSCORES", "LIMIT", 1, 2))
+		b, err := redis.ByteSlices(c.Do("ZRANGEBYSCORE", "z", "-inf", "inf", "WITHSCORES", "LIMIT", 1, 2))
 		ok(t, err)
-		equals(t, []string{"minusfour", "-4", "one", "1"}, b)
+		values, scores, err := unzipScores(b)
+		ok(t, err)
+		equals(t, []string{"minusfour", "one"}, values)
+		equals(t, []float64{-4, 1}, scores)
 
-		b, err = redis.Strings(c.Do("ZRANGEBYSCORE", "z", "-inf", "inf", "LIMIT", 1, 2, "WITHSCORES"))
+		b, err = redis.ByteSlices(c.Do("ZRANGEBYSCORE", "z", "-inf", "inf", "LIMIT", 1, 2, "WITHSCORES"))
 		ok(t, err)
-		equals(t, []string{"minusfour", "-4", "one", "1"}, b)
+		values, scores, err = unzipScores(b)
+		ok(t, err)
+		equals(t, []string{"minusfour", "one"}, values)
+		equals(t, []float64{-4, 1}, scores)
 	}
 
 	// Error cases
