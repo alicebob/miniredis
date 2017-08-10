@@ -1106,6 +1106,20 @@ func TestZunionstore(t *testing.T) {
 		equals(t, map[string]float64{"field1": 2, "field2": 4}, ss)
 	}
 
+	// Merge destination with itself.
+	{
+		s.ZAdd("h3", 1.0, "field1")
+		s.ZAdd("h3", 3.0, "field3")
+
+		res, err := redis.Int(c.Do("ZUNIONSTORE", "h3", 2, "h1", "h3"))
+		ok(t, err)
+		equals(t, 3, res)
+
+		ss, err := s.SortedSet("h3")
+		ok(t, err)
+		equals(t, map[string]float64{"field1": 2, "field2": 2, "field3": 3}, ss)
+	}
+
 	// WEIGHTS
 	{
 		res, err := redis.Int(c.Do("ZUNIONSTORE", "weighted", 2, "h1", "h2", "WeIgHtS", "4.5", "12"))
