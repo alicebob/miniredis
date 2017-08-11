@@ -16,7 +16,6 @@ package miniredis
 
 import (
 	"fmt"
-	"net"
 	"strconv"
 	"sync"
 	"time"
@@ -48,7 +47,6 @@ type Miniredis struct {
 	srv        *server.Server
 	port       int
 	password   string
-	listen     net.Listener
 	dbs        map[int]*RedisDB
 	selectedDB int // DB id used in the direct Get(), Set() &c.
 	signal     *sync.Cond

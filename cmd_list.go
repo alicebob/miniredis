@@ -109,7 +109,6 @@ func (m *Miniredis) cmdBXpop(c *server.Peer, cmd string, args []string, lr leftr
 			c.WriteNull()
 		},
 	)
-	return
 }
 
 // LINDEX
@@ -683,5 +682,4 @@ func (m *Miniredis) cmdBrpoplpush(c *server.Peer, cmd string, args []string) {
 			c.WriteNull()
 		},
 	)
-	return
 }

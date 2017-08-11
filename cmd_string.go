@@ -356,7 +356,6 @@ func (m *Miniredis) cmdGetset(c *server.Peer, cmd string, args []string) {
 			return
 		}
 		c.WriteBulk(old)
-		return
 	})
 }
 
