@@ -70,6 +70,19 @@ func TestRestart(t *testing.T) {
 	}
 }
 
+// Test a custom addr
+func TestAddr(t *testing.T) {
+	m := NewMiniRedis()
+	err := m.StartAddr("127.0.0.1:7887")
+	ok(t, err)
+	defer m.Close()
+
+	c, err := redis.Dial("tcp", "127.0.0.1:7887")
+	ok(t, err)
+	_, err = c.Do("PING")
+	ok(t, err)
+}
+
 func TestDump(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
