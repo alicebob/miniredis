@@ -1,4 +1,4 @@
-.PHONY: all install test vet
+.PHONY: all install test testrace vet
 
 all: test vet
 
@@ -7,6 +7,9 @@ install:
 
 test:
 	go test ./...
+
+testrace:
+	go test -race ./...
 
 vet:
 	go vet ./...
