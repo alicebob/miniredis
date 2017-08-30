@@ -103,13 +103,26 @@ func Run() (*Miniredis, error) {
 // Start starts a server. It listens on a random port on localhost. See also
 // Addr().
 func (m *Miniredis) Start() error {
-	m.Lock()
-	defer m.Unlock()
-
 	s, err := server.NewServer(fmt.Sprintf("127.0.0.1:%d", m.port))
 	if err != nil {
 		return err
 	}
+	return m.start(s)
+}
+
+// StartAddr runs miniredis with a given addr. Examples: "127.0.0.1:6379",
+// ":6379", or "127.0.0.1:0"
+func (m *Miniredis) StartAddr(addr string) error {
+	s, err := server.NewServer(addr)
+	if err != nil {
+		return err
+	}
+	return m.start(s)
+}
+
+func (m *Miniredis) start(s *server.Server) error {
+	m.Lock()
+	defer m.Unlock()
 	m.srv = s
 	m.port = s.Addr().Port
 
