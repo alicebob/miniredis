@@ -68,10 +68,10 @@ func readString(rd *bufio.Reader) (string, error) {
 			// -1 is a nil response
 			return "", nil
 		}
-		buf := make([]byte, length+2)
-		if n, err := rd.Read(buf); err != nil {
+		buf, err := rd.ReadString('\n')
+		if err != nil {
 			return "", err
-		} else if n != length+2 {
+		} else if len(buf) != length+2 {
 			return "", ErrProtocol
 		}
 		return string(buf[:len(buf)-2]), nil
