@@ -3,8 +3,10 @@ package server
 import (
 	"bufio"
 	"bytes"
+	"fmt"
 	"io"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -25,7 +27,7 @@ func TestReadArray(t *testing.T) {
 		},
 		{
 			payload: "*2\r\n$4\r\nLLEN\r\n$6\r\nmyl",
-			err:     ErrProtocol,
+			err:     io.EOF,
 		},
 		{
 			payload: "PING",
@@ -55,6 +57,7 @@ func TestReadString(t *testing.T) {
 		err     error
 		res     string
 	}
+	bigPayload := strings.Repeat("X", 1<<24)
 	for i, c := range []cas{
 		{
 			payload: "+hello world\r\n",
@@ -75,6 +78,10 @@ func TestReadString(t *testing.T) {
 		{
 			payload: "$4\r\nabcd\r\n",
 			res:     "abcd",
+		},
+		{
+			payload: fmt.Sprintf("$%d\r\n%s\r\n", len(bigPayload), bigPayload),
+			res:     bigPayload,
 		},
 
 		{

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/garyburd/redigo/redis"
@@ -141,6 +142,17 @@ func Test(t *testing.T) {
 			t.Fatal(err)
 		}
 		if have, want := res, interface{}(nil); have != want {
+			t.Errorf("have: %s, want: %s", have, want)
+		}
+	}
+
+	{
+		bigPayload := strings.Repeat("X", 1<<24)
+		echo, err := redis.String(c.Do("ECHO", bigPayload))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if have, want := echo, bigPayload; have != want {
 			t.Errorf("have: %s, want: %s", have, want)
 		}
 	}
