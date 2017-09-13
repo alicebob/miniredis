@@ -1153,7 +1153,15 @@ func (m *Miniredis) cmdZunionstore(c *server.Peer, cmd string, args []string) {
 
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
-		db.del(destination, true)
+		deleteDest := true
+		for _, key := range keys {
+			if destination == key {
+				deleteDest = false
+			}
+		}
+		if deleteDest {
+			db.del(destination, true)
+		}
 
 		sset := sortedSet{}
 		for i, key := range keys {
