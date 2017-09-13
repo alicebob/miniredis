@@ -352,7 +352,7 @@ func (m *Miniredis) cmdRpushx(c *server.Peer, cmd string, args []string) {
 }
 
 func (m *Miniredis) cmdXpushx(c *server.Peer, cmd string, args []string, lr leftright) {
-	if len(args) != 2 {
+	if len(args) < 2 {
 		setDirty(c)
 		c.WriteError(errWrongNumber(cmd))
 		return
@@ -361,7 +361,7 @@ func (m *Miniredis) cmdXpushx(c *server.Peer, cmd string, args []string, lr left
 		return
 	}
 
-	key, value := args[0], args[1]
+	key, args := args[0], args[1:]
 
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
@@ -376,11 +376,13 @@ func (m *Miniredis) cmdXpushx(c *server.Peer, cmd string, args []string, lr left
 		}
 
 		var newLen int
-		switch lr {
-		case left:
-			newLen = db.listLpush(key, value)
-		case right:
-			newLen = db.listPush(key, value)
+		for _, value := range args {
+			switch lr {
+			case left:
+				newLen = db.listLpush(key, value)
+			case right:
+				newLen = db.listPush(key, value)
+			}
 		}
 		c.WriteInt(newLen)
 	})

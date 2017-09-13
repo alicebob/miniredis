@@ -14,6 +14,7 @@ func setup(t *testing.T) (*Miniredis, redis.Conn, func()) {
 	ok(t, err)
 	return s, c1, func() { s.Close() }
 }
+
 func setup2(t *testing.T) (*Miniredis, redis.Conn, redis.Conn, func()) {
 	s, err := Run()
 	ok(t, err)
@@ -118,13 +119,29 @@ func TestLpushx(t *testing.T) {
 		equals(t, true, s.Exists("l"))
 	}
 
+	// Push more.
+	{
+		b, err := redis.Int(c.Do("LPUSH", "l2", "aap1"))
+		ok(t, err)
+		equals(t, 1, b)
+		b, err = redis.Int(c.Do("LPUSHX", "l2", "aap2", "noot2", "mies2"))
+		ok(t, err)
+		equals(t, 4, b)
+
+		r, err := redis.Strings(c.Do("LRANGE", "l2", "0", "0"))
+		ok(t, err)
+		equals(t, []string{"mies2"}, r)
+
+		r, err = redis.Strings(c.Do("LRANGE", "l2", "-1", "-1"))
+		ok(t, err)
+		equals(t, []string{"aap1"}, r)
+	}
+
 	// Errors
 	{
 		_, err = redis.Int(c.Do("LPUSHX"))
 		assert(t, err != nil, "LPUSHX error")
 		_, err = redis.Int(c.Do("LPUSHX", "l"))
-		assert(t, err != nil, "LPUSHX error")
-		_, err = redis.Int(c.Do("LPUSHX", "l", "too", "many"))
 		assert(t, err != nil, "LPUSHX error")
 		_, err := redis.String(c.Do("SET", "str", "value"))
 		ok(t, err)
@@ -758,17 +775,33 @@ func TestRpushx(t *testing.T) {
 		s.CheckList(t, "l", "aap", "noot", "mies")
 	}
 
+	// Push more.
+	{
+		b, err := redis.Int(c.Do("LPUSH", "l2", "aap1"))
+		ok(t, err)
+		equals(t, 1, b)
+		b, err = redis.Int(c.Do("RPUSHX", "l2", "aap2", "noot2", "mies2"))
+		ok(t, err)
+		equals(t, 4, b)
+
+		r, err := redis.Strings(c.Do("LRANGE", "l2", "0", "0"))
+		ok(t, err)
+		equals(t, []string{"aap1"}, r)
+
+		r, err = redis.Strings(c.Do("LRANGE", "l2", "-1", "-1"))
+		ok(t, err)
+		equals(t, []string{"mies2"}, r)
+	}
+
 	// Error cases
 	{
 		s.Push("src", "aap", "noot", "mies")
-		_, err = redis.String(c.Do("RPUSHX"))
+		_, err = redis.Int(c.Do("RPUSHX"))
 		assert(t, err != nil, "RPUSHX error")
-		_, err = redis.String(c.Do("RPUSHX", "l"))
-		assert(t, err != nil, "RPUSHX error")
-		_, err = redis.String(c.Do("RPUSHX", "too", "many", "arguments"))
+		_, err = redis.Int(c.Do("RPUSHX", "l"))
 		assert(t, err != nil, "RPUSHX error")
 		s.Set("str", "string!")
-		_, err = redis.String(c.Do("RPUSHX", "str", "value"))
+		_, err = redis.Int(c.Do("RPUSHX", "str", "value"))
 		assert(t, err != nil, "RPUSHX error")
 	}
 }
