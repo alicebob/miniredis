@@ -3,6 +3,8 @@
 package miniredis
 
 import (
+	"strings"
+
 	"github.com/alicebob/miniredis/server"
 )
 
@@ -32,11 +34,15 @@ func (m *Miniredis) cmdDbsize(c *server.Peer, cmd string, args []string) {
 
 // FLUSHALL
 func (m *Miniredis) cmdFlushall(c *server.Peer, cmd string, args []string) {
+	if len(args) > 0 && strings.ToLower(args[0]) == "async" {
+		args = args[1:]
+	}
 	if len(args) > 0 {
 		setDirty(c)
-		c.WriteError(errWrongNumber(cmd))
+		c.WriteError(msgSyntaxError)
 		return
 	}
+
 	if !m.handleAuth(c) {
 		return
 	}
@@ -49,11 +55,15 @@ func (m *Miniredis) cmdFlushall(c *server.Peer, cmd string, args []string) {
 
 // FLUSHDB
 func (m *Miniredis) cmdFlushdb(c *server.Peer, cmd string, args []string) {
+	if len(args) > 0 && strings.ToLower(args[0]) == "async" {
+		args = args[1:]
+	}
 	if len(args) > 0 {
 		setDirty(c)
-		c.WriteError(errWrongNumber(cmd))
+		c.WriteError(msgSyntaxError)
 		return
 	}
+
 	if !m.handleAuth(c) {
 		return
 	}

@@ -59,13 +59,32 @@ func TestCmdServer(t *testing.T) {
 	}
 
 	{
+		b, err := redis.String(c.Do("FLUSHDB", "ASYNC"))
+		ok(t, err)
+		equals(t, "OK", b)
+
+		b, err = redis.String(c.Do("FLUSHALL", "ASYNC"))
+		ok(t, err)
+		equals(t, "OK", b)
+	}
+
+	{
 		_, err := redis.Int(c.Do("DBSIZE", "FOO"))
 		assert(t, err != nil, "no DBSIZE error")
 
 		_, err = redis.Int(c.Do("FLUSHDB", "FOO"))
 		assert(t, err != nil, "no FLUSHDB error")
 
+		_, err = redis.Int(c.Do("FLUSHDB", "ASYNC", "FOO"))
+		assert(t, err != nil, "no FLUSHDB error")
+
 		_, err = redis.Int(c.Do("FLUSHALL", "FOO"))
+		assert(t, err != nil, "no FLUSHALL error")
+
+		_, err = redis.Int(c.Do("FLUSHALL", "ASYNC", "FOO"))
+		assert(t, err != nil, "no FLUSHALL error")
+
+		_, err = redis.Int(c.Do("FLUSHALL", "ASYNC", "ASYNC"))
 		assert(t, err != nil, "no FLUSHALL error")
 	}
 }
