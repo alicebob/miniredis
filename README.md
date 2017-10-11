@@ -196,18 +196,18 @@ func TestSomething(t *testing.T) {
 
 	// Optionally check values in redis...
 	if got, err := s.Get("foo"); err != nil || got != "bar" {
-        t.Error("'foo' has the wrong value")
-    }
-    // ... or use a helper for that:
-    s.CheckGet(t, "foo", "bar")
+		t.Error("'foo' has the wrong value")
+	}
+	// ... or use a helper for that:
+	s.CheckGet(t, "foo", "bar")
 
-    // TTL and expiration:
-    s.Set("foo", "bar")
-    s.SetTTL("foo", 10 * time.Second)
-    s.FastForward(11 * time.Second)
-    if s.Exists("foo") {
-        t.Fatal("'foo' should not have existed anymore")
-    }
+	// TTL and expiration:
+	s.Set("foo", "bar")
+	s.SetTTL("foo", 10*time.Second)
+	s.FastForward(11 * time.Second)
+	if s.Exists("foo") {
+		t.Fatal("'foo' should not have existed anymore")
+	}
 }
 ```
 
