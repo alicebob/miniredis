@@ -164,6 +164,12 @@ Implemented commands:
    - ZSCORE
    - ZUNIONSTORE
    - ZSCAN
+ - Scripting (all)
+    - EVAL
+    - EVALSHA
+    - SCRIPT LOAD
+    - SCRIPT EXISTS
+    - SCRIPT FLUSH
 
 
 Since miniredis is intended to be used in unittests TTLs don't decrease
@@ -244,9 +250,8 @@ Commands which will probably not be implemented:
     - ~~SUBSCRIBE~~
     - ~~UNSUBSCRIBE~~
  - Scripting (all)
-    - ~~EVAL~~
-    - ~~EVALSHA~~
-    - ~~SCRIPT *~~
+    - ~~SCRIPT DEBUG~~
+    - ~~SCRIPT KILL~~
  - Server
     - ~~BGSAVE~~
     - ~~BGWRITEAOF~~

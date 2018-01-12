@@ -135,6 +135,7 @@ func (m *Miniredis) start(s *server.Server) error {
 	commandsSet(m)
 	commandsSortedSet(m)
 	commandsTransaction(m)
+	commandsScripting(m)
 
 	return nil
 }
