@@ -164,7 +164,7 @@ Implemented commands:
    - ZSCORE
    - ZUNIONSTORE
    - ZSCAN
- - Scripting (all)
+ - Scripting
     - EVAL
     - EVALSHA
     - SCRIPT LOAD
@@ -249,7 +249,7 @@ Commands which will probably not be implemented:
     - ~~PUNSUBSCRIBE~~
     - ~~SUBSCRIBE~~
     - ~~UNSUBSCRIBE~~
- - Scripting (all)
+ - Scripting
     - ~~SCRIPT DEBUG~~
     - ~~SCRIPT KILL~~
  - Server
