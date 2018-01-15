@@ -20,15 +20,15 @@ func TestEval(t *testing.T) {
 	}
 
 	{
-		b, err := c.Do("EVAL", "return {KEYS[1], ARGV[1]}", 1, "key1", "key2")
+		b, err := redis.Strings(c.Do("EVAL", "return {KEYS[1], ARGV[1]}", 1, "key1", "key2"))
 		ok(t, err)
-		equals(t, []interface{}{"key1", "key2"}, b)
+		equals(t, []string{"key1", "key2"}, b)
 	}
 
 	{
-		b, err := c.Do("EVAL", "return {ARGV[1]}", 0, "key1")
+		b, err := redis.Strings(c.Do("EVAL", "return {ARGV[1]}", 0, "key1"))
 		ok(t, err)
-		equals(t, []interface{}{"key1"}, b)
+		equals(t, []string{"key1"}, b)
 	}
 
 	// Invalid args

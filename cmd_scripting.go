@@ -185,7 +185,7 @@ func (m *Miniredis) luaToRedis(l *lua.LState, c *server.Peer, value lua.LValue) 
 	case lua.LTNumber:
 		c.WriteInt(int(lua.LVAsNumber(value)))
 	case lua.LTString:
-		c.WriteInline(lua.LVAsString(value))
+		c.WriteBulk(lua.LVAsString(value))
 	case lua.LTTable:
 		result := []lua.LValue{}
 		for j := 1; true; j++ {
