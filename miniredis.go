@@ -48,7 +48,8 @@ type Miniredis struct {
 	port       int
 	password   string
 	dbs        map[int]*RedisDB
-	selectedDB int // DB id used in the direct Get(), Set() &c.
+	selectedDB int               // DB id used in the direct Get(), Set() &c.
+	scripts    map[string]string // sha1 -> lua src
 	signal     *sync.Cond
 	now        time.Time // used to make a duration from EXPIREAT. time.Now() if not set.
 }
@@ -73,7 +74,8 @@ type connCtx struct {
 // NewMiniRedis makes a new, non-started, Miniredis object.
 func NewMiniRedis() *Miniredis {
 	m := Miniredis{
-		dbs: map[int]*RedisDB{},
+		dbs:     map[int]*RedisDB{},
+		scripts: map[string]string{},
 	}
 	m.signal = sync.NewCond(&m)
 	return &m

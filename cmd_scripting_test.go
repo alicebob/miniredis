@@ -33,11 +33,11 @@ func TestCmdEvalReplyConversion(t *testing.T) {
 			expected: int64(1),
 		},
 		"Return boolean false": {
-			script: "return true",
+			script: "return false",
 			args: []interface{}{
 				0,
 			},
-			expected: int64(1),
+			expected: int64(0),
 		},
 		"Return single number": {
 			script: "return 10",

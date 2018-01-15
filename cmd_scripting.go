@@ -21,8 +21,6 @@ func commandsScripting(m *Miniredis) {
 	m.srv.Register("SCRIPT", m.cmdScript)
 }
 
-var scriptmap = map[string]string{}
-
 func byteToString(bs []uint8) string {
 	b := make([]byte, len(bs))
 	for i, v := range bs {
@@ -241,13 +239,16 @@ func (m *Miniredis) cmdEvalsha(c *server.Peer, cmd string, args []string) {
 		return
 	}
 
-	if script, ok := scriptmap[args[0]]; ok {
-		err := m.runLuaScript(c, script, args)
-		if err != nil {
-			c.WriteError(err.Error())
-		}
-	} else {
-		c.WriteError(fmt.Sprintf("Invalid SHA %v", args[0]))
+	sha := args[0]
+	m.Lock()
+	script, ok := m.scripts[sha]
+	m.Unlock()
+	if !ok {
+		c.WriteError(fmt.Sprintf("Invalid SHA %v", sha))
+	}
+	err := m.runLuaScript(c, script, args)
+	if err != nil {
+		c.WriteError(err.Error())
 	}
 }
 
@@ -261,6 +262,9 @@ func (m *Miniredis) cmdScript(c *server.Peer, cmd string, args []string) {
 		return
 	}
 
+	m.Lock()
+	defer m.Unlock()
+
 	switch strings.Trim(strings.ToLower(args[0]), " \t") {
 	case "load":
 		if len(args) < 2 {
@@ -269,13 +273,11 @@ func (m *Miniredis) cmdScript(c *server.Peer, cmd string, args []string) {
 			return
 		}
 
-		shaList := []string{}
-		for i := 1; i < len(args); i++ {
-			h := sha1.New()
-			io.WriteString(h, args[i])
-			hash := hex.EncodeToString(h.Sum(nil))
-			scriptmap[hash] = args[i]
-			shaList = append(shaList, hash)
+		var shaList []string
+		for _, arg := range args[1:] {
+			sha := scriptSha(arg)
+			m.scripts[sha] = arg
+			shaList = append(shaList, sha)
 		}
 
 		c.WriteLen(len(shaList))
@@ -290,19 +292,23 @@ func (m *Miniredis) cmdScript(c *server.Peer, cmd string, args []string) {
 		}
 
 		c.WriteLen(len(args) - 1)
-		for i := 1; i < len(args); i++ {
-			if _, ok := scriptmap[args[i]]; ok {
+		for _, arg := range args[1:] {
+			if _, ok := m.scripts[arg]; ok {
 				c.WriteInt(1)
 			} else {
 				c.WriteInt(0)
 			}
 		}
 	case "flush":
-		for k := range scriptmap {
-			delete(scriptmap, k)
-		}
+		m.scripts = map[string]string{}
 		c.WriteOK()
 	default:
 		c.WriteError("Not implemented yet")
 	}
+}
+
+func scriptSha(s string) string {
+	h := sha1.New()
+	io.WriteString(h, s)
+	return hex.EncodeToString(h.Sum(nil))
 }
