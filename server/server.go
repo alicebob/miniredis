@@ -54,22 +54,27 @@ func (s *Server) serve(l net.Listener) {
 		if err != nil {
 			return
 		}
-		s.wg.Add(1)
-		go func() {
-			defer s.wg.Done()
-			defer conn.Close()
-			s.mu.Lock()
-			s.peers[conn] = struct{}{}
-			s.infoConns++
-			s.mu.Unlock()
-
-			s.servePeer(conn)
-
-			s.mu.Lock()
-			delete(s.peers, conn)
-			s.mu.Unlock()
-		}()
+		s.ServeConn(conn)
 	}
+}
+
+// ServeConn handles a net.Conn. Nice with net.Pipe()
+func (s *Server) ServeConn(conn net.Conn) {
+	s.wg.Add(1)
+	go func() {
+		defer s.wg.Done()
+		defer conn.Close()
+		s.mu.Lock()
+		s.peers[conn] = struct{}{}
+		s.infoConns++
+		s.mu.Unlock()
+
+		s.servePeer(conn)
+
+		s.mu.Lock()
+		delete(s.peers, conn)
+		s.mu.Unlock()
+	}()
 }
 
 // Addr has the net.Addr struct

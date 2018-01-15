@@ -16,9 +16,12 @@ package miniredis
 
 import (
 	"fmt"
+	"net"
 	"strconv"
 	"sync"
 	"time"
+
+	redigo "github.com/garyburd/redigo/redis"
 
 	"github.com/alicebob/miniredis/server"
 )
@@ -235,6 +238,13 @@ func (m *Miniredis) FastForward(duration time.Duration) {
 	for _, db := range m.dbs {
 		db.fastForward(duration)
 	}
+}
+
+// redigo returns a redigo.Conn, connected using net.Pipe
+func (m *Miniredis) redigo() redigo.Conn {
+	c1, c2 := net.Pipe()
+	m.srv.ServeConn(c1)
+	return redigo.NewConn(c2, 0, 0)
 }
 
 // Dump returns a text version of the selected DB, usable for debugging.

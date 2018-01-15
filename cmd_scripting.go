@@ -3,12 +3,10 @@ package miniredis
 import (
 	"crypto/sha1"
 	"encoding/hex"
-	"fmt"
 	"io"
 	"strconv"
 	"strings"
 
-	"github.com/garyburd/redigo/redis"
 	lua "github.com/yuin/gopher-lua"
 	"github.com/yuin/gopher-lua/parse"
 
@@ -25,12 +23,7 @@ func (m *Miniredis) runLuaScript(c *server.Peer, script string, args []string) {
 	l := lua.NewState()
 	defer l.Close()
 
-	// create a redis client for redis.call
-	conn, err := redis.Dial("tcp", m.srv.Addr().String())
-	if err != nil {
-		c.WriteError(fmt.Sprintf("ERR Redis error: %v", err.Error()))
-		return
-	}
+	conn := m.redigo()
 	defer conn.Close()
 
 	// set global variable KEYS
