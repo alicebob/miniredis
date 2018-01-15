@@ -65,16 +65,16 @@ func mkLuaFuncs(conn redigo.Conn) map[string]lua.LGFunction {
 			return 1 // Notify that we pushed one value to the stack
 		},
 		"error_reply": func(l *lua.LState) int {
-			msg := l.CheckAny(1)
+			msg := l.CheckString(1)
 			res := &lua.LTable{}
-			res.RawSetString("err", msg)
+			res.RawSetString("err", lua.LString(msg))
 			l.Push(res)
 			return 1
 		},
 		"status_reply": func(l *lua.LState) int {
-			msg := l.CheckAny(1)
+			msg := l.CheckString(1)
 			res := &lua.LTable{}
-			res.RawSetString("ok", msg)
+			res.RawSetString("ok", lua.LString(msg))
 			l.Push(res)
 			return 1
 		},
@@ -104,17 +104,15 @@ func luaToRedis(l *lua.LState, c *server.Peer, value lua.LValue) {
 		c.WriteBulk(lua.LVAsString(value))
 	case lua.LTTable:
 		t := value.(*lua.LTable)
-		// special case for table with only an 'err' field
-		var keys []string
-		t.ForEach(func(k, _ lua.LValue) {
-			keys = append(keys, k.String())
-		})
-		if len(keys) == 1 && keys[0] == "err" {
-			c.WriteError(t.RawGetString("err").String())
+		// special case for tables with an 'err' or 'ok' field
+		// note: according to the docs this only counts when 'err' or 'ok' is
+		// the only field.
+		if s := t.RawGetString("err"); s.Type() != lua.LTNil {
+			c.WriteError(s.String())
 			return
 		}
-		if len(keys) == 1 && keys[0] == "ok" {
-			c.WriteInline(t.RawGetString("ok").String())
+		if s := t.RawGetString("ok"); s.Type() != lua.LTNil {
+			c.WriteInline(s.String())
 			return
 		}
 

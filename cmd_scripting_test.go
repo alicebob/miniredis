@@ -325,6 +325,18 @@ func TestCmdEvalReply(t *testing.T) {
 		ok(t, err)
 		equals(t, "good", v)
 	}
+
+	_, err = c.Do("EVAL", `return redis.error_reply()`, 0)
+	assert(t, err != nil, "no EVAL error")
+
+	_, err = c.Do("EVAL", `return redis.error_reply(1)`, 0)
+	assert(t, err != nil, "no EVAL error")
+
+	_, err = c.Do("EVAL", `return redis.status_reply()`, 0)
+	assert(t, err != nil, "no EVAL error")
+
+	_, err = c.Do("EVAL", `return redis.status_reply(1)`, 0)
+	assert(t, err != nil, "no EVAL error")
 }
 
 func TestCmdEvalResponse(t *testing.T) {
