@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
-	"reflect"
 	"strconv"
 	"strings"
 
@@ -30,8 +29,8 @@ func byteToString(bs []uint8) string {
 }
 
 func (m *Miniredis) runLuaScript(c *server.Peer, script string, args []string) error {
-	L := lua.NewState()
-	defer L.Close()
+	l := lua.NewState()
+	defer l.Close()
 
 	// create a redis client for redis.call
 	conn, err := redis.Dial("tcp", m.srv.Addr().String())
@@ -41,34 +40,34 @@ func (m *Miniredis) runLuaScript(c *server.Peer, script string, args []string) e
 	defer conn.Close()
 
 	// set global variable KEYS
-	keysTable := L.NewTable()
+	keysTable := l.NewTable()
 	keysLen, err := strconv.Atoi(args[1])
 	if err != nil {
 		c.WriteError(err.Error())
 		return err
 	}
 	for i := 0; i < keysLen; i++ {
-		L.RawSet(keysTable, lua.LNumber(i+1), lua.LString(args[i+2]))
+		l.RawSet(keysTable, lua.LNumber(i+1), lua.LString(args[i+2]))
 	}
-	L.SetGlobal("KEYS", keysTable)
+	l.SetGlobal("KEYS", keysTable)
 
 	// set global variable ARGV
-	argvTable := L.NewTable()
+	argvTable := l.NewTable()
 	argvLen := len(args) - 2 - keysLen
 	for i := 0; i < argvLen; i++ {
-		L.RawSet(argvTable, lua.LNumber(i+1), lua.LString(args[i+2+keysLen]))
+		l.RawSet(argvTable, lua.LNumber(i+1), lua.LString(args[i+2+keysLen]))
 	}
-	L.SetGlobal("ARGV", argvTable)
+	l.SetGlobal("ARGV", argvTable)
 
 	// Register call function to lua VM
 	redisFuncs := map[string]lua.LGFunction{
-		"call": func(L *lua.LState) int {
-			top := L.GetTop()
+		"call": func(l *lua.LState) int {
+			top := l.GetTop()
 
-			cmd := lua.LVAsString(L.Get(1))
+			cmd := lua.LVAsString(l.Get(1))
 			args := make([]interface{}, top-1)
 			for i := 2; i <= top; i++ {
-				arg := L.Get(i)
+				arg := l.Get(i)
 
 				dataType := arg.Type()
 				switch dataType {
@@ -91,55 +90,51 @@ func (m *Miniredis) runLuaScript(c *server.Peer, script string, args []string) e
 			}
 			res, err := conn.Do(cmd, args...)
 			if err != nil {
-				L.Push(lua.LNil)
+				l.Push(lua.LNil)
 				return 1
 			}
 
-			pushCount := 0
-			resType := reflect.TypeOf(res)
-
-			if resType == nil {
-				L.Push(lua.LNil)
-				pushCount++
+			if res == nil {
+				l.Push(lua.LNil)
 			} else {
-				if resType.String() == "int64" {
-					L.Push(lua.LNumber(res.(int64)))
-					pushCount++
-				} else if resType.String() == "[]uint8" {
-					L.Push(lua.LString(byteToString(res.([]uint8))))
-					pushCount++
-				} else if resType.String() == "[]interface {}" {
-					L.Push(m.redisToLua(L, res))
-					pushCount++
-				} else {
-					L.Push(lua.LString(res.(string)))
-					pushCount++
+				switch r := res.(type) {
+				case int64:
+					l.Push(lua.LNumber(r))
+				case []uint8:
+					l.Push(lua.LString(string(r)))
+				case []interface{}:
+					l.Push(m.redisToLua(l, r))
+				case string:
+					l.Push(lua.LString(r))
+				default:
+					// TODO: oops?
+					l.Push(lua.LString(res.(string)))
 				}
 			}
 
-			return pushCount // Notify that we pushed one value to the stack
+			return 1 // Notify that we pushed one value to the stack
 		},
 	}
 
 	redisFuncs["pcall"] = redisFuncs["call"]
 
 	// Register command handlers
-	L.Push(L.NewFunction(func(L *lua.LState) int {
-		mod := L.RegisterModule("redis", redisFuncs).(*lua.LTable)
-		L.Push(mod)
+	l.Push(l.NewFunction(func(l *lua.LState) int {
+		mod := l.RegisterModule("redis", redisFuncs).(*lua.LTable)
+		l.Push(mod)
 		return 1
 	}))
 
-	L.Push(lua.LString("redis"))
-	L.Call(1, 0)
+	l.Push(lua.LString("redis"))
+	l.Call(1, 0)
 
-	if err := L.DoString(script); err != nil {
+	if err := l.DoString(script); err != nil {
 		c.WriteError(err.Error())
 		return err
 	}
 
-	if L.GetTop() > 0 {
-		m.luaToRedis(L, c, L.Get(1))
+	if l.GetTop() > 0 {
+		m.luaToRedis(l, c, l.Get(1))
 	} else {
 		c.WriteNull()
 	}
@@ -147,29 +142,33 @@ func (m *Miniredis) runLuaScript(c *server.Peer, script string, args []string) e
 	return nil
 }
 
-func (m *Miniredis) redisToLua(L *lua.LState, res interface{}) *lua.LTable {
-	rettb := L.NewTable()
-	for _, e := range res.([]interface{}) {
+func (m *Miniredis) redisToLua(l *lua.LState, res []interface{}) *lua.LTable {
+	rettb := l.NewTable()
+	for _, e := range res {
+		var v lua.LValue
 		if e == nil {
-			L.RawSet(rettb, lua.LNumber(rettb.Len()+1), lua.LValue(nil))
-			continue
-		}
-
-		if reflect.TypeOf(e).String() == "int64" {
-			L.RawSet(rettb, lua.LNumber(rettb.Len()+1), lua.LNumber(e.(int64)))
-		} else if reflect.TypeOf(e).String() == "[]uint8" {
-			L.RawSet(rettb, lua.LNumber(rettb.Len()+1), lua.LString(byteToString(e.([]uint8))))
-		} else if reflect.TypeOf(e).String() == "[]interface {}" {
-			L.RawSet(rettb, lua.LNumber(rettb.Len()+1), m.redisToLua(L, e))
+			v = lua.LValue(nil)
 		} else {
-			L.RawSet(rettb, lua.LNumber(rettb.Len()+1), lua.LString(e.(string)))
+			switch et := e.(type) {
+			case int64:
+				v = lua.LNumber(et)
+			case []uint8:
+				v = lua.LString(string(et))
+			case []interface{}:
+				v = m.redisToLua(l, et)
+			case string:
+				v = lua.LString(et)
+			default:
+				// TODO: oops?
+				v = lua.LString(e.(string))
+			}
 		}
+		l.RawSet(rettb, lua.LNumber(rettb.Len()+1), v)
 	}
-
 	return rettb
 }
 
-func (m *Miniredis) luaToRedis(L *lua.LState, c *server.Peer, value lua.LValue) {
+func (m *Miniredis) luaToRedis(l *lua.LState, c *server.Peer, value lua.LValue) {
 	if value == nil {
 		c.WriteNull()
 		return
@@ -191,7 +190,7 @@ func (m *Miniredis) luaToRedis(L *lua.LState, c *server.Peer, value lua.LValue) 
 	case lua.LTTable:
 		result := []lua.LValue{}
 		for j := 1; true; j++ {
-			val := L.GetTable(value, lua.LNumber(j))
+			val := l.GetTable(value, lua.LNumber(j))
 			if val == nil {
 				result = append(result, val)
 				continue
@@ -206,7 +205,7 @@ func (m *Miniredis) luaToRedis(L *lua.LState, c *server.Peer, value lua.LValue) 
 
 		c.WriteLen(len(result))
 		for _, r := range result {
-			m.luaToRedis(L, c, r)
+			m.luaToRedis(l, c, r)
 		}
 	default:
 		c.WriteInline(lua.LVAsString(value))
