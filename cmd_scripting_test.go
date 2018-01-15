@@ -162,7 +162,7 @@ func TestEvalsha(t *testing.T) {
 	mustFail(t, err, msgNoScriptFound)
 }
 
-func TestCmdEvalReplyConversion(t *testing.T) {
+func TestCmdEvalReply(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
@@ -306,6 +306,24 @@ func TestCmdEvalReplyConversion(t *testing.T) {
 			continue
 		}
 		equals(t, tc.expected, reply)
+	}
+
+	{
+		_, err := c.Do("EVAL", `return {err="broken"}`, 0)
+		mustFail(t, err, "broken")
+
+		_, err = c.Do("EVAL", `return redis.error_reply("broken")`, 0)
+		mustFail(t, err, "broken")
+	}
+
+	{
+		v, err := redis.String(c.Do("EVAL", `return {ok="good"}`, 0))
+		ok(t, err)
+		equals(t, "good", v)
+
+		v, err = redis.String(c.Do("EVAL", `return redis.status_reply("good")`, 0))
+		ok(t, err)
+		equals(t, "good", v)
 	}
 }
 
