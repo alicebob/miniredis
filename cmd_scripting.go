@@ -226,7 +226,7 @@ func (m *Miniredis) cmdEval(c *server.Peer, cmd string, args []string) {
 }
 
 func (m *Miniredis) cmdEvalsha(c *server.Peer, cmd string, args []string) {
-	if len(args) < 1 {
+	if len(args) < 2 {
 		setDirty(c)
 		c.WriteError(errWrongNumber(cmd))
 		return
@@ -240,7 +240,7 @@ func (m *Miniredis) cmdEvalsha(c *server.Peer, cmd string, args []string) {
 	script, ok := m.scripts[sha]
 	m.Unlock()
 	if !ok {
-		c.WriteError(fmt.Sprintf("ERR Invalid SHA %v", sha))
+		c.WriteError(msgNoScriptFound)
 		return
 	}
 	m.runLuaScript(c, script, args)

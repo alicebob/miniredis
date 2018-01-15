@@ -29,6 +29,7 @@ const (
 	msgInvalidKeysNumber  = "ERR Number of keys can't be greater than number of args"
 	msgNegativeKeysNumber = "ERR Number of keys can't be negative"
 	msgScriptUsage        = "ERR Unknown SCRIPT subcommand or wrong # of args."
+	msgNoScriptFound      = "NOSCRIPT No matching script. Please use EVAL."
 )
 
 func errWrongNumber(cmd string) string {

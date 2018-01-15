@@ -119,13 +119,56 @@ func TestScript(t *testing.T) {
 	mustFail(t, err, msgScriptUsage)
 }
 
+func TestEvalsha(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+	defer c.Close()
+
+	script1sha := "bfbf458525d6a0b19200bfd6db3af481156b367b"
+	{
+		v, err := redis.String(c.Do("SCRIPT", "LOAD", "return {KEYS[1],ARGV[1]}"))
+		ok(t, err)
+		equals(t, script1sha, v)
+	}
+
+	{
+		b, err := redis.Strings(c.Do("EVALSHA", script1sha, 1, "key1", "key2"))
+		ok(t, err)
+		equals(t, []string{"key1", "key2"}, b)
+	}
+
+	_, err = c.Do("EVALSHA")
+	mustFail(t, err, errWrongNumber("evalsha"))
+
+	_, err = c.Do("EVALSHA", "foo")
+	mustFail(t, err, errWrongNumber("evalsha"))
+
+	_, err = c.Do("EVALSHA", "foo", 0)
+	mustFail(t, err, msgNoScriptFound)
+
+	_, err = c.Do("EVALSHA", script1sha, script1sha)
+	mustFail(t, err, msgInvalidInt)
+
+	_, err = c.Do("EVALSHA", script1sha, -1)
+	mustFail(t, err, msgNegativeKeysNumber)
+
+	_, err = c.Do("EVALSHA", script1sha, 1)
+	mustFail(t, err, msgInvalidKeysNumber)
+
+	_, err = c.Do("EVALSHA", "foo", 1, "bar")
+	mustFail(t, err, msgNoScriptFound)
+}
+
 func TestCmdEvalReplyConversion(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-
 	c, err := redis.Dial("tcp", s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	cases := map[string]struct {
 		script   string
@@ -316,29 +359,4 @@ func TestCmdEvalResponse(t *testing.T) {
 		ok(t, err)
 		equals(t, []interface{}{nil, nil}, v)
 	}
-}
-
-func TestCmdScriptAndEvalsha(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
-
-	c, err := redis.Dial("tcp", s.Addr())
-	ok(t, err)
-	defer c.Close()
-
-	// SCRIPT LOAD
-	{
-		v, err := redis.String(c.Do("SCRIPT", "LOAD", "redis.call('set', KEYS[1], ARGV[1])\n return redis.call('get', KEYS[1]) "))
-		ok(t, err)
-		equals(t, "054a13c20b748da2922a5f37f144342de21b8650", v)
-	}
-
-	// TEST EVALSHA
-	{
-		v, err := redis.String(c.Do("EVALSHA", "054a13c20b748da2922a5f37f144342de21b8650", 1, "test_key", "test_value"))
-		ok(t, err)
-		equals(t, "test_value", v)
-	}
-
 }
