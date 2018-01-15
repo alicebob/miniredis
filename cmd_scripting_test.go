@@ -12,6 +12,7 @@ func TestEval(t *testing.T) {
 	defer s.Close()
 	c, err := redis.Dial("tcp", s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	{
 		b, err := redis.Int(c.Do("EVAL", "return 42", 0))
@@ -49,6 +50,73 @@ func TestEval(t *testing.T) {
 
 	_, err = c.Do("EVAL", "[", 0)
 	assert(t, err != nil, "no EVAL error")
+}
+
+func TestScript(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+	defer c.Close()
+
+	var (
+		script1sha = "a42059b356c875f0717db19a51f6aaca9ae659ea"
+		script2sha = "1fa00e76656cc152ad327c13fe365858fd7be306" // "return 42"
+	)
+	{
+		v, err := redis.String(c.Do("SCRIPT", "LOAD", "return {KEYS[1],KEYS[2],ARGV[1],ARGV[2]}"))
+		ok(t, err)
+		equals(t, script1sha, v)
+	}
+
+	{
+		v, err := redis.String(c.Do("SCRIPT", "LOAD", "return 42"))
+		ok(t, err)
+		equals(t, script2sha, v)
+	}
+
+	{
+		v, err := redis.Int64s(c.Do("SCRIPT", "EXISTS", script1sha, script2sha, "invalid sha"))
+		ok(t, err)
+		equals(t, []int64{1, 1, 0}, v)
+	}
+
+	{
+		v, err := redis.String(c.Do("SCRIPT", "FLUSH"))
+		ok(t, err)
+		equals(t, "OK", v)
+	}
+
+	{
+		v, err := redis.Int64s(c.Do("SCRIPT", "EXISTS", script1sha))
+		ok(t, err)
+		equals(t, []int64{0}, v)
+	}
+
+	{
+		v, err := redis.Int64s(c.Do("SCRIPT", "EXISTS"))
+		ok(t, err)
+		equals(t, []int64{}, v)
+	}
+
+	_, err = c.Do("SCRIPT")
+	mustFail(t, err, errWrongNumber("script"))
+
+	_, err = c.Do("SCRIPT", "LOAD")
+	mustFail(t, err, msgScriptUsage)
+
+	_, err = c.Do("SCRIPT", "LOAD", "return 42", "FOO")
+	mustFail(t, err, msgScriptUsage)
+
+	_, err = c.Do("SCRIPT", "LOAD", "[")
+	assert(t, err != nil, "no SCRIPT lOAD error")
+
+	_, err = c.Do("SCRIPT", "FLUSH", "1")
+	mustFail(t, err, msgScriptUsage)
+
+	_, err = c.Do("SCRIPT", "FOO")
+	mustFail(t, err, msgScriptUsage)
 }
 
 func TestCmdEvalReplyConversion(t *testing.T) {
@@ -110,14 +178,14 @@ func TestCmdEvalReplyConversion(t *testing.T) {
 			args: []interface{}{
 				0,
 			},
-			expected: "test",
+			expected: []byte("test"),
 		},
 		"Return multiple string": {
 			script: "return 'test1', 'test2'",
 			args: []interface{}{
 				0,
 			},
-			expected: "test1",
+			expected: []byte("test1"),
 		},
 		"Return single table multiple integer": {
 			script: "return {10, 20}",
@@ -135,8 +203,8 @@ func TestCmdEvalReplyConversion(t *testing.T) {
 				0,
 			},
 			expected: []interface{}{
-				"test1",
-				"test2",
+				[]byte("test1"),
+				[]byte("test2"),
 			},
 		},
 		"Return nested table": {
@@ -163,7 +231,7 @@ func TestCmdEvalReplyConversion(t *testing.T) {
 				int64(20),
 				[]interface{}{
 					int64(30),
-					"test",
+					[]byte("test"),
 					int64(1),
 					int64(40),
 				},
@@ -180,10 +248,10 @@ func TestCmdEvalReplyConversion(t *testing.T) {
 				"second",
 			},
 			expected: []interface{}{
-				"key1",
-				"key2",
-				"first",
-				"second",
+				[]byte("key1"),
+				[]byte("key2"),
+				[]byte("first"),
+				[]byte("second"),
 			},
 		},
 	}
@@ -208,76 +276,45 @@ func TestCmdEvalResponse(t *testing.T) {
 	defer c.Close()
 
 	{
-		v, err := c.Do("EVAL", "return redis.call('set','foo','bar')", 0)
+		v, err := redis.String(c.Do("EVAL", "return redis.call('set','foo','bar')", 0))
 		ok(t, err)
 		equals(t, "OK", v)
 	}
 
 	{
-		v, err := c.Do("EVAL", "return redis.call('get','foo')", 0)
+		v, err := redis.String(c.Do("EVAL", "return redis.call('get','foo')", 0))
 		ok(t, err)
 		equals(t, "bar", v)
 	}
 
 	{
-		v, err := c.Do("EVAL", "return redis.call('HMSET', 'mkey', 'foo','bar','foo1','bar1')", 0)
+		v, err := redis.String(c.Do("EVAL", "return redis.call('HMSET', 'mkey', 'foo','bar','foo1','bar1')", 0))
 		ok(t, err)
 		equals(t, "OK", v)
 	}
 
 	{
-		v, err := c.Do("EVAL", "return redis.call('HGETALL','mkey')", 0)
+		v, err := redis.Strings(c.Do("EVAL", "return redis.call('HGETALL','mkey')", 0))
 		ok(t, err)
-		equals(t, []interface{}{"foo", "bar", "foo1", "bar1"}, v)
+		equals(t, []string{"foo", "bar", "foo1", "bar1"}, v)
 	}
 
 	{
-		v, err := c.Do("EVAL", "return redis.call('HMGET','mkey', 'foo1')", 0)
+		v, err := redis.Strings(c.Do("EVAL", "return redis.call('HMGET','mkey', 'foo1')", 0))
 		ok(t, err)
-		equals(t, []interface{}{"bar1"}, v)
+		equals(t, []string{"bar1"}, v)
 	}
 
 	{
-		v, err := c.Do("EVAL", "return redis.call('HMGET','mkey', 'foo')", 0)
+		v, err := redis.Strings(c.Do("EVAL", "return redis.call('HMGET','mkey', 'foo')", 0))
 		ok(t, err)
-		equals(t, []interface{}{"bar"}, v)
+		equals(t, []string{"bar"}, v)
 	}
 
 	{
 		v, err := c.Do("EVAL", "return redis.call('HMGET','mkey', 'bad', 'key')", 0)
 		ok(t, err)
 		equals(t, []interface{}{nil, nil}, v)
-	}
-}
-
-func TestCmdScript(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
-
-	c, err := redis.Dial("tcp", s.Addr())
-	ok(t, err)
-	defer c.Close()
-
-	// SCRIPT LOAD
-	{
-		v, err := redis.Strings(c.Do("SCRIPT", "LOAD", "return {KEYS[1],KEYS[2],ARGV[1],ARGV[2]}", "return redis.call('set','foo','bar')"))
-		ok(t, err)
-		equals(t, []string{"a42059b356c875f0717db19a51f6aaca9ae659ea", "2fa2b029f72572e803ff55a09b1282699aecae6a"}, v)
-	}
-
-	// SCRIPT EXISTS
-	{
-		v, err := redis.Int64s(c.Do("SCRIPT", "exists", "a42059b356c875f0717db19a51f6aaca9ae659ea", "2fa2b029f72572e803ff55a09b1282699aecae6a", "invalid sha"))
-		ok(t, err)
-		equals(t, []int64{1, 1, 0}, v)
-	}
-
-	// SCRIPT FLUSH
-	{
-		v, err := redis.String(c.Do("SCRIPT", "flush"))
-		ok(t, err)
-		equals(t, "OK", v)
 	}
 }
 
@@ -292,14 +329,14 @@ func TestCmdScriptAndEvalsha(t *testing.T) {
 
 	// SCRIPT LOAD
 	{
-		v, err := redis.Strings(c.Do("SCRIPT", "LOAD", "redis.call('set', KEYS[1], ARGV[1])\n return redis.call('get', KEYS[1]) "))
+		v, err := redis.String(c.Do("SCRIPT", "LOAD", "redis.call('set', KEYS[1], ARGV[1])\n return redis.call('get', KEYS[1]) "))
 		ok(t, err)
-		equals(t, []string{"054a13c20b748da2922a5f37f144342de21b8650"}, v)
+		equals(t, "054a13c20b748da2922a5f37f144342de21b8650", v)
 	}
 
 	// TEST EVALSHA
 	{
-		v, err := c.Do("EVALSHA", "054a13c20b748da2922a5f37f144342de21b8650", 1, "test_key", "test_value")
+		v, err := redis.String(c.Do("EVALSHA", "054a13c20b748da2922a5f37f144342de21b8650", 1, "test_key", "test_value"))
 		ok(t, err)
 		equals(t, "test_value", v)
 	}

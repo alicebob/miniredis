@@ -28,10 +28,15 @@ const (
 	msgInvalidPSETEXTime  = "ERR invalid expire time in psetex"
 	msgInvalidKeysNumber  = "ERR Number of keys can't be greater than number of args"
 	msgNegativeKeysNumber = "ERR Number of keys can't be negative"
+	msgScriptUsage        = "ERR Unknown SCRIPT subcommand or wrong # of args."
 )
 
 func errWrongNumber(cmd string) string {
 	return fmt.Sprintf("ERR wrong number of arguments for '%s' command", strings.ToLower(cmd))
+}
+
+func errLuaParseError(err error) string {
+	return fmt.Sprintf("ERR Error compiling script (new function): %s", err.Error())
 }
 
 // withTx wraps the non-argument-checking part of command handling code in

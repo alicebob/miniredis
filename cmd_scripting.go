@@ -10,6 +10,7 @@ import (
 
 	"github.com/garyburd/redigo/redis"
 	lua "github.com/yuin/gopher-lua"
+	"github.com/yuin/gopher-lua/parse"
 
 	"github.com/alicebob/miniredis/server"
 )
@@ -130,7 +131,7 @@ func (m *Miniredis) runLuaScript(c *server.Peer, script string, args []string) {
 	l.Call(1, 0)
 
 	if err := l.DoString(script); err != nil {
-		c.WriteError(fmt.Sprintf("ERR Error compiling script (new function): %s", err.Error()))
+		c.WriteError(errLuaParseError(err))
 		return
 	}
 
@@ -255,48 +256,51 @@ func (m *Miniredis) cmdScript(c *server.Peer, cmd string, args []string) {
 		return
 	}
 
-	m.Lock()
-	defer m.Unlock()
-
-	switch strings.Trim(strings.ToLower(args[0]), " \t") {
+	subcmd, args := args[0], args[1:]
+	switch strings.ToLower(subcmd) {
 	case "load":
-		if len(args) < 2 {
+		if len(args) != 1 {
 			setDirty(c)
-			c.WriteError(errWrongNumber(cmd))
+			c.WriteError(msgScriptUsage)
 			return
 		}
-
-		var shaList []string
-		for _, arg := range args[1:] {
-			sha := scriptSha(arg)
-			m.scripts[sha] = arg
-			shaList = append(shaList, sha)
+		script := args[0]
+		if _, err := parse.Parse(strings.NewReader(script), "user_script"); err != nil {
+			c.WriteError(errLuaParseError(err))
+			return
 		}
+		sha := scriptSha(script)
+		m.Lock()
+		m.scripts[sha] = script
+		m.Unlock()
+		c.WriteBulk(sha)
 
-		c.WriteLen(len(shaList))
-		for _, sha := range shaList {
-			c.WriteBulk(sha)
-		}
 	case "exists":
-		if len(args) < 2 {
-			setDirty(c)
-			c.WriteError(errWrongNumber(cmd))
-			return
-		}
-
-		c.WriteLen(len(args) - 1)
-		for _, arg := range args[1:] {
+		m.Lock()
+		defer m.Unlock()
+		c.WriteLen(len(args))
+		for _, arg := range args {
 			if _, ok := m.scripts[arg]; ok {
 				c.WriteInt(1)
 			} else {
 				c.WriteInt(0)
 			}
 		}
+
 	case "flush":
+		if len(args) != 0 {
+			setDirty(c)
+			c.WriteError(msgScriptUsage)
+			return
+		}
+
+		m.Lock()
+		defer m.Unlock()
 		m.scripts = map[string]string{}
 		c.WriteOK()
+
 	default:
-		c.WriteError("ERR Not implemented yet")
+		c.WriteError(msgScriptUsage)
 	}
 }
 
