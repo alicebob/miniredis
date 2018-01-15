@@ -11,21 +11,23 @@ import (
 )
 
 const (
-	msgWrongType         = "WRONGTYPE Operation against a key holding the wrong kind of value"
-	msgInvalidInt        = "ERR value is not an integer or out of range"
-	msgInvalidFloat      = "ERR value is not a valid float"
-	msgInvalidMinMax     = "ERR min or max is not a float"
-	msgInvalidRangeItem  = "ERR min or max not valid string range item"
-	msgInvalidTimeout    = "ERR timeout is not an integer or out of range"
-	msgSyntaxError       = "ERR syntax error"
-	msgKeyNotFound       = "ERR no such key"
-	msgOutOfRange        = "ERR index out of range"
-	msgInvalidCursor     = "ERR invalid cursor"
-	msgXXandNX           = "ERR XX and NX options at the same time are not compatible"
-	msgNegTimeout        = "ERR timeout is negative"
-	msgInvalidSETime     = "ERR invalid expire time in set"
-	msgInvalidSETEXTime  = "ERR invalid expire time in setex"
-	msgInvalidPSETEXTime = "ERR invalid expire time in psetex"
+	msgWrongType          = "WRONGTYPE Operation against a key holding the wrong kind of value"
+	msgInvalidInt         = "ERR value is not an integer or out of range"
+	msgInvalidFloat       = "ERR value is not a valid float"
+	msgInvalidMinMax      = "ERR min or max is not a float"
+	msgInvalidRangeItem   = "ERR min or max not valid string range item"
+	msgInvalidTimeout     = "ERR timeout is not an integer or out of range"
+	msgSyntaxError        = "ERR syntax error"
+	msgKeyNotFound        = "ERR no such key"
+	msgOutOfRange         = "ERR index out of range"
+	msgInvalidCursor      = "ERR invalid cursor"
+	msgXXandNX            = "ERR XX and NX options at the same time are not compatible"
+	msgNegTimeout         = "ERR timeout is negative"
+	msgInvalidSETime      = "ERR invalid expire time in set"
+	msgInvalidSETEXTime   = "ERR invalid expire time in setex"
+	msgInvalidPSETEXTime  = "ERR invalid expire time in psetex"
+	msgInvalidKeysNumber  = "ERR Number of keys can't be greater than number of args"
+	msgNegativeKeysNumber = "ERR Number of keys can't be negative"
 )
 
 func errWrongNumber(cmd string) string {

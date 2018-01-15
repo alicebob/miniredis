@@ -20,42 +20,43 @@ func commandsScripting(m *Miniredis) {
 	m.srv.Register("SCRIPT", m.cmdScript)
 }
 
-func byteToString(bs []uint8) string {
-	b := make([]byte, len(bs))
-	for i, v := range bs {
-		b[i] = byte(v)
-	}
-	return string(b)
-}
-
-func (m *Miniredis) runLuaScript(c *server.Peer, script string, args []string) error {
+func (m *Miniredis) runLuaScript(c *server.Peer, script string, args []string) {
 	l := lua.NewState()
 	defer l.Close()
 
 	// create a redis client for redis.call
 	conn, err := redis.Dial("tcp", m.srv.Addr().String())
 	if err != nil {
-		return err
+		c.WriteError(fmt.Sprintf("ERR Redis error: %v", err.Error()))
+		return
 	}
 	defer conn.Close()
 
 	// set global variable KEYS
 	keysTable := l.NewTable()
-	keysLen, err := strconv.Atoi(args[1])
+	keysS, args := args[0], args[1:]
+	keysLen, err := strconv.Atoi(keysS)
 	if err != nil {
-		c.WriteError(err.Error())
-		return err
+		c.WriteError(msgInvalidInt)
+		return
 	}
-	for i := 0; i < keysLen; i++ {
-		l.RawSet(keysTable, lua.LNumber(i+1), lua.LString(args[i+2]))
+	if keysLen < 0 {
+		c.WriteError(msgNegativeKeysNumber)
+		return
+	}
+	if keysLen > len(args) {
+		c.WriteError(msgInvalidKeysNumber)
+		return
+	}
+	keys, args := args[:keysLen], args[keysLen:]
+	for i, k := range keys {
+		l.RawSet(keysTable, lua.LNumber(i+1), lua.LString(k))
 	}
 	l.SetGlobal("KEYS", keysTable)
 
-	// set global variable ARGV
 	argvTable := l.NewTable()
-	argvLen := len(args) - 2 - keysLen
-	for i := 0; i < argvLen; i++ {
-		l.RawSet(argvTable, lua.LNumber(i+1), lua.LString(args[i+2+keysLen]))
+	for i, a := range args {
+		l.RawSet(argvTable, lua.LNumber(i+1), lua.LString(a))
 	}
 	l.SetGlobal("ARGV", argvTable)
 
@@ -129,8 +130,8 @@ func (m *Miniredis) runLuaScript(c *server.Peer, script string, args []string) e
 	l.Call(1, 0)
 
 	if err := l.DoString(script); err != nil {
-		c.WriteError(err.Error())
-		return err
+		c.WriteError(fmt.Sprintf("ERR Error compiling script (new function): %s", err.Error()))
+		return
 	}
 
 	if l.GetTop() > 0 {
@@ -138,8 +139,6 @@ func (m *Miniredis) runLuaScript(c *server.Peer, script string, args []string) e
 	} else {
 		c.WriteNull()
 	}
-
-	return nil
 }
 
 func (m *Miniredis) redisToLua(l *lua.LState, res []interface{}) *lua.LTable {
@@ -213,7 +212,7 @@ func (m *Miniredis) luaToRedis(l *lua.LState, c *server.Peer, value lua.LValue) 
 }
 
 func (m *Miniredis) cmdEval(c *server.Peer, cmd string, args []string) {
-	if len(args) < 1 {
+	if len(args) < 2 {
 		setDirty(c)
 		c.WriteError(errWrongNumber(cmd))
 		return
@@ -221,11 +220,8 @@ func (m *Miniredis) cmdEval(c *server.Peer, cmd string, args []string) {
 	if !m.handleAuth(c) {
 		return
 	}
-
-	err := m.runLuaScript(c, args[0], args)
-	if err != nil {
-		c.WriteError(err.Error())
-	}
+	script, args := args[0], args[1:]
+	m.runLuaScript(c, script, args)
 }
 
 func (m *Miniredis) cmdEvalsha(c *server.Peer, cmd string, args []string) {
@@ -238,17 +234,15 @@ func (m *Miniredis) cmdEvalsha(c *server.Peer, cmd string, args []string) {
 		return
 	}
 
-	sha := args[0]
+	sha, args := args[0], args[1:]
 	m.Lock()
 	script, ok := m.scripts[sha]
 	m.Unlock()
 	if !ok {
-		c.WriteError(fmt.Sprintf("Invalid SHA %v", sha))
+		c.WriteError(fmt.Sprintf("ERR Invalid SHA %v", sha))
+		return
 	}
-	err := m.runLuaScript(c, script, args)
-	if err != nil {
-		c.WriteError(err.Error())
-	}
+	m.runLuaScript(c, script, args)
 }
 
 func (m *Miniredis) cmdScript(c *server.Peer, cmd string, args []string) {
@@ -302,7 +296,7 @@ func (m *Miniredis) cmdScript(c *server.Peer, cmd string, args []string) {
 		m.scripts = map[string]string{}
 		c.WriteOK()
 	default:
-		c.WriteError("Not implemented yet")
+		c.WriteError("ERR Not implemented yet")
 	}
 }
 

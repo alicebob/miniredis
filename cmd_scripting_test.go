@@ -6,6 +6,51 @@ import (
 	"github.com/garyburd/redigo/redis"
 )
 
+func TestEval(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	{
+		b, err := redis.Int(c.Do("EVAL", "return 42", 0))
+		ok(t, err)
+		equals(t, 42, b)
+	}
+
+	{
+		b, err := c.Do("EVAL", "return {KEYS[1], ARGV[1]}", 1, "key1", "key2")
+		ok(t, err)
+		equals(t, []interface{}{"key1", "key2"}, b)
+	}
+
+	{
+		b, err := c.Do("EVAL", "return {ARGV[1]}", 0, "key1")
+		ok(t, err)
+		equals(t, []interface{}{"key1"}, b)
+	}
+
+	// Invalid args
+	_, err = c.Do("EVAL", 42, 0)
+	assert(t, err != nil, "no EVAL error")
+
+	_, err = c.Do("EVAL", "return 42")
+	mustFail(t, err, errWrongNumber("eval"))
+
+	_, err = c.Do("EVAL", "return 42", 1)
+	mustFail(t, err, msgInvalidKeysNumber)
+
+	_, err = c.Do("EVAL", "return 42", -1)
+	mustFail(t, err, msgNegativeKeysNumber)
+
+	_, err = c.Do("EVAL", "return 42", "letter")
+	mustFail(t, err, msgInvalidInt)
+
+	_, err = c.Do("EVAL", "[", 0)
+	assert(t, err != nil, "no EVAL error")
+}
+
 func TestCmdEvalReplyConversion(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
@@ -144,17 +189,11 @@ func TestCmdEvalReplyConversion(t *testing.T) {
 	}
 
 	for id, tc := range cases {
-		args := make([]interface{}, len(tc.args)+1)
-		args[0] = tc.script
-		for index, arg := range tc.args {
-			args[index+1] = arg
-		}
-
-		reply, err := c.Do("EVAL", args...)
+		reply, err := c.Do("EVAL", append([]interface{}{tc.script}, tc.args...)...)
 		if err != nil {
 			t.Errorf("%v: Unexpected error: %v", id, err)
+			continue
 		}
-
 		equals(t, tc.expected, reply)
 	}
 }
