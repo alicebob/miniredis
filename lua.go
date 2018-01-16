@@ -1,8 +1,6 @@
 package miniredis
 
 import (
-	"strconv"
-
 	redigo "github.com/garyburd/redigo/redis"
 	lua "github.com/yuin/gopher-lua"
 
@@ -10,36 +8,41 @@ import (
 )
 
 func mkLuaFuncs(conn redigo.Conn) map[string]lua.LGFunction {
-	funcs := map[string]lua.LGFunction{
-		"call": func(l *lua.LState) int {
+	mkCall := func(failFast bool) func(l *lua.LState) int {
+		return func(l *lua.LState) int {
 			top := l.GetTop()
-
-			cmd := lua.LVAsString(l.Get(1))
-			args := make([]interface{}, top-1)
-			for i := 2; i <= top; i++ {
-				arg := l.Get(i)
-
-				dataType := arg.Type()
-				switch dataType {
-				case lua.LTBool:
-					args[i-2] = lua.LVAsBool(arg)
-				case lua.LTNumber:
-					value, _ := strconv.ParseFloat(lua.LVAsString(arg), 64)
-					args[i-2] = value
-				case lua.LTString:
-					args[i-2] = lua.LVAsString(arg)
-				case lua.LTNil:
-				case lua.LTFunction:
-				case lua.LTUserData:
-				case lua.LTThread:
-				case lua.LTTable:
-				case lua.LTChannel:
+			if top == 0 {
+				l.Error(lua.LString("Please specify at least one argument for redis.call()"), 1)
+				return 0
+			}
+			var args []interface{}
+			for i := 1; i <= top; i++ {
+				switch a := l.Get(i).(type) {
+				// case lua.LBool:
+				// args[i-2] = a
+				case lua.LNumber:
+					// value, _ := strconv.ParseFloat(lua.LVAsString(arg), 64)
+					args = append(args, float64(a))
+				case lua.LString:
+					args = append(args, string(a))
 				default:
-					args[i-2] = nil
+					l.Error(lua.LString("Lua redis() command arguments must be strings or integers"), 1)
+					return 0
 				}
 			}
-			res, err := conn.Do(cmd, args...)
+			cmd, ok := args[0].(string)
+			if !ok {
+				l.Error(lua.LString("Unknown Redis command called from Lua script"), 1)
+				return 0
+			}
+			res, err := conn.Do(cmd, args[1:]...)
 			if err != nil {
+				if failFast {
+					// call() mode
+					l.Error(lua.LString(err.Error()), 1)
+					return 0
+				}
+				// pcall() mode
 				l.Push(lua.LNil)
 				return 1
 			}
@@ -57,13 +60,16 @@ func mkLuaFuncs(conn redigo.Conn) map[string]lua.LGFunction {
 				case string:
 					l.Push(lua.LString(r))
 				default:
-					// TODO: oops?
-					l.Push(lua.LString(res.(string)))
+					panic("type not handled")
 				}
 			}
+			return 1
+		}
+	}
 
-			return 1 // Notify that we pushed one value to the stack
-		},
+	return map[string]lua.LGFunction{
+		"call":  mkCall(true),
+		"pcall": mkCall(false),
 		"error_reply": func(l *lua.LState) int {
 			msg := l.CheckString(1)
 			res := &lua.LTable{}
@@ -79,8 +85,6 @@ func mkLuaFuncs(conn redigo.Conn) map[string]lua.LGFunction {
 			return 1
 		},
 	}
-	funcs["pcall"] = funcs["call"]
-	return funcs
 }
 
 func luaToRedis(l *lua.LState, c *server.Peer, value lua.LValue) {
@@ -89,21 +93,20 @@ func luaToRedis(l *lua.LState, c *server.Peer, value lua.LValue) {
 		return
 	}
 
-	switch value.Type() {
-	case lua.LTNil:
+	switch t := value.(type) {
+	case *lua.LNilType:
 		c.WriteNull()
-	case lua.LTBool:
+	case lua.LBool:
 		if lua.LVAsBool(value) {
 			c.WriteInt(1)
 		} else {
 			c.WriteInt(0)
 		}
-	case lua.LTNumber:
+	case lua.LNumber:
 		c.WriteInt(int(lua.LVAsNumber(value)))
-	case lua.LTString:
+	case lua.LString:
 		c.WriteBulk(lua.LVAsString(value))
-	case lua.LTTable:
-		t := value.(*lua.LTable)
+	case *lua.LTable:
 		// special case for tables with an 'err' or 'ok' field
 		// note: according to the docs this only counts when 'err' or 'ok' is
 		// the only field.
@@ -136,7 +139,7 @@ func luaToRedis(l *lua.LState, c *server.Peer, value lua.LValue) {
 			luaToRedis(l, c, r)
 		}
 	default:
-		c.WriteInline(lua.LVAsString(value))
+		panic("....")
 	}
 }
 

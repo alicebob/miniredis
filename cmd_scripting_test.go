@@ -52,6 +52,24 @@ func TestEval(t *testing.T) {
 	assert(t, err != nil, "no EVAL error")
 }
 
+func TestEvalCall(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+	defer c.Close()
+
+	_, err = c.Do("EVAL", "redis.call()", "0")
+	assert(t, err != nil, "no EVAL error")
+
+	_, err = c.Do("EVAL", "redis.call({})", "0")
+	assert(t, err != nil, "no EVAL error")
+
+	_, err = c.Do("EVAL", "redis.call(1)", "0")
+	assert(t, err != nil, "no EVAL error")
+}
+
 func TestScript(t *testing.T) {
 	s, err := Run()
 	ok(t, err)

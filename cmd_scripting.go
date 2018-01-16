@@ -70,11 +70,7 @@ func (m *Miniredis) runLuaScript(c *server.Peer, script string, args []string) {
 		return
 	}
 
-	if l.GetTop() > 0 {
-		luaToRedis(l, c, l.Get(1))
-	} else {
-		c.WriteNull()
-	}
+	luaToRedis(l, c, l.Get(1))
 }
 
 func (m *Miniredis) cmdEval(c *server.Peer, cmd string, args []string) {
