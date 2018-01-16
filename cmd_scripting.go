@@ -20,8 +20,28 @@ func commandsScripting(m *Miniredis) {
 }
 
 func (m *Miniredis) runLuaScript(c *server.Peer, script string, args []string) {
-	l := lua.NewState()
+	l := lua.NewState(lua.Options{SkipOpenLibs: true})
 	defer l.Close()
+
+	// Taken from the go-lua manual
+	for _, pair := range []struct {
+		n string
+		f lua.LGFunction
+	}{
+		{lua.BaseLibName, lua.OpenBase},
+		{lua.CoroutineLibName, lua.OpenCoroutine},
+		{lua.TabLibName, lua.OpenTable},
+		{lua.StringLibName, lua.OpenString},
+		{lua.MathLibName, lua.OpenMath},
+	} {
+		if err := l.CallByParam(lua.P{
+			Fn:      l.NewFunction(pair.f),
+			NRet:    0,
+			Protect: true,
+		}, lua.LString(pair.n)); err != nil {
+			panic(err)
+		}
+	}
 
 	conn := m.redigo()
 	defer conn.Close()

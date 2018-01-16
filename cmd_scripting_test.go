@@ -50,6 +50,15 @@ func TestEval(t *testing.T) {
 
 	_, err = c.Do("EVAL", "[", 0)
 	assert(t, err != nil, "no EVAL error")
+
+	_, err = c.Do("EVAL", "os.exit(42)", 0)
+	assert(t, err != nil, "no EVAL error")
+
+	{
+		b, err := redis.String(c.Do("EVAL", `return string.gsub("foo", "o", "a")`, 0))
+		ok(t, err)
+		equals(t, "faa", b)
+	}
 }
 
 func TestEvalCall(t *testing.T) {
