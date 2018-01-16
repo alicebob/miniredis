@@ -16,7 +16,7 @@ stack.
 
 There are no dependencies on external binaries, so you can easily integrate it in automated build processes.
 
-## 1.0.0 incompatiliby notice
+## 1.0.0 incompatibility notice
 
 2.0.0 improves TTLs to be `time.Duration` values. `.Expire()` is removed and
 replaced by `.TTL()`, which returns the TTL as a `time.Duration`.
@@ -165,11 +165,11 @@ Implemented commands:
    - ZUNIONSTORE
    - ZSCAN
  - Scripting
-    - EVAL
-    - EVALSHA
-    - SCRIPT LOAD
-    - SCRIPT EXISTS
-    - SCRIPT FLUSH
+   - EVAL
+   - EVALSHA
+   - SCRIPT LOAD
+   - SCRIPT EXISTS
+   - SCRIPT FLUSH
 
 
 Since miniredis is intended to be used in unittests TTLs don't decrease
