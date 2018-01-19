@@ -20,7 +20,7 @@ There are no dependencies on external binaries, so you can easily integrate it i
 
 ### 2.3
 
-Added the `EVAL`, `EVALLUA`, and `SCRIPT` commands. Uses a pure Go Lua interpreter. Please open an issue if there are problems with any Lua code.
+Added the `EVAL`, `EVALSHA`, and `SCRIPT` commands. Uses a pure Go Lua interpreter. Please open an issue if there are problems with any Lua code.
 
 ### 2.2
 
