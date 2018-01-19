@@ -16,17 +16,31 @@ stack.
 
 There are no dependencies on external binaries, so you can easily integrate it in automated build processes.
 
-## 1.0.0 incompatibility notice
+## Changelog
+
+### 2.3
+
+Added the `EVAL`, `EVALLUA`, and `SCRIPT` commands. Uses a pure Go Lua interpreter. Please open an issue if there are problems with any Lua code.
+
+### 2.2
+
+Introduced `StartAddr()`.
+
+### 2.1
+
+Internal cleanups. No changes in functionality.
+
+### 2.0
 
 2.0.0 improves TTLs to be `time.Duration` values. `.Expire()` is removed and
 replaced by `.TTL()`, which returns the TTL as a `time.Duration`.
 This should be the change needed to upgrade:
 
-1.0.0:
+1.0:
 
     m.Expire() == 4
    
-2.0.0:
+2.0:
 
     m.TTL() == 4 * time.Second
 
@@ -274,7 +288,7 @@ Commands which will probably not be implemented:
 ## &c.
 
 See https://github.com/alicebob/miniredis_vs_redis for tests comparing
-miniredis against the real thing. Tests are run against Redis 4.0.2 (Debian).
+miniredis against the real thing. Tests are run against Redis 4.0.6 (Debian).
 
 
 [![Build Status](https://travis-ci.org/alicebob/miniredis.svg?branch=master)](https://travis-ci.org/alicebob/miniredis) 
