@@ -155,7 +155,7 @@ func (m *Miniredis) cmdScript(c *server.Peer, cmd string, args []string) {
 			c.WriteError(errLuaParseError(err))
 			return
 		}
-		sha := scriptSha(script)
+		sha := sha1Hex(script)
 		m.Lock()
 		m.scripts[sha] = script
 		m.Unlock()
@@ -190,7 +190,7 @@ func (m *Miniredis) cmdScript(c *server.Peer, cmd string, args []string) {
 	}
 }
 
-func scriptSha(s string) string {
+func sha1Hex(s string) string {
 	h := sha1.New()
 	io.WriteString(h, s)
 	return hex.EncodeToString(h.Sum(nil))
