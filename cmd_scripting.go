@@ -7,8 +7,9 @@ import (
 	"strconv"
 	"strings"
 
-	lua "github.com/yuin/gopher-lua"
+	"github.com/yuin/gopher-lua"
 	"github.com/yuin/gopher-lua/parse"
+	luajson "layeh.com/gopher-json"
 
 	"github.com/alicebob/miniredis/server"
 )
@@ -28,6 +29,7 @@ func (m *Miniredis) runLuaScript(c *server.Peer, script string, args []string) {
 		n string
 		f lua.LGFunction
 	}{
+		{lua.LoadLibName, lua.OpenPackage},
 		{lua.BaseLibName, lua.OpenBase},
 		{lua.CoroutineLibName, lua.OpenCoroutine},
 		{lua.TabLibName, lua.OpenTable},
@@ -42,6 +44,9 @@ func (m *Miniredis) runLuaScript(c *server.Peer, script string, args []string) {
 			panic(err)
 		}
 	}
+
+	luajson.Preload(l)
+	requireGlobal(l, "cjson", "json")
 
 	conn := m.redigo()
 	defer conn.Close()
@@ -150,7 +155,7 @@ func (m *Miniredis) cmdScript(c *server.Peer, cmd string, args []string) {
 			c.WriteError(errLuaParseError(err))
 			return
 		}
-		sha := scriptSha(script)
+		sha := sha1Hex(script)
 		m.Lock()
 		m.scripts[sha] = script
 		m.Unlock()
@@ -185,8 +190,24 @@ func (m *Miniredis) cmdScript(c *server.Peer, cmd string, args []string) {
 	}
 }
 
-func scriptSha(s string) string {
+func sha1Hex(s string) string {
 	h := sha1.New()
 	io.WriteString(h, s)
 	return hex.EncodeToString(h.Sum(nil))
+}
+
+// requireGlobal imports module modName into the global namespace with the identifier id.  panics if an error results
+// from the function execution
+func requireGlobal(l *lua.LState, id, modName string) {
+	if err := l.CallByParam(lua.P{
+		Fn:      l.GetGlobal("require"),
+		NRet:    1,
+		Protect: true,
+	}, lua.LString(modName)); err != nil {
+		panic(err)
+	}
+	mod := l.Get(-1)
+	l.Pop(1)
+
+	l.SetGlobal(id, mod)
 }

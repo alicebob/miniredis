@@ -146,6 +146,73 @@ func TestScript(t *testing.T) {
 	mustFail(t, err, msgScriptUsage)
 }
 
+func TestCJSON(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+	defer c.Close()
+
+	tests := map[string]struct {
+		expr string
+		want string
+	}{
+		"decode": {
+			expr: `return cjson.decode('{"id":"foo"}')['id']`,
+			want: "foo",
+		},
+		"encode": {
+			expr: `return cjson.encode({foo=42})`,
+			want: `{"foo":42}`,
+		},
+	}
+
+	for name, test := range tests {
+		t.Log(name)
+		str, err := redis.String(c.Do("EVAL", test.expr, 0))
+		assert(t, err == nil, "got %v, want no ERR", err)
+		assert(t, str == test.want, "got %q, want %q", str, test.want)
+	}
+}
+
+func TestSha1Hex(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+	defer c.Close()
+
+	tests := []struct {
+		val  interface{}
+		want string
+	}{
+		{
+			val:  "foo",
+			want: "0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33",
+		},
+		{
+			val:  "bar",
+			want: "62cdb7020ff920e5aa642c3d4066950dd1f01f4d",
+		},
+		{
+			val:  "0",
+			want: "b6589fc6ab0dc82cf12099d1c2d40ab994e8410c",
+		},
+		{
+			val:  0,
+			want: "b6589fc6ab0dc82cf12099d1c2d40ab994e8410c",
+		},
+	}
+
+	for _, test := range tests {
+		str, err := redis.String(c.Do("EVAL", "return redis.sha1hex(ARGV[1])", 0, test.val))
+		assert(t, err == nil, "got %v, want no ERR", err)
+		assert(t, str == test.want, "got %q, want %q", str, test.want)
+	}
+}
+
 func TestEvalsha(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
