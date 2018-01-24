@@ -84,6 +84,11 @@ func mkLuaFuncs(conn redigo.Conn) map[string]lua.LGFunction {
 			l.Push(res)
 			return 1
 		},
+		"sha1hex": func(l *lua.LState) int {
+			msg := l.CheckString(1)
+			l.Push(lua.LString(sha1Hex(msg)))
+			return 1
+		},
 	}
 }
 
