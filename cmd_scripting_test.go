@@ -174,13 +174,29 @@ func TestSha1Hex(t *testing.T) {
 			val:  0,
 			want: "b6589fc6ab0dc82cf12099d1c2d40ab994e8410c",
 		},
+		{
+			val:  nil,
+			want: "da39a3ee5e6b4b0d3255bfef95601890afd80709",
+		},
 	}
-
 	for _, test := range tests {
 		str, err := redis.String(c.Do("EVAL", "return redis.sha1hex(ARGV[1])", 0, test.val))
-		assert(t, err == nil, "got %v, want no ERR", err)
-		assert(t, str == test.want, "got %q, want %q", str, test.want)
+		ok(t, err)
+		equals(t, str, test.want)
 	}
+
+	for _, cas := range [][2]string{
+		{"return redis.sha1hex({})", "da39a3ee5e6b4b0d3255bfef95601890afd80709"},
+		{"return redis.sha1hex(nil)", "da39a3ee5e6b4b0d3255bfef95601890afd80709"},
+		{"return redis.sha1hex(42)", "92cfceb39d57d914ed8b14d0e37643de0797ae56"},
+	} {
+		have, err := redis.String(c.Do("EVAL", cas[0], 0))
+		ok(t, err)
+		equals(t, have, cas[1])
+	}
+
+	_, err = c.Do("EVAL", "redis.sha1hex()", 0)
+	assert(t, err != nil, "lua error")
 }
 
 func TestEvalsha(t *testing.T) {

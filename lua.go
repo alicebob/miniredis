@@ -2,7 +2,7 @@ package miniredis
 
 import (
 	redigo "github.com/garyburd/redigo/redis"
-	lua "github.com/yuin/gopher-lua"
+	"github.com/yuin/gopher-lua"
 
 	"github.com/alicebob/miniredis/server"
 )
@@ -85,7 +85,12 @@ func mkLuaFuncs(conn redigo.Conn) map[string]lua.LGFunction {
 			return 1
 		},
 		"sha1hex": func(l *lua.LState) int {
-			msg := l.CheckString(1)
+			top := l.GetTop()
+			if top != 1 {
+				l.Error(lua.LString("wrong number of arguments"), 1)
+				return 0
+			}
+			msg := lua.LVAsString(l.Get(1))
 			l.Push(lua.LString(sha1Hex(msg)))
 			return 1
 		},
