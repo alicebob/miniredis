@@ -7,9 +7,9 @@ import (
 	"strconv"
 	"strings"
 
+	luajson "github.com/alicebob/gopher-json"
 	"github.com/yuin/gopher-lua"
 	"github.com/yuin/gopher-lua/parse"
-	luajson "layeh.com/gopher-json"
 
 	"github.com/alicebob/miniredis/server"
 )
