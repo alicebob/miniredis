@@ -154,26 +154,36 @@ func TestCJSON(t *testing.T) {
 	ok(t, err)
 	defer c.Close()
 
-	tests := map[string]struct {
+	tests := []struct {
 		expr string
 		want string
 	}{
-		"decode": {
+		{
 			expr: `return cjson.decode('{"id":"foo"}')['id']`,
 			want: "foo",
 		},
-		"encode": {
+		{
 			expr: `return cjson.encode({foo=42})`,
 			want: `{"foo":42}`,
 		},
 	}
-
-	for name, test := range tests {
-		t.Log(name)
+	for _, test := range tests {
 		str, err := redis.String(c.Do("EVAL", test.expr, 0))
+		ok(t, err)
 		assert(t, err == nil, "got %v, want no ERR", err)
-		assert(t, str == test.want, "got %q, want %q", str, test.want)
+		equals(t, str, test.want)
 	}
+
+	_, err = c.Do("EVAL", `redis.encode()`, 0)
+	assert(t, err != nil, "lua error")
+	_, err = c.Do("EVAL", `redis.encode("1", "2")`, 0)
+	assert(t, err != nil, "lua error")
+	_, err = c.Do("EVAL", `redis.decode()`, 0)
+	assert(t, err != nil, "lua error")
+	_, err = c.Do("EVAL", `redis.decode("{")`, 0)
+	assert(t, err != nil, "lua error")
+	_, err = c.Do("EVAL", `redis.decode("1", "2")`, 0)
+	assert(t, err != nil, "lua error")
 }
 
 func TestSha1Hex(t *testing.T) {
