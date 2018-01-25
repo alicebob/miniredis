@@ -115,7 +115,12 @@ func luaToRedis(l *lua.LState, c *server.Peer, value lua.LValue) {
 	case lua.LNumber:
 		c.WriteInt(int(lua.LVAsNumber(value)))
 	case lua.LString:
-		c.WriteBulk(lua.LVAsString(value))
+		s := lua.LVAsString(value)
+		if s == "OK" {
+			c.WriteInline(s)
+		} else {
+			c.WriteBulk(s)
+		}
 	case *lua.LTable:
 		// special case for tables with an 'err' or 'ok' field
 		// note: according to the docs this only counts when 'err' or 'ok' is
