@@ -170,7 +170,6 @@ func TestCJSON(t *testing.T) {
 	for _, test := range tests {
 		str, err := redis.String(c.Do("EVAL", test.expr, 0))
 		ok(t, err)
-		assert(t, err == nil, "got %v, want no ERR", err)
 		equals(t, str, test.want)
 	}
 
