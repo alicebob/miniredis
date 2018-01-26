@@ -18,6 +18,10 @@ There are no dependencies on external binaries, so you can easily integrate it i
 
 ## Changelog
 
+### 2.3.1
+
+Lua changes: added `cjson` library, and `redis.sha1hex()`.
+
 ### 2.3
 
 Added the `EVAL`, `EVALSHA`, and `SCRIPT` commands. Uses a pure Go Lua interpreter. Please open an issue if there are problems with any Lua code.
