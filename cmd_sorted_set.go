@@ -266,7 +266,8 @@ func (m *Miniredis) cmdZinterstore(c *server.Peer, cmd string, args []string) {
 	weights := []float64{}
 	aggregate := "sum"
 	for len(args) > 0 {
-		if strings.ToLower(args[0]) == "weights" {
+		switch strings.ToLower(args[0]) {
+		case "weights":
 			if len(args) < numKeys+1 {
 				setDirty(c)
 				c.WriteError(msgSyntaxError)
@@ -283,9 +284,7 @@ func (m *Miniredis) cmdZinterstore(c *server.Peer, cmd string, args []string) {
 			}
 			withWeights = true
 			args = args[numKeys+1:]
-			continue
-		}
-		if strings.ToLower(args[0]) == "aggregate" {
+		case "aggregate":
 			if len(args) < 2 {
 				setDirty(c)
 				c.WriteError(msgSyntaxError)
@@ -293,18 +292,18 @@ func (m *Miniredis) cmdZinterstore(c *server.Peer, cmd string, args []string) {
 			}
 			aggregate = strings.ToLower(args[1])
 			switch aggregate {
+			case "sum", "min", "max":
 			default:
 				setDirty(c)
 				c.WriteError(msgSyntaxError)
 				return
-			case "sum", "min", "max":
 			}
 			args = args[2:]
-			continue
+		default:
+			setDirty(c)
+			c.WriteError(msgSyntaxError)
+			return
 		}
-		setDirty(c)
-		c.WriteError(msgSyntaxError)
-		return
 	}
 
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
@@ -1110,7 +1109,8 @@ func (m *Miniredis) cmdZunionstore(c *server.Peer, cmd string, args []string) {
 	weights := []float64{}
 	aggregate := "sum"
 	for len(args) > 0 {
-		if strings.ToLower(args[0]) == "weights" {
+		switch strings.ToLower(args[0]) {
+		case "weights":
 			if len(args) < numKeys+1 {
 				setDirty(c)
 				c.WriteError(msgSyntaxError)
@@ -1127,9 +1127,7 @@ func (m *Miniredis) cmdZunionstore(c *server.Peer, cmd string, args []string) {
 			}
 			withWeights = true
 			args = args[numKeys+1:]
-			continue
-		}
-		if strings.ToLower(args[0]) == "aggregate" {
+		case "aggregate":
 			if len(args) < 2 {
 				setDirty(c)
 				c.WriteError(msgSyntaxError)
@@ -1144,11 +1142,11 @@ func (m *Miniredis) cmdZunionstore(c *server.Peer, cmd string, args []string) {
 			case "sum", "min", "max":
 			}
 			args = args[2:]
-			continue
+		default:
+			setDirty(c)
+			c.WriteError(msgSyntaxError)
+			return
 		}
-		setDirty(c)
-		c.WriteError(msgSyntaxError)
-		return
 	}
 
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
