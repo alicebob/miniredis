@@ -172,6 +172,34 @@ func TestSortedSetAdd(t *testing.T) {
 		ok(t, err)
 		equals(t, 1, b)
 
+		n, err := redis.Float64(c.Do("ZADD", "z", "INCR", 1.2, "one"))
+		ok(t, err)
+		equals(t, 2.4, n)
+
+		z, err := c.Do("ZADD", "z", "INCR", "NX", 1.2, "one")
+		ok(t, err)
+		equals(t, nil, z)
+
+		n, err = redis.Float64(c.Do("ZADD", "z", "INCR", "XX", 1.2, "one"))
+		ok(t, err)
+		equals(t, 3.6, n)
+
+		z, err = c.Do("ZADD", "q", "INCR", "XX", 1.2, "one")
+		ok(t, err)
+		equals(t, nil, z)
+
+		n, err = redis.Float64(c.Do("ZADD", "q", "INCR", "NX", 1.2, "one"))
+		ok(t, err)
+		equals(t, 1.2, n)
+
+		z, err = c.Do("ZADD", "q", "INCR", "NX", 1.2, "one")
+		ok(t, err)
+		equals(t, nil, z)
+
+		// CH is ignored with INCR
+		n, err = redis.Float64(c.Do("ZADD", "z", "INCR", "CH", 1.2, "one"))
+		ok(t, err)
+		equals(t, 4.8, n)
 	}
 
 	// Error cases
@@ -192,7 +220,11 @@ func TestSortedSetAdd(t *testing.T) {
 		assert(t, err != nil, "ZADD error")
 		_, err = redis.String(c.Do("ZADD", "set", "MX", 1.0))
 		assert(t, err != nil, "ZADD error")
+		_, err = redis.String(c.Do("ZADD", "set", 1.0, "key", "MX"))
+		assert(t, err != nil, "ZADD error")
 		_, err = redis.String(c.Do("ZADD", "set", "MX", "XX", 1.0, "foo"))
+		assert(t, err != nil, "ZADD error")
+		_, err = redis.String(c.Do("ZADD", "set", "INCR", 1.0, "foo", 2.3, "bar"))
 		assert(t, err != nil, "ZADD error")
 	}
 }
