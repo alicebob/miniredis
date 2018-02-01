@@ -55,8 +55,11 @@ func (m *Miniredis) cmdZadd(c *server.Peer, cmd string, args []string) {
 		nx    = false
 		xx    = false
 		ch    = false
+		incr  = false
 		elems = map[string]float64{}
 	)
+
+outer:
 	for len(args) > 0 {
 		switch strings.ToUpper(args[0]) {
 		case "NX":
@@ -71,21 +74,29 @@ func (m *Miniredis) cmdZadd(c *server.Peer, cmd string, args []string) {
 			ch = true
 			args = args[1:]
 			continue
+		case "INCR":
+			incr = true
+			args = args[1:]
+			continue
 		default:
-			if len(args) < 2 {
-				setDirty(c)
-				c.WriteError(msgSyntaxError)
-				return
-			}
-			score, err := strconv.ParseFloat(args[0], 64)
-			if err != nil {
-				setDirty(c)
-				c.WriteError(msgInvalidFloat)
-				return
-			}
-			elems[args[1]] = score
-			args = args[2:]
+			break outer
 		}
+	}
+
+	if len(args) == 0 || len(args)%2 != 0 {
+		setDirty(c)
+		c.WriteError(msgSyntaxError)
+		return
+	}
+	for len(args) > 0 {
+		score, err := strconv.ParseFloat(args[0], 64)
+		if err != nil {
+			setDirty(c)
+			c.WriteError(msgInvalidFloat)
+			return
+		}
+		elems[args[1]] = score
+		args = args[2:]
 	}
 
 	if xx && nx {
@@ -94,11 +105,33 @@ func (m *Miniredis) cmdZadd(c *server.Peer, cmd string, args []string) {
 		return
 	}
 
+	if incr && len(elems) > 1 {
+		setDirty(c)
+		c.WriteError(msgSingleElementPair)
+		return
+	}
+
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
 		if db.exists(key) && db.t(key) != "zset" {
 			c.WriteError(ErrWrongType.Error())
+			return
+		}
+
+		if incr {
+			for member, delta := range elems {
+				if nx && db.ssetExists(key, member) {
+					c.WriteNull()
+					return
+				}
+				if xx && !db.ssetExists(key, member) {
+					c.WriteNull()
+					return
+				}
+				newScore := db.ssetIncrby(key, member, delta)
+				c.WriteBulk(formatFloat(newScore))
+			}
 			return
 		}
 
