@@ -16,6 +16,8 @@ stack.
 
 There are no dependencies on external binaries, so you can easily integrate it in automated build processes.
 
+It requires [Go](https://golang.org/doc/install) 1.9.
+
 ## Changelog
 
 ### 2.3.1
