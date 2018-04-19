@@ -771,30 +771,23 @@ func TestGetrange(t *testing.T) {
 
 	{
 		s.Set("foo", "abcdefg")
-		type tc struct {
-			s   int
-			e   int
-			res string
+		test := func(s, e int, res string) {
+			t.Helper()
+			v, err := redis.String(c.Do("GETRANGE", "foo", s, e))
+			ok(t, err)
+			equals(t, res, v)
 		}
-		for _, p := range []tc{
-			{0, 0, "a"},
-			{0, 3, "abcd"},
-			{0, 7, "abcdefg"},
-			{0, 100, "abcdefg"},
-			{1, 2, "bc"},
-			{1, 100, "bcdefg"},
-			{-4, -2, "def"},
-			{0, -1, "abcdefg"},
-			{0, -2, "abcdef"},
-			{0, -100, "a"}, // Redis is funny
-			{-2, 2, ""},
-		} {
-			{
-				v, err := redis.String(c.Do("GETRANGE", "foo", p.s, p.e))
-				ok(t, err)
-				equals(t, p.res, v)
-			}
-		}
+		test(0, 0, "a")
+		test(0, 3, "abcd")
+		test(0, 7, "abcdefg")
+		test(0, 100, "abcdefg")
+		test(1, 2, "bc")
+		test(1, 100, "bcdefg")
+		test(-4, -2, "def")
+		test(0, -1, "abcdefg")
+		test(0, -2, "abcdef")
+		test(0, -100, "a") // Redis is funny
+		test(-2, 2, "")
 	}
 
 	// New key
@@ -904,22 +897,15 @@ func TestBitcount(t *testing.T) {
 		// c: 0x1100011 - 4
 		// d: 0x1100100 - 3
 		s.Set("foo", "abcd")
-		type tc struct {
-			s   int
-			e   int
-			res int
+		test := func(s, e, res int) {
+			t.Helper()
+			v, err := redis.Int(c.Do("BITCOUNT", "foo", s, e))
+			ok(t, err)
+			equals(t, res, v)
 		}
-		for _, p := range []tc{
-			{0, 0, 3},   // "a"
-			{0, 3, 13},  // "abcd"
-			{-2, -2, 4}, // "c"
-		} {
-			{
-				v, err := redis.Int(c.Do("BITCOUNT", "foo", p.s, p.e))
-				ok(t, err)
-				equals(t, p.res, v)
-			}
-		}
+		test(0, 0, 3)  // "a"
+		test(0, 3, 13) // "abcd"
+		test(2, -2, 4) // "c"
 	}
 
 	// Wrong type of existing key

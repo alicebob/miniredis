@@ -154,24 +154,20 @@ func TestCJSON(t *testing.T) {
 	ok(t, err)
 	defer c.Close()
 
-	tests := []struct {
-		expr string
-		want string
-	}{
-		{
-			expr: `return cjson.decode('{"id":"foo"}')['id']`,
-			want: "foo",
-		},
-		{
-			expr: `return cjson.encode({foo=42})`,
-			want: `{"foo":42}`,
-		},
-	}
-	for _, test := range tests {
-		str, err := redis.String(c.Do("EVAL", test.expr, 0))
+	test := func(expr, want string) {
+		t.Helper()
+		str, err := redis.String(c.Do("EVAL", expr, 0))
 		ok(t, err)
-		equals(t, str, test.want)
+		equals(t, str, want)
 	}
+	test(
+		`return cjson.decode('{"id":"foo"}')['id']`,
+		"foo",
+	)
+	test(
+		`return cjson.encode({foo=42})`,
+		`{"foo":42}`,
+	)
 
 	_, err = c.Do("EVAL", `redis.encode()`, 0)
 	assert(t, err != nil, "lua error")
@@ -193,46 +189,27 @@ func TestSha1Hex(t *testing.T) {
 	ok(t, err)
 	defer c.Close()
 
-	tests := []struct {
-		val  interface{}
-		want string
-	}{
-		{
-			val:  "foo",
-			want: "0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33",
-		},
-		{
-			val:  "bar",
-			want: "62cdb7020ff920e5aa642c3d4066950dd1f01f4d",
-		},
-		{
-			val:  "0",
-			want: "b6589fc6ab0dc82cf12099d1c2d40ab994e8410c",
-		},
-		{
-			val:  0,
-			want: "b6589fc6ab0dc82cf12099d1c2d40ab994e8410c",
-		},
-		{
-			val:  nil,
-			want: "da39a3ee5e6b4b0d3255bfef95601890afd80709",
-		},
-	}
-	for _, test := range tests {
-		str, err := redis.String(c.Do("EVAL", "return redis.sha1hex(ARGV[1])", 0, test.val))
+	test1 := func(val interface{}, want string) {
+		t.Helper()
+		str, err := redis.String(c.Do("EVAL", "return redis.sha1hex(ARGV[1])", 0, val))
 		ok(t, err)
-		equals(t, str, test.want)
+		equals(t, str, want)
 	}
+	test1("foo", "0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33")
+	test1("bar", "62cdb7020ff920e5aa642c3d4066950dd1f01f4d")
+	test1("0", "b6589fc6ab0dc82cf12099d1c2d40ab994e8410c")
+	test1(0, "b6589fc6ab0dc82cf12099d1c2d40ab994e8410c")
+	test1(nil, "da39a3ee5e6b4b0d3255bfef95601890afd80709")
 
-	for _, cas := range [][2]string{
-		{"return redis.sha1hex({})", "da39a3ee5e6b4b0d3255bfef95601890afd80709"},
-		{"return redis.sha1hex(nil)", "da39a3ee5e6b4b0d3255bfef95601890afd80709"},
-		{"return redis.sha1hex(42)", "92cfceb39d57d914ed8b14d0e37643de0797ae56"},
-	} {
-		have, err := redis.String(c.Do("EVAL", cas[0], 0))
+	test2 := func(eval, want string) {
+		t.Helper()
+		have, err := redis.String(c.Do("EVAL", eval, 0))
 		ok(t, err)
-		equals(t, have, cas[1])
+		equals(t, have, want)
 	}
+	test2("return redis.sha1hex({})", "da39a3ee5e6b4b0d3255bfef95601890afd80709")
+	test2("return redis.sha1hex(nil)", "da39a3ee5e6b4b0d3255bfef95601890afd80709")
+	test2("return redis.sha1hex(42)", "92cfceb39d57d914ed8b14d0e37643de0797ae56")
 
 	_, err = c.Do("EVAL", "redis.sha1hex()", 0)
 	assert(t, err != nil, "lua error")
@@ -289,143 +266,152 @@ func TestCmdEvalReply(t *testing.T) {
 	ok(t, err)
 	defer c.Close()
 
-	cases := map[string]struct {
-		script   string
-		args     []interface{}
-		expected interface{}
-	}{
-		"Return nil": {
-			script: "",
-			args: []interface{}{
-				0,
-			},
-		},
-		"Return boolean true": {
-			script: "return true",
-			args: []interface{}{
-				0,
-			},
-			expected: int64(1),
-		},
-		"Return boolean false": {
-			script: "return false",
-			args: []interface{}{
-				0,
-			},
-			expected: int64(0),
-		},
-		"Return single number": {
-			script: "return 10",
-			args: []interface{}{
-				0,
-			},
-			expected: int64(10),
-		},
-		"Return single float": {
-			script: "return 12.345",
-			args: []interface{}{
-				0,
-			},
-			expected: int64(12),
-		},
-		"Return multiple number": {
-			script: "return 10, 20",
-			args: []interface{}{
-				0,
-			},
-			expected: int64(10),
-		},
-		"Return single string": {
-			script: "return 'test'",
-			args: []interface{}{
-				0,
-			},
-			expected: []byte("test"),
-		},
-		"Return multiple string": {
-			script: "return 'test1', 'test2'",
-			args: []interface{}{
-				0,
-			},
-			expected: []byte("test1"),
-		},
-		"Return single table multiple integer": {
-			script: "return {10, 20}",
-			args: []interface{}{
-				0,
-			},
-			expected: []interface{}{
-				int64(10),
-				int64(20),
-			},
-		},
-		"Return single table multiple string": {
-			script: "return {'test1', 'test2'}",
-			args: []interface{}{
-				0,
-			},
-			expected: []interface{}{
-				[]byte("test1"),
-				[]byte("test2"),
-			},
-		},
-		"Return nested table": {
-			script: "return {10, 20, {30, 40}}",
-			args: []interface{}{
-				0,
-			},
-			expected: []interface{}{
-				int64(10),
-				int64(20),
-				[]interface{}{
-					int64(30),
-					int64(40),
-				},
-			},
-		},
-		"Return combination table": {
-			script: "return {10, 20, {30, 'test', true, 40}, false}",
-			args: []interface{}{
-				0,
-			},
-			expected: []interface{}{
-				int64(10),
-				int64(20),
-				[]interface{}{
-					int64(30),
-					[]byte("test"),
-					int64(1),
-					int64(40),
-				},
-				int64(0),
-			},
-		},
-		"KEYS and ARGV": {
-			script: "return {KEYS[1],KEYS[2],ARGV[1],ARGV[2]}",
-			args: []interface{}{
-				2,
-				"key1",
-				"key2",
-				"first",
-				"second",
-			},
-			expected: []interface{}{
-				[]byte("key1"),
-				[]byte("key2"),
-				[]byte("first"),
-				[]byte("second"),
-			},
-		},
+	test := func(script string, args []interface{}, expected interface{}) {
+		t.Helper()
+		reply, err := c.Do("EVAL", append([]interface{}{script}, args...)...)
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+			return
+		}
+		equals(t, expected, reply)
 	}
 
-	for id, tc := range cases {
-		reply, err := c.Do("EVAL", append([]interface{}{tc.script}, tc.args...)...)
-		if err != nil {
-			t.Errorf("%v: Unexpected error: %v", id, err)
-			continue
-		}
-		equals(t, tc.expected, reply)
-	}
+	// return nil
+	test(
+		"",
+		[]interface{}{
+			0,
+		},
+		nil,
+	)
+	// return boolean true
+	test(
+		"return true",
+		[]interface{}{
+			0,
+		},
+		int64(1),
+	)
+	// return boolean false
+	test(
+		"return false",
+		[]interface{}{
+			0,
+		},
+		int64(0),
+	)
+	// return single number
+	test(
+		"return 10",
+		[]interface{}{
+			0,
+		},
+		int64(10),
+	)
+	// return single float
+	test(
+		"return 12.345",
+		[]interface{}{
+			0,
+		},
+		int64(12),
+	)
+	// return multiple numbers
+	test(
+		"return 10, 20",
+		[]interface{}{
+			0,
+		},
+		int64(10),
+	)
+	// return single string
+	test(
+		"return 'test'",
+		[]interface{}{
+			0,
+		},
+		[]byte("test"),
+	)
+	// return multiple string
+	test(
+		"return 'test1', 'test2'",
+		[]interface{}{
+			0,
+		},
+		[]byte("test1"),
+	)
+	// return single table multiple integer
+	test(
+		"return {10, 20}",
+		[]interface{}{
+			0,
+		},
+		[]interface{}{
+			int64(10),
+			int64(20),
+		},
+	)
+	// return single table multiple string
+	test(
+		"return {'test1', 'test2'}",
+		[]interface{}{
+			0,
+		},
+		[]interface{}{
+			[]byte("test1"),
+			[]byte("test2"),
+		},
+	)
+	// return nested table
+	test(
+		"return {10, 20, {30, 40}}",
+		[]interface{}{
+			0,
+		},
+		[]interface{}{
+			int64(10),
+			int64(20),
+			[]interface{}{
+				int64(30),
+				int64(40),
+			},
+		},
+	)
+	// return combination table
+	test(
+		"return {10, 20, {30, 'test', true, 40}, false}",
+		[]interface{}{
+			0,
+		},
+		[]interface{}{
+			int64(10),
+			int64(20),
+			[]interface{}{
+				int64(30),
+				[]byte("test"),
+				int64(1),
+				int64(40),
+			},
+			int64(0),
+		},
+	)
+	// KEYS and ARGV
+	test(
+		"return {KEYS[1],KEYS[2],ARGV[1],ARGV[2]}",
+		[]interface{}{
+			2,
+			"key1",
+			"key2",
+			"first",
+			"second",
+		},
+		[]interface{}{
+			[]byte("key1"),
+			[]byte("key2"),
+			[]byte("first"),
+			[]byte("second"),
+		},
+	)
 
 	{
 		_, err := c.Do("EVAL", `return {err="broken"}`, 0)
