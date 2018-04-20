@@ -18,6 +18,10 @@ There are no dependencies on external binaries, so you can easily integrate it i
 
 ## Changelog
 
+### 2.4
+
+Minor cleanups. Miniredis now requires Go >= 1.9 (only for the tests. If you don't run the tests you can use an older Go version).
+
 ### 2.3.1
 
 Lua changes: added `cjson` library, and `redis.sha1hex()`.
