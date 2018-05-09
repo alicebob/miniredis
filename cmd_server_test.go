@@ -3,7 +3,7 @@ package miniredis
 import (
 	"testing"
 
-	"github.com/garyburd/redigo/redis"
+	"github.com/gomodule/redigo/redis"
 )
 
 // Test DBSIZE, FLUSHDB, and FLUSHALL.

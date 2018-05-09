@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/garyburd/redigo/redis"
+	"github.com/gomodule/redigo/redis"
 )
 
 func setup(t *testing.T) (*Miniredis, redis.Conn, func()) {

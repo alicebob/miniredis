@@ -21,7 +21,7 @@ import (
 	"sync"
 	"time"
 
-	redigo "github.com/garyburd/redigo/redis"
+	redigo "github.com/gomodule/redigo/redis"
 
 	"github.com/alicebob/miniredis/server"
 )

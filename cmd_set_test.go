@@ -4,7 +4,7 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/garyburd/redigo/redis"
+	"github.com/gomodule/redigo/redis"
 )
 
 // Test SADD / SMEMBERS.

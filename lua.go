@@ -1,7 +1,7 @@
 package miniredis
 
 import (
-	redigo "github.com/garyburd/redigo/redis"
+	redigo "github.com/gomodule/redigo/redis"
 	"github.com/yuin/gopher-lua"
 
 	"github.com/alicebob/miniredis/server"

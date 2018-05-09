@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/garyburd/redigo/redis"
+	"github.com/gomodule/redigo/redis"
 )
 
 // Test EXPIRE. Keys with an expiration are called volatile in Redis parlance.
