@@ -14,14 +14,14 @@ func TestAuth(t *testing.T) {
 	ok(t, err)
 
 	_, err = c.Do("AUTH", "foo", "bar")
-	assert(t, err != nil, "no password set")
+	mustFail(t, err, "ERR wrong number of arguments for 'auth' command")
 
 	s.RequireAuth("nocomment")
 	_, err = c.Do("PING", "foo", "bar")
-	assert(t, err != nil, "need AUTH")
+	mustFail(t, err, "NOAUTH Authentication required.")
 
 	_, err = c.Do("AUTH", "wrongpasswd")
-	assert(t, err != nil, "wrong password")
+	mustFail(t, err, "ERR invalid password")
 
 	_, err = c.Do("AUTH", "nocomment")
 	ok(t, err)

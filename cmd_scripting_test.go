@@ -495,3 +495,26 @@ func TestCmdEvalResponse(t *testing.T) {
 		equals(t, []interface{}{nil, nil}, v)
 	}
 }
+
+func TestCmdEvalAuth(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+	defer c.Close()
+
+	eval := "return redis.call('set','foo','bar')"
+
+	s.RequireAuth("123password")
+
+	_, err = c.Do("EVAL", eval, 0)
+	mustFail(t, err, "NOAUTH Authentication required.")
+
+	_, err = c.Do("AUTH", "123password")
+	ok(t, err)
+
+	_, err = c.Do("EVAL", eval, 0)
+	ok(t, err)
+}
