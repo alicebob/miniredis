@@ -18,6 +18,10 @@ There are no dependencies on external binaries, so you can easily integrate it i
 
 ## Changelog
 
+### 2.4.3
+
+Fixed using Lua with authenticated redis.
+
 ### 2.4.2
 
 Changed redigo import path.
