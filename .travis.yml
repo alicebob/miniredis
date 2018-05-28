@@ -2,7 +2,7 @@ language: go
 
 install: go get -t
 
-script: make test testrace
+script: make test testrace int
 
 sudo: false
 

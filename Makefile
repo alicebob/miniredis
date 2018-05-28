@@ -1,4 +1,4 @@
-.PHONY: all install test testrace vet
+.PHONY: all install test testrace vet int
 
 all: test vet
 
@@ -14,3 +14,6 @@ testrace:
 vet:
 	go vet ./...
 	golint ./...
+
+int:
+	${MAKE} -C integration all

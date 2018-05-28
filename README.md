@@ -303,8 +303,7 @@ Commands which will probably not be implemented:
 
 ## &c.
 
-See https://github.com/alicebob/miniredis_vs_redis for tests comparing
-miniredis against the real thing. Tests are run against Redis 4.0.6 (Debian).
+Tests are run against Redis 4.0.6 (Debian).
 
 
 [![Build Status](https://travis-ci.org/alicebob/miniredis.svg?branch=master)](https://travis-ci.org/alicebob/miniredis) 
