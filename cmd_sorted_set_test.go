@@ -208,8 +208,11 @@ func TestSortedSetAdd(t *testing.T) {
 		_, err := redis.String(c.Do("SET", "str", "value"))
 		ok(t, err)
 
+		_, err = s.ZAdd("str", 1.0, "hi")
+		mustFail(t, err, msgWrongType)
+
 		_, err = redis.Int(c.Do("ZADD", "str", 1.0, "hi"))
-		assert(t, err != nil, "ZADD error")
+		mustFail(t, err, msgWrongType)
 		_, err = redis.String(c.Do("ZADD"))
 		assert(t, err != nil, "ZADD error")
 		_, err = redis.String(c.Do("ZADD", "set"))
