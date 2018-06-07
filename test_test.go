@@ -34,6 +34,7 @@ func mustFail(tb testing.TB, err error, want string) {
 	tb.Helper()
 	if err == nil {
 		tb.Errorf("expected an error, but got a nil")
+		return
 	}
 
 	if have := err.Error(); have != want {
