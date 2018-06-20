@@ -48,7 +48,7 @@ func mkLuaFuncs(conn redigo.Conn) map[string]lua.LGFunction {
 			}
 
 			if res == nil {
-				l.Push(lua.LNil)
+				l.Push(lua.LFalse)
 			} else {
 				switch r := res.(type) {
 				case int64:
@@ -110,7 +110,7 @@ func luaToRedis(l *lua.LState, c *server.Peer, value lua.LValue) {
 		if lua.LVAsBool(value) {
 			c.WriteInt(1)
 		} else {
-			c.WriteInt(0)
+			c.WriteNull()
 		}
 	case lua.LNumber:
 		c.WriteInt(int(lua.LVAsNumber(value)))

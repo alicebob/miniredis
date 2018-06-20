@@ -16,6 +16,8 @@ func TestEval(t *testing.T) {
 		succ("EVAL", "return {KEYS[1],KEYS[2],ARGV[1],ARGV[2]}", 2, "key1", "key2", "first", "second"),
 		succ("EVAL", "return {ARGV[1]}", 0, "first"),
 		succ("EVAL", "return {ARGV[1]}", 0, "first\nwith\nnewlines!\r\r\n\t!"),
+		succ("EVAL", "return redis.call('GET', 'nosuch')==false", 0),
+		succ("EVAL", "return redis.call('GET', 'nosuch')==nil", 0),
 
 		// failure cases
 		fail("EVAL"),

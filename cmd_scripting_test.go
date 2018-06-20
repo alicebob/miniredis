@@ -298,7 +298,7 @@ func TestCmdEvalReply(t *testing.T) {
 		[]interface{}{
 			0,
 		},
-		int64(0),
+		nil,
 	)
 	// return single number
 	test(
@@ -392,7 +392,7 @@ func TestCmdEvalReply(t *testing.T) {
 				int64(1),
 				int64(40),
 			},
-			int64(0),
+			nil,
 		},
 	)
 	// KEYS and ARGV
@@ -463,6 +463,12 @@ func TestCmdEvalResponse(t *testing.T) {
 		v, err := redis.String(c.Do("EVAL", "return redis.call('get','foo')", 0))
 		ok(t, err)
 		equals(t, "bar", v)
+	}
+
+	{
+		v, err := c.Do("EVAL", "return redis.call('get','nosuch')", 0)
+		ok(t, err)
+		equals(t, nil, v)
 	}
 
 	{
