@@ -163,7 +163,7 @@ func redisToLua(l *lua.LState, res []interface{}) *lua.LTable {
 	for _, e := range res {
 		var v lua.LValue
 		if e == nil {
-			v = lua.LValue(nil)
+			v = lua.LFalse
 		} else {
 			switch et := e.(type) {
 			case int64:

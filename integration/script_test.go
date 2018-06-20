@@ -18,6 +18,8 @@ func TestEval(t *testing.T) {
 		succ("EVAL", "return {ARGV[1]}", 0, "first\nwith\nnewlines!\r\r\n\t!"),
 		succ("EVAL", "return redis.call('GET', 'nosuch')==false", 0),
 		succ("EVAL", "return redis.call('GET', 'nosuch')==nil", 0),
+		succ("EVAL", "local a = redis.call('MGET', 'bar'); return a[1] == false", 0),
+		succ("EVAL", "local a = redis.call('MGET', 'bar'); return a[1] == nil", 0),
 
 		// failure cases
 		fail("EVAL"),
