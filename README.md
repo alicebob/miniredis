@@ -18,6 +18,10 @@ There are no dependencies on external binaries, so you can easily integrate it i
 
 ## Changelog
 
+### 2.4.4
+
+Fixed nil Lua return value (#43)
+
 ### 2.4.3
 
 Fixed using Lua with authenticated redis.
