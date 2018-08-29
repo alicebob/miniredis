@@ -94,6 +94,10 @@ func mkLuaFuncs(conn redigo.Conn) map[string]lua.LGFunction {
 			l.Push(lua.LString(sha1Hex(msg)))
 			return 1
 		},
+		"replicate_commands": func(l *lua.LState) int {
+			// ignored
+			return 1
+		},
 	}
 }
 
