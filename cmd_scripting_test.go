@@ -524,3 +524,15 @@ func TestCmdEvalAuth(t *testing.T) {
 	_, err = c.Do("EVAL", eval, 0)
 	ok(t, err)
 }
+
+func TestLuaReplicate(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+	defer c.Close()
+
+	_, err = c.Do("EVAL", "redis.replicate_commands()", 0)
+	ok(t, err)
+}

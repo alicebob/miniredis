@@ -287,3 +287,11 @@ func TestScriptNoAuth(t *testing.T) {
 		),
 	)
 }
+
+func TestScriptReplicate(t *testing.T) {
+	testCommands(t,
+		succ(
+			"EVAL", `redis.replicate_commands();`, 0,
+		),
+	)
+}
