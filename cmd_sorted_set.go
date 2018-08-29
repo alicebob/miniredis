@@ -24,7 +24,7 @@ func commandsSortedSet(m *Miniredis) {
 	m.srv.Register("ZINTERSTORE", m.cmdZinterstore)
 	m.srv.Register("ZLEXCOUNT", m.cmdZlexcount)
 	m.srv.Register("ZRANGE", m.makeCmdZrange(false))
-	m.srv.Register("ZRANGEBYLEX", m.cmdZrangebylex)
+	m.srv.Register("ZRANGEBYLEX", m.makeCmdZrangebylex(false))
 	m.srv.Register("ZRANGEBYSCORE", m.makeCmdZrangebyscore(false))
 	m.srv.Register("ZRANK", m.makeCmdZrank(false))
 	m.srv.Register("ZREM", m.cmdZrem)
@@ -32,6 +32,7 @@ func commandsSortedSet(m *Miniredis) {
 	m.srv.Register("ZREMRANGEBYRANK", m.cmdZremrangebyrank)
 	m.srv.Register("ZREMRANGEBYSCORE", m.cmdZremrangebyscore)
 	m.srv.Register("ZREVRANGE", m.makeCmdZrange(true))
+	m.srv.Register("ZREVRANGEBYLEX", m.makeCmdZrangebylex(true))
 	m.srv.Register("ZREVRANGEBYSCORE", m.makeCmdZrangebyscore(true))
 	m.srv.Register("ZREVRANK", m.makeCmdZrank(true))
 	m.srv.Register("ZSCORE", m.cmdZscore)
@@ -512,106 +513,115 @@ func (m *Miniredis) makeCmdZrange(reverse bool) server.Cmd {
 	}
 }
 
-// ZRANGEBYLEX
-func (m *Miniredis) cmdZrangebylex(c *server.Peer, cmd string, args []string) {
-	if len(args) < 3 {
-		setDirty(c)
-		c.WriteError(errWrongNumber(cmd))
-		return
-	}
-	if !m.handleAuth(c) {
-		return
-	}
-
-	key := args[0]
-	min, minIncl, err := parseLexrange(args[1])
-	if err != nil {
-		setDirty(c)
-		c.WriteError(err.Error())
-		return
-	}
-	max, maxIncl, err := parseLexrange(args[2])
-	if err != nil {
-		setDirty(c)
-		c.WriteError(err.Error())
-		return
-	}
-	args = args[3:]
-
-	withLimit := false
-	limitStart := 0
-	limitEnd := 0
-	for len(args) > 0 {
-		if strings.ToLower(args[0]) == "limit" {
-			withLimit = true
-			args = args[1:]
-			if len(args) < 2 {
-				c.WriteError(msgSyntaxError)
-				return
-			}
-			limitStart, err = strconv.Atoi(args[0])
-			if err != nil {
-				setDirty(c)
-				c.WriteError(msgInvalidInt)
-				return
-			}
-			limitEnd, err = strconv.Atoi(args[1])
-			if err != nil {
-				setDirty(c)
-				c.WriteError(msgInvalidInt)
-				return
-			}
-			args = args[2:]
-			continue
+// ZRANGEBYLEX and ZREVRANGEBYLEX
+func (m *Miniredis) makeCmdZrangebylex(reverse bool) server.Cmd {
+	return func(c *server.Peer, cmd string, args []string) {
+		if len(args) < 3 {
+			setDirty(c)
+			c.WriteError(errWrongNumber(cmd))
+			return
 		}
-		// Syntax error
-		setDirty(c)
-		c.WriteError(msgSyntaxError)
-		return
-	}
-
-	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
-		db := m.db(ctx.selectedDB)
-
-		if !db.exists(key) {
-			c.WriteLen(0)
+		if !m.handleAuth(c) {
 			return
 		}
 
-		if db.t(key) != "zset" {
-			c.WriteError(ErrWrongType.Error())
+		key := args[0]
+		min, minIncl, err := parseLexrange(args[1])
+		if err != nil {
+			setDirty(c)
+			c.WriteError(err.Error())
 			return
 		}
+		max, maxIncl, err := parseLexrange(args[2])
+		if err != nil {
+			setDirty(c)
+			c.WriteError(err.Error())
+			return
+		}
+		args = args[3:]
 
-		members := db.ssetMembers(key)
-		// Just key sort. If scores are not the same we don't care.
-		sort.Strings(members)
-		members = withLexRange(members, min, minIncl, max, maxIncl)
-
-		// Apply LIMIT ranges. That's <start> <elements>. Unlike RANGE.
-		if withLimit {
-			if limitStart < 0 {
-				members = nil
-			} else {
-				if limitStart < len(members) {
-					members = members[limitStart:]
-				} else {
-					// out of range
-					members = nil
+		withLimit := false
+		limitStart := 0
+		limitEnd := 0
+		for len(args) > 0 {
+			if strings.ToLower(args[0]) == "limit" {
+				withLimit = true
+				args = args[1:]
+				if len(args) < 2 {
+					c.WriteError(msgSyntaxError)
+					return
 				}
-				if limitEnd >= 0 {
-					if len(members) > limitEnd {
-						members = members[:limitEnd]
+				limitStart, err = strconv.Atoi(args[0])
+				if err != nil {
+					setDirty(c)
+					c.WriteError(msgInvalidInt)
+					return
+				}
+				limitEnd, err = strconv.Atoi(args[1])
+				if err != nil {
+					setDirty(c)
+					c.WriteError(msgInvalidInt)
+					return
+				}
+				args = args[2:]
+				continue
+			}
+			// Syntax error
+			setDirty(c)
+			c.WriteError(msgSyntaxError)
+			return
+		}
+
+		withTx(m, c, func(c *server.Peer, ctx *connCtx) {
+			db := m.db(ctx.selectedDB)
+
+			if !db.exists(key) {
+				c.WriteLen(0)
+				return
+			}
+
+			if db.t(key) != "zset" {
+				c.WriteError(ErrWrongType.Error())
+				return
+			}
+
+			members := db.ssetMembers(key)
+			// Just key sort. If scores are not the same we don't care.
+			sort.Strings(members)
+			if reverse {
+				min, max = max, min
+				minIncl, maxIncl = maxIncl, minIncl
+			}
+			members = withLexRange(members, min, minIncl, max, maxIncl)
+			if reverse {
+				reverseSlice(members)
+			}
+
+			// Apply LIMIT ranges. That's <start> <elements>. Unlike RANGE.
+			if withLimit {
+				if limitStart < 0 {
+					members = nil
+				} else {
+					if limitStart < len(members) {
+						members = members[limitStart:]
+					} else {
+						// out of range
+						members = nil
+					}
+					if limitEnd >= 0 {
+						if len(members) > limitEnd {
+							members = members[:limitEnd]
+						}
 					}
 				}
 			}
-		}
 
-		c.WriteLen(len(members))
-		for _, el := range members {
-			c.WriteBulk(el)
-		}
-	})
+			c.WriteLen(len(members))
+			for _, el := range members {
+				c.WriteBulk(el)
+			}
+		})
+	}
 }
 
 // ZRANGEBYSCORE and ZREVRANGEBYSCORE

@@ -852,7 +852,7 @@ func TestSortedSetScore(t *testing.T) {
 	}
 }
 
-// Test ZRANGEBYLEX, ZLEXCOUNT
+// Test ZRANGEBYLEX, ZREVRANGEBYLEX, ZLEXCOUNT
 func TestSortedSetRangeByLex(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
@@ -874,7 +874,31 @@ func TestSortedSetRangeByLex(t *testing.T) {
 	{
 		b, err := redis.Strings(c.Do("ZRANGEBYLEX", "z", "-", "+"))
 		ok(t, err)
-		equals(t, []string{"drei", "inf", "minusfour", "one", "oneone", "three", "two", "zero kelvin", "zwei"}, b)
+		equals(t, []string{
+			"drei",
+			"inf",
+			"minusfour",
+			"one",
+			"oneone",
+			"three",
+			"two",
+			"zero kelvin",
+			"zwei",
+		}, b)
+
+		b, err = redis.Strings(c.Do("ZREVRANGEBYLEX", "z", "+", "-"))
+		ok(t, err)
+		equals(t, []string{
+			"zwei",
+			"zero kelvin",
+			"two",
+			"three",
+			"oneone",
+			"one",
+			"minusfour",
+			"inf",
+			"drei",
+		}, b)
 
 		i, err := redis.Int(c.Do("ZLEXCOUNT", "z", "-", "+"))
 		ok(t, err)
@@ -886,6 +910,10 @@ func TestSortedSetRangeByLex(t *testing.T) {
 		ok(t, err)
 		equals(t, []string{"one", "oneone", "three"}, b)
 
+		b, err = redis.Strings(c.Do("ZREVRANGEBYLEX", "z", "[three", "[o"))
+		ok(t, err)
+		equals(t, []string{"three", "oneone", "one"}, b)
+
 		i, err := redis.Int(c.Do("ZLEXCOUNT", "z", "[o", "[three"))
 		ok(t, err)
 		equals(t, 3, i)
@@ -895,6 +923,10 @@ func TestSortedSetRangeByLex(t *testing.T) {
 		b, err := redis.Strings(c.Do("ZRANGEBYLEX", "z", "(o", "(z"))
 		ok(t, err)
 		equals(t, []string{"one", "oneone", "three", "two"}, b)
+
+		b, err = redis.Strings(c.Do("ZREVRANGEBYLEX", "z", "(z", "(o"))
+		ok(t, err)
+		equals(t, []string{"two", "three", "oneone", "one"}, b)
 
 		i, err := redis.Int(c.Do("ZLEXCOUNT", "z", "(o", "(z"))
 		ok(t, err)
@@ -906,7 +938,15 @@ func TestSortedSetRangeByLex(t *testing.T) {
 		ok(t, err)
 		equals(t, []string{}, b)
 
+		b, err = redis.Strings(c.Do("ZREVRANGEBYLEX", "z", "(z", "+"))
+		ok(t, err)
+		equals(t, []string{}, b)
+
 		b, err = redis.Strings(c.Do("ZRANGEBYLEX", "z", "(a", "-"))
+		ok(t, err)
+		equals(t, []string{}, b)
+
+		b, err = redis.Strings(c.Do("ZREVRANGEBYLEX", "z", "-", "(a"))
 		ok(t, err)
 		equals(t, []string{}, b)
 
