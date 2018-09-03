@@ -17,6 +17,7 @@ package miniredis
 import (
 	"fmt"
 	"net"
+	"regexp"
 	"strconv"
 	"sync"
 	"time"
@@ -32,29 +33,41 @@ type setKey map[string]struct{}
 
 // RedisDB holds a single (numbered) Redis database.
 type RedisDB struct {
-	master        *sync.Mutex              // pointer to the lock in Miniredis
-	id            int                      // db id
-	keys          map[string]string        // Master map of keys with their type
-	stringKeys    map[string]string        // GET/SET &c. keys
-	hashKeys      map[string]hashKey       // MGET/MSET &c. keys
-	listKeys      map[string]listKey       // LPUSH &c. keys
-	setKeys       map[string]setKey        // SADD &c. keys
-	sortedsetKeys map[string]sortedSet     // ZADD &c. keys
-	ttl           map[string]time.Duration // effective TTL values
-	keyVersion    map[string]uint          // used to watch values
+	master             *sync.Mutex              // pointer to the lock in Miniredis
+	id                 int                      // db id
+	keys               map[string]string        // Master map of keys with their type
+	stringKeys         map[string]string        // GET/SET &c. keys
+	hashKeys           map[string]hashKey       // MGET/MSET &c. keys
+	listKeys           map[string]listKey       // LPUSH &c. keys
+	setKeys            map[string]setKey        // SADD &c. keys
+	sortedsetKeys      map[string]sortedSet     // ZADD &c. keys
+	ttl                map[string]time.Duration // effective TTL values
+	keyVersion         map[string]uint          // used to watch values
+	subscribedChannels map[string]map[*server.Peer]struct{}
+	subscribedPatterns map[string]map[*server.Peer]struct{}
+}
+
+type peerSubscriptions struct {
+	channels, patterns map[string]struct{}
+}
+
+type peerCache struct {
+	subscriptions map[int]peerSubscriptions
 }
 
 // Miniredis is a Redis server implementation.
 type Miniredis struct {
 	sync.Mutex
-	srv        *server.Server
-	port       int
-	password   string
-	dbs        map[int]*RedisDB
-	selectedDB int               // DB id used in the direct Get(), Set() &c.
-	scripts    map[string]string // sha1 -> lua src
-	signal     *sync.Cond
-	now        time.Time // used to make a duration from EXPIREAT. time.Now() if not set.
+	srv             *server.Server
+	port            int
+	password        string
+	dbs             map[int]*RedisDB
+	selectedDB      int               // DB id used in the direct Get(), Set() &c.
+	scripts         map[string]string // sha1 -> lua src
+	signal          *sync.Cond
+	now             time.Time // used to make a duration from EXPIREAT. time.Now() if not set.
+	peers           map[*server.Peer]peerCache
+	channelPatterns map[string]*regexp.Regexp
 }
 
 type txCmd func(*server.Peer, *connCtx)
@@ -77,8 +90,10 @@ type connCtx struct {
 // NewMiniRedis makes a new, non-started, Miniredis object.
 func NewMiniRedis() *Miniredis {
 	m := Miniredis{
-		dbs:     map[int]*RedisDB{},
-		scripts: map[string]string{},
+		dbs:             map[int]*RedisDB{},
+		scripts:         map[string]string{},
+		peers:           map[*server.Peer]peerCache{},
+		channelPatterns: map[string]*regexp.Regexp{},
 	}
 	m.signal = sync.NewCond(&m)
 	return &m
@@ -86,16 +101,18 @@ func NewMiniRedis() *Miniredis {
 
 func newRedisDB(id int, l *sync.Mutex) RedisDB {
 	return RedisDB{
-		id:            id,
-		master:        l,
-		keys:          map[string]string{},
-		stringKeys:    map[string]string{},
-		hashKeys:      map[string]hashKey{},
-		listKeys:      map[string]listKey{},
-		setKeys:       map[string]setKey{},
-		sortedsetKeys: map[string]sortedSet{},
-		ttl:           map[string]time.Duration{},
-		keyVersion:    map[string]uint{},
+		id:                 id,
+		master:             l,
+		keys:               map[string]string{},
+		stringKeys:         map[string]string{},
+		hashKeys:           map[string]hashKey{},
+		listKeys:           map[string]listKey{},
+		setKeys:            map[string]setKey{},
+		sortedsetKeys:      map[string]sortedSet{},
+		ttl:                map[string]time.Duration{},
+		keyVersion:         map[string]uint{},
+		subscribedChannels: map[string]map[*server.Peer]struct{}{},
+		subscribedPatterns: map[string]map[*server.Peer]struct{}{},
 	}
 }
 
@@ -141,6 +158,8 @@ func (m *Miniredis) start(s *server.Server) error {
 	commandsSortedSet(m)
 	commandsTransaction(m)
 	commandsScripting(m)
+
+	s.OnDisconnect(m.onDisconnect)
 
 	return nil
 }
@@ -321,6 +340,37 @@ func (m *Miniredis) handleAuth(c *server.Peer) bool {
 		return false
 	}
 	return true
+}
+
+func (m *Miniredis) onDisconnect(c *server.Peer) {
+	m.Lock()
+	defer m.Unlock()
+
+	if cache, hasCache := m.peers[c]; hasCache {
+		for dbIdx, subscriptions := range cache.subscriptions {
+			db := m.dbs[dbIdx]
+
+			for channel := range subscriptions.channels {
+				peers := db.subscribedChannels[channel]
+				delete(peers, c)
+
+				if len(peers) < 1 {
+					delete(db.subscribedChannels, channel)
+				}
+			}
+
+			for pattern := range subscriptions.patterns {
+				peers := db.subscribedPatterns[pattern]
+				delete(peers, c)
+
+				if len(peers) < 1 {
+					delete(db.subscribedPatterns, pattern)
+				}
+			}
+		}
+
+		delete(m.peers, c)
+	}
 }
 
 func getCtx(c *server.Peer) *connCtx {
