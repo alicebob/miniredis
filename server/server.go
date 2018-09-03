@@ -16,22 +16,26 @@ func errUnknownCommand(cmd string) string {
 // Cmd is what Register expects
 type Cmd func(c *Peer, cmd string, args []string)
 
+type DisconnectHandler func(c *Peer)
+
 // Server is a simple redis server
 type Server struct {
-	l         net.Listener
-	cmds      map[string]Cmd
-	peers     map[net.Conn]struct{}
-	mu        sync.Mutex
-	wg        sync.WaitGroup
-	infoConns int
-	infoCmds  int
+	l            net.Listener
+	cmds         map[string]Cmd
+	peers        map[net.Conn]struct{}
+	mu           sync.Mutex
+	wg           sync.WaitGroup
+	infoConns    int
+	infoCmds     int
+	onDisconnect DisconnectHandler
 }
 
 // NewServer makes a server listening on addr. Close with .Close().
 func NewServer(addr string) (*Server, error) {
 	s := Server{
-		cmds:  map[string]Cmd{},
-		peers: map[net.Conn]struct{}{},
+		cmds:         map[string]Cmd{},
+		peers:        map[net.Conn]struct{}{},
+		onDisconnect: func(c *Peer) {},
 	}
 
 	l, err := net.Listen("tcp", addr)
@@ -69,7 +73,7 @@ func (s *Server) ServeConn(conn net.Conn) {
 		s.infoConns++
 		s.mu.Unlock()
 
-		s.servePeer(conn)
+		s.onDisconnect(s.servePeer(conn))
 
 		s.mu.Lock()
 		delete(s.peers, conn)
@@ -115,9 +119,13 @@ func (s *Server) Register(cmd string, f Cmd) error {
 	return nil
 }
 
-func (s *Server) servePeer(c net.Conn) {
+func (s *Server) OnDisconnect(handler DisconnectHandler) {
+	s.onDisconnect = handler
+}
+
+func (s *Server) servePeer(c net.Conn) (cl *Peer) {
 	r := bufio.NewReader(c)
-	cl := &Peer{
+	cl = &Peer{
 		w: bufio.NewWriter(c),
 	}
 	for {
