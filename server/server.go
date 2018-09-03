@@ -23,22 +23,26 @@ func errUnknownCommand(cmd string, args []string) string {
 // Cmd is what Register expects
 type Cmd func(c *Peer, cmd string, args []string)
 
+type DisconnectHandler func(c *Peer)
+
 // Server is a simple redis server
 type Server struct {
-	l         net.Listener
-	cmds      map[string]Cmd
-	peers     map[net.Conn]struct{}
-	mu        sync.Mutex
-	wg        sync.WaitGroup
-	infoConns int
-	infoCmds  int
+	l            net.Listener
+	cmds         map[string]Cmd
+	peers        map[net.Conn]struct{}
+	mu           sync.Mutex
+	wg           sync.WaitGroup
+	infoConns    int
+	infoCmds     int
+	onDisconnect DisconnectHandler
 }
 
 // NewServer makes a server listening on addr. Close with .Close().
 func NewServer(addr string) (*Server, error) {
 	s := Server{
-		cmds:  map[string]Cmd{},
-		peers: map[net.Conn]struct{}{},
+		cmds:         map[string]Cmd{},
+		peers:        map[net.Conn]struct{}{},
+		onDisconnect: func(c *Peer) {},
 	}
 
 	l, err := net.Listen("tcp", addr)
@@ -76,7 +80,7 @@ func (s *Server) ServeConn(conn net.Conn) {
 		s.infoConns++
 		s.mu.Unlock()
 
-		s.servePeer(conn)
+		s.onDisconnect(s.servePeer(conn))
 
 		s.mu.Lock()
 		delete(s.peers, conn)
@@ -122,22 +126,87 @@ func (s *Server) Register(cmd string, f Cmd) error {
 	return nil
 }
 
-func (s *Server) servePeer(c net.Conn) {
+func (s *Server) OnDisconnect(handler DisconnectHandler) {
+	s.onDisconnect = handler
+}
+
+func (s *Server) servePeer(c net.Conn) (cl *Peer) {
 	r := bufio.NewReader(c)
-	cl := &Peer{
+	cl = &Peer{
 		w: bufio.NewWriter(c),
+		MsgQueue: MessageQueue{
+			messages:       []QueuedMessage{},
+			hasNewMessages: make(chan struct{}, 1),
+		},
 	}
+
+	chReceivedArray, chReadNext := readArrayAsync(r)
+	defer close(chReadNext)
+
+	chReadNext <- struct{}{}
+
 	for {
+		select {
+		case message := <-chReceivedArray:
+			if message.err != nil {
+				return
+			}
+
+			s.dispatch(cl, message.array)
+			cl.w.Flush()
+
+			if cl.closed {
+				c.Close()
+				return
+			}
+
+			chReadNext <- struct{}{}
+		case <-cl.MsgQueue.hasNewMessages:
+			cl.MsgQueue.Lock()
+
+			select {
+			case <-cl.MsgQueue.hasNewMessages:
+				break
+			default:
+				break
+			}
+
+			messages := cl.MsgQueue.messages
+			cl.MsgQueue.messages = []QueuedMessage{}
+
+			cl.MsgQueue.Unlock()
+
+			for _, message := range messages {
+				message.Write(cl)
+			}
+
+			cl.Flush()
+		}
+	}
+}
+
+type receivedArray struct {
+	array []string
+	err   error
+}
+
+func readArrayAsync(r *bufio.Reader) (chReceivedArray chan receivedArray, chReadNext chan struct{}) {
+	chReceivedArray = make(chan receivedArray)
+	chReadNext = make(chan struct{})
+
+	go readArraySync(r, chReceivedArray, chReadNext)
+	return
+}
+
+func readArraySync(r *bufio.Reader, chReceivedArray chan receivedArray, chReadNext chan struct{}) {
+	for {
+		if _, isOpen := <-chReadNext; !isOpen {
+			close(chReceivedArray)
+			return
+		}
+
 		args, err := readArray(r)
-		if err != nil {
-			return
-		}
-		s.dispatch(cl, args)
-		cl.w.Flush()
-		if cl.closed {
-			c.Close()
-			return
-		}
+		chReceivedArray <- receivedArray{args, err}
 	}
 }
 
@@ -180,11 +249,36 @@ func (s *Server) TotalConnections() int {
 	return s.infoConns
 }
 
+type QueuedMessage interface {
+	Write(c *Peer)
+}
+
+type MessageQueue struct {
+	sync.Mutex
+	messages       []QueuedMessage
+	hasNewMessages chan struct{}
+}
+
+func (q *MessageQueue) Enqueue(message QueuedMessage) {
+	q.Lock()
+	defer q.Unlock()
+
+	q.messages = append(q.messages, message)
+
+	select {
+	case q.hasNewMessages <- struct{}{}:
+		break
+	default:
+		break
+	}
+}
+
 // Peer is a client connected to the server
 type Peer struct {
-	w      *bufio.Writer
-	closed bool
-	Ctx    interface{} // anything goes, server won't touch this
+	w        *bufio.Writer
+	closed   bool
+	Ctx      interface{} // anything goes, server won't touch this
+	MsgQueue MessageQueue
 }
 
 // Flush the write buffer. Called automatically after every redis command

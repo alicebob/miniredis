@@ -4,6 +4,10 @@ package miniredis
 
 import (
 	"errors"
+	"github.com/alicebob/miniredis/server"
+	"regexp"
+	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -546,4 +550,446 @@ func (db *RedisDB) ZScore(k, member string) (float64, error) {
 		return 0, ErrWrongType
 	}
 	return db.ssetScore(k, member), nil
+}
+
+type Message struct {
+	Channel, Message string
+}
+
+type messageQueue struct {
+	sync.Mutex
+	messages       []Message
+	hasNewMessages chan struct{}
+}
+
+func (q *messageQueue) Enqueue(message Message) {
+	q.Lock()
+	defer q.Unlock()
+
+	q.messages = append(q.messages, message)
+
+	select {
+	case q.hasNewMessages <- struct{}{}:
+		break
+	default:
+		break
+	}
+}
+
+type Subscriber struct {
+	Messages chan Message
+	close    chan struct{}
+	db       *RedisDB
+	channels map[string]struct{}
+	patterns map[*regexp.Regexp]struct{}
+	queue    messageQueue
+}
+
+func (s *Subscriber) Close() error {
+	close(s.close)
+
+	s.db.master.Lock()
+	defer s.db.master.Unlock()
+
+	for channel := range s.channels {
+		subscribers := s.db.directlySubscribedChannels[channel]
+		delete(subscribers, s)
+
+		if len(subscribers) < 1 {
+			delete(s.db.directlySubscribedChannels, channel)
+		}
+	}
+
+	for pattern := range s.patterns {
+		subscribers := s.db.directlySubscribedPatterns[pattern]
+		delete(subscribers, s)
+
+		if len(subscribers) < 1 {
+			delete(s.db.directlySubscribedPatterns, pattern)
+		}
+	}
+
+	return nil
+}
+
+func (s *Subscriber) Subscribe(channels ...string) {
+	s.db.master.Lock()
+	defer s.db.master.Unlock()
+
+	for _, channel := range channels {
+		s.channels[channel] = struct{}{}
+
+		var peers map[*Subscriber]struct{}
+		var hasPeers bool
+
+		if peers, hasPeers = s.db.directlySubscribedChannels[channel]; !hasPeers {
+			peers = map[*Subscriber]struct{}{}
+			s.db.directlySubscribedChannels[channel] = peers
+		}
+
+		peers[s] = struct{}{}
+	}
+}
+
+func (s *Subscriber) Unsubscribe(channels ...string) {
+	s.db.master.Lock()
+	defer s.db.master.Unlock()
+
+	for _, channel := range channels {
+		if _, hasChannel := s.channels[channel]; hasChannel {
+			delete(s.channels, channel)
+
+			peers := s.db.directlySubscribedChannels[channel]
+			delete(peers, s)
+
+			if len(peers) < 1 {
+				delete(s.db.directlySubscribedChannels, channel)
+			}
+		}
+	}
+}
+
+func (s *Subscriber) UnsubscribeAll() {
+	s.db.master.Lock()
+	defer s.db.master.Unlock()
+
+	for channel := range s.channels {
+		subscribers := s.db.directlySubscribedChannels[channel]
+		delete(subscribers, s)
+
+		if len(subscribers) < 1 {
+			delete(s.db.directlySubscribedChannels, channel)
+		}
+	}
+
+	s.channels = map[string]struct{}{}
+}
+
+func (s *Subscriber) PSubscribe(patterns ...*regexp.Regexp) {
+	s.db.master.Lock()
+	defer s.db.master.Unlock()
+
+	decompiledDSPs := s.db.master.decompiledDirectlySubscribedPatterns
+
+	for _, pattern := range patterns {
+		decompiled := pattern.String()
+
+		if decompiledDSP, hasDDSP := decompiledDSPs[decompiled]; hasDDSP {
+			pattern = decompiledDSP
+		} else {
+			decompiledDSPs[decompiled] = pattern
+		}
+
+		s.patterns[pattern] = struct{}{}
+
+		var peers map[*Subscriber]struct{}
+		var hasPeers bool
+
+		if peers, hasPeers = s.db.directlySubscribedPatterns[pattern]; !hasPeers {
+			peers = map[*Subscriber]struct{}{}
+			s.db.directlySubscribedPatterns[pattern] = peers
+		}
+
+		peers[s] = struct{}{}
+	}
+}
+
+func (s *Subscriber) PUnsubscribe(patterns ...*regexp.Regexp) {
+	s.db.master.Lock()
+	defer s.db.master.Unlock()
+
+	decompiledDSPs := s.db.master.decompiledDirectlySubscribedPatterns
+
+	for _, pattern := range patterns {
+		if decompiledDSP, hasDDSP := decompiledDSPs[pattern.String()]; hasDDSP {
+			pattern = decompiledDSP
+		}
+
+		if _, hasChannel := s.patterns[pattern]; hasChannel {
+			delete(s.patterns, pattern)
+
+			peers := s.db.directlySubscribedPatterns[pattern]
+			delete(peers, s)
+
+			if len(peers) < 1 {
+				delete(s.db.directlySubscribedPatterns, pattern)
+			}
+		}
+	}
+}
+
+func (s *Subscriber) PUnsubscribeAll() {
+	s.db.master.Lock()
+	defer s.db.master.Unlock()
+
+	for pattern := range s.patterns {
+		subscribers := s.db.directlySubscribedPatterns[pattern]
+		delete(subscribers, s)
+
+		if len(subscribers) < 1 {
+			delete(s.db.directlySubscribedPatterns, pattern)
+		}
+	}
+
+	s.patterns = map[*regexp.Regexp]struct{}{}
+}
+
+func (s *Subscriber) streamMessages() {
+	defer close(s.Messages)
+
+	for {
+		select {
+		case <-s.queue.hasNewMessages:
+			s.queue.Lock()
+
+			select {
+			case <-s.queue.hasNewMessages:
+				break
+			default:
+				break
+			}
+
+			messages := s.queue.messages
+			s.queue.messages = []Message{}
+
+			s.queue.Unlock()
+
+			for _, message := range messages {
+				select {
+				case s.Messages <- message:
+					break
+				case <-s.close:
+					return
+				}
+			}
+		case <-s.close:
+			return
+		}
+	}
+}
+
+func (m *Miniredis) NewSubscriber() *Subscriber {
+	return m.DB(m.selectedDB).NewSubscriber()
+}
+
+func (db *RedisDB) NewSubscriber() *Subscriber {
+	s := &Subscriber{
+		Messages: make(chan Message),
+		close:    make(chan struct{}),
+		db:       db,
+		channels: map[string]struct{}{},
+		patterns: map[*regexp.Regexp]struct{}{},
+		queue: messageQueue{
+			messages:       []Message{},
+			hasNewMessages: make(chan struct{}, 1),
+		},
+	}
+
+	go s.streamMessages()
+
+	return s
+}
+
+func (m *Miniredis) Publish(channel, message string) int {
+	return m.DB(m.selectedDB).Publish(channel, message)
+}
+
+func (db *RedisDB) Publish(channel, message string) int {
+	db.master.Lock()
+	defer db.master.Unlock()
+
+	return db.publishMessage(channel, message)
+}
+
+func (m *Miniredis) PubSubChannels(pattern *regexp.Regexp) map[string]struct{} {
+	return m.DB(m.selectedDB).PubSubChannels(pattern)
+}
+
+func (db *RedisDB) PubSubChannels(pattern *regexp.Regexp) map[string]struct{} {
+	db.master.Lock()
+	defer db.master.Unlock()
+
+	return db.pubSubChannelsNoLock(pattern)
+}
+
+func (m *Miniredis) PubSubNumSub(channels ...string) map[string]int {
+	return m.DB(m.selectedDB).PubSubNumSub(channels...)
+}
+
+func (db *RedisDB) PubSubNumSub(channels ...string) map[string]int {
+	db.master.Lock()
+	defer db.master.Unlock()
+
+	return db.pubSubNumSubNoLock(channels...)
+}
+
+func (m *Miniredis) PubSubNumPat() int {
+	return m.DB(m.selectedDB).PubSubNumPat()
+}
+
+func (db *RedisDB) PubSubNumPat() int {
+	db.master.Lock()
+	defer db.master.Unlock()
+
+	return db.pubSubNumPatNoLock()
+}
+
+func (db *RedisDB) pubSubChannelsNoLock(pattern *regexp.Regexp) map[string]struct{} {
+	channels := map[string]struct{}{}
+
+	if pattern == nil {
+		for channel := range db.subscribedChannels {
+			channels[channel] = struct{}{}
+		}
+
+		for channel := range db.directlySubscribedChannels {
+			channels[channel] = struct{}{}
+		}
+	} else {
+		for channel := range db.subscribedChannels {
+			if pattern.MatchString(channel) {
+				channels[channel] = struct{}{}
+			}
+		}
+
+		for channel := range db.directlySubscribedChannels {
+			if pattern.MatchString(channel) {
+				channels[channel] = struct{}{}
+			}
+		}
+	}
+
+	return channels
+}
+
+func (db *RedisDB) pubSubNumSubNoLock(channels ...string) map[string]int {
+	numSub := map[string]int{}
+
+	for _, channel := range channels {
+		numSub[channel] = len(db.subscribedChannels[channel]) + len(db.directlySubscribedChannels[channel])
+	}
+
+	return numSub
+}
+
+func (db *RedisDB) pubSubNumPatNoLock() (numPat int) {
+	for _, peers := range db.subscribedPatterns {
+		numPat += len(peers)
+	}
+
+	for _, subscribers := range db.directlySubscribedPatterns {
+		numPat += len(subscribers)
+	}
+
+	return
+}
+
+func (db *RedisDB) publishMessage(channel, message string) int {
+	count := 0
+
+	var allPeers map[*server.Peer]struct{} = nil
+
+	if peers, hasPeers := db.subscribedChannels[channel]; hasPeers {
+		allPeers = make(map[*server.Peer]struct{}, len(peers))
+
+		for peer := range peers {
+			allPeers[peer] = struct{}{}
+		}
+	}
+
+	for pattern, peers := range db.subscribedPatterns {
+		if db.master.channelPatterns[pattern].MatchString(channel) {
+			if allPeers == nil {
+				allPeers = make(map[*server.Peer]struct{}, len(peers))
+			}
+
+			for peer := range peers {
+				allPeers[peer] = struct{}{}
+			}
+		}
+	}
+
+	if allPeers != nil {
+		count += len(allPeers)
+
+		wait := publishMessagesAsync(allPeers, channel, message)
+		defer wait()
+	}
+
+	var allSubscribers map[*Subscriber]struct{} = nil
+
+	if subscribers, hasSubscribers := db.directlySubscribedChannels[channel]; hasSubscribers {
+		allSubscribers = make(map[*Subscriber]struct{}, len(subscribers))
+
+		for subscriber := range subscribers {
+			allSubscribers[subscriber] = struct{}{}
+		}
+	}
+
+	for pattern, subscribers := range db.directlySubscribedPatterns {
+		if pattern.MatchString(channel) {
+			if allSubscribers == nil {
+				allSubscribers = make(map[*Subscriber]struct{}, len(subscribers))
+			}
+
+			for subscriber := range subscribers {
+				allSubscribers[subscriber] = struct{}{}
+			}
+		}
+	}
+
+	if allSubscribers != nil {
+		count += len(allSubscribers)
+
+		wait := publishMessagesToOurselvesAsync(allSubscribers, channel, message)
+		defer wait()
+	}
+
+	return count
+}
+
+func publishMessagesAsync(peers map[*server.Peer]struct{}, channel, message string) (wait func()) {
+	chCtl := make(chan struct{})
+	go publishMessages(peers, channel, message, chCtl)
+
+	return func() { <-chCtl }
+}
+
+func publishMessages(peers map[*server.Peer]struct{}, channel, message string, chCtl chan struct{}) {
+	pending := uint64(len(peers))
+
+	for peer := range peers {
+		go publishMessage(peer, channel, message, &pending, chCtl)
+	}
+}
+
+func publishMessage(peer *server.Peer, channel, message string, pending *uint64, chCtl chan struct{}) {
+	peer.MsgQueue.Enqueue(&queuedPubSubMessage{channel, message})
+
+	if atomic.AddUint64(pending, ^uint64(0)) == 0 {
+		close(chCtl)
+	}
+}
+
+func publishMessagesToOurselvesAsync(subscribers map[*Subscriber]struct{}, channel, message string) (wait func()) {
+	chCtl := make(chan struct{})
+	go publishMessagesToOurselves(subscribers, channel, message, chCtl)
+
+	return func() { <-chCtl }
+}
+
+func publishMessagesToOurselves(subscribers map[*Subscriber]struct{}, channel, message string, chCtl chan struct{}) {
+	pending := uint64(len(subscribers))
+
+	for subscriber := range subscribers {
+		go publishMessageToOurselves(subscriber, channel, message, &pending, chCtl)
+	}
+}
+
+func publishMessageToOurselves(subscriber *Subscriber, channel, message string, pending *uint64, chCtl chan struct{}) {
+	subscriber.queue.Enqueue(Message{channel, message})
+
+	if atomic.AddUint64(pending, ^uint64(0)) == 0 {
+		close(chCtl)
+	}
 }

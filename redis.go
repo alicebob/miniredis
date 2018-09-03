@@ -41,6 +41,10 @@ func errLuaParseError(err error) string {
 	return fmt.Sprintf("ERR Error compiling script (new function): %s", err.Error())
 }
 
+func errInvalidPubsubArgs(subcommand string) string {
+	return fmt.Sprintf("ERR Unknown PUBSUB subcommand or wrong number of arguments for '%s'", subcommand)
+}
+
 // withTx wraps the non-argument-checking part of command handling code in
 // transaction logic.
 func withTx(
