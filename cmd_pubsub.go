@@ -13,6 +13,7 @@ func commandsPubsub(m *Miniredis) {
 	m.srv.Register("UNSUBSCRIBE", m.cmdUnsubscribe)
 	m.srv.Register("PSUBSCRIBE", m.cmdPSubscribe)
 	m.srv.Register("PUNSUBSCRIBE", m.cmdPUnsubscribe)
+	m.srv.Register("PUBLISH", m.cmdPublish)
 }
 
 // SUBSCRIBE
@@ -316,4 +317,49 @@ func (m *Miniredis) cmdPUnsubscribe(c *server.Peer, cmd string, args []string) {
 	m.Unlock()
 
 	c.WriteOK()
+}
+
+// PUBLISH
+func (m *Miniredis) cmdPublish(c *server.Peer, cmd string, args []string) {
+	if len(args) != 2 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
+	}
+	if !m.handleAuth(c) {
+		return
+	}
+
+	channel := args[0]
+
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
+		db := m.db(getCtx(c).selectedDB)
+		var allPeers map[*server.Peer]struct{} = nil
+
+		if peers, hasPeers := db.subscribedChannels[channel]; hasPeers {
+			allPeers = make(map[*server.Peer]struct{}, len(peers))
+
+			for peer := range peers {
+				allPeers[peer] = struct{}{}
+			}
+		}
+
+		for pattern, peers := range db.subscribedPatterns {
+			if m.channelPatterns[pattern].MatchString(channel) {
+				if allPeers == nil {
+					allPeers = make(map[*server.Peer]struct{}, len(peers))
+				}
+
+				for peer := range peers {
+					allPeers[peer] = struct{}{}
+				}
+			}
+		}
+
+		if allPeers == nil {
+			c.WriteInt(0)
+		} else {
+			c.WriteInt(len(allPeers))
+		}
+	})
 }
