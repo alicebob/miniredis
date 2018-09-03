@@ -27,6 +27,8 @@ func (m *Miniredis) cmdSubscribe(c *server.Peer, cmd string, args []string) {
 		return
 	}
 
+	subscriptionsAmounts := make([]int, len(args))
+
 	m.Lock()
 
 	var cache peerCache
@@ -49,7 +51,7 @@ func (m *Miniredis) cmdSubscribe(c *server.Peer, cmd string, args []string) {
 
 	subscribedChannels := m.db(dbIdx).subscribedChannels
 
-	for _, channel := range args {
+	for i, channel := range args {
 		var peers map[*server.Peer]struct{}
 		var hasPeers bool
 
@@ -61,11 +63,28 @@ func (m *Miniredis) cmdSubscribe(c *server.Peer, cmd string, args []string) {
 		peers[c] = struct{}{}
 
 		dbSubs.channels[channel] = struct{}{}
+
+		subscriptionsAmounts[i] = m.getSubscriptionsAmount(c)
 	}
 
 	m.Unlock()
 
-	c.WriteOK()
+	for i, channel := range args {
+		c.WriteLen(3)
+		c.WriteBulk("subscribe")
+		c.WriteBulk(channel)
+		c.WriteInt(subscriptionsAmounts[i])
+	}
+}
+
+func (m *Miniredis) getSubscriptionsAmount(c *server.Peer) (total int) {
+	if cache, hasCache := m.peers[c]; hasCache {
+		if dbSubs, hasDbSubs := cache.subscriptions[getCtx(c).selectedDB]; hasDbSubs {
+			total = len(dbSubs.channels) + len(dbSubs.patterns)
+		}
+	}
+
+	return
 }
 
 // UNSUBSCRIBE
@@ -74,6 +93,9 @@ func (m *Miniredis) cmdUnsubscribe(c *server.Peer, cmd string, args []string) {
 		return
 	}
 
+	var channels []string = nil
+	var subscriptionsAmounts []int = nil
+
 	m.Lock()
 
 	if cache, hasCache := m.peers[c]; hasCache {
@@ -81,8 +103,6 @@ func (m *Miniredis) cmdUnsubscribe(c *server.Peer, cmd string, args []string) {
 
 		if dbSubs, hasDbSubs := cache.subscriptions[dbIdx]; hasDbSubs {
 			subscribedChannels := m.db(dbIdx).subscribedChannels
-
-			var channels []string
 
 			if len(args) > 0 {
 				channels = args
@@ -96,7 +116,9 @@ func (m *Miniredis) cmdUnsubscribe(c *server.Peer, cmd string, args []string) {
 				}
 			}
 
-			for _, channel := range channels {
+			subscriptionsAmounts = make([]int, len(channels))
+
+			for i, channel := range channels {
 				if peers, hasPeers := subscribedChannels[channel]; hasPeers {
 					delete(peers, c)
 					delete(dbSubs.channels, channel)
@@ -113,13 +135,35 @@ func (m *Miniredis) cmdUnsubscribe(c *server.Peer, cmd string, args []string) {
 						}
 					}
 				}
+
+				subscriptionsAmounts[i] = m.getSubscriptionsAmount(c)
 			}
 		}
 	}
 
+	var subscriptionsAmount int
+
+	if channels == nil {
+		subscriptionsAmount = m.getSubscriptionsAmount(c)
+	}
+
 	m.Unlock()
 
-	c.WriteOK()
+	if channels == nil {
+		for _, channel := range args {
+			c.WriteLen(3)
+			c.WriteBulk("unsubscribe")
+			c.WriteBulk(channel)
+			c.WriteInt(subscriptionsAmount)
+		}
+	} else {
+		for i, channel := range channels {
+			c.WriteLen(3)
+			c.WriteBulk("unsubscribe")
+			c.WriteBulk(channel)
+			c.WriteInt(subscriptionsAmounts[i])
+		}
+	}
 }
 
 // PSUBSCRIBE
@@ -132,6 +176,8 @@ func (m *Miniredis) cmdPSubscribe(c *server.Peer, cmd string, args []string) {
 	if !m.handleAuth(c) {
 		return
 	}
+
+	subscriptionsAmounts := make([]int, len(args))
 
 	m.Lock()
 
@@ -155,7 +201,7 @@ func (m *Miniredis) cmdPSubscribe(c *server.Peer, cmd string, args []string) {
 
 	subscribedPatterns := m.db(dbIdx).subscribedPatterns
 
-	for _, pattern := range args {
+	for i, pattern := range args {
 		var peers map[*server.Peer]struct{}
 		var hasPeers bool
 
@@ -171,11 +217,18 @@ func (m *Miniredis) cmdPSubscribe(c *server.Peer, cmd string, args []string) {
 		if _, hasRgx := m.channelPatterns[pattern]; !hasRgx {
 			m.channelPatterns[pattern] = compileChannelPattern(pattern)
 		}
+
+		subscriptionsAmounts[i] = m.getSubscriptionsAmount(c)
 	}
 
 	m.Unlock()
 
-	c.WriteOK()
+	for i, pattern := range args {
+		c.WriteLen(3)
+		c.WriteBulk("psubscribe")
+		c.WriteBulk(pattern)
+		c.WriteInt(subscriptionsAmounts[i])
+	}
 }
 
 func compileChannelPattern(pattern string) *regexp.Regexp {
@@ -271,6 +324,9 @@ func (m *Miniredis) cmdPUnsubscribe(c *server.Peer, cmd string, args []string) {
 		return
 	}
 
+	var patterns []string = nil
+	var subscriptionsAmounts []int = nil
+
 	m.Lock()
 
 	if cache, hasCache := m.peers[c]; hasCache {
@@ -278,8 +334,6 @@ func (m *Miniredis) cmdPUnsubscribe(c *server.Peer, cmd string, args []string) {
 
 		if dbSubs, hasDbSubs := cache.subscriptions[dbIdx]; hasDbSubs {
 			subscribedPatterns := m.db(dbIdx).subscribedPatterns
-
-			var patterns []string
 
 			if len(args) > 0 {
 				patterns = args
@@ -293,7 +347,9 @@ func (m *Miniredis) cmdPUnsubscribe(c *server.Peer, cmd string, args []string) {
 				}
 			}
 
-			for _, pattern := range patterns {
+			subscriptionsAmounts = make([]int, len(patterns))
+
+			for i, pattern := range patterns {
 				if peers, hasPeers := subscribedPatterns[pattern]; hasPeers {
 					delete(peers, c)
 					delete(dbSubs.patterns, pattern)
@@ -310,13 +366,35 @@ func (m *Miniredis) cmdPUnsubscribe(c *server.Peer, cmd string, args []string) {
 						}
 					}
 				}
+
+				subscriptionsAmounts[i] = m.getSubscriptionsAmount(c)
 			}
 		}
 	}
 
+	var subscriptionsAmount int
+
+	if patterns == nil {
+		subscriptionsAmount = m.getSubscriptionsAmount(c)
+	}
+
 	m.Unlock()
 
-	c.WriteOK()
+	if patterns == nil {
+		for _, pattern := range args {
+			c.WriteLen(3)
+			c.WriteBulk("punsubscribe")
+			c.WriteBulk(pattern)
+			c.WriteInt(subscriptionsAmount)
+		}
+	} else {
+		for i, pattern := range patterns {
+			c.WriteLen(3)
+			c.WriteBulk("punsubscribe")
+			c.WriteBulk(pattern)
+			c.WriteInt(subscriptionsAmounts[i])
+		}
+	}
 }
 
 // PUBLISH
@@ -331,6 +409,7 @@ func (m *Miniredis) cmdPublish(c *server.Peer, cmd string, args []string) {
 	}
 
 	channel := args[0]
+	message := args[1]
 
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(getCtx(c).selectedDB)
@@ -360,6 +439,10 @@ func (m *Miniredis) cmdPublish(c *server.Peer, cmd string, args []string) {
 			c.WriteInt(0)
 		} else {
 			c.WriteInt(len(allPeers))
+
+			for peer := range allPeers {
+				peer.MsgQueue.Enqueue(channel, message)
+			}
 		}
 	})
 }

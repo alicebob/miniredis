@@ -127,18 +127,80 @@ func (s *Server) servePeer(c net.Conn) (cl *Peer) {
 	r := bufio.NewReader(c)
 	cl = &Peer{
 		w: bufio.NewWriter(c),
+		MsgQueue: MessageQueue{
+			messages:       []queuedMessage{},
+			hasNewMessages: make(chan struct{}, 1),
+		},
 	}
+
+	chReceivedArray, chReadNext := readArrayAsync(r)
+	defer close(chReadNext)
+
+	chReadNext <- struct{}{}
+
 	for {
+		select {
+		case message := <-chReceivedArray:
+			if message.err != nil {
+				return
+			}
+
+			s.dispatch(cl, message.array)
+			cl.w.Flush()
+
+			if cl.closed {
+				c.Close()
+				return
+			}
+
+			chReadNext <- struct{}{}
+		case <-cl.MsgQueue.hasNewMessages:
+			cl.MsgQueue.Lock()
+
+			select {
+			case <-cl.MsgQueue.hasNewMessages:
+				break
+			default:
+				break
+			}
+
+			messages := cl.MsgQueue.messages
+			cl.MsgQueue.messages = []queuedMessage{}
+
+			cl.MsgQueue.Unlock()
+
+			for _, message := range messages {
+				cl.WriteLen(3)
+				cl.WriteBulk("message")
+				cl.WriteBulk(message.channel)
+				cl.WriteBulk(message.message)
+			}
+		}
+	}
+}
+
+type receivedArray struct {
+	array []string
+	err   error
+}
+
+func readArrayAsync(r *bufio.Reader) (chReceivedArray chan receivedArray, chReadNext chan struct{}) {
+	chReceivedArray = make(chan receivedArray)
+	chReadNext = make(chan struct{})
+
+	go readArraySync(r, chReceivedArray, chReadNext)
+	return
+}
+
+func readArraySync(r *bufio.Reader, chReceivedArray chan receivedArray, chReadNext chan struct{}) {
+	for {
+		if _, isOpen := <-chReadNext; !isOpen {
+			close(chReceivedArray)
+			return
+		}
+
 		args, err := readArray(r)
-		if err != nil {
-			return
-		}
-		s.dispatch(cl, args)
-		cl.w.Flush()
-		if cl.closed {
-			c.Close()
-			return
-		}
+		chReceivedArray <- receivedArray{args, err}
 	}
 }
 
@@ -180,11 +242,36 @@ func (s *Server) TotalConnections() int {
 	return s.infoConns
 }
 
+type queuedMessage struct {
+	channel, message string
+}
+
+type MessageQueue struct {
+	sync.Mutex
+	messages       []queuedMessage
+	hasNewMessages chan struct{}
+}
+
+func (q *MessageQueue) Enqueue(channel, message string) {
+	q.Lock()
+	defer q.Unlock()
+
+	q.messages = append(q.messages, queuedMessage{channel, message})
+
+	select {
+	case q.hasNewMessages <- struct{}{}:
+		break
+	default:
+		break
+	}
+}
+
 // Peer is a client connected to the server
 type Peer struct {
-	w      *bufio.Writer
-	closed bool
-	Ctx    interface{} // anything goes, server won't touch this
+	w        *bufio.Writer
+	closed   bool
+	Ctx      interface{} // anything goes, server won't touch this
+	MsgQueue MessageQueue
 }
 
 // Flush the write buffer. Called automatically after every redis command
