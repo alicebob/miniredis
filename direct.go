@@ -561,6 +561,8 @@ type messageQueue struct {
 }
 
 type Subscriber struct {
+	Messages chan Message
+	close    chan struct{}
 	db       *RedisDB
 	channels map[string]struct{}
 	patterns map[*regexp.Regexp]struct{}
@@ -568,6 +570,8 @@ type Subscriber struct {
 }
 
 func (s *Subscriber) Close() error {
+	close(s.close)
+
 	s.db.master.Lock()
 	defer s.db.master.Unlock()
 
@@ -666,12 +670,46 @@ func (s *Subscriber) PUnsubscribe(patterns ...*regexp.Regexp) {
 	}
 }
 
+func (s *Subscriber) streamMessages() {
+	for {
+		select {
+		case <-s.queue.hasNewMessages:
+			s.queue.Lock()
+
+			select {
+			case <-s.queue.hasNewMessages:
+				break
+			default:
+				break
+			}
+
+			messages := s.queue.messages
+			s.queue.messages = []Message{}
+
+			s.queue.Unlock()
+
+			for _, message := range messages {
+				select {
+				case s.Messages <- message:
+					break
+				case <-s.close:
+					return
+				}
+			}
+		case <-s.close:
+			return
+		}
+	}
+}
+
 func (m *Miniredis) NewSubscriber() *Subscriber {
 	return m.DB(m.selectedDB).NewSubscriber()
 }
 
 func (db *RedisDB) NewSubscriber() *Subscriber {
-	return &Subscriber{
+	s := &Subscriber{
+		Messages: make(chan Message),
+		close:    make(chan struct{}),
 		db:       db,
 		channels: map[string]struct{}{},
 		patterns: map[*regexp.Regexp]struct{}{},
@@ -680,4 +718,8 @@ func (db *RedisDB) NewSubscriber() *Subscriber {
 			hasNewMessages: make(chan struct{}, 1),
 		},
 	}
+
+	go s.streamMessages()
+
+	return s
 }
