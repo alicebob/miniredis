@@ -5,6 +5,7 @@ package miniredis
 import (
 	"github.com/alicebob/miniredis/server"
 	"regexp"
+	"strings"
 )
 
 // commandsPubsub handles all PUB/SUB operations.
@@ -457,7 +458,7 @@ func (m *Miniredis) cmdPubSub(c *server.Peer, cmd string, args []string) {
 	var subargs []string
 
 	if argsOk {
-		subcommand = args[0]
+		subcommand = strings.ToUpper(args[0])
 		subargs = args[1:]
 
 		switch subcommand {
