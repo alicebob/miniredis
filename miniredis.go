@@ -154,6 +154,7 @@ func (m *Miniredis) start(s *server.Server) error {
 	commandsString(m)
 	commandsHash(m)
 	commandsList(m)
+	commandsPubsub(m)
 	commandsSet(m)
 	commandsSortedSet(m)
 	commandsTransaction(m)
