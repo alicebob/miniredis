@@ -172,6 +172,8 @@ func (s *Server) servePeer(c net.Conn) (cl *Peer) {
 			for _, message := range messages {
 				message.Write(cl)
 			}
+
+			cl.Flush()
 		}
 	}
 }
