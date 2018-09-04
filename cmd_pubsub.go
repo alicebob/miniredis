@@ -14,6 +14,7 @@ func commandsPubsub(m *Miniredis) {
 	m.srv.Register("PSUBSCRIBE", m.cmdPSubscribe)
 	m.srv.Register("PUNSUBSCRIBE", m.cmdPUnsubscribe)
 	m.srv.Register("PUBLISH", m.cmdPublish)
+	m.srv.Register("PUBSUB", m.cmdPubSub)
 }
 
 // SUBSCRIBE
@@ -438,6 +439,92 @@ func (m *Miniredis) cmdPublish(c *server.Peer, cmd string, args []string) {
 			for peer := range allPeers {
 				peer.MsgQueue.Enqueue(&queuedPubSubMessage{channel, message})
 			}
+		}
+	})
+}
+
+// PUBSUB
+func (m *Miniredis) cmdPubSub(c *server.Peer, cmd string, args []string) {
+	argsOk := len(args) > 0
+	var subcommand string
+	var subargs []string
+
+	if argsOk {
+		subcommand = args[0]
+		subargs = args[1:]
+
+		switch subcommand {
+		case "CHANNELS":
+			argsOk = len(subargs) < 2
+		case "NUMSUB":
+			break
+		case "NUMPAT":
+			argsOk = len(subargs) == 0
+		default:
+			argsOk = false
+		}
+	}
+
+	if !argsOk {
+		setDirty(c)
+		c.WriteError(errInvalidPubsubArgs(subcommand))
+		return
+	}
+
+	if !m.handleAuth(c) {
+		return
+	}
+
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
+		switch subcommand {
+		case "CHANNELS":
+			var channels []string
+
+			if len(subargs) == 1 {
+				pattern := subargs[0]
+
+				var rgx *regexp.Regexp
+				var hasRgx bool
+
+				if rgx, hasRgx = m.channelPatterns[pattern]; !hasRgx {
+					rgx = compileChannelPattern(pattern)
+					m.channelPatterns[pattern] = rgx
+				}
+
+				channels = []string{}
+
+				for channel := range m.db(ctx.selectedDB).subscribedChannels {
+					if rgx.MatchString(channel) {
+						channels = append(channels, channel)
+					}
+				}
+			} else {
+				subscribedChannels := m.db(ctx.selectedDB).subscribedChannels
+				channels = make([]string, len(subscribedChannels))
+				i := 0
+
+				for channel := range subscribedChannels {
+					channels[i] = channel
+					i++
+				}
+			}
+
+			c.WriteLen(len(channels))
+
+			for _, channel := range channels {
+				c.WriteBulk(channel)
+			}
+		case "NUMSUB":
+			subscribedChannels := m.db(ctx.selectedDB).subscribedChannels
+
+			c.WriteLen(len(subargs) * 2)
+
+			for _, channel := range subargs {
+				c.WriteBulk(channel)
+				c.WriteInt(len(subscribedChannels[channel]))
+			}
+		case "NUMPAT":
+			c.WriteInt(len(m.db(ctx.selectedDB).subscribedPatterns))
 		}
 	})
 }
