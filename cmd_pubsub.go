@@ -435,12 +435,19 @@ func (m *Miniredis) cmdPublish(c *server.Peer, cmd string, args []string) {
 			c.WriteInt(0)
 		} else {
 			c.WriteInt(len(allPeers))
-
-			for peer := range allPeers {
-				peer.MsgQueue.Enqueue(&queuedPubSubMessage{channel, message})
-			}
+			go publishMessages(allPeers, channel, message)
 		}
 	})
+}
+
+func publishMessages(peers map[*server.Peer]struct{}, channel, message string) {
+	for peer := range peers {
+		go publishMessage(peer, channel, message)
+	}
+}
+
+func publishMessage(peer *server.Peer, channel, message string) {
+	peer.MsgQueue.Enqueue(&queuedPubSubMessage{channel, message})
 }
 
 // PUBSUB
