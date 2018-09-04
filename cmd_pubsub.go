@@ -453,24 +453,25 @@ func publishMessage(peer *server.Peer, channel, message string) {
 
 // PUBSUB
 func (m *Miniredis) cmdPubSub(c *server.Peer, cmd string, args []string) {
-	argsOk := len(args) > 0
-	var subcommand string
-	var subargs []string
+	if len(args) < 1 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
+	}
 
-	if argsOk {
-		subcommand = strings.ToUpper(args[0])
-		subargs = args[1:]
+	subcommand := strings.ToUpper(args[0])
+	subargs := args[1:]
+	var argsOk bool
 
-		switch subcommand {
-		case "CHANNELS":
-			argsOk = len(subargs) < 2
-		case "NUMSUB":
-			break
-		case "NUMPAT":
-			argsOk = len(subargs) == 0
-		default:
-			argsOk = false
-		}
+	switch subcommand {
+	case "CHANNELS":
+		argsOk = len(subargs) < 2
+	case "NUMSUB":
+		argsOk = true
+	case "NUMPAT":
+		argsOk = len(subargs) == 0
+	default:
+		argsOk = false
 	}
 
 	if !argsOk {
