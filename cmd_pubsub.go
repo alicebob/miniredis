@@ -271,7 +271,14 @@ func compileChannelPattern(pattern string) *regexp.Regexp {
 				}
 
 				klass = map[rune]struct{}{}
-				rgx = append(rgx, append(append(expr, []rune(regexp.QuoteMeta(string(flatClass)))...), ']')...)
+				expr = append(append(expr, []rune(regexp.QuoteMeta(string(flatClass)))...), ']')
+
+				if len(expr) < 3 {
+					rgx = append(rgx, 'x', '\\', 'b', 'y')
+				} else {
+					rgx = append(rgx, expr...)
+				}
+
 				state = readingLiteral
 			} else {
 				klass[c] = struct{}{}
@@ -301,7 +308,13 @@ func compileChannelPattern(pattern string) *regexp.Regexp {
 				i++
 			}
 
-			rgx = append(rgx, append(append(expr, []rune(regexp.QuoteMeta(string(flatClass)))...), ']')...)
+			expr = append(append(expr, []rune(regexp.QuoteMeta(string(flatClass)))...), ']')
+
+			if len(expr) < 3 {
+				rgx = append(rgx, 'x', '\\', 'b', 'y')
+			} else {
+				rgx = append(rgx, expr...)
+			}
 		}
 	}
 
