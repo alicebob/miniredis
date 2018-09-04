@@ -4,6 +4,7 @@ package miniredis
 
 import (
 	"errors"
+	"github.com/alicebob/miniredis/server"
 	"regexp"
 	"sync"
 	"time"
@@ -736,4 +737,95 @@ func (db *RedisDB) NewSubscriber() *Subscriber {
 	go s.streamMessages()
 
 	return s
+}
+
+func (m *Miniredis) Publish(channel, message string) int {
+	return m.DB(m.selectedDB).Publish(channel, message)
+}
+
+func (db *RedisDB) Publish(channel, message string) int {
+	db.master.Lock()
+	defer db.master.Unlock()
+
+	return db.publishMessage(channel, message)
+}
+
+func (db *RedisDB) publishMessage(channel, message string) int {
+	count := 0
+
+	var allPeers map[*server.Peer]struct{} = nil
+
+	if peers, hasPeers := db.subscribedChannels[channel]; hasPeers {
+		allPeers = make(map[*server.Peer]struct{}, len(peers))
+
+		for peer := range peers {
+			allPeers[peer] = struct{}{}
+		}
+	}
+
+	for pattern, peers := range db.subscribedPatterns {
+		if db.master.channelPatterns[pattern].MatchString(channel) {
+			if allPeers == nil {
+				allPeers = make(map[*server.Peer]struct{}, len(peers))
+			}
+
+			for peer := range peers {
+				allPeers[peer] = struct{}{}
+			}
+		}
+	}
+
+	if allPeers != nil {
+		count += len(allPeers)
+		go publishMessages(allPeers, channel, message)
+	}
+
+	var allSubscribers map[*Subscriber]struct{} = nil
+
+	if subscribers, hasSubscribers := db.directlySubscribedChannels[channel]; hasSubscribers {
+		allSubscribers = make(map[*Subscriber]struct{}, len(subscribers))
+
+		for subscriber := range subscribers {
+			allSubscribers[subscriber] = struct{}{}
+		}
+	}
+
+	for pattern, subscribers := range db.directlySubscribedPatterns {
+		if pattern.MatchString(channel) {
+			if allSubscribers == nil {
+				allSubscribers = make(map[*Subscriber]struct{}, len(subscribers))
+			}
+
+			for subscriber := range subscribers {
+				allSubscribers[subscriber] = struct{}{}
+			}
+		}
+	}
+
+	if allSubscribers != nil {
+		count += len(allSubscribers)
+		go publishMessagesToOurselves(allSubscribers, channel, message)
+	}
+
+	return count
+}
+
+func publishMessages(peers map[*server.Peer]struct{}, channel, message string) {
+	for peer := range peers {
+		go publishMessage(peer, channel, message)
+	}
+}
+
+func publishMessage(peer *server.Peer, channel, message string) {
+	peer.MsgQueue.Enqueue(&queuedPubSubMessage{channel, message})
+}
+
+func publishMessagesToOurselves(subscribers map[*Subscriber]struct{}, channel, message string) {
+	for subscriber := range subscribers {
+		go publishMessageToOurselves(subscriber, channel, message)
+	}
+}
+
+func publishMessageToOurselves(subscriber *Subscriber, channel, message string) {
+	subscriber.queue.Enqueue(Message{channel, message})
 }
