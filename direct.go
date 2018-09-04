@@ -750,6 +750,91 @@ func (db *RedisDB) Publish(channel, message string) int {
 	return db.publishMessage(channel, message)
 }
 
+func (m *Miniredis) PubSubChannels(pattern *regexp.Regexp) map[string]struct{} {
+	return m.DB(m.selectedDB).PubSubChannels(pattern)
+}
+
+func (db *RedisDB) PubSubChannels(pattern *regexp.Regexp) map[string]struct{} {
+	db.master.Lock()
+	defer db.master.Unlock()
+
+	return db.pubSubChannelsNoLock(pattern)
+}
+
+func (m *Miniredis) PubSubNumSub(channels ...string) map[string]int {
+	return m.DB(m.selectedDB).PubSubNumSub(channels...)
+}
+
+func (db *RedisDB) PubSubNumSub(channels ...string) map[string]int {
+	db.master.Lock()
+	defer db.master.Unlock()
+
+	return db.pubSubNumSubNoLock(channels...)
+}
+
+func (m *Miniredis) PubSubNumPat() int {
+	return m.DB(m.selectedDB).PubSubNumPat()
+}
+
+func (db *RedisDB) PubSubNumPat() int {
+	db.master.Lock()
+	defer db.master.Unlock()
+
+	return db.pubSubNumPatNoLock()
+}
+
+func (db *RedisDB) pubSubChannelsNoLock(pattern *regexp.Regexp) map[string]struct{} {
+	channels := map[string]struct{}{}
+
+	if pattern == nil {
+		for channel := range db.subscribedChannels {
+			channels[channel] = struct{}{}
+		}
+
+		for channel := range db.directlySubscribedChannels {
+			channels[channel] = struct{}{}
+		}
+	} else {
+		for channel := range db.subscribedChannels {
+			if pattern.MatchString(channel) {
+				channels[channel] = struct{}{}
+			}
+		}
+
+		for channel := range db.directlySubscribedChannels {
+			if pattern.MatchString(channel) {
+				channels[channel] = struct{}{}
+			}
+		}
+	}
+
+	return channels
+}
+
+func (db *RedisDB) pubSubNumSubNoLock(channels ...string) map[string]int {
+	numSub := map[string]int{}
+
+	for _, channel := range channels {
+		numSub[channel] = len(db.subscribedChannels[channel]) + len(db.directlySubscribedChannels[channel])
+	}
+
+	return numSub
+}
+
+func (db *RedisDB) pubSubNumPatNoLock() int {
+	rgxs := map[string]struct{}{}
+
+	for pattern := range db.subscribedPatterns {
+		rgxs[db.master.channelPatterns[pattern].String()] = struct{}{}
+	}
+
+	for pattern := range db.directlySubscribedPatterns {
+		rgxs[pattern.String()] = struct{}{}
+	}
+
+	return len(rgxs)
+}
+
 func (db *RedisDB) publishMessage(channel, message string) int {
 	count := 0
 
