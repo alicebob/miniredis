@@ -449,7 +449,8 @@ func (m *Miniredis) cmdPubSub(c *server.Peer, cmd string, args []string) {
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		switch subcommand {
 		case "CHANNELS":
-			var channels []string
+			db := m.db(ctx.selectedDB)
+			channels := map[string]struct{}{}
 
 			if len(subargs) == 1 {
 				pattern := subargs[0]
@@ -462,40 +463,54 @@ func (m *Miniredis) cmdPubSub(c *server.Peer, cmd string, args []string) {
 					m.channelPatterns[pattern] = rgx
 				}
 
-				channels = []string{}
-
-				for channel := range m.db(ctx.selectedDB).subscribedChannels {
+				for channel := range db.subscribedChannels {
 					if rgx.MatchString(channel) {
-						channels = append(channels, channel)
+						channels[channel] = struct{}{}
+					}
+				}
+
+				for channel := range db.directlySubscribedChannels {
+					if rgx.MatchString(channel) {
+						channels[channel] = struct{}{}
 					}
 				}
 			} else {
-				subscribedChannels := m.db(ctx.selectedDB).subscribedChannels
-				channels = make([]string, len(subscribedChannels))
-				i := 0
+				for channel := range db.subscribedChannels {
+					channels[channel] = struct{}{}
+				}
 
-				for channel := range subscribedChannels {
-					channels[i] = channel
-					i++
+				for channel := range db.directlySubscribedChannels {
+					channels[channel] = struct{}{}
 				}
 			}
 
 			c.WriteLen(len(channels))
 
-			for _, channel := range channels {
+			for channel := range channels {
 				c.WriteBulk(channel)
 			}
 		case "NUMSUB":
-			subscribedChannels := m.db(ctx.selectedDB).subscribedChannels
+			db := m.db(ctx.selectedDB)
 
 			c.WriteLen(len(subargs) * 2)
 
 			for _, channel := range subargs {
 				c.WriteBulk(channel)
-				c.WriteInt(len(subscribedChannels[channel]))
+				c.WriteInt(len(db.subscribedChannels[channel]) + len(db.directlySubscribedChannels[channel]))
 			}
 		case "NUMPAT":
-			c.WriteInt(len(m.db(ctx.selectedDB).subscribedPatterns))
+			db := m.db(ctx.selectedDB)
+			rgxs := map[string]struct{}{}
+
+			for pattern := range db.subscribedPatterns {
+				rgxs[m.channelPatterns[pattern].String()] = struct{}{}
+			}
+
+			for pattern := range db.directlySubscribedPatterns {
+				rgxs[pattern.String()] = struct{}{}
+			}
+
+			c.WriteInt(len(rgxs))
 		}
 	})
 }
