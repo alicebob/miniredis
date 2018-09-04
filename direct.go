@@ -4,6 +4,8 @@ package miniredis
 
 import (
 	"errors"
+	"regexp"
+	"sync"
 	"time"
 )
 
@@ -546,4 +548,136 @@ func (db *RedisDB) ZScore(k, member string) (float64, error) {
 		return 0, ErrWrongType
 	}
 	return db.ssetScore(k, member), nil
+}
+
+type Message struct {
+	Channel, Message string
+}
+
+type messageQueue struct {
+	sync.Mutex
+	messages       []Message
+	hasNewMessages chan struct{}
+}
+
+type Subscriber struct {
+	db       *RedisDB
+	channels map[string]struct{}
+	patterns map[*regexp.Regexp]struct{}
+	queue    messageQueue
+}
+
+func (s *Subscriber) Close() error {
+	s.db.master.Lock()
+	defer s.db.master.Unlock()
+
+	for channel := range s.channels {
+		subscribers := s.db.directlySubscribedChannels[channel]
+		delete(subscribers, s)
+
+		if len(subscribers) < 1 {
+			delete(s.db.directlySubscribedChannels, channel)
+		}
+	}
+
+	for pattern := range s.patterns {
+		subscribers := s.db.directlySubscribedPatterns[pattern]
+		delete(subscribers, s)
+
+		if len(subscribers) < 1 {
+			delete(s.db.directlySubscribedPatterns, pattern)
+		}
+	}
+
+	return nil
+}
+
+func (s *Subscriber) Subscribe(channels ...string) {
+	s.db.master.Lock()
+	defer s.db.master.Unlock()
+
+	for _, channel := range channels {
+		s.channels[channel] = struct{}{}
+
+		var peers map[*Subscriber]struct{}
+		var hasPeers bool
+
+		if peers, hasPeers = s.db.directlySubscribedChannels[channel]; !hasPeers {
+			peers = map[*Subscriber]struct{}{}
+			s.db.directlySubscribedChannels[channel] = peers
+		}
+
+		peers[s] = struct{}{}
+	}
+}
+
+func (s *Subscriber) Unsubscribe(channels ...string) {
+	s.db.master.Lock()
+	defer s.db.master.Unlock()
+
+	for _, channel := range channels {
+		if _, hasChannel := s.channels[channel]; hasChannel {
+			delete(s.channels, channel)
+
+			peers := s.db.directlySubscribedChannels[channel]
+			delete(peers, s)
+
+			if len(peers) < 1 {
+				delete(s.db.directlySubscribedChannels, channel)
+			}
+		}
+	}
+}
+
+func (s *Subscriber) PSubscribe(patterns ...*regexp.Regexp) {
+	s.db.master.Lock()
+	defer s.db.master.Unlock()
+
+	for _, pattern := range patterns {
+		s.patterns[pattern] = struct{}{}
+
+		var peers map[*Subscriber]struct{}
+		var hasPeers bool
+
+		if peers, hasPeers = s.db.directlySubscribedPatterns[pattern]; !hasPeers {
+			peers = map[*Subscriber]struct{}{}
+			s.db.directlySubscribedPatterns[pattern] = peers
+		}
+
+		peers[s] = struct{}{}
+	}
+}
+
+func (s *Subscriber) PUnsubscribe(patterns ...*regexp.Regexp) {
+	s.db.master.Lock()
+	defer s.db.master.Unlock()
+
+	for _, pattern := range patterns {
+		if _, hasChannel := s.patterns[pattern]; hasChannel {
+			delete(s.patterns, pattern)
+
+			peers := s.db.directlySubscribedPatterns[pattern]
+			delete(peers, s)
+
+			if len(peers) < 1 {
+				delete(s.db.directlySubscribedPatterns, pattern)
+			}
+		}
+	}
+}
+
+func (m *Miniredis) NewSubscriber() *Subscriber {
+	return m.DB(m.selectedDB).NewSubscriber()
+}
+
+func (db *RedisDB) NewSubscriber() *Subscriber {
+	return &Subscriber{
+		db:       db,
+		channels: map[string]struct{}{},
+		patterns: map[*regexp.Regexp]struct{}{},
+		queue: messageQueue{
+			messages:       []Message{},
+			hasNewMessages: make(chan struct{}, 1),
+		},
+	}
 }

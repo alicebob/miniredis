@@ -33,18 +33,20 @@ type setKey map[string]struct{}
 
 // RedisDB holds a single (numbered) Redis database.
 type RedisDB struct {
-	master             *sync.Mutex              // pointer to the lock in Miniredis
-	id                 int                      // db id
-	keys               map[string]string        // Master map of keys with their type
-	stringKeys         map[string]string        // GET/SET &c. keys
-	hashKeys           map[string]hashKey       // MGET/MSET &c. keys
-	listKeys           map[string]listKey       // LPUSH &c. keys
-	setKeys            map[string]setKey        // SADD &c. keys
-	sortedsetKeys      map[string]sortedSet     // ZADD &c. keys
-	ttl                map[string]time.Duration // effective TTL values
-	keyVersion         map[string]uint          // used to watch values
-	subscribedChannels map[string]map[*server.Peer]struct{}
-	subscribedPatterns map[string]map[*server.Peer]struct{}
+	master                     *sync.Mutex              // pointer to the lock in Miniredis
+	id                         int                      // db id
+	keys                       map[string]string        // Master map of keys with their type
+	stringKeys                 map[string]string        // GET/SET &c. keys
+	hashKeys                   map[string]hashKey       // MGET/MSET &c. keys
+	listKeys                   map[string]listKey       // LPUSH &c. keys
+	setKeys                    map[string]setKey        // SADD &c. keys
+	sortedsetKeys              map[string]sortedSet     // ZADD &c. keys
+	ttl                        map[string]time.Duration // effective TTL values
+	keyVersion                 map[string]uint          // used to watch values
+	subscribedChannels         map[string]map[*server.Peer]struct{}
+	subscribedPatterns         map[string]map[*server.Peer]struct{}
+	directlySubscribedChannels map[string]map[*Subscriber]struct{}
+	directlySubscribedPatterns map[*regexp.Regexp]map[*Subscriber]struct{}
 }
 
 type peerSubscriptions struct {
@@ -101,18 +103,20 @@ func NewMiniRedis() *Miniredis {
 
 func newRedisDB(id int, l *sync.Mutex) RedisDB {
 	return RedisDB{
-		id:                 id,
-		master:             l,
-		keys:               map[string]string{},
-		stringKeys:         map[string]string{},
-		hashKeys:           map[string]hashKey{},
-		listKeys:           map[string]listKey{},
-		setKeys:            map[string]setKey{},
-		sortedsetKeys:      map[string]sortedSet{},
-		ttl:                map[string]time.Duration{},
-		keyVersion:         map[string]uint{},
-		subscribedChannels: map[string]map[*server.Peer]struct{}{},
-		subscribedPatterns: map[string]map[*server.Peer]struct{}{},
+		id:                         id,
+		master:                     l,
+		keys:                       map[string]string{},
+		stringKeys:                 map[string]string{},
+		hashKeys:                   map[string]hashKey{},
+		listKeys:                   map[string]listKey{},
+		setKeys:                    map[string]setKey{},
+		sortedsetKeys:              map[string]sortedSet{},
+		ttl:                        map[string]time.Duration{},
+		keyVersion:                 map[string]uint{},
+		subscribedChannels:         map[string]map[*server.Peer]struct{}{},
+		subscribedPatterns:         map[string]map[*server.Peer]struct{}{},
+		directlySubscribedChannels: map[string]map[*Subscriber]struct{}{},
+		directlySubscribedPatterns: map[*regexp.Regexp]map[*Subscriber]struct{}{},
 	}
 }
 
