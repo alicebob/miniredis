@@ -560,6 +560,20 @@ type messageQueue struct {
 	hasNewMessages chan struct{}
 }
 
+func (q *messageQueue) Enqueue(message Message) {
+	q.Lock()
+	defer q.Unlock()
+
+	q.messages = append(q.messages, message)
+
+	select {
+	case q.hasNewMessages <- struct{}{}:
+		break
+	default:
+		break
+	}
+}
+
 type Subscriber struct {
 	Messages chan Message
 	close    chan struct{}

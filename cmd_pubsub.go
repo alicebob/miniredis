@@ -410,6 +410,8 @@ func (m *Miniredis) cmdPublish(c *server.Peer, cmd string, args []string) {
 
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
+		count := 0
+
 		var allPeers map[*server.Peer]struct{} = nil
 
 		if peers, hasPeers := db.subscribedChannels[channel]; hasPeers {
@@ -432,12 +434,39 @@ func (m *Miniredis) cmdPublish(c *server.Peer, cmd string, args []string) {
 			}
 		}
 
-		if allPeers == nil {
-			c.WriteInt(0)
-		} else {
-			c.WriteInt(len(allPeers))
+		if allPeers != nil {
+			count += len(allPeers)
 			go publishMessages(allPeers, channel, message)
 		}
+
+		var allSubscribers map[*Subscriber]struct{} = nil
+
+		if subscribers, hasSubscribers := db.directlySubscribedChannels[channel]; hasSubscribers {
+			allSubscribers = make(map[*Subscriber]struct{}, len(subscribers))
+
+			for subscriber := range subscribers {
+				allSubscribers[subscriber] = struct{}{}
+			}
+		}
+
+		for pattern, subscribers := range db.directlySubscribedPatterns {
+			if pattern.MatchString(channel) {
+				if allSubscribers == nil {
+					allSubscribers = make(map[*Subscriber]struct{}, len(subscribers))
+				}
+
+				for subscriber := range subscribers {
+					allSubscribers[subscriber] = struct{}{}
+				}
+			}
+		}
+
+		if allSubscribers != nil {
+			count += len(allSubscribers)
+			go publishMessagesToOurselves(allSubscribers, channel, message)
+		}
+
+		c.WriteInt(count)
 	})
 }
 
@@ -449,6 +478,16 @@ func publishMessages(peers map[*server.Peer]struct{}, channel, message string) {
 
 func publishMessage(peer *server.Peer, channel, message string) {
 	peer.MsgQueue.Enqueue(&queuedPubSubMessage{channel, message})
+}
+
+func publishMessagesToOurselves(subscribers map[*Subscriber]struct{}, channel, message string) {
+	for subscriber := range subscribers {
+		go publishMessageToOurselves(subscriber, channel, message)
+	}
+}
+
+func publishMessageToOurselves(subscriber *Subscriber, channel, message string) {
+	subscriber.queue.Enqueue(Message{channel, message})
 }
 
 // PUBSUB
