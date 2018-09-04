@@ -381,6 +381,17 @@ func (m *Miniredis) cmdPUnsubscribe(c *server.Peer, cmd string, args []string) {
 	})
 }
 
+type queuedPubSubMessage struct {
+	channel, message string
+}
+
+func (m *queuedPubSubMessage) Write(c *server.Peer) {
+	c.WriteLen(3)
+	c.WriteBulk("message")
+	c.WriteBulk(m.channel)
+	c.WriteBulk(m.message)
+}
+
 // PUBLISH
 func (m *Miniredis) cmdPublish(c *server.Peer, cmd string, args []string) {
 	if len(args) != 2 {
@@ -425,7 +436,7 @@ func (m *Miniredis) cmdPublish(c *server.Peer, cmd string, args []string) {
 			c.WriteInt(len(allPeers))
 
 			for peer := range allPeers {
-				peer.MsgQueue.Enqueue(channel, message)
+				peer.MsgQueue.Enqueue(&queuedPubSubMessage{channel, message})
 			}
 		}
 	})

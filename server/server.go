@@ -128,7 +128,7 @@ func (s *Server) servePeer(c net.Conn) (cl *Peer) {
 	cl = &Peer{
 		w: bufio.NewWriter(c),
 		MsgQueue: MessageQueue{
-			messages:       []queuedMessage{},
+			messages:       []QueuedMessage{},
 			hasNewMessages: make(chan struct{}, 1),
 		},
 	}
@@ -165,15 +165,12 @@ func (s *Server) servePeer(c net.Conn) (cl *Peer) {
 			}
 
 			messages := cl.MsgQueue.messages
-			cl.MsgQueue.messages = []queuedMessage{}
+			cl.MsgQueue.messages = []QueuedMessage{}
 
 			cl.MsgQueue.Unlock()
 
 			for _, message := range messages {
-				cl.WriteLen(3)
-				cl.WriteBulk("message")
-				cl.WriteBulk(message.channel)
-				cl.WriteBulk(message.message)
+				message.Write(cl)
 			}
 		}
 	}
@@ -242,21 +239,21 @@ func (s *Server) TotalConnections() int {
 	return s.infoConns
 }
 
-type queuedMessage struct {
-	channel, message string
+type QueuedMessage interface {
+	Write(c *Peer)
 }
 
 type MessageQueue struct {
 	sync.Mutex
-	messages       []queuedMessage
+	messages       []QueuedMessage
 	hasNewMessages chan struct{}
 }
 
-func (q *MessageQueue) Enqueue(channel, message string) {
+func (q *MessageQueue) Enqueue(message QueuedMessage) {
 	q.Lock()
 	defer q.Unlock()
 
-	q.messages = append(q.messages, queuedMessage{channel, message})
+	q.messages = append(q.messages, message)
 
 	select {
 	case q.hasNewMessages <- struct{}{}:
