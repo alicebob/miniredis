@@ -686,6 +686,8 @@ func (s *Subscriber) PUnsubscribe(patterns ...*regexp.Regexp) {
 }
 
 func (s *Subscriber) streamMessages() {
+	defer close(s.Messages)
+
 	for {
 		select {
 		case <-s.queue.hasNewMessages:
