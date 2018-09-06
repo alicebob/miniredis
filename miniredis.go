@@ -348,6 +348,10 @@ func (m *Miniredis) handleAuth(c *server.Peer) bool {
 }
 
 func (m *Miniredis) onDisconnect(c *server.Peer) {
+	go m.unsubscribeAll(c)
+}
+
+func (m *Miniredis) unsubscribeAll(c *server.Peer) {
 	m.Lock()
 	defer m.Unlock()
 
