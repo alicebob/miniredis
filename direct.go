@@ -652,7 +652,17 @@ func (s *Subscriber) PSubscribe(patterns ...*regexp.Regexp) {
 	s.db.master.Lock()
 	defer s.db.master.Unlock()
 
+	decompiledDSPs := s.db.master.decompiledDirectlySubscribedPatterns
+
 	for _, pattern := range patterns {
+		decompiled := pattern.String()
+
+		if decompiledDSP, hasDDSP := decompiledDSPs[decompiled]; hasDDSP {
+			pattern = decompiledDSP
+		} else {
+			decompiledDSPs[decompiled] = pattern
+		}
+
 		s.patterns[pattern] = struct{}{}
 
 		var peers map[*Subscriber]struct{}
@@ -671,7 +681,13 @@ func (s *Subscriber) PUnsubscribe(patterns ...*regexp.Regexp) {
 	s.db.master.Lock()
 	defer s.db.master.Unlock()
 
+	decompiledDSPs := s.db.master.decompiledDirectlySubscribedPatterns
+
 	for _, pattern := range patterns {
+		if decompiledDSP, hasDDSP := decompiledDSPs[pattern.String()]; hasDDSP {
+			pattern = decompiledDSP
+		}
+
 		if _, hasChannel := s.patterns[pattern]; hasChannel {
 			delete(s.patterns, pattern)
 
@@ -823,18 +839,16 @@ func (db *RedisDB) pubSubNumSubNoLock(channels ...string) map[string]int {
 	return numSub
 }
 
-func (db *RedisDB) pubSubNumPatNoLock() int {
-	rgxs := map[string]struct{}{}
-
-	for pattern := range db.subscribedPatterns {
-		rgxs[db.master.channelPatterns[pattern].String()] = struct{}{}
+func (db *RedisDB) pubSubNumPatNoLock() (numPat int) {
+	for _, peers := range db.subscribedPatterns {
+		numPat += len(peers)
 	}
 
-	for pattern := range db.directlySubscribedPatterns {
-		rgxs[pattern.String()] = struct{}{}
+	for _, subscribers := range db.directlySubscribedPatterns {
+		numPat += len(subscribers)
 	}
 
-	return len(rgxs)
+	return
 }
 
 func (db *RedisDB) publishMessage(channel, message string) int {
