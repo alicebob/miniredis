@@ -648,6 +648,22 @@ func (s *Subscriber) Unsubscribe(channels ...string) {
 	}
 }
 
+func (s *Subscriber) UnsubscribeAll() {
+	s.db.master.Lock()
+	defer s.db.master.Unlock()
+
+	for channel := range s.channels {
+		subscribers := s.db.directlySubscribedChannels[channel]
+		delete(subscribers, s)
+
+		if len(subscribers) < 1 {
+			delete(s.db.directlySubscribedChannels, channel)
+		}
+	}
+
+	s.channels = map[string]struct{}{}
+}
+
 func (s *Subscriber) PSubscribe(patterns ...*regexp.Regexp) {
 	s.db.master.Lock()
 	defer s.db.master.Unlock()
@@ -699,6 +715,22 @@ func (s *Subscriber) PUnsubscribe(patterns ...*regexp.Regexp) {
 			}
 		}
 	}
+}
+
+func (s *Subscriber) PUnsubscribeAll() {
+	s.db.master.Lock()
+	defer s.db.master.Unlock()
+
+	for pattern := range s.patterns {
+		subscribers := s.db.directlySubscribedPatterns[pattern]
+		delete(subscribers, s)
+
+		if len(subscribers) < 1 {
+			delete(s.db.directlySubscribedPatterns, pattern)
+		}
+	}
+
+	s.patterns = map[*regexp.Regexp]struct{}{}
 }
 
 func (s *Subscriber) streamMessages() {
