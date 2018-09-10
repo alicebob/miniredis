@@ -78,6 +78,15 @@ func failLoosely(cmd string, args ...interface{}) command {
 	}
 }
 
+func varDump(value interface{}) string {
+	typ := reflect.TypeOf(value)
+	if typ == nil {
+		return "nil"
+	}
+
+	return fmt.Sprintf("%s(%#v)", typ.Name(), value)
+}
+
 // ok fails the test if an err is not nil.
 func ok(tb testing.TB, err error) {
 	tb.Helper()
@@ -195,7 +204,7 @@ func runCommand(t *testing.T, cMini, cReal redis.Conn, p command) {
 	}
 
 	if !reflect.DeepEqual(errReal, errMini) {
-		t.Errorf("error error. expected: %#v got: %#v case: %#v", vReal, vMini, p)
+		t.Errorf("error error. expected: %s got: %s case: %#v", varDump(vReal), varDump(vMini), p)
 		return
 	}
 	// Sort the strings.
@@ -205,12 +214,12 @@ func runCommand(t *testing.T, cMini, cReal redis.Conn, p command) {
 	}
 	if p.loosely {
 		if !looselyEqual(vReal, vMini) {
-			t.Errorf("value error. expected: %#v got: %#v case: %#v", vReal, vMini, p)
+			t.Errorf("value error. expected: %s got: %s case: %#v", varDump(vReal), varDump(vMini), p)
 			return
 		}
 	} else {
 		if !reflect.DeepEqual(vReal, vMini) {
-			t.Errorf("value error. expected: %#v got: %#v case: %#v", vReal, vMini, p)
+			t.Errorf("value error. expected: %s got: %s case: %#v", varDump(vReal), varDump(vMini), p)
 			return
 		}
 	}
