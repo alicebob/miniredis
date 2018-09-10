@@ -1,7 +1,9 @@
 package miniredis
 
 import (
+	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -40,4 +42,23 @@ func mustFail(tb testing.TB, err error, want string) {
 	if have := err.Error(); have != want {
 		tb.Errorf("have %q, want %q", have, want)
 	}
+}
+
+func oneOf(tb testing.TB, exps []interface{}, act interface{}) bool {
+	tb.Helper()
+
+	for _, exp := range exps {
+		if reflect.DeepEqual(exp, act) {
+			return true
+		}
+	}
+
+	expPP := make([]string, len(exps))
+	for i, exp := range exps {
+		expPP[i] = fmt.Sprintf("%#v", exp)
+	}
+
+	tb.Errorf("expected one of: %s got: %#v", strings.Join(expPP, ", "), act)
+
+	return false
 }
