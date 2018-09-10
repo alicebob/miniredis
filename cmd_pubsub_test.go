@@ -559,3 +559,28 @@ func TestPubSubNumPat(t *testing.T) {
 
 	equals(t, 0, s.PubSubNumPat())
 }
+
+func TestPubSubBadArgs(t *testing.T) {
+	for _, command := range [9]struct {
+		command string
+		args    []interface{}
+		err     string
+	}{
+		{"SUBSCRIBE", []interface{}{}, "ERR wrong number of arguments for 'subscribe' command"},
+		{"PSUBSCRIBE", []interface{}{}, "ERR wrong number of arguments for 'psubscribe' command"},
+		{"PUBLISH", []interface{}{}, "ERR wrong number of arguments for 'publish' command"},
+		{"PUBLISH", []interface{}{"event1"}, "ERR wrong number of arguments for 'publish' command"},
+		{"PUBLISH", []interface{}{"event1", "message2", "message3"}, "ERR wrong number of arguments for 'publish' command"},
+		{"PUBSUB", []interface{}{}, "ERR wrong number of arguments for 'pubsub' command"},
+		{"PUBSUB", []interface{}{"FOOBAR"}, "ERR Unknown PUBSUB subcommand or wrong number of arguments for 'FOOBAR'"},
+		{"PUBSUB", []interface{}{"NUMPAT", "FOOBAR"}, "ERR Unknown PUBSUB subcommand or wrong number of arguments for 'NUMPAT'"},
+		{"PUBSUB", []interface{}{"CHANNELS", "FOOBAR1", "FOOBAR2"}, "ERR Unknown PUBSUB subcommand or wrong number of arguments for 'CHANNELS'"},
+	} {
+		_, c, done := setup(t)
+
+		_, err := c.Do(command.command, command.args...)
+		mustFail(t, err, command.err)
+
+		done()
+	}
+}
