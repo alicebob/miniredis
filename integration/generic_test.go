@@ -74,7 +74,6 @@ func TestUnknownCommand(t *testing.T) {
 func TestQuit(t *testing.T) {
 	testCommands(t,
 		succ("QUIT"),
-		fail("QUIT"),
 	)
 }
 
