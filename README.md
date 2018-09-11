@@ -312,7 +312,7 @@ Commands which will probably not be implemented:
 
 ## &c.
 
-Tests are run against Redis 4.0.6 (Debian). The [./integration](./integration/)
+Tests are run against Redis 4.0.11 (Debian). The [./integration](./integration/)
 subdir compares miniredis against a real redis instance.
 
 
