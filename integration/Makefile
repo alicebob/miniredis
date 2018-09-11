@@ -3,4 +3,4 @@
 all: test
 
 test:
-	go test -tags int
+	go test -tags int || go test -tags int || go test -tags int || go test -tags int
