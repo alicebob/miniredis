@@ -584,3 +584,141 @@ func TestPubSubBadArgs(t *testing.T) {
 		done()
 	}
 }
+
+func TestPubSubInteraction(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+
+	ch := make(chan struct{}, 4)
+
+	sub1 := runActualRedisClientForPubSub(t, s, func(t *testing.T, c redis.Conn) {
+		assertCorrectSubscriptionsCounts(
+			t,
+			[]int64{1, 2, 3, 4},
+			runCmdDuringPubSub(t, c, 3, "SUBSCRIBE", "event1", "event2", "event3", "event4"),
+		)
+
+		ch <- struct{}{}
+		receiveMessagesDuringPubSub(t, c, '1', '2', '3', '4')
+	})
+
+	sub2 := runActualRedisClientForPubSub(t, s, func(t *testing.T, c redis.Conn) {
+		assertCorrectSubscriptionsCounts(
+			t,
+			[]int64{1, 2, 3, 4},
+			runCmdDuringPubSub(t, c, 3, "SUBSCRIBE", "event3", "event4", "event5", "event6"),
+		)
+
+		ch <- struct{}{}
+		receiveMessagesDuringPubSub(t, c, '3', '4', '5', '6')
+	})
+
+	psub1 := runActualRedisClientForPubSub(t, s, func(t *testing.T, c redis.Conn) {
+		assertCorrectSubscriptionsCounts(
+			t,
+			[]int64{1, 2, 3, 4},
+			runCmdDuringPubSub(t, c, 3, "PSUBSCRIBE", "event[ab1]", "event[cd]", "event[ef3]", "event[gh]"),
+		)
+
+		ch <- struct{}{}
+		receiveMessagesDuringPubSub(t, c, '1', '3', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h')
+	})
+
+	psub2 := runActualRedisClientForPubSub(t, s, func(t *testing.T, c redis.Conn) {
+		assertCorrectSubscriptionsCounts(
+			t,
+			[]int64{1, 2, 3, 4},
+			runCmdDuringPubSub(t, c, 3, "PSUBSCRIBE", "event[ef]", "event[gh4]", "event[ij]", "event[kl6]"),
+		)
+
+		ch <- struct{}{}
+		receiveMessagesDuringPubSub(t, c, '4', '6', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l')
+	})
+
+	pub := runActualRedisClientForPubSub(t, s, func(t *testing.T, c redis.Conn) {
+		for i := uint8(0); i < 4; i++ {
+			<-ch
+		}
+
+		for _, message := range [18]struct {
+			channelSuffix rune
+			subscribers   uint8
+		}{
+			{'1', 2}, {'2', 1}, {'3', 3}, {'4', 3}, {'5', 1}, {'6', 2},
+			{'a', 1}, {'b', 1}, {'c', 1}, {'d', 1}, {'e', 2}, {'f', 2},
+			{'g', 2}, {'h', 2}, {'i', 1}, {'j', 1}, {'k', 1}, {'l', 1},
+		} {
+			suffix := string([]rune{message.channelSuffix})
+			replies := runCmdDuringPubSub(t, c, 0, "PUBLISH", "event"+suffix, "message"+suffix)
+			equals(t, []interface{}{int64(message.subscribers)}, replies)
+		}
+	})
+
+	sub1()
+	sub2()
+	psub1()
+	psub2()
+	pub()
+}
+
+func runActualRedisClientForPubSub(t *testing.T, s *Miniredis, tester func(t *testing.T, c redis.Conn)) (wait func()) {
+	t.Helper()
+
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	ch := make(chan struct{})
+
+	go func() {
+		tester(t, c)
+		c.Close()
+		close(ch)
+	}()
+
+	return func() { <-ch }
+}
+
+func runCmdDuringPubSub(t *testing.T, c redis.Conn, followUpMessages uint8, command string, args ...interface{}) (replies []interface{}) {
+	t.Helper()
+
+	replies = make([]interface{}, followUpMessages+1)
+
+	reply, err := c.Do(command, args...)
+	ok(t, err)
+
+	replies[0] = reply
+	i := 1
+
+	for ; followUpMessages > 0; followUpMessages-- {
+		reply, err := c.Receive()
+		ok(t, err)
+
+		replies[i] = reply
+		i++
+	}
+
+	return
+}
+
+func assertCorrectSubscriptionsCounts(t *testing.T, subscriptionsCounts []int64, replies []interface{}) {
+	t.Helper()
+
+	for i, subscriptionsCount := range subscriptionsCounts {
+		if arrayReply, isArrayReply := replies[i].([]interface{}); isArrayReply && len(arrayReply) > 2 {
+			equals(t, subscriptionsCount, arrayReply[2])
+		}
+	}
+}
+
+func receiveMessagesDuringPubSub(t *testing.T, c redis.Conn, suffixes ...rune) {
+	t.Helper()
+
+	for _, suffix := range suffixes {
+		msg, err := c.Receive()
+		ok(t, err)
+
+		suff := string([]rune{suffix})
+		equals(t, []interface{}{[]byte("message"), []byte("event" + suff), []byte("message" + suff)}, msg)
+	}
+}
