@@ -315,8 +315,8 @@ Commands which will probably not be implemented:
 
 ## &c.
 
-Tests are run against Redis 5.0.3. The [./integration](./integration/)
-subdir compares miniredis against a real redis instance.
+Tests are run against Redis 5.0.3. The [./integration](./integration/) subdir
+compares miniredis against a real redis instance.
 
 
 [![Build Status](https://travis-ci.org/alicebob/miniredis.svg?branch=master)](https://travis-ci.org/alicebob/miniredis) 

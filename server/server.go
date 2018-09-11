@@ -9,8 +9,15 @@ import (
 	"unicode"
 )
 
-func errUnknownCommand(cmd string) string {
-	return fmt.Sprintf("ERR unknown command '%s'", strings.ToLower(cmd))
+func errUnknownCommand(cmd string, args []string) string {
+	s := fmt.Sprintf("ERR unknown command `%s`, with args beginning with: ", cmd)
+	if len(args) > 20 {
+		args = args[:20]
+	}
+	for _, a := range args {
+		s += fmt.Sprintf("`%s`, ", a)
+	}
+	return s
 }
 
 // Cmd is what Register expects
@@ -135,19 +142,20 @@ func (s *Server) servePeer(c net.Conn) {
 }
 
 func (s *Server) dispatch(c *Peer, args []string) {
-	cmd, args := strings.ToUpper(args[0]), args[1:]
+	cmd, args := args[0], args[1:]
+	cmdUp := strings.ToUpper(cmd)
 	s.mu.Lock()
-	cb, ok := s.cmds[cmd]
+	cb, ok := s.cmds[cmdUp]
 	s.mu.Unlock()
 	if !ok {
-		c.WriteError(errUnknownCommand(cmd))
+		c.WriteError(errUnknownCommand(cmd, args))
 		return
 	}
 
 	s.mu.Lock()
 	s.infoCmds++
 	s.mu.Unlock()
-	cb(c, cmd, args)
+	cb(c, cmdUp, args)
 }
 
 // TotalCommands is total (known) commands since this the server started
