@@ -644,6 +644,23 @@ func TestPubSubInteraction(t *testing.T) {
 			<-ch
 		}
 
+		for _, pattern := range [2]string{"", "event?"} {
+			assertActiveChannelsDuringPubSub(t, c, pattern, map[string]struct{}{
+				"event1": {}, "event2": {}, "event3": {}, "event4": {}, "event5": {}, "event6": {},
+			})
+		}
+
+		assertActiveChannelsDuringPubSub(t, c, "*[123]", map[string]struct{}{
+			"event1": {}, "event2": {}, "event3": {},
+		})
+
+		assertNumSubDuringPubSub(t, c, map[string]int64{
+			"event1": 1, "event2": 1, "event3": 2, "event4": 2, "event5": 1, "event6": 1,
+			"event[ab1]": 0, "event[cd]": 0, "event[ef3]": 0, "event[gh]": 0, "event[ij]": 0, "event[kl6]": 0,
+		})
+
+		assertNumPatDuringPubSub(t, c, 8)
+
 		for _, message := range [18]struct {
 			channelSuffix rune
 			subscribers   uint8
@@ -724,4 +741,79 @@ func receiveMessagesDuringPubSub(t *testing.T, c redis.Conn, suffixes ...rune) {
 		suff := string([]rune{suffix})
 		equals(t, []interface{}{[]byte("message"), []byte("event" + suff), []byte("message" + suff)}, msg)
 	}
+}
+
+func assertActiveChannelsDuringPubSub(t *testing.T, c redis.Conn, pattern string, channels map[string]struct{}) {
+	t.Helper()
+
+	var args []interface{}
+	if pattern == "" {
+		args = []interface{}{"CHANNELS"}
+	} else {
+		args = []interface{}{"CHANNELS", pattern}
+	}
+
+	a, err := redis.Values(c.Do("PUBSUB", args...))
+	ok(t, err)
+
+	actualChannels := make(map[string]struct{}, len(a))
+
+	for _, channel := range a {
+		if channelString, channelIsString := channel.([]byte); channelIsString {
+			actualChannels[string(channelString)] = struct{}{}
+		}
+	}
+
+	equals(t, channels, actualChannels)
+}
+
+func assertNumSubDuringPubSub(t *testing.T, c redis.Conn, channels map[string]int64) {
+	t.Helper()
+
+	args := make([]interface{}, 1+len(channels))
+	args[0] = "NUMSUB"
+	i := 1
+
+	for channel := range channels {
+		args[i] = channel
+		i++
+	}
+
+	a, err := redis.Values(c.Do("PUBSUB", args...))
+	ok(t, err)
+	equals(t, len(channels)*2, len(a))
+
+	actualChannels := make(map[string]int64, len(a))
+
+	var currentChannel string
+	currentState := uint8(0)
+
+	for _, item := range a {
+		if currentState&uint8(1) == 0 {
+			if channelString, channelIsString := item.([]byte); channelIsString {
+				currentChannel = string(channelString)
+				currentState |= 2
+			} else {
+				currentState &= ^uint8(2)
+			}
+
+			currentState |= 1
+		} else {
+			if subsInt, subsIsInt := item.(int64); subsIsInt && currentState&uint8(2) != 0 {
+				actualChannels[currentChannel] = subsInt
+			}
+
+			currentState &= ^uint8(1)
+		}
+	}
+
+	equals(t, channels, actualChannels)
+}
+
+func assertNumPatDuringPubSub(t *testing.T, c redis.Conn, numPat int) {
+	t.Helper()
+
+	a, err := redis.Int(c.Do("PUBSUB", "NUMPAT"))
+	ok(t, err)
+	equals(t, numPat, a)
 }
