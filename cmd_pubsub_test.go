@@ -541,7 +541,10 @@ func TestPubSubNumSub(t *testing.T) {
 	{
 		a, err := redis.Values(c.Do("PUBSUB", "NUMSUB", "event1", "event2"))
 		ok(t, err)
-		equals(t, []interface{}{[]byte("event1"), int64(0), []byte("event2"), int64(0)}, a)
+		oneOf(t, []interface{}{
+			[]interface{}{[]byte("event1"), int64(0), []byte("event2"), int64(0)},
+			[]interface{}{[]byte("event2"), int64(0), []byte("event1"), int64(0)},
+		}, a)
 	}
 
 	equals(t, map[string]int{"event1": 0}, s.PubSubNumSub("event1"))
