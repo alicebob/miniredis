@@ -597,7 +597,7 @@ func TestPubSubInteraction(t *testing.T) {
 	tasks := [5]func(){}
 	directTasks := [4]func(){}
 
-	for i, tester := range [5]func(t *testing.T, c redis.Conn, chCtl chan struct{}){
+	for i, tester := range [5]func(t *testing.T, s *Miniredis, c redis.Conn, chCtl chan struct{}){
 		testPubSubInteractionSub1,
 		testPubSubInteractionSub2,
 		testPubSubInteractionPsub1,
@@ -625,7 +625,7 @@ func TestPubSubInteraction(t *testing.T) {
 	}
 }
 
-func testPubSubInteractionSub1(t *testing.T, c redis.Conn, ch chan struct{}) {
+func testPubSubInteractionSub1(t *testing.T, _ *Miniredis, c redis.Conn, ch chan struct{}) {
 	assertCorrectSubscriptionsCounts(
 		t,
 		[]int64{1, 2, 3, 4},
@@ -645,7 +645,7 @@ func testPubSubInteractionSub1(t *testing.T, c redis.Conn, ch chan struct{}) {
 	receiveMessagesDuringPubSub(t, c, '1', '4')
 }
 
-func testPubSubInteractionSub2(t *testing.T, c redis.Conn, ch chan struct{}) {
+func testPubSubInteractionSub2(t *testing.T, _ *Miniredis, c redis.Conn, ch chan struct{}) {
 	assertCorrectSubscriptionsCounts(
 		t,
 		[]int64{1, 2, 3, 4},
@@ -695,7 +695,7 @@ func testPubSubInteractionDirectSub2(t *testing.T, s *Miniredis, ch chan struct{
 	receiveMessagesDirectlyDuringPubSub(t, sub, '2', '4')
 }
 
-func testPubSubInteractionPsub1(t *testing.T, c redis.Conn, ch chan struct{}) {
+func testPubSubInteractionPsub1(t *testing.T, _ *Miniredis, c redis.Conn, ch chan struct{}) {
 	assertCorrectSubscriptionsCounts(
 		t,
 		[]int64{1, 2, 3, 4},
@@ -715,7 +715,7 @@ func testPubSubInteractionPsub1(t *testing.T, c redis.Conn, ch chan struct{}) {
 	receiveMessagesDuringPubSub(t, c, '1', 'a', 'b', 'g', 'h')
 }
 
-func testPubSubInteractionPsub2(t *testing.T, c redis.Conn, ch chan struct{}) {
+func testPubSubInteractionPsub2(t *testing.T, _ *Miniredis, c redis.Conn, ch chan struct{}) {
 	assertCorrectSubscriptionsCounts(
 		t,
 		[]int64{1, 2, 3, 4},
@@ -767,32 +767,35 @@ func testPubSubInteractionDirectPsub2(t *testing.T, s *Miniredis, ch chan struct
 	receiveMessagesDirectlyDuringPubSub(t, sub, '4', 'c', 'd', 'g', 'h')
 }
 
-func testPubSubInteractionPub(t *testing.T, c redis.Conn, ch chan struct{}) {
-	testPubSubInteractionPubStage1(t, c, ch)
-	testPubSubInteractionPubStage2(t, c, ch)
+func testPubSubInteractionPub(t *testing.T, s *Miniredis, c redis.Conn, ch chan struct{}) {
+	testPubSubInteractionPubStage1(t, s, c, ch)
+	testPubSubInteractionPubStage2(t, s, c, ch)
 }
 
-func testPubSubInteractionPubStage1(t *testing.T, c redis.Conn, ch chan struct{}) {
+func testPubSubInteractionPubStage1(t *testing.T, s *Miniredis, c redis.Conn, ch chan struct{}) {
 	for i := uint8(0); i < 8; i++ {
 		<-ch
 	}
 
-	for _, pattern := range [2]string{"", "event?"} {
-		assertActiveChannelsDuringPubSub(t, c, pattern, map[string]struct{}{
+	for _, pattern := range [2]struct {
+		pattern string
+		rgx     *regexp.Regexp
+	}{{"", nil}, {"event?", regexp.MustCompile(`\Aevent.\z`)}} {
+		assertActiveChannelsDuringPubSub(t, s, c, pattern.pattern, pattern.rgx, map[string]struct{}{
 			"event1": {}, "event2": {}, "event3": {}, "event4": {}, "event5": {}, "event6": {},
 		})
 	}
 
-	assertActiveChannelsDuringPubSub(t, c, "*[123]", map[string]struct{}{
+	assertActiveChannelsDuringPubSub(t, s, c, "*[123]", regexp.MustCompile(`[123]\z`), map[string]struct{}{
 		"event1": {}, "event2": {}, "event3": {},
 	})
 
-	assertNumSubDuringPubSub(t, c, map[string]int64{
+	assertNumSubDuringPubSub(t, s, c, map[string]int{
 		"event1": 2, "event2": 2, "event3": 4, "event4": 4, "event5": 2, "event6": 2,
 		"event[ab1]": 0, "event[cd]": 0, "event[ef3]": 0, "event[gh]": 0, "event[ij]": 0, "event[kl6]": 0,
 	})
 
-	assertNumPatDuringPubSub(t, c, 16)
+	assertNumPatDuringPubSub(t, s, c, 16)
 
 	for _, message := range [18]struct {
 		channelSuffix rune
@@ -808,27 +811,30 @@ func testPubSubInteractionPubStage1(t *testing.T, c redis.Conn, ch chan struct{}
 	}
 }
 
-func testPubSubInteractionPubStage2(t *testing.T, c redis.Conn, ch chan struct{}) {
+func testPubSubInteractionPubStage2(t *testing.T, s *Miniredis, c redis.Conn, ch chan struct{}) {
 	for i := uint8(0); i < 8; i++ {
 		<-ch
 	}
 
-	for _, pattern := range [2]string{"", "event?"} {
-		assertActiveChannelsDuringPubSub(t, c, pattern, map[string]struct{}{
+	for _, pattern := range [2]struct {
+		pattern string
+		rgx     *regexp.Regexp
+	}{{"", nil}, {"event?", regexp.MustCompile(`\Aevent.\z`)}} {
+		assertActiveChannelsDuringPubSub(t, s, c, pattern.pattern, pattern.rgx, map[string]struct{}{
 			"event1": {}, "event2": {}, "event3": {}, "event4": {}, "event6": {},
 		})
 	}
 
-	assertActiveChannelsDuringPubSub(t, c, "*[123]", map[string]struct{}{
+	assertActiveChannelsDuringPubSub(t, s, c, "*[123]", regexp.MustCompile(`[123]\z`), map[string]struct{}{
 		"event1": {}, "event2": {}, "event3": {},
 	})
 
-	assertNumSubDuringPubSub(t, c, map[string]int64{
+	assertNumSubDuringPubSub(t, s, c, map[string]int{
 		"event1": 1, "event2": 1, "event3": 2, "event4": 2, "event5": 0, "event6": 2,
 		"event[ab1]": 0, "event[cd]": 0, "event[ef3]": 0, "event[gh]": 0, "event[ij]": 0, "event[kl6]": 0,
 	})
 
-	assertNumPatDuringPubSub(t, c, 8)
+	assertNumPatDuringPubSub(t, s, c, 8)
 
 	for _, message := range [18]struct {
 		channelSuffix rune
@@ -844,7 +850,7 @@ func testPubSubInteractionPubStage2(t *testing.T, c redis.Conn, ch chan struct{}
 	}
 }
 
-func runActualRedisClientForPubSub(t *testing.T, s *Miniredis, chCtl chan struct{}, tester func(t *testing.T, c redis.Conn, chCtl chan struct{})) (wait func()) {
+func runActualRedisClientForPubSub(t *testing.T, s *Miniredis, chCtl chan struct{}, tester func(t *testing.T, s *Miniredis, c redis.Conn, chCtl chan struct{})) (wait func()) {
 	t.Helper()
 
 	c, err := redis.Dial("tcp", s.Addr())
@@ -855,7 +861,7 @@ func runActualRedisClientForPubSub(t *testing.T, s *Miniredis, chCtl chan struct
 	go func() {
 		t.Helper()
 
-		tester(t, c, chCtl)
+		tester(t, s, c, chCtl)
 		c.Close()
 		close(ch)
 	}()
@@ -931,7 +937,7 @@ func receiveMessagesDirectlyDuringPubSub(t *testing.T, sub *Subscriber, suffixes
 	}
 }
 
-func assertActiveChannelsDuringPubSub(t *testing.T, c redis.Conn, pattern string, channels map[string]struct{}) {
+func assertActiveChannelsDuringPubSub(t *testing.T, s *Miniredis, c redis.Conn, pattern string, rgx *regexp.Regexp, channels map[string]struct{}) {
 	t.Helper()
 
 	var args []interface{}
@@ -953,25 +959,33 @@ func assertActiveChannelsDuringPubSub(t *testing.T, c redis.Conn, pattern string
 	}
 
 	equals(t, channels, actualChannels)
+
+	equals(t, channels, s.PubSubChannels(rgx))
 }
 
-func assertNumSubDuringPubSub(t *testing.T, c redis.Conn, channels map[string]int64) {
+func assertNumSubDuringPubSub(t *testing.T, s *Miniredis, c redis.Conn, channels map[string]int) {
 	t.Helper()
 
 	args := make([]interface{}, 1+len(channels))
 	args[0] = "NUMSUB"
 	i := 1
 
+	flatChannels := make([]string, len(channels))
+	j := 0
+
 	for channel := range channels {
 		args[i] = channel
 		i++
+
+		flatChannels[j] = channel
+		j++
 	}
 
 	a, err := redis.Values(c.Do("PUBSUB", args...))
 	ok(t, err)
 	equals(t, len(channels)*2, len(a))
 
-	actualChannels := make(map[string]int64, len(a))
+	actualChannels := make(map[string]int, len(a))
 
 	var currentChannel string
 	currentState := uint8(0)
@@ -988,7 +1002,7 @@ func assertNumSubDuringPubSub(t *testing.T, c redis.Conn, channels map[string]in
 			currentState |= 1
 		} else {
 			if subsInt, subsIsInt := item.(int64); subsIsInt && currentState&uint8(2) != 0 {
-				actualChannels[currentChannel] = subsInt
+				actualChannels[currentChannel] = int(subsInt)
 			}
 
 			currentState &= ^uint8(1)
@@ -996,12 +1010,16 @@ func assertNumSubDuringPubSub(t *testing.T, c redis.Conn, channels map[string]in
 	}
 
 	equals(t, channels, actualChannels)
+
+	equals(t, channels, s.PubSubNumSub(flatChannels...))
 }
 
-func assertNumPatDuringPubSub(t *testing.T, c redis.Conn, numPat int) {
+func assertNumPatDuringPubSub(t *testing.T, s *Miniredis, c redis.Conn, numPat int) {
 	t.Helper()
 
 	a, err := redis.Int(c.Do("PUBSUB", "NUMPAT"))
 	ok(t, err)
 	equals(t, numPat, a)
+
+	equals(t, numPat, s.PubSubNumPat())
 }
