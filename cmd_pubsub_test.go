@@ -692,6 +692,11 @@ func testPubSubInteractionPsub2(t *testing.T, c redis.Conn, ch chan struct{}) {
 }
 
 func testPubSubInteractionPub(t *testing.T, c redis.Conn, ch chan struct{}) {
+	testPubSubInteractionPubStage1(t, c, ch)
+	testPubSubInteractionPubStage2(t, c, ch)
+}
+
+func testPubSubInteractionPubStage1(t *testing.T, c redis.Conn, ch chan struct{}) {
 	for i := uint8(0); i < 4; i++ {
 		<-ch
 	}
@@ -725,7 +730,9 @@ func testPubSubInteractionPub(t *testing.T, c redis.Conn, ch chan struct{}) {
 		replies := runCmdDuringPubSub(t, c, 0, "PUBLISH", "event"+suffix, "message"+suffix)
 		equals(t, []interface{}{int64(message.subscribers)}, replies)
 	}
+}
 
+func testPubSubInteractionPubStage2(t *testing.T, c redis.Conn, ch chan struct{}) {
 	for i := uint8(0); i < 4; i++ {
 		<-ch
 	}
