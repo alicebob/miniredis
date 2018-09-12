@@ -593,8 +593,9 @@ func TestPubSubInteraction(t *testing.T) {
 	ok(t, err)
 	defer s.Close()
 
-	ch := make(chan struct{}, 4)
+	ch := make(chan struct{}, 8)
 	tasks := [5]func(){}
+	directTasks := [4]func(){}
 
 	for i, tester := range [5]func(t *testing.T, c redis.Conn, chCtl chan struct{}){
 		testPubSubInteractionSub1,
@@ -606,7 +607,20 @@ func TestPubSubInteraction(t *testing.T) {
 		tasks[i] = runActualRedisClientForPubSub(t, s, ch, tester)
 	}
 
+	for i, tester := range [4]func(t *testing.T, s *Miniredis, chCtl chan struct{}){
+		testPubSubInteractionDirectSub1,
+		testPubSubInteractionDirectSub2,
+		testPubSubInteractionDirectPsub1,
+		testPubSubInteractionDirectPsub2,
+	} {
+		directTasks[i] = runDirectRedisClientForPubSub(t, s, ch, tester)
+	}
+
 	for _, task := range tasks {
+		task()
+	}
+
+	for _, task := range directTasks {
 		task()
 	}
 }
@@ -651,6 +665,26 @@ func testPubSubInteractionSub2(t *testing.T, c redis.Conn, ch chan struct{}) {
 	receiveMessagesDuringPubSub(t, c, '3', '6')
 }
 
+func testPubSubInteractionDirectSub1(t *testing.T, s *Miniredis, ch chan struct{}) {
+	sub := s.NewSubscriber()
+	defer sub.Close()
+
+	sub.Subscribe("event1", "event3", "event4", "event6")
+
+	ch <- struct{}{}
+	receiveMessagesDirectlyDuringPubSub(t, sub, '1', '3', '4', '6')
+}
+
+func testPubSubInteractionDirectSub2(t *testing.T, s *Miniredis, ch chan struct{}) {
+	sub := s.NewSubscriber()
+	defer sub.Close()
+
+	sub.Subscribe("event2", "event3", "event4", "event5")
+
+	ch <- struct{}{}
+	receiveMessagesDirectlyDuringPubSub(t, sub, '2', '3', '4', '5')
+}
+
 func testPubSubInteractionPsub1(t *testing.T, c redis.Conn, ch chan struct{}) {
 	assertCorrectSubscriptionsCounts(
 		t,
@@ -691,13 +725,35 @@ func testPubSubInteractionPsub2(t *testing.T, c redis.Conn, ch chan struct{}) {
 	receiveMessagesDuringPubSub(t, c, '6', 'e', 'f', 'k', 'l')
 }
 
+func testPubSubInteractionDirectPsub1(t *testing.T, s *Miniredis, ch chan struct{}) {
+	rgx := regexp.MustCompile
+	sub := s.NewSubscriber()
+	defer sub.Close()
+
+	sub.PSubscribe(rgx(`\Aevent[ab1]\z`), rgx(`\Aevent[ef3]\z`), rgx(`\Aevent[gh]\z`), rgx(`\Aevent[kl6]\z`))
+
+	ch <- struct{}{}
+	receiveMessagesDirectlyDuringPubSub(t, sub, '1', '3', '6', 'a', 'b', 'e', 'f', 'g', 'h', 'k', 'l')
+}
+
+func testPubSubInteractionDirectPsub2(t *testing.T, s *Miniredis, ch chan struct{}) {
+	rgx := regexp.MustCompile
+	sub := s.NewSubscriber()
+	defer sub.Close()
+
+	sub.PSubscribe(rgx(`\Aevent[cd]\z`), rgx(`\Aevent[ef]\z`), rgx(`\Aevent[gh4]\z`), rgx(`\Aevent[ij]\z`))
+
+	ch <- struct{}{}
+	receiveMessagesDirectlyDuringPubSub(t, sub, '4', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j')
+}
+
 func testPubSubInteractionPub(t *testing.T, c redis.Conn, ch chan struct{}) {
 	testPubSubInteractionPubStage1(t, c, ch)
 	testPubSubInteractionPubStage2(t, c, ch)
 }
 
 func testPubSubInteractionPubStage1(t *testing.T, c redis.Conn, ch chan struct{}) {
-	for i := uint8(0); i < 4; i++ {
+	for i := uint8(0); i < 8; i++ {
 		<-ch
 	}
 
@@ -712,19 +768,19 @@ func testPubSubInteractionPubStage1(t *testing.T, c redis.Conn, ch chan struct{}
 	})
 
 	assertNumSubDuringPubSub(t, c, map[string]int64{
-		"event1": 1, "event2": 1, "event3": 2, "event4": 2, "event5": 1, "event6": 1,
+		"event1": 2, "event2": 2, "event3": 4, "event4": 4, "event5": 2, "event6": 2,
 		"event[ab1]": 0, "event[cd]": 0, "event[ef3]": 0, "event[gh]": 0, "event[ij]": 0, "event[kl6]": 0,
 	})
 
-	assertNumPatDuringPubSub(t, c, 8)
+	assertNumPatDuringPubSub(t, c, 16)
 
 	for _, message := range [18]struct {
 		channelSuffix rune
 		subscribers   uint8
 	}{
-		{'1', 2}, {'2', 1}, {'3', 3}, {'4', 3}, {'5', 1}, {'6', 2},
-		{'a', 1}, {'b', 1}, {'c', 1}, {'d', 1}, {'e', 2}, {'f', 2},
-		{'g', 2}, {'h', 2}, {'i', 1}, {'j', 1}, {'k', 1}, {'l', 1},
+		{'1', 4}, {'2', 2}, {'3', 6}, {'4', 6}, {'5', 2}, {'6', 4},
+		{'a', 2}, {'b', 2}, {'c', 2}, {'d', 2}, {'e', 4}, {'f', 4},
+		{'g', 4}, {'h', 4}, {'i', 2}, {'j', 2}, {'k', 2}, {'l', 2},
 	} {
 		suffix := string([]rune{message.channelSuffix})
 		replies := runCmdDuringPubSub(t, c, 0, "PUBLISH", "event"+suffix, "message"+suffix)
@@ -777,8 +833,25 @@ func runActualRedisClientForPubSub(t *testing.T, s *Miniredis, chCtl chan struct
 	ch := make(chan struct{})
 
 	go func() {
+		t.Helper()
+
 		tester(t, c, chCtl)
 		c.Close()
+		close(ch)
+	}()
+
+	return func() { <-ch }
+}
+
+func runDirectRedisClientForPubSub(t *testing.T, s *Miniredis, chCtl chan struct{}, tester func(t *testing.T, s *Miniredis, chCtl chan struct{})) (wait func()) {
+	t.Helper()
+
+	ch := make(chan struct{})
+
+	go func() {
+		t.Helper()
+
+		tester(t, s, chCtl)
 		close(ch)
 	}()
 
@@ -826,6 +899,15 @@ func receiveMessagesDuringPubSub(t *testing.T, c redis.Conn, suffixes ...rune) {
 
 		suff := string([]rune{suffix})
 		equals(t, []interface{}{[]byte("message"), []byte("event" + suff), []byte("message" + suff)}, msg)
+	}
+}
+
+func receiveMessagesDirectlyDuringPubSub(t *testing.T, sub *Subscriber, suffixes ...rune) {
+	t.Helper()
+
+	for _, suffix := range suffixes {
+		suff := string([]rune{suffix})
+		equals(t, Message{"event" + suff, "message" + suff}, <-sub.Messages)
 	}
 }
 
