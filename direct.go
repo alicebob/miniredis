@@ -7,6 +7,7 @@ import (
 	"github.com/alicebob/miniredis/server"
 	"regexp"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -910,7 +911,9 @@ func (db *RedisDB) publishMessage(channel, message string) int {
 
 	if allPeers != nil {
 		count += len(allPeers)
-		go publishMessages(allPeers, channel, message)
+
+		wait := publishMessagesAsync(allPeers, channel, message)
+		defer wait()
 	}
 
 	var allSubscribers map[*Subscriber]struct{} = nil
@@ -937,28 +940,56 @@ func (db *RedisDB) publishMessage(channel, message string) int {
 
 	if allSubscribers != nil {
 		count += len(allSubscribers)
-		go publishMessagesToOurselves(allSubscribers, channel, message)
+
+		wait := publishMessagesToOurselvesAsync(allSubscribers, channel, message)
+		defer wait()
 	}
 
 	return count
 }
 
-func publishMessages(peers map[*server.Peer]struct{}, channel, message string) {
+func publishMessagesAsync(peers map[*server.Peer]struct{}, channel, message string) (wait func()) {
+	chCtl := make(chan struct{})
+	go publishMessages(peers, channel, message, chCtl)
+
+	return func() { <-chCtl }
+}
+
+func publishMessages(peers map[*server.Peer]struct{}, channel, message string, chCtl chan struct{}) {
+	pending := uint64(len(peers))
+
 	for peer := range peers {
-		go publishMessage(peer, channel, message)
+		go publishMessage(peer, channel, message, &pending, chCtl)
 	}
 }
 
-func publishMessage(peer *server.Peer, channel, message string) {
+func publishMessage(peer *server.Peer, channel, message string, pending *uint64, chCtl chan struct{}) {
 	peer.MsgQueue.Enqueue(&queuedPubSubMessage{channel, message})
-}
 
-func publishMessagesToOurselves(subscribers map[*Subscriber]struct{}, channel, message string) {
-	for subscriber := range subscribers {
-		go publishMessageToOurselves(subscriber, channel, message)
+	if atomic.AddUint64(pending, ^uint64(0)) == 0 {
+		close(chCtl)
 	}
 }
 
-func publishMessageToOurselves(subscriber *Subscriber, channel, message string) {
+func publishMessagesToOurselvesAsync(subscribers map[*Subscriber]struct{}, channel, message string) (wait func()) {
+	chCtl := make(chan struct{})
+	go publishMessagesToOurselves(subscribers, channel, message, chCtl)
+
+	return func() { <-chCtl }
+}
+
+func publishMessagesToOurselves(subscribers map[*Subscriber]struct{}, channel, message string, chCtl chan struct{}) {
+	pending := uint64(len(subscribers))
+
+	for subscriber := range subscribers {
+		go publishMessageToOurselves(subscriber, channel, message, &pending, chCtl)
+	}
+}
+
+func publishMessageToOurselves(subscriber *Subscriber, channel, message string, pending *uint64, chCtl chan struct{}) {
 	subscriber.queue.Enqueue(Message{channel, message})
+
+	if atomic.AddUint64(pending, ^uint64(0)) == 0 {
+		close(chCtl)
+	}
 }
