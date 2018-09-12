@@ -845,8 +845,7 @@ func testPubSubInteractionPubStage2(t *testing.T, s *Miniredis, c redis.Conn, ch
 		{'g', 2}, {'h', 2}, {'i', 0}, {'j', 0}, {'k', 2}, {'l', 2},
 	} {
 		suffix := string([]rune{message.channelSuffix})
-		replies := runCmdDuringPubSub(t, c, 0, "PUBLISH", "event"+suffix, "message"+suffix)
-		equals(t, []interface{}{int64(message.subscribers)}, replies)
+		equals(t, int(message.subscribers), s.Publish("event"+suffix, "message"+suffix))
 	}
 }
 
