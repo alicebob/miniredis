@@ -673,6 +673,11 @@ func testPubSubInteractionDirectSub1(t *testing.T, s *Miniredis, ch chan struct{
 
 	ch <- struct{}{}
 	receiveMessagesDirectlyDuringPubSub(t, sub, '1', '3', '4', '6')
+
+	sub.Unsubscribe("event1", "event4")
+
+	ch <- struct{}{}
+	receiveMessagesDirectlyDuringPubSub(t, sub, '3', '6')
 }
 
 func testPubSubInteractionDirectSub2(t *testing.T, s *Miniredis, ch chan struct{}) {
@@ -683,6 +688,11 @@ func testPubSubInteractionDirectSub2(t *testing.T, s *Miniredis, ch chan struct{
 
 	ch <- struct{}{}
 	receiveMessagesDirectlyDuringPubSub(t, sub, '2', '3', '4', '5')
+
+	sub.Unsubscribe("event3", "event5")
+
+	ch <- struct{}{}
+	receiveMessagesDirectlyDuringPubSub(t, sub, '2', '4')
 }
 
 func testPubSubInteractionPsub1(t *testing.T, c redis.Conn, ch chan struct{}) {
@@ -734,6 +744,11 @@ func testPubSubInteractionDirectPsub1(t *testing.T, s *Miniredis, ch chan struct
 
 	ch <- struct{}{}
 	receiveMessagesDirectlyDuringPubSub(t, sub, '1', '3', '6', 'a', 'b', 'e', 'f', 'g', 'h', 'k', 'l')
+
+	sub.PUnsubscribe(rgx(`\Aevent[ab1]\z`), rgx(`\Aevent[gh]\z`))
+
+	ch <- struct{}{}
+	receiveMessagesDirectlyDuringPubSub(t, sub, '3', '6', 'e', 'f', 'k', 'l')
 }
 
 func testPubSubInteractionDirectPsub2(t *testing.T, s *Miniredis, ch chan struct{}) {
@@ -745,6 +760,11 @@ func testPubSubInteractionDirectPsub2(t *testing.T, s *Miniredis, ch chan struct
 
 	ch <- struct{}{}
 	receiveMessagesDirectlyDuringPubSub(t, sub, '4', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j')
+
+	sub.PUnsubscribe(rgx(`\Aevent[ef]\z`), rgx(`\Aevent[ij]\z`))
+
+	ch <- struct{}{}
+	receiveMessagesDirectlyDuringPubSub(t, sub, '4', 'c', 'd', 'g', 'h')
 }
 
 func testPubSubInteractionPub(t *testing.T, c redis.Conn, ch chan struct{}) {
@@ -789,34 +809,34 @@ func testPubSubInteractionPubStage1(t *testing.T, c redis.Conn, ch chan struct{}
 }
 
 func testPubSubInteractionPubStage2(t *testing.T, c redis.Conn, ch chan struct{}) {
-	for i := uint8(0); i < 4; i++ {
+	for i := uint8(0); i < 8; i++ {
 		<-ch
 	}
 
 	for _, pattern := range [2]string{"", "event?"} {
 		assertActiveChannelsDuringPubSub(t, c, pattern, map[string]struct{}{
-			"event1": {}, "event3": {}, "event4": {}, "event6": {},
+			"event1": {}, "event2": {}, "event3": {}, "event4": {}, "event6": {},
 		})
 	}
 
 	assertActiveChannelsDuringPubSub(t, c, "*[123]", map[string]struct{}{
-		"event1": {}, "event3": {},
+		"event1": {}, "event2": {}, "event3": {},
 	})
 
 	assertNumSubDuringPubSub(t, c, map[string]int64{
-		"event1": 1, "event2": 0, "event3": 1, "event4": 1, "event5": 0, "event6": 1,
+		"event1": 1, "event2": 1, "event3": 2, "event4": 2, "event5": 0, "event6": 2,
 		"event[ab1]": 0, "event[cd]": 0, "event[ef3]": 0, "event[gh]": 0, "event[ij]": 0, "event[kl6]": 0,
 	})
 
-	assertNumPatDuringPubSub(t, c, 4)
+	assertNumPatDuringPubSub(t, c, 8)
 
 	for _, message := range [18]struct {
 		channelSuffix rune
 		subscribers   uint8
 	}{
-		{'1', 2}, {'2', 0}, {'3', 1}, {'4', 1}, {'5', 0}, {'6', 2},
-		{'a', 1}, {'b', 1}, {'c', 0}, {'d', 0}, {'e', 1}, {'f', 1},
-		{'g', 1}, {'h', 1}, {'i', 0}, {'j', 0}, {'k', 1}, {'l', 1},
+		{'1', 2}, {'2', 1}, {'3', 3}, {'4', 3}, {'5', 0}, {'6', 4},
+		{'a', 1}, {'b', 1}, {'c', 1}, {'d', 1}, {'e', 2}, {'f', 2},
+		{'g', 2}, {'h', 2}, {'i', 0}, {'j', 0}, {'k', 2}, {'l', 2},
 	} {
 		suffix := string([]rune{message.channelSuffix})
 		replies := runCmdDuringPubSub(t, c, 0, "PUBLISH", "event"+suffix, "message"+suffix)
