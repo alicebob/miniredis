@@ -74,14 +74,20 @@ type connCtx struct {
 	watch            map[dbKey]uint // WATCHed keys.
 }
 
-// NewMiniRedis makes a new, non-started, Miniredis object.
-func NewMiniRedis() *Miniredis {
+// NewMiniRedisAt makes a new, non-started, Miniredis object at the specified port.
+func NewMiniRedisAt(port int) *Miniredis {
 	m := Miniredis{
 		dbs:     map[int]*RedisDB{},
 		scripts: map[string]string{},
+		port:    port,
 	}
 	m.signal = sync.NewCond(&m)
 	return &m
+}
+
+// NewMiniRedis makes a new, non-started, Miniredis object.
+func NewMiniRedis() *Miniredis {
+	return NewMiniRedisAt(0)
 }
 
 func newRedisDB(id int, l *sync.Mutex) RedisDB {
