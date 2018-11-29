@@ -104,6 +104,7 @@ Implemented commands:
    - DBSIZE
    - FLUSHALL
    - FLUSHDB
+   - TIME -- returns time.Now() or value set by SetTime()
  - String keys (complete)
    - APPEND
    - BITCOUNT
@@ -205,7 +206,7 @@ Implemented commands:
    - SCRIPT EXISTS
    - SCRIPT FLUSH
 
-## TTLs and key expiration
+## TTLs, key expiration, and time
 
 Since miniredis is intended to be used in unittests TTLs don't decrease
 automatically. You can use `TTL()` to get the TTL (as a time.Duration) of a
@@ -219,6 +220,8 @@ converted to a duration. For that you can either set m.SetTime(t) to use that
 time as the base for the (P)EXPIREAT conversion, or don't call SetTime(), in
 which case time.Now() will be used.
 
+SetTime() also sets the value returned by TIME, which defaults to time.Now().
+It is not updated by FastForward, only by SetTime.
 
 ## Example
 
@@ -307,7 +310,6 @@ Commands which will probably not be implemented:
     - ~~SLAVEOF~~
     - ~~SLOWLOG~~
     - ~~SYNC~~
-    - ~~TIME~~
     
 
 ## &c.
