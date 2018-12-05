@@ -2,6 +2,7 @@ package miniredis
 
 import (
 	"testing"
+	"time"
 
 	"github.com/gomodule/redigo/redis"
 )
@@ -87,4 +88,32 @@ func TestCmdServer(t *testing.T) {
 		_, err = redis.Int(c.Do("FLUSHALL", "ASYNC", "ASYNC"))
 		assert(t, err != nil, "no FLUSHALL error")
 	}
+}
+
+// Test TIME
+func TestCmdServerTime(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	var seconds, microseconds int
+
+	res, err := redis.Values(c.Do("TIME"))
+	ok(t, err)
+	_, err = redis.Scan(res, &seconds, &microseconds)
+	ok(t, err)
+	assert(t, seconds > 0, "seconds")
+
+	s.SetTime(time.Unix(100, 123456789))
+	res, err = redis.Values(c.Do("TIME"))
+	ok(t, err)
+	_, err = redis.Scan(res, &seconds, &microseconds)
+	ok(t, err)
+	equals(t, seconds, 100)
+	equals(t, microseconds, 123456)
+
+	_, err = redis.MultiBulk(c.Do("TIME", "FOO"))
+	assert(t, err != nil, "no TIME error")
 }
