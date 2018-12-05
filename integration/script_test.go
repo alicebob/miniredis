@@ -295,3 +295,29 @@ func TestScriptReplicate(t *testing.T) {
 		),
 	)
 }
+
+func TestScriptTx(t *testing.T) {
+	sha2 := "bfbf458525d6a0b19200bfd6db3af481156b367b" // keys[1], argv[1]
+
+	testCommands(t,
+		succ("SCRIPT", "LOAD", "return {KEYS[1],ARGV[1]}"),
+		succ("MULTI"),
+		succ("EVALSHA", sha2, "0"),
+		succ("EXEC"),
+	)
+
+	testCommands(t,
+		succ("MULTI"),
+		succ("SCRIPT", "LOAD", "return {KEYS[1],ARGV[1]}"),
+		succ("EVALSHA", sha2, "0"),
+		succ("EXEC"),
+	)
+
+	testCommands(t,
+		succ("MULTI"),
+		succ("SCRIPT", "LOAD", "return {"),
+		succ("SCRIPT", "FOO"),
+		succ("EVALSHA", "aaaa", "0"),
+		succLoosely("EXEC"),
+	)
+}

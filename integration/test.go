@@ -238,6 +238,9 @@ func looselyEqual(a, b interface{}) bool {
 	case []byte:
 		_, ok := b.([]byte)
 		return ok
+	case error:
+		_, ok := b.(error)
+		return ok
 	case []interface{}:
 		bv, ok := b.([]interface{})
 		if !ok {
