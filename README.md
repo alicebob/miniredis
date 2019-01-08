@@ -18,6 +18,10 @@ There are no dependencies on external binaries, so you can easily integrate it i
 
 ## Changelog
 
+### 2.5.0
+
+Added ZPopMin and ZPopMax
+
 ### 2.4.4
 
 Fixed nil Lua return value (#43)
@@ -185,6 +189,8 @@ Implemented commands:
    - ZINCRBY
    - ZINTERSTORE
    - ZLEXCOUNT
+   - ZPOPMIN
+   - ZPOPMAX
    - ZRANGE
    - ZRANGEBYLEX
    - ZRANGEBYSCORE
