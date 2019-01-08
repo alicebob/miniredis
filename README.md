@@ -18,6 +18,10 @@ There are no dependencies on external binaries, so you can easily integrate it i
 
 ## Changelog
 
+### 2.5.0
+
+Added ZPopMin and ZPopMax
+
 ### v2.4.6
 
 support for TIME (thanks @leon-barrett and @lirao)
@@ -192,6 +196,8 @@ Implemented commands:
    - ZINCRBY
    - ZINTERSTORE
    - ZLEXCOUNT
+   - ZPOPMIN
+   - ZPOPMAX
    - ZRANGE
    - ZRANGEBYLEX
    - ZRANGEBYSCORE
