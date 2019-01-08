@@ -38,6 +38,8 @@ func commandsSortedSet(m *Miniredis) {
 	m.srv.Register("ZSCORE", m.cmdZscore)
 	m.srv.Register("ZUNIONSTORE", m.cmdZunionstore)
 	m.srv.Register("ZSCAN", m.cmdZscan)
+	m.srv.Register("ZPOPMAX", m.cmdZpopmax(false))
+	m.srv.Register("ZPOPMIN", m.cmdZpopmax(true))
 }
 
 // ZADD
@@ -1329,4 +1331,69 @@ func (m *Miniredis) cmdZscan(c *server.Peer, cmd string, args []string) {
 			c.WriteBulk(formatFloat(db.ssetScore(key, k)))
 		}
 	})
+}
+
+// ZPOPMAX and ZPOPMIN
+func (m *Miniredis) cmdZpopmax(reverse bool) server.Cmd {
+	return func(c *server.Peer, cmd string, args []string) {
+		if len(args) < 1 {
+			setDirty(c)
+			c.WriteError(errWrongNumber(cmd))
+			return
+		}
+		if !m.handleAuth(c) {
+			return
+		}
+
+		key := args[0]
+		count := 1
+		var err error
+		if len(args) > 1 {
+			count, err = strconv.Atoi(args[1])
+
+			if err != nil {
+				setDirty(c)
+				c.WriteError(msgInvalidInt)
+				return
+			}
+		}
+
+		withScores := true
+		if len(args) > 2 {
+			c.WriteError(msgSyntaxError)
+			return
+		}
+
+		withTx(m, c, func(c *server.Peer, ctx *connCtx) {
+			db := m.db(ctx.selectedDB)
+
+			if !db.exists(key) {
+				c.WriteLen(0)
+				return
+			}
+
+			if db.t(key) != "zset" {
+				c.WriteError(ErrWrongType.Error())
+				return
+			}
+
+			members := db.ssetMembers(key)
+			if reverse {
+				reverseSlice(members)
+			}
+			rs, re := redisRange(len(members), 0, count-1, false)
+			if withScores {
+				c.WriteLen((re - rs) * 2)
+			} else {
+				c.WriteLen(re - rs)
+			}
+			for _, el := range members[rs:re] {
+				c.WriteBulk(el)
+				if withScores {
+					c.WriteBulk(formatFloat(db.ssetScore(key, el)))
+				}
+				db.ssetRem(key, el)
+			}
+		})
+	}
 }
