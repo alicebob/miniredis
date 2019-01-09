@@ -64,10 +64,10 @@ func TestRandom(t *testing.T) {
 }
 
 func TestUnknownCommand(t *testing.T) {
-	// Can't compare; we get a different message from redeo
 	testCommands(t,
-		fail("nosuch"), // redeo doesn't change the capitilization, Redis lowercases it.
-		succ("SET", "foo", "bar"),
+		fail("nosuch"),
+		fail("noSUCH"),
+		fail("noSUCH", 1, 2, 3),
 	)
 }
 

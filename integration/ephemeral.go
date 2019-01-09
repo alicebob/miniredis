@@ -7,12 +7,14 @@ package main
 import (
 	"fmt"
 	"net"
+	"os"
 	"os/exec"
 	"strconv"
 	"time"
 )
 
 const (
+	localSrc   = "./redis_src/"
 	executable = "redis-server"
 )
 
@@ -33,6 +35,9 @@ func RedisAuth(passwd string) (*ephemeral, string) {
 
 func runRedis(extraConfig string) (*ephemeral, string) {
 	port := arbitraryPort()
+
+	// we prefer the executable from ./redis_src, if any. See ./get_redis.sh
+	os.Setenv("PATH", fmt.Sprintf("%s:PATH", localSrc))
 
 	c := exec.Command(executable, "-")
 	stdin, err := c.StdinPipe()

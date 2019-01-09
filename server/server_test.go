@@ -87,7 +87,7 @@ func Test(t *testing.T) {
 
 	{
 		_, err := c.Do("NOSUCH")
-		if have, want := err.Error(), "ERR unknown command 'nosuch'"; have != want {
+		if have, want := err.Error(), "ERR unknown command `NOSUCH`, with args beginning with: "; have != want {
 			t.Errorf("have: %s, want: %s", have, want)
 		}
 	}
