@@ -536,3 +536,104 @@ func TestLuaReplicate(t *testing.T) {
 	_, err = c.Do("EVAL", "redis.replicate_commands()", 0)
 	ok(t, err)
 }
+
+func TestLuaTX(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+	defer c.Close()
+
+	// EVAL
+	{
+		b, err := redis.String(c.Do("MULTI"))
+		ok(t, err)
+		equals(t, "OK", b)
+
+		b, err = redis.String(c.Do("EVAL", "return {ARGV[1]}", 0, "key1"))
+		ok(t, err)
+		equals(t, "QUEUED", b)
+
+		v, err := redis.Values(c.Do("EXEC"))
+		ok(t, err)
+		equals(t, 1, len(redis.Args(v)))
+		v0, err := redis.Strings(v[0], nil)
+		ok(t, err)
+		equals(t, []string{"key1"}, v0)
+	}
+
+	// EVALSHA
+	{
+		script1sha := "bfbf458525d6a0b19200bfd6db3af481156b367b"
+
+		b, err := redis.String(c.Do("MULTI"))
+		ok(t, err)
+		equals(t, "OK", b)
+
+		b, err = redis.String(c.Do("SCRIPT", "LOAD", "return {KEYS[1],ARGV[1]}"))
+		ok(t, err)
+		equals(t, "QUEUED", b)
+
+		b, err = redis.String(c.Do("EVALSHA", script1sha, 1, "key1", "key2"))
+		ok(t, err)
+		equals(t, "QUEUED", b)
+
+		v, err := redis.Values(c.Do("EXEC"))
+		ok(t, err)
+		equals(t, 2, len(redis.Args(v)))
+		v0, err := redis.String(v[0], nil)
+		ok(t, err)
+		v1, err := redis.Strings(v[1], nil)
+		ok(t, err)
+		equals(t, script1sha, v0)               // SCRIPT
+		equals(t, []string{"key1", "key2"}, v1) // EVALSHA
+	}
+
+	// compiling is done inside the transaction
+	{
+		b, err := redis.String(c.Do("SET", "foo", "12"))
+		ok(t, err)
+		equals(t, "OK", b)
+
+		b, err = redis.String(c.Do("MULTI"))
+		ok(t, err)
+		equals(t, "OK", b)
+
+		b, err = redis.String(c.Do("SCRIPT", "LOAD", "foobar"))
+		ok(t, err)
+		equals(t, "QUEUED", b)
+
+		b, err = redis.String(c.Do("GET", "foo"))
+		ok(t, err)
+		equals(t, "QUEUED", b)
+
+		v, err := redis.Values(c.Do("EXEC"))
+		ok(t, err)
+		equals(t, 2, len(redis.Args(v)))
+		_, err = redis.String(v[0], nil)
+		mustFail(t, err, "ERR Error compiling script (new function): user_script at EOF:   parse error ")
+		v1, err := redis.String(v[1], nil)
+		ok(t, err)
+		equals(t, "12", v1)
+	}
+
+	// misc SCRIPT subcommands
+	{
+		b, err := redis.String(c.Do("MULTI"))
+		ok(t, err)
+		equals(t, "OK", b)
+
+		b, err = redis.String(c.Do("SCRIPT", "EXISTS", "123"))
+		ok(t, err)
+		equals(t, "QUEUED", b)
+
+		b, err = redis.String(c.Do("SCRIPT", "FLUSH"))
+		ok(t, err)
+		equals(t, "QUEUED", b)
+
+		v, err := redis.Values(c.Do("EXEC"))
+		ok(t, err)
+		equals(t, 2, len(redis.Args(v)))
+	}
+}

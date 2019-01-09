@@ -21,6 +21,7 @@ func commandsScripting(m *Miniredis) {
 	m.srv.Register("SCRIPT", m.cmdScript)
 }
 
+// Execute lua. Needs to run m.Lock()ed, from within withTx().
 func (m *Miniredis) runLuaScript(c *server.Peer, script string, args []string) {
 	l := lua.NewState(lua.Options{SkipOpenLibs: true})
 	defer l.Close()
@@ -49,7 +50,9 @@ func (m *Miniredis) runLuaScript(c *server.Peer, script string, args []string) {
 	luajson.Preload(l)
 	requireGlobal(l, "cjson", "json")
 
+	m.Unlock()
 	conn := m.redigo()
+	m.Lock()
 	defer conn.Close()
 
 	// set global variable KEYS
@@ -91,6 +94,8 @@ func (m *Miniredis) runLuaScript(c *server.Peer, script string, args []string) {
 	l.Push(lua.LString("redis"))
 	l.Call(1, 0)
 
+	m.Unlock() // This runs in a transaction, but can access our db recursively
+	defer m.Lock()
 	if err := l.DoString(script); err != nil {
 		c.WriteError(errLuaParseError(err))
 		return
@@ -109,7 +114,10 @@ func (m *Miniredis) cmdEval(c *server.Peer, cmd string, args []string) {
 		return
 	}
 	script, args := args[0], args[1:]
-	m.runLuaScript(c, script, args)
+
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
+		m.runLuaScript(c, script, args)
+	})
 }
 
 func (m *Miniredis) cmdEvalsha(c *server.Peer, cmd string, args []string) {
@@ -123,14 +131,16 @@ func (m *Miniredis) cmdEvalsha(c *server.Peer, cmd string, args []string) {
 	}
 
 	sha, args := args[0], args[1:]
-	m.Lock()
-	script, ok := m.scripts[sha]
-	m.Unlock()
-	if !ok {
-		c.WriteError(msgNoScriptFound)
-		return
-	}
-	m.runLuaScript(c, script, args)
+
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
+		script, ok := m.scripts[sha]
+		if !ok {
+			c.WriteError(msgNoScriptFound)
+			return
+		}
+
+		m.runLuaScript(c, script, args)
+	})
 }
 
 func (m *Miniredis) cmdScript(c *server.Peer, cmd string, args []string) {
@@ -144,51 +154,47 @@ func (m *Miniredis) cmdScript(c *server.Peer, cmd string, args []string) {
 	}
 
 	subcmd, args := args[0], args[1:]
-	switch strings.ToLower(subcmd) {
-	case "load":
-		if len(args) != 1 {
-			setDirty(c)
-			c.WriteError(fmt.Sprintf(msgFScriptUsage, "LOAD"))
-			return
-		}
-		script := args[0]
-		if _, err := parse.Parse(strings.NewReader(script), "user_script"); err != nil {
-			c.WriteError(errLuaParseError(err))
-			return
-		}
-		sha := sha1Hex(script)
-		m.Lock()
-		m.scripts[sha] = script
-		m.Unlock()
-		c.WriteBulk(sha)
 
-	case "exists":
-		m.Lock()
-		defer m.Unlock()
-		c.WriteLen(len(args))
-		for _, arg := range args {
-			if _, ok := m.scripts[arg]; ok {
-				c.WriteInt(1)
-			} else {
-				c.WriteInt(0)
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
+		switch strings.ToLower(subcmd) {
+		case "load":
+			if len(args) != 1 {
+				c.WriteError(fmt.Sprintf(msgFScriptUsage, "LOAD"))
+				return
 			}
+			script := args[0]
+
+			if _, err := parse.Parse(strings.NewReader(script), "user_script"); err != nil {
+				c.WriteError(errLuaParseError(err))
+				return
+			}
+			sha := sha1Hex(script)
+			m.scripts[sha] = script
+			c.WriteBulk(sha)
+
+		case "exists":
+			c.WriteLen(len(args))
+			for _, arg := range args {
+				if _, ok := m.scripts[arg]; ok {
+					c.WriteInt(1)
+				} else {
+					c.WriteInt(0)
+				}
+			}
+
+		case "flush":
+			if len(args) != 0 {
+				c.WriteError(fmt.Sprintf(msgFScriptUsage, "FLUSH"))
+				return
+			}
+
+			m.scripts = map[string]string{}
+			c.WriteOK()
+
+		default:
+			c.WriteError(fmt.Sprintf(msgFScriptUsage, strings.ToUpper(subcmd)))
 		}
-
-	case "flush":
-		if len(args) != 0 {
-			setDirty(c)
-			c.WriteError(fmt.Sprintf(msgFScriptUsage, "FLUSH"))
-			return
-		}
-
-		m.Lock()
-		defer m.Unlock()
-		m.scripts = map[string]string{}
-		c.WriteOK()
-
-	default:
-		c.WriteError(fmt.Sprintf(msgFScriptUsage, strings.ToUpper(subcmd)))
-	}
+	})
 }
 
 func sha1Hex(s string) string {
@@ -197,8 +203,8 @@ func sha1Hex(s string) string {
 	return hex.EncodeToString(h.Sum(nil))
 }
 
-// requireGlobal imports module modName into the global namespace with the identifier id.  panics if an error results
-// from the function execution
+// requireGlobal imports module modName into the global namespace with the
+// identifier id.  panics if an error results from the function execution
 func requireGlobal(l *lua.LState, id, modName string) {
 	if err := l.CallByParam(lua.P{
 		Fn:      l.GetGlobal("require"),
