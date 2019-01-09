@@ -3,6 +3,7 @@ package miniredis
 import (
 	"crypto/sha1"
 	"encoding/hex"
+	"fmt"
 	"io"
 	"strconv"
 	"strings"
@@ -158,7 +159,7 @@ func (m *Miniredis) cmdScript(c *server.Peer, cmd string, args []string) {
 		switch strings.ToLower(subcmd) {
 		case "load":
 			if len(args) != 1 {
-				c.WriteError(msgScriptUsage)
+				c.WriteError(fmt.Sprintf(msgFScriptUsage, "LOAD"))
 				return
 			}
 			script := args[0]
@@ -183,7 +184,7 @@ func (m *Miniredis) cmdScript(c *server.Peer, cmd string, args []string) {
 
 		case "flush":
 			if len(args) != 0 {
-				c.WriteError(msgScriptUsage)
+				c.WriteError(fmt.Sprintf(msgFScriptUsage, "FLUSH"))
 				return
 			}
 
@@ -191,7 +192,7 @@ func (m *Miniredis) cmdScript(c *server.Peer, cmd string, args []string) {
 			c.WriteOK()
 
 		default:
-			c.WriteError(msgScriptUsage)
+			c.WriteError(fmt.Sprintf(msgFScriptUsage, strings.ToUpper(subcmd)))
 		}
 	})
 }

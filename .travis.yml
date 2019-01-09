@@ -1,5 +1,8 @@
 language: go
 
+before_script:
+  - (cd ./integration && ./get_redis.sh)
+
 install: go get -t
 
 script: make test testrace int

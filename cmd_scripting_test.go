@@ -131,19 +131,19 @@ func TestScript(t *testing.T) {
 	mustFail(t, err, errWrongNumber("script"))
 
 	_, err = c.Do("SCRIPT", "LOAD")
-	mustFail(t, err, msgScriptUsage)
+	mustFail(t, err, "ERR Unknown subcommand or wrong number of arguments for 'LOAD'. Try SCRIPT HELP.")
 
 	_, err = c.Do("SCRIPT", "LOAD", "return 42", "FOO")
-	mustFail(t, err, msgScriptUsage)
+	mustFail(t, err, "ERR Unknown subcommand or wrong number of arguments for 'LOAD'. Try SCRIPT HELP.")
 
 	_, err = c.Do("SCRIPT", "LOAD", "[")
 	assert(t, err != nil, "no SCRIPT lOAD error")
 
 	_, err = c.Do("SCRIPT", "FLUSH", "1")
-	mustFail(t, err, msgScriptUsage)
+	mustFail(t, err, "ERR Unknown subcommand or wrong number of arguments for 'FLUSH'. Try SCRIPT HELP.")
 
 	_, err = c.Do("SCRIPT", "FOO")
-	mustFail(t, err, msgScriptUsage)
+	mustFail(t, err, "ERR Unknown subcommand or wrong number of arguments for 'FOO'. Try SCRIPT HELP.")
 }
 
 func TestCJSON(t *testing.T) {
