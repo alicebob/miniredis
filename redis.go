@@ -28,7 +28,7 @@ const (
 	msgInvalidPSETEXTime  = "ERR invalid expire time in psetex"
 	msgInvalidKeysNumber  = "ERR Number of keys can't be greater than number of args"
 	msgNegativeKeysNumber = "ERR Number of keys can't be negative"
-	msgScriptUsage        = "ERR Unknown SCRIPT subcommand or wrong # of args."
+	msgFScriptUsage       = "ERR Unknown subcommand or wrong number of arguments for '%s'. Try SCRIPT HELP."
 	msgSingleElementPair  = "ERR INCR option supports a single increment-element pair"
 	msgNoScriptFound      = "NOSCRIPT No matching script. Please use EVAL."
 )
