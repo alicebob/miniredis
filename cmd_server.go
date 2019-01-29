@@ -97,7 +97,7 @@ func (m *Miniredis) cmdTime(c *server.Peer, cmd string, args []string) {
 		microseconds := (nanos / 1000) % 1000000
 
 		c.WriteLen(2)
-		c.WriteInt(int(seconds))
-		c.WriteInt(int(microseconds))
+		c.WriteBulk(strconv.FormatInt(seconds, 10))
+		c.WriteBulk(strconv.FormatInt(microseconds,10))
 	})
 }
