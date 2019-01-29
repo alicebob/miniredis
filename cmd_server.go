@@ -3,6 +3,7 @@
 package miniredis
 
 import (
+	"strconv"
 	"strings"
 	"time"
 
@@ -98,6 +99,6 @@ func (m *Miniredis) cmdTime(c *server.Peer, cmd string, args []string) {
 
 		c.WriteLen(2)
 		c.WriteBulk(strconv.FormatInt(seconds, 10))
-		c.WriteBulk(strconv.FormatInt(microseconds,10))
+		c.WriteBulk(strconv.FormatInt(microseconds, 10))
 	})
 }
