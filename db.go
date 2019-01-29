@@ -490,7 +490,7 @@ func (db *RedisDB) setInter(keys []string) (setKey, error) {
 	}
 	for _, sk := range keys {
 		if !db.exists(sk) {
-			continue
+			return setKey{}, nil
 		}
 		if db.t(sk) != "set" {
 			// Bug(?) in redis 2.8.14, it just skips the key.
