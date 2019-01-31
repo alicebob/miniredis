@@ -208,15 +208,15 @@ func TestSetSdiff(t *testing.T) {
 
 func TestSetSinter(t *testing.T) {
 	testCommands(t,
-		succ("SINTER", "s1", "aap", "noot", "mies"),
-		succ("SINTER", "s2", "noot", "mies", "vuur"),
-		succ("SINTER", "s3", "mies", "wim"),
-		succ("SINTER", "s1"),
-		succ("SINTER", "s1", "s2"),
-		succ("SINTER", "s1", "s2", "s3"),
+		succ("SADD", "s1", "aap", "noot", "mies"),
+		succ("SADD", "s2", "noot", "mies", "vuur"),
+		succ("SADD", "s3", "mies", "wim"),
+		succSorted("SINTER", "s1"),
+		succSorted("SINTER", "s1", "s2"),
+		succSorted("SINTER", "s1", "s2", "s3"),
 		succ("SINTER", "nosuch"),
 		succ("SINTER", "s1", "nosuch", "s2", "nosuch", "s3"),
-		succ("SINTER", "s1", "s1"),
+		succSorted("SINTER", "s1", "s1"),
 
 		succ("SINTERSTORE", "res", "s3", "nosuch", "s1"),
 		succ("SMEMBERS", "res"),
@@ -227,11 +227,12 @@ func TestSetSinter(t *testing.T) {
 		fail("SINTERSTORE", "key"),
 		// Wrong type
 		succ("SET", "str", "I am a string"),
-		succ("SINTER", "s1", "str"),     // !
-		succ("SINTER", "nosuch", "str"), // !
+		fail("SINTER", "s1", "str"),
+		succ("SINTER", "nosuch", "str"), // SINTER succeeds if an input type is wrong as long as the preceding inputs result in an empty set
+		fail("SINTER", "str", "nosuch"),
 		fail("SINTER", "str", "s1"),
 		fail("SINTERSTORE", "res", "str", "s1"),
-		succ("SINTERSTORE", "res", "s1", "str"), // !
+		fail("SINTERSTORE", "res", "s1", "str"),
 	)
 }
 
