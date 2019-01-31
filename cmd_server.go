@@ -77,7 +77,7 @@ func (m *Miniredis) cmdFlushdb(c *server.Peer, cmd string, args []string) {
 	})
 }
 
-// TIME
+// TIME: time values are returned in string format instead of int
 func (m *Miniredis) cmdTime(c *server.Peer, cmd string, args []string) {
 	if len(args) > 0 {
 		setDirty(c)
