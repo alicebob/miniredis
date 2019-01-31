@@ -18,6 +18,13 @@ There are no dependencies on external binaries, so you can easily integrate it i
 
 ## Changelog
 
+### v2.4.6
+
+support for TIME (thanks @leon-barrett and @lirao)
+support for ZREVRANGEBYLEX
+fix for SINTER (thanks @robstein)
+updates for latest redis
+
 ### 2.4.4
 
 Fixed nil Lua return value (#43)
