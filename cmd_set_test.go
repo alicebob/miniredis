@@ -507,6 +507,13 @@ func TestSinter(t *testing.T) {
 		equals(t, []string{}, els)
 	}
 
+	// With one of the keys being an empty set, the resulting set is also empty
+	{
+		els, err := redis.Strings(c.Do("SINTER", "s1", "s9"))
+		ok(t, err)
+		equals(t, []string{}, els)
+	}
+
 	// Various errors
 	{
 		s.SetAdd("chk", "aap", "noot")
@@ -539,6 +546,14 @@ func TestSinterstore(t *testing.T) {
 		ok(t, err)
 		equals(t, 2, i)
 		s.CheckSet(t, "res", "aap", "mies")
+	}
+
+	// With one of the keys being an empty set, the resulting set is also empty
+	{
+		i, err := redis.Int(c.Do("SINTERSTORE", "res", "s1", "s9"))
+		ok(t, err)
+		equals(t, 0, i)
+		s.CheckSet(t, "res", []string{}...)
 	}
 
 	// Various errors

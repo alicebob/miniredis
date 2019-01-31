@@ -481,7 +481,10 @@ func (db *RedisDB) setDiff(keys []string) (setKey, error) {
 func (db *RedisDB) setInter(keys []string) (setKey, error) {
 	key := keys[0]
 	keys = keys[1:]
-	if db.exists(key) && db.t(key) != "set" {
+	if !db.exists(key) {
+		return setKey{}, nil
+	}
+	if db.t(key) != "set" {
 		return nil, ErrWrongType
 	}
 	s := setKey{}
@@ -490,12 +493,10 @@ func (db *RedisDB) setInter(keys []string) (setKey, error) {
 	}
 	for _, sk := range keys {
 		if !db.exists(sk) {
-			continue
+			return setKey{}, nil
 		}
 		if db.t(sk) != "set" {
-			// Bug(?) in redis 2.8.14, it just skips the key.
-			continue
-			// return nil, ErrWrongType
+			return nil, ErrWrongType
 		}
 		other := db.setKeys[sk]
 		for e := range s {
