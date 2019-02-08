@@ -143,6 +143,43 @@ func TestExpireat(t *testing.T) {
 	}
 }
 
+func TestPexpireat(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	// Not volatile yet
+	{
+		equals(t, time.Duration(0), s.TTL("foo"))
+		b, err := redis.Int(c.Do("TTL", "foo"))
+		ok(t, err)
+		equals(t, -2, b)
+	}
+
+	// Set something
+	{
+		_, err := c.Do("SET", "foo", "bar")
+		ok(t, err)
+		// Key exists, but no ttl set.
+		b, err := redis.Int(c.Do("PTTL", "foo"))
+		ok(t, err)
+		equals(t, -1, b)
+
+		s.SetTime(time.Unix(1234567890, 0))
+		n, err := redis.Int(c.Do("PEXPIREAT", "foo", 1234567890*1000+100))
+		ok(t, err)
+		equals(t, 1, n) // EXPIREAT returns 1 on success.
+
+		equals(t, 100*time.Millisecond, s.TTL("foo"))
+		b, err = redis.Int(c.Do("PTTL", "foo"))
+		ok(t, err)
+		equals(t, 100, b)
+		equals(t, 100*time.Millisecond, s.TTL("foo"))
+	}
+}
+
 func TestPexpire(t *testing.T) {
 	s, err := Run()
 	ok(t, err)

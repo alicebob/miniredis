@@ -71,7 +71,7 @@ func makeCmdExpire(m *Miniredis, unix bool, d time.Duration) func(*server.Peer, 
 				var ts time.Time
 				switch d {
 				case time.Millisecond:
-					ts = time.Unix(0, int64(i))
+					ts = time.Unix(int64(i/1000), 1000000*int64(i%1000))
 				case time.Second:
 					ts = time.Unix(int64(i), 0)
 				default:
