@@ -1417,6 +1417,74 @@ func TestSSRange(t *testing.T) {
 	}
 }
 
+// Test ZPOPMIN
+func TestSortedSetPopMin(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	s.ZAdd("z", 1, "one")
+	s.ZAdd("z", 2, "two")
+	s.ZAdd("z", 2, "zwei")
+	s.ZAdd("z", 3, "three")
+	s.ZAdd("z", 3, "drei")
+	s.ZAdd("z", math.Inf(+1), "inf")
+
+	{
+		n, err := redis.Strings(c.Do("ZPOPMIN", "z", 2))
+		ok(t, err)
+		equals(t, 4, len(n))
+
+		equals(t, []string{"one", "1", "two", "2"}, n)
+	}
+	// Get one - without count
+	{
+		n, err := redis.Strings(c.Do("ZPOPMIN", "z"))
+		ok(t, err)
+		equals(t, 2, len(n))
+		equals(t, []string{"zwei", "2"}, n)
+	}
+	// weird cases.
+	{
+		n, err := redis.Strings(c.Do("ZPOPMIN", "z", -100))
+		ok(t, err)
+		equals(t, 0, len(n))
+	}
+	// Nonexistent key
+	{
+		n, err := redis.Strings(c.Do("ZPOPMIN", "nosuch", 1))
+		ok(t, err)
+		equals(t, 0, len(n))
+	}
+	// Get more than exist
+	{
+		n, err := redis.Strings(c.Do("ZPOPMIN", "z", 100))
+		ok(t, err)
+		equals(t, 6, len(n))
+		equals(t, []string{"drei", "3", "three", "3", "inf", "inf"}, n)
+	}
+
+	// Error cases
+	{
+		_, err = redis.String(c.Do("ZPOPMIN"))
+		assert(t, err != nil, "ZPOPMIN error")
+		_, err = redis.String(c.Do("ZPOPMIN", "set"))
+		assert(t, err != nil, "ZPOPMIN error")
+		_, err = redis.String(c.Do("ZPOPMIN", "set", 1))
+		assert(t, err != nil, "ZPOPMIN error")
+		_, err = redis.String(c.Do("ZPOPMIN", "set", "noint"))
+		assert(t, err != nil, "ZPOPMIN error")
+		_, err = redis.String(c.Do("ZPOPMIN", "set", 1, "toomany"))
+		assert(t, err != nil, "ZPOPMIN error")
+		// Wrong type of key
+		s.Set("str", "value")
+		_, err = redis.Int(c.Do("ZPOPMIN", "str", 1, 2))
+		assert(t, err != nil, "ZPOPMIN error")
+	}
+}
+
 // Test ZPOPMAX
 func TestSortedSetPopMax(t *testing.T) {
 	s, err := Run()
@@ -1437,14 +1505,14 @@ func TestSortedSetPopMax(t *testing.T) {
 		ok(t, err)
 		equals(t, 4, len(n))
 
-		equals(t, []string{"one", "1", "two", "2"}, n)
+		equals(t, []string{"inf", "inf", "three", "3"}, n)
 	}
 	// Get one - without count
 	{
 		n, err := redis.Strings(c.Do("ZPOPMAX", "z"))
 		ok(t, err)
 		equals(t, 2, len(n))
-		equals(t, []string{"zwei", "2"}, n)
+		equals(t, []string{"drei", "3"}, n)
 	}
 	// weird cases.
 	{
@@ -1463,7 +1531,7 @@ func TestSortedSetPopMax(t *testing.T) {
 		n, err := redis.Strings(c.Do("ZPOPMAX", "z", 100))
 		ok(t, err)
 		equals(t, 6, len(n))
-		equals(t, []string{"drei", "3", "three", "3", "inf", "inf"}, n)
+		equals(t, []string{"zwei", "2", "two", "2", "one", "1"}, n)
 	}
 
 	// Error cases
@@ -1482,73 +1550,5 @@ func TestSortedSetPopMax(t *testing.T) {
 		s.Set("str", "value")
 		_, err = redis.Int(c.Do("ZPOPMAX", "str", 1, 2))
 		assert(t, err != nil, "ZPOPMAX error")
-	}
-}
-
-// Test ZPOPMAX
-func TestSortedSetPopMin(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
-	ok(t, err)
-
-	s.ZAdd("z", 1, "one")
-	s.ZAdd("z", 2, "two")
-	s.ZAdd("z", 2, "zwei")
-	s.ZAdd("z", 3, "three")
-	s.ZAdd("z", 3, "drei")
-	s.ZAdd("z", math.Inf(+1), "inf")
-
-	{
-		n, err := redis.Strings(c.Do("ZPOPMIN", "z", 2))
-		ok(t, err)
-		equals(t, 4, len(n))
-
-		equals(t, []string{"inf", "inf", "three", "3"}, n)
-	}
-	// Get one - without count
-	{
-		n, err := redis.Strings(c.Do("ZPOPMIN", "z"))
-		ok(t, err)
-		equals(t, 2, len(n))
-		equals(t, []string{"drei", "3"}, n)
-	}
-	// weird cases.
-	{
-		n, err := redis.Strings(c.Do("ZPOPMIN", "z", -100))
-		ok(t, err)
-		equals(t, 0, len(n))
-	}
-	// Nonexistent key
-	{
-		n, err := redis.Strings(c.Do("ZPOPMIN", "nosuch", 1))
-		ok(t, err)
-		equals(t, 0, len(n))
-	}
-	// Get more than exist
-	{
-		n, err := redis.Strings(c.Do("ZPOPMIN", "z", 100))
-		ok(t, err)
-		equals(t, 6, len(n))
-		equals(t, []string{"zwei", "2", "two", "2", "one", "1"}, n)
-	}
-
-	// Error cases
-	{
-		_, err = redis.String(c.Do("ZPOPMIN"))
-		assert(t, err != nil, "ZPOPMIN error")
-		_, err = redis.String(c.Do("ZPOPMIN", "set"))
-		assert(t, err != nil, "ZPOPMIN error")
-		_, err = redis.String(c.Do("ZPOPMIN", "set", 1))
-		assert(t, err != nil, "ZPOPMIN error")
-		_, err = redis.String(c.Do("ZPOPMIN", "set", "noint"))
-		assert(t, err != nil, "ZPOPMIN error")
-		_, err = redis.String(c.Do("ZPOPMIN", "set", 1, "toomany"))
-		assert(t, err != nil, "ZPOPMIN error")
-		// Wrong type of key
-		s.Set("str", "value")
-		_, err = redis.Int(c.Do("ZPOPMIN", "str", 1, 2))
-		assert(t, err != nil, "ZPOPMIN error")
 	}
 }

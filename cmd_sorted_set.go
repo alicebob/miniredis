@@ -38,8 +38,8 @@ func commandsSortedSet(m *Miniredis) {
 	m.srv.Register("ZSCORE", m.cmdZscore)
 	m.srv.Register("ZUNIONSTORE", m.cmdZunionstore)
 	m.srv.Register("ZSCAN", m.cmdZscan)
-	m.srv.Register("ZPOPMAX", m.cmdZpopmax(false))
-	m.srv.Register("ZPOPMIN", m.cmdZpopmax(true))
+	m.srv.Register("ZPOPMAX", m.cmdZpopmax(true))
+	m.srv.Register("ZPOPMIN", m.cmdZpopmax(false))
 }
 
 // ZADD

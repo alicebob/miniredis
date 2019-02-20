@@ -37,6 +37,18 @@ func TestSortedSet(t *testing.T) {
 		succ("ZADD", "zz", 1, "aap", 2, "aap"),
 		succ("ZCARD", "zz"),
 
+		succ("ZPOPMAX", "zz", 2),
+		succ("ZPOPMAX", "zz"),
+		succ("ZPOPMAX", "zz", -100),
+		succ("ZPOPMAX", "nosuch", 1),
+		succ("ZPOPMAX", "zz", 100),
+
+		succ("ZPOPMIN", "zz", 2),
+		succ("ZPOPMIN", "zz"),
+		succ("ZPOPMIN", "zz", -100),
+		succ("ZPOPMIN", "nosuch", 1),
+		succ("ZPOPMIN", "zz", 100),
+
 		// failure cases
 		succ("SET", "str", "I am a string"),
 		fail("ZADD"),
@@ -54,6 +66,12 @@ func TestSortedSet(t *testing.T) {
 		fail("ZRANK", "str", "member"),
 		fail("ZREVRANK"),
 		fail("ZREVRANK", "key"),
+		fail("ZPOPMAX"),
+		fail("ZPOPMAX", "set", "noint"),
+		fail("ZPOPMAX", "set", 1, "toomany"),
+		fail("ZPOPMIN"),
+		fail("ZPOPMIN", "set", "noint"),
+		fail("ZPOPMIN", "set", 1, "toomany"),
 
 		succ("RENAME", "z", "z2"),
 		succ("EXISTS", "z"),
@@ -630,5 +648,35 @@ func TestZinterstore(t *testing.T) {
 		fail("ZINTERSTORE", "h", 2, "f1", "f2", "AGGREGATE", "foo"),
 		succ("SET", "str", "1"),
 		fail("ZINTERSTORE", "h", 1, "str"),
+	)
+}
+
+func TestZpopminmax(t *testing.T) {
+	testCommands(t,
+		succ("ZADD", "set:zpop", 1.0, "key1"),
+		succ("ZADD", "set:zpop", 2.0, "key2"),
+		succ("ZADD", "set:zpop", 3.0, "key3"),
+		succ("ZADD", "set:zpop", 4.0, "key4"),
+		succ("ZADD", "set:zpop", 5.0, "key5"),
+		succ("ZCARD", "set:zpop"),
+
+		succ("ZSCORE", "set:zpop", "key1"),
+		succ("ZSCORE", "set:zpop", "key5"),
+
+		succ("ZPOPMIN", "set:zpop"),
+		succ("ZPOPMIN", "set:zpop", 2),
+		succ("ZPOPMIN", "set:zpop", 100),
+		succ("ZPOPMIN", "set:zpop", -100),
+
+		succ("ZPOPMAX", "set:zpop"),
+		succ("ZPOPMAX", "set:zpop", 2),
+		succ("ZPOPMAX", "set:zpop", 100),
+		succ("ZPOPMAX", "set:zpop", -100),
+		succ("ZPOPMAX", "nosuch", 1),
+
+		// Wrong args
+		fail("ZPOPMIN"),
+		fail("ZPOPMIN", "set:zpop", "h1"),
+		fail("ZPOPMIN", "set:zpop", 1, "h2"),
 	)
 }
