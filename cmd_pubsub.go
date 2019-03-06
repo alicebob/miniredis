@@ -3,9 +3,11 @@
 package miniredis
 
 import (
-	"github.com/alicebob/miniredis/server"
+	"fmt"
 	"regexp"
 	"strings"
+
+	"github.com/alicebob/miniredis/server"
 )
 
 // commandsPubsub handles all PUB/SUB operations.
@@ -451,7 +453,7 @@ func (m *Miniredis) cmdPubSub(c *server.Peer, cmd string, args []string) {
 
 	if !argsOk {
 		setDirty(c)
-		c.WriteError(errInvalidPubsubArgs(subcommand))
+		c.WriteError(fmt.Sprintf(msgFPubsubUsage, subcommand))
 		return
 	}
 

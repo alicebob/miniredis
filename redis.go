@@ -29,6 +29,7 @@ const (
 	msgInvalidKeysNumber  = "ERR Number of keys can't be greater than number of args"
 	msgNegativeKeysNumber = "ERR Number of keys can't be negative"
 	msgFScriptUsage       = "ERR Unknown subcommand or wrong number of arguments for '%s'. Try SCRIPT HELP."
+	msgFPubsubUsage       = "ERR Unknown subcommand or wrong number of arguments for '%s'. Try PUBSUB HELP."
 	msgSingleElementPair  = "ERR INCR option supports a single increment-element pair"
 	msgNoScriptFound      = "NOSCRIPT No matching script. Please use EVAL."
 )
@@ -39,10 +40,6 @@ func errWrongNumber(cmd string) string {
 
 func errLuaParseError(err error) string {
 	return fmt.Sprintf("ERR Error compiling script (new function): %s", err.Error())
-}
-
-func errInvalidPubsubArgs(subcommand string) string {
-	return fmt.Sprintf("ERR Unknown PUBSUB subcommand or wrong number of arguments for '%s'", subcommand)
 }
 
 // withTx wraps the non-argument-checking part of command handling code in
