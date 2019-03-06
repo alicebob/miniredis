@@ -37,7 +37,7 @@ func runRedis(extraConfig string) (*ephemeral, string) {
 	port := arbitraryPort()
 
 	// we prefer the executable from ./redis_src, if any. See ./get_redis.sh
-	os.Setenv("PATH", fmt.Sprintf("%s:PATH", localSrc))
+	os.Setenv("PATH", fmt.Sprintf("%s:%s", localSrc, os.Getenv("PATH")))
 
 	c := exec.Command(executable, "-")
 	stdin, err := c.StdinPipe()
