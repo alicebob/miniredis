@@ -27,22 +27,21 @@ type DisconnectHandler func(c *Peer)
 
 // Server is a simple redis server
 type Server struct {
-	l            net.Listener
-	cmds         map[string]Cmd
-	peers        map[net.Conn]struct{}
-	mu           sync.Mutex
-	wg           sync.WaitGroup
-	infoConns    int
-	infoCmds     int
-	onDisconnect DisconnectHandler
+	l         net.Listener
+	cmds      map[string]Cmd
+	peers     map[net.Conn]struct{}
+	mu        sync.Mutex
+	wg        sync.WaitGroup
+	infoConns int
+	infoCmds  int
 }
 
 // NewServer makes a server listening on addr. Close with .Close().
 func NewServer(addr string) (*Server, error) {
 	s := Server{
-		cmds:         map[string]Cmd{},
-		peers:        map[net.Conn]struct{}{},
-		onDisconnect: func(c *Peer) {},
+		cmds:  map[string]Cmd{},
+		peers: map[net.Conn]struct{}{},
+		// onDisconnect: func(c *Peer) {},
 	}
 
 	l, err := net.Listen("tcp", addr)
@@ -80,7 +79,7 @@ func (s *Server) ServeConn(conn net.Conn) {
 		s.infoConns++
 		s.mu.Unlock()
 
-		s.onDisconnect(s.servePeer(conn))
+		s.servePeer(conn)
 
 		s.mu.Lock()
 		delete(s.peers, conn)
@@ -126,87 +125,27 @@ func (s *Server) Register(cmd string, f Cmd) error {
 	return nil
 }
 
-func (s *Server) OnDisconnect(handler DisconnectHandler) {
-	s.onDisconnect = handler
-}
-
-func (s *Server) servePeer(c net.Conn) (cl *Peer) {
+func (s *Server) servePeer(c net.Conn) {
 	r := bufio.NewReader(c)
-	cl = &Peer{
+	peer := &Peer{
 		w: bufio.NewWriter(c),
-		MsgQueue: MessageQueue{
-			messages:       []QueuedMessage{},
-			hasNewMessages: make(chan struct{}, 1),
-		},
 	}
-
-	chReceivedArray, chReadNext := readArrayAsync(r)
-	defer close(chReadNext)
-
-	chReadNext <- struct{}{}
-
-	for {
-		select {
-		case message := <-chReceivedArray:
-			if message.err != nil {
-				return
-			}
-
-			s.dispatch(cl, message.array)
-			cl.w.Flush()
-
-			if cl.closed {
-				c.Close()
-				return
-			}
-
-			chReadNext <- struct{}{}
-		case <-cl.MsgQueue.hasNewMessages:
-			cl.MsgQueue.Lock()
-
-			select {
-			case <-cl.MsgQueue.hasNewMessages:
-				break
-			default:
-				break
-			}
-
-			messages := cl.MsgQueue.messages
-			cl.MsgQueue.messages = []QueuedMessage{}
-
-			cl.MsgQueue.Unlock()
-
-			for _, message := range messages {
-				message.Write(cl)
-			}
-
-			cl.Flush()
+	defer func() {
+		for _, f := range peer.onDisconnect {
+			f()
 		}
-	}
-}
+	}()
 
-type receivedArray struct {
-	array []string
-	err   error
-}
-
-func readArrayAsync(r *bufio.Reader) (chReceivedArray chan receivedArray, chReadNext chan struct{}) {
-	chReceivedArray = make(chan receivedArray)
-	chReadNext = make(chan struct{})
-
-	go readArraySync(r, chReceivedArray, chReadNext)
-	return
-}
-
-func readArraySync(r *bufio.Reader, chReceivedArray chan receivedArray, chReadNext chan struct{}) {
 	for {
-		if _, isOpen := <-chReadNext; !isOpen {
-			close(chReceivedArray)
+		args, err := readArray(r)
+		if err != nil {
 			return
 		}
-
-		args, err := readArray(r)
-		chReceivedArray <- receivedArray{args, err}
+		s.dispatch(peer, args)
+		peer.w.Flush()
+		if peer.closed {
+			c.Close()
+		}
 	}
 }
 
@@ -249,41 +188,21 @@ func (s *Server) TotalConnections() int {
 	return s.infoConns
 }
 
-type QueuedMessage interface {
-	Write(c *Peer)
-}
-
-type MessageQueue struct {
-	sync.Mutex
-	messages       []QueuedMessage
-	hasNewMessages chan struct{}
-}
-
-func (q *MessageQueue) Enqueue(message QueuedMessage) {
-	q.Lock()
-	defer q.Unlock()
-
-	q.messages = append(q.messages, message)
-
-	select {
-	case q.hasNewMessages <- struct{}{}:
-		break
-	default:
-		break
-	}
-}
-
 // Peer is a client connected to the server
 type Peer struct {
-	w        *bufio.Writer
-	closed   bool
-	Ctx      interface{} // anything goes, server won't touch this
-	MsgQueue MessageQueue
+	w            *bufio.Writer
+	closed       bool
+	Ctx          interface{} // anything goes, server won't touch this
+	onDisconnect []func()    // list of callbacks
+	Error        error       // set if any Write* call had an error
+	mu           sync.Mutex  // for Block()
 }
 
 // Flush the write buffer. Called automatically after every redis command
 func (c *Peer) Flush() {
-	c.w.Flush()
+	if err := c.w.Flush(); err != nil {
+		c.Error = err
+	}
 }
 
 // Close the client connection after the current command is done.
@@ -291,14 +210,31 @@ func (c *Peer) Close() {
 	c.closed = true
 }
 
+// Register a function to execute on disconnect. There can be multiple
+// functions registered.
+func (c *Peer) OnDisconnect(f func()) {
+	c.onDisconnect = append(c.onDisconnect, f)
+}
+
+// issue multiple calls, guarded with a mutex
+func (c *Peer) Block(f func(*Peer)) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	f(c)
+}
+
 // WriteError writes a redis 'Error'
 func (c *Peer) WriteError(e string) {
-	fmt.Fprintf(c.w, "-%s\r\n", toInline(e))
+	if _, err := fmt.Fprintf(c.w, "-%s\r\n", toInline(e)); err != nil {
+		c.Error = err
+	}
 }
 
 // WriteInline writes a redis inline string
 func (c *Peer) WriteInline(s string) {
-	fmt.Fprintf(c.w, "+%s\r\n", toInline(s))
+	if _, err := fmt.Fprintf(c.w, "+%s\r\n", toInline(s)); err != nil {
+		c.Error = err
+	}
 }
 
 // WriteOK write the inline string `OK`
@@ -308,22 +244,30 @@ func (c *Peer) WriteOK() {
 
 // WriteBulk writes a bulk string
 func (c *Peer) WriteBulk(s string) {
-	fmt.Fprintf(c.w, "$%d\r\n%s\r\n", len(s), s)
+	if _, err := fmt.Fprintf(c.w, "$%d\r\n%s\r\n", len(s), s); err != nil {
+		c.Error = err
+	}
 }
 
 // WriteNull writes a redis Null element
 func (c *Peer) WriteNull() {
-	fmt.Fprintf(c.w, "$-1\r\n")
+	if _, err := fmt.Fprintf(c.w, "$-1\r\n"); err != nil {
+		c.Error = err
+	}
 }
 
 // WriteLen starts an array with the given length
 func (c *Peer) WriteLen(n int) {
-	fmt.Fprintf(c.w, "*%d\r\n", n)
+	if _, err := fmt.Fprintf(c.w, "*%d\r\n", n); err != nil {
+		c.Error = err
+	}
 }
 
 // WriteInt writes an integer
 func (c *Peer) WriteInt(i int) {
-	fmt.Fprintf(c.w, ":%d\r\n", i)
+	if _, err := fmt.Fprintf(c.w, ":%d\r\n", i); err != nil {
+		c.Error = err
+	}
 }
 
 func toInline(s string) string {

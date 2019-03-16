@@ -37,6 +37,9 @@ func (m *Miniredis) cmdHset(c *server.Peer, cmd string, args []string) {
 	if !m.handleAuth(c) {
 		return
 	}
+	if m.checkPubsub(c) {
+		return
+	}
 
 	key, field, value := args[0], args[1], args[2]
 
@@ -136,6 +139,9 @@ func (m *Miniredis) cmdHget(c *server.Peer, cmd string, args []string) {
 		return
 	}
 	if !m.handleAuth(c) {
+		return
+	}
+	if m.checkPubsub(c) {
 		return
 	}
 

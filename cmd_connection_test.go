@@ -30,6 +30,26 @@ func TestAuth(t *testing.T) {
 	ok(t, err)
 }
 
+func TestPing(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	r, err := redis.String(c.Do("PING"))
+	ok(t, err)
+	equals(t, "PONG", r)
+
+	r, err = redis.String(c.Do("PING", "hi"))
+	ok(t, err)
+	equals(t, "hi", r)
+
+	_, err = c.Do("PING", "foo", "bar")
+	mustFail(t, err, errWrongNumber("ping"))
+
+}
+
 func TestEcho(t *testing.T) {
 	s, err := Run()
 	ok(t, err)

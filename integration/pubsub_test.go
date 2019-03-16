@@ -104,36 +104,30 @@ func TestPubSub(t *testing.T) {
 }
 
 func TestPubsubFull(t *testing.T) {
-	t.Skip() // exit 1, no idea why
 	var wg1 sync.WaitGroup
 	wg1.Add(1)
 	testMultiCommands(t,
 		func(r chan<- command, _ *miniredis.Miniredis) {
 			r <- succ("SUBSCRIBE", "news", "sport")
 			r <- receive()
-			/*
-				wg1.Done()
-				r <- receive()
-				r <- receive()
-				r <- receive()
-				r <- succ("UNSUBSCRIBE", "news", "sport")
-				r <- receive()
-			*/
+			wg1.Done()
+			r <- receive()
+			r <- receive()
+			r <- receive()
+			r <- succ("UNSUBSCRIBE", "news", "sport")
+			r <- receive()
 		},
-		/*
-			func(r chan<- command, _ *miniredis.Miniredis) {
-				wg1.Wait()
-				r <- succ("PUBLISH", "news", "revolution!")
-				r <- succ("PUBLISH", "news", "alien invasion!")
-				r <- succ("PUBLISH", "sport", "lady biked too fast")
-				r <- succ("PUBLISH", "gossip", "man bites dog")
-			},
-		*/
+		func(r chan<- command, _ *miniredis.Miniredis) {
+			wg1.Wait()
+			r <- succ("PUBLISH", "news", "revolution!")
+			r <- succ("PUBLISH", "news", "alien invasion!")
+			r <- succ("PUBLISH", "sport", "lady biked too fast")
+			r <- succ("PUBLISH", "gossip", "man bites dog")
+		},
 	)
 }
 
 func TestPubsubMulti(t *testing.T) {
-	t.Skip() // hangs. No idea why.
 	var wg1 sync.WaitGroup
 	wg1.Add(2)
 	testMultiCommands(t,
@@ -149,11 +143,9 @@ func TestPubsubMulti(t *testing.T) {
 		},
 		func(r chan<- command, _ *miniredis.Miniredis) {
 			r <- succ("SUBSCRIBE", "sport")
-			r <- receive()
 			wg1.Done()
 			r <- receive()
 			r <- succ("UNSUBSCRIBE", "sport")
-			r <- receive()
 		},
 		func(r chan<- command, _ *miniredis.Miniredis) {
 			wg1.Wait()
@@ -165,30 +157,43 @@ func TestPubsubMulti(t *testing.T) {
 }
 
 func TestPubsubSelect(t *testing.T) {
-	t.Skip() // known broken
-	var wg1 sync.WaitGroup
-	wg1.Add(1)
-	testMultiCommands(t,
-		func(r chan<- command, _ *miniredis.Miniredis) {
-			r <- succ("SUBSCRIBE", "news", "sport")
-			r <- receive()
-			wg1.Done()
-			r <- receive()
-		},
-		func(r chan<- command, _ *miniredis.Miniredis) {
-			wg1.Wait()
-			r <- succ("SELECT", 3)
-			r <- succ("PUBLISH", "news", "revolution!")
-		},
-	)
+	testClients2(t, func(r1, r2 chan<- command) {
+		r1 <- succ("SUBSCRIBE", "news", "sport")
+		r1 <- receive()
+		r2 <- succ("SELECT", 3)
+		r2 <- succ("PUBLISH", "news", "revolution!")
+		r1 <- receive()
+	})
 }
 
 func TestPubsubMode(t *testing.T) {
-	t.Skip() // known broken
 	testCommands(t,
 		succ("SUBSCRIBE", "news", "sport"),
 		receive(),
+		succ("PING"),
+		succ("PING", "foo"),
 		fail("ECHO", "foo"),
 		fail("HGET", "foo", "bar"),
+		fail("SET", "foo", "bar"),
+		succ("QUIT"),
 	)
+}
+
+func TestSubscriptions(t *testing.T) {
+	testClients2(t, func(r1, r2 chan<- command) {
+		r1 <- succ("SUBSCRIBE", "foo", "bar", "foo")
+		r2 <- succ("PUBSUB", "NUMSUB")
+		r1 <- succ("UNSUBSCRIBE", "bar", "bar", "bar")
+		r2 <- succ("PUBSUB", "NUMSUB")
+	})
+}
+
+func TestPubsubUnsub(t *testing.T) {
+	testClients2(t, func(c1, c2 chan<- command) {
+		c1 <- succ("SUBSCRIBE", "news", "sport")
+		c1 <- receive()
+		c2 <- succSorted("PUBSUB", "CHANNELS")
+		c1 <- succ("QUIT")
+		c2 <- succSorted("PUBSUB", "CHANNELS")
+	})
 }

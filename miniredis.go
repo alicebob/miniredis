@@ -17,7 +17,6 @@ package miniredis
 import (
 	"fmt"
 	"net"
-	"regexp"
 	"strconv"
 	"sync"
 	"time"
@@ -33,44 +32,30 @@ type setKey map[string]struct{}
 
 // RedisDB holds a single (numbered) Redis database.
 type RedisDB struct {
-	master                     *Miniredis               // pointer to the lock in Miniredis
-	id                         int                      // db id
-	keys                       map[string]string        // Master map of keys with their type
-	stringKeys                 map[string]string        // GET/SET &c. keys
-	hashKeys                   map[string]hashKey       // MGET/MSET &c. keys
-	listKeys                   map[string]listKey       // LPUSH &c. keys
-	setKeys                    map[string]setKey        // SADD &c. keys
-	sortedsetKeys              map[string]sortedSet     // ZADD &c. keys
-	ttl                        map[string]time.Duration // effective TTL values
-	keyVersion                 map[string]uint          // used to watch values
-	subscribedChannels         map[string]map[*server.Peer]struct{}
-	subscribedPatterns         map[string]map[*server.Peer]struct{}
-	directlySubscribedChannels map[string]map[*Subscriber]struct{}
-	directlySubscribedPatterns map[*regexp.Regexp]map[*Subscriber]struct{}
-}
-
-type peerSubscriptions struct {
-	channels, patterns map[string]struct{}
-}
-
-type peerCache struct {
-	subscriptions map[int]peerSubscriptions
+	master        *Miniredis               // pointer to the lock in Miniredis
+	id            int                      // db id
+	keys          map[string]string        // Master map of keys with their type
+	stringKeys    map[string]string        // GET/SET &c. keys
+	hashKeys      map[string]hashKey       // MGET/MSET &c. keys
+	listKeys      map[string]listKey       // LPUSH &c. keys
+	setKeys       map[string]setKey        // SADD &c. keys
+	sortedsetKeys map[string]sortedSet     // ZADD &c. keys
+	ttl           map[string]time.Duration // effective TTL values
+	keyVersion    map[string]uint          // used to watch values
 }
 
 // Miniredis is a Redis server implementation.
 type Miniredis struct {
 	sync.Mutex
-	srv                                  *server.Server
-	port                                 int
-	password                             string
-	dbs                                  map[int]*RedisDB
-	selectedDB                           int               // DB id used in the direct Get(), Set() &c.
-	scripts                              map[string]string // sha1 -> lua src
-	signal                               *sync.Cond
-	now                                  time.Time // used to make a duration from EXPIREAT. time.Now() if not set.
-	peers                                map[*server.Peer]peerCache
-	channelPatterns                      map[string]*regexp.Regexp
-	decompiledDirectlySubscribedPatterns map[string]*regexp.Regexp
+	srv         *server.Server
+	port        int
+	password    string
+	dbs         map[int]*RedisDB
+	selectedDB  int               // DB id used in the direct Get(), Set() &c.
+	scripts     map[string]string // sha1 -> lua src
+	signal      *sync.Cond
+	now         time.Time // used to make a duration from EXPIREAT. time.Now() if not set.
+	subscribers map[*Subscriber]struct{}
 }
 
 type txCmd func(*server.Peer, *connCtx)
@@ -86,18 +71,17 @@ type connCtx struct {
 	selectedDB       int            // selected DB
 	authenticated    bool           // auth enabled and a valid AUTH seen
 	transaction      []txCmd        // transaction callbacks. Or nil.
-	dirtyTransaction bool           // any error during QUEUEing.
-	watch            map[dbKey]uint // WATCHed keys.
+	dirtyTransaction bool           // any error during QUEUEing
+	watch            map[dbKey]uint // WATCHed keys
+	subscriber       *Subscriber    // client is in PUBSUB mode if not nil
 }
 
 // NewMiniRedis makes a new, non-started, Miniredis object.
 func NewMiniRedis() *Miniredis {
 	m := Miniredis{
-		dbs:                                  map[int]*RedisDB{},
-		scripts:                              map[string]string{},
-		peers:                                map[*server.Peer]peerCache{},
-		channelPatterns:                      map[string]*regexp.Regexp{},
-		decompiledDirectlySubscribedPatterns: map[string]*regexp.Regexp{},
+		dbs:         map[int]*RedisDB{},
+		scripts:     map[string]string{},
+		subscribers: map[*Subscriber]struct{}{},
 	}
 	m.signal = sync.NewCond(&m)
 	return &m
@@ -105,20 +89,16 @@ func NewMiniRedis() *Miniredis {
 
 func newRedisDB(id int, l *Miniredis) RedisDB {
 	return RedisDB{
-		id:                         id,
-		master:                     l,
-		keys:                       map[string]string{},
-		stringKeys:                 map[string]string{},
-		hashKeys:                   map[string]hashKey{},
-		listKeys:                   map[string]listKey{},
-		setKeys:                    map[string]setKey{},
-		sortedsetKeys:              map[string]sortedSet{},
-		ttl:                        map[string]time.Duration{},
-		keyVersion:                 map[string]uint{},
-		subscribedChannels:         map[string]map[*server.Peer]struct{}{},
-		subscribedPatterns:         map[string]map[*server.Peer]struct{}{},
-		directlySubscribedChannels: map[string]map[*Subscriber]struct{}{},
-		directlySubscribedPatterns: map[*regexp.Regexp]map[*Subscriber]struct{}{},
+		id:            id,
+		master:        l,
+		keys:          map[string]string{},
+		stringKeys:    map[string]string{},
+		hashKeys:      map[string]hashKey{},
+		listKeys:      map[string]listKey{},
+		setKeys:       map[string]setKey{},
+		sortedsetKeys: map[string]sortedSet{},
+		ttl:           map[string]time.Duration{},
+		keyVersion:    map[string]uint{},
 	}
 }
 
@@ -166,8 +146,6 @@ func (m *Miniredis) start(s *server.Server) error {
 	commandsTransaction(m)
 	commandsScripting(m)
 
-	s.OnDisconnect(m.onDisconnect)
-
 	return nil
 }
 
@@ -180,12 +158,16 @@ func (m *Miniredis) Restart() error {
 // Close shuts down a Miniredis.
 func (m *Miniredis) Close() {
 	m.Lock()
-	defer m.Unlock()
 	if m.srv == nil {
 		return
 	}
+	m.Unlock()
+
 	m.srv.Close()
+
+	m.Lock()
 	m.srv = nil
+	m.Unlock()
 }
 
 // RequireAuth makes every connection need to AUTH first. Disable again by
@@ -349,39 +331,19 @@ func (m *Miniredis) handleAuth(c *server.Peer) bool {
 	return true
 }
 
-func (m *Miniredis) onDisconnect(c *server.Peer) {
-	go m.unsubscribeAll(c)
-}
-
-func (m *Miniredis) unsubscribeAll(c *server.Peer) {
+// handlePubsub sends an error to the user if the connection is in PUBSUB mode.
+// It'll return true if it did.
+func (m *Miniredis) checkPubsub(c *server.Peer) bool {
 	m.Lock()
 	defer m.Unlock()
 
-	if cache, hasCache := m.peers[c]; hasCache {
-		for dbIdx, subscriptions := range cache.subscriptions {
-			db := m.dbs[dbIdx]
-
-			for channel := range subscriptions.channels {
-				peers := db.subscribedChannels[channel]
-				delete(peers, c)
-
-				if len(peers) < 1 {
-					delete(db.subscribedChannels, channel)
-				}
-			}
-
-			for pattern := range subscriptions.patterns {
-				peers := db.subscribedPatterns[pattern]
-				delete(peers, c)
-
-				if len(peers) < 1 {
-					delete(db.subscribedPatterns, pattern)
-				}
-			}
-		}
-
-		delete(m.peers, c)
+	ctx := getCtx(c)
+	if ctx.subscriber == nil {
+		return false
 	}
+
+	c.WriteError("ERR only (P)SUBSCRIBE / (P)UNSUBSCRIBE / PING / QUIT allowed in this context")
+	return true
 }
 
 func getCtx(c *server.Peer) *connCtx {
@@ -431,4 +393,77 @@ func setDirty(c *server.Peer) {
 
 func setAuthenticated(c *server.Peer) {
 	getCtx(c).authenticated = true
+}
+
+func (m *Miniredis) addSubscriber(s *Subscriber) {
+	m.Lock()
+	m.subscribers[s] = struct{}{}
+	m.Unlock()
+}
+
+// closes and remove the subscriber
+func (m *Miniredis) removeSubscriber(s *Subscriber) {
+	m.Lock()
+	_, ok := m.subscribers[s]
+	delete(m.subscribers, s)
+	m.Unlock()
+	if ok {
+		s.Close()
+	}
+}
+
+func (m *Miniredis) publish(c, msg string) int {
+	n := 0
+	for s := range m.subscribers {
+		n += s.Publish(c, msg)
+	}
+	return n
+}
+
+// enter 'subscribed state', or return the existing one.
+func (m *Miniredis) subscribedState(c *server.Peer) *Subscriber {
+	ctx := getCtx(c)
+	sub := ctx.subscriber
+	if sub != nil {
+		return sub
+	}
+
+	sub = m.NewSubscriber()
+	c.OnDisconnect(func() {
+		m.removeSubscriber(sub)
+	})
+
+	ctx.subscriber = sub
+
+	go monitorPublish(c, sub.publish)
+
+	return sub
+}
+
+// whenever the p?sub count drops to 0 subscribed state should be stopped, and
+// all redis commands are allowed again.
+func endSubscriber(m *Miniredis, c *server.Peer) {
+	ctx := getCtx(c)
+	if sub := ctx.subscriber; sub != nil {
+		m.removeSubscriber(sub) // will Close() the sub
+	}
+	ctx.subscriber = nil
+}
+
+// Start a new pubsub subscriber. It can (un) subscribe to channels and
+// patterns, and has a channel to get published messages. Close it with
+// Close().
+// Does not close itself when there are no subscriptions left.
+func (m *Miniredis) NewSubscriber() *Subscriber {
+	sub := newSubscriber()
+	m.addSubscriber(sub)
+	return sub
+}
+
+func (m *Miniredis) allSubscribers() []*Subscriber {
+	var subs []*Subscriber
+	for s := range m.subscribers {
+		subs = append(subs, s)
+	}
+	return subs
 }

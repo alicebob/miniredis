@@ -48,6 +48,10 @@ func (m *Miniredis) cmdSet(c *server.Peer, cmd string, args []string) {
 		return
 	}
 
+	if m.checkPubsub(c) {
+		return
+	}
+
 	var (
 		nx  = false // set iff not exists
 		xx  = false // set iff exists

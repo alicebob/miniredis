@@ -4,6 +4,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"reflect"
 	"sort"
@@ -142,6 +143,58 @@ func testMultiCommands(t *testing.T, cs ...func(chan<- command, *miniredis.Minir
 	wg.Wait()
 }
 
+// like testCommands, but multiple connections
+func testClients2(t *testing.T, f func(c1, c2 chan<- command)) {
+	t.Helper()
+	sMini, err := miniredis.Run()
+	ok(t, err)
+	defer sMini.Close()
+
+	sReal, realAddr := Redis()
+	defer sReal.Close()
+
+	type aChan struct {
+		c            chan command
+		cMini, cReal redis.Conn
+	}
+	chans := [2]aChan{}
+	for i := range chans {
+		gen := make(chan command)
+		cMini, err := redis.Dial("tcp", sMini.Addr())
+		ok(t, err)
+
+		cReal, err := redis.Dial("tcp", realAddr)
+		ok(t, err)
+		chans[i] = aChan{
+			c:     gen,
+			cMini: cMini,
+			cReal: cReal,
+		}
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	go func() {
+		f(chans[0].c, chans[1].c)
+		cancel()
+		for _, c := range chans {
+			close(c.c)
+		}
+	}()
+
+loop:
+	for {
+		select {
+		case <-ctx.Done():
+			break loop
+		case cm := <-chans[0].c:
+			runCommand(t, chans[0].cMini, chans[0].cReal, cm)
+		case cm := <-chans[1].c:
+			runCommand(t, chans[1].cMini, chans[1].cReal, cm)
+		}
+	}
+}
+
 func testAuthCommands(t *testing.T, passwd string, commands ...command) {
 	sMini, err := miniredis.Run()
 	ok(t, err)
@@ -177,22 +230,6 @@ func runCommand(t *testing.T, cMini, cReal redis.Conn, p command) {
 		dump(vReal, "-real-")
 		vMini, errMini = cMini.Receive()
 		dump(vMini, "-mini-")
-		for _, k := range vReal.([]interface{}) {
-			switch k := k.(type) {
-			case []byte:
-				t.Errorf(" -real- %s", string(k))
-			default:
-				t.Errorf(" -real- %#v", k)
-			}
-		}
-		for _, k := range vMini.([]interface{}) {
-			switch k := k.(type) {
-			case []byte:
-				t.Errorf(" -mini- %s", string(k))
-			default:
-				t.Errorf(" -mini- %#v", k)
-			}
-		}
 	} else {
 		vReal, errReal = cReal.Do(p.cmd, p.args...)
 		vMini, errMini = cMini.Do(p.cmd, p.args...)
