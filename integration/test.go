@@ -16,12 +16,13 @@ import (
 )
 
 type command struct {
-	cmd      string // 'GET', 'SET', &c.
-	args     []interface{}
-	error    bool   // Whether the command should return an error or not.
-	sort     bool   // Sort real redis's result. Used for 'keys'.
-	loosely  bool   // Don't compare values, only structure. (for random things)
-	errorSub string // Both errors need this substring
+	cmd         string // 'GET', 'SET', &c.
+	args        []interface{}
+	error       bool   // Whether the command should return an error or not.
+	sort        bool   // Sort real redis's result. Used for 'keys'.
+	loosely     bool   // Don't compare values, only structure. (for random things)
+	errorSub    string // Both errors need this substring
+	receiveOnly bool   // no command, only receive. For pubsub messages.
 }
 
 func succ(cmd string, args ...interface{}) command {
@@ -78,6 +79,13 @@ func failLoosely(cmd string, args ...interface{}) command {
 	}
 }
 
+// don't send a message, only read one. For pubsub messages.
+func receive() command {
+	return command{
+		receiveOnly: true,
+	}
+}
+
 // ok fails the test if an err is not nil.
 func ok(tb testing.TB, err error) {
 	tb.Helper()
@@ -109,7 +117,7 @@ func testMultiCommands(t *testing.T, cs ...func(chan<- command, *miniredis.Minir
 
 	var wg sync.WaitGroup
 	for _, c := range cs {
-		// one connections per cs
+		// one connection per cs
 		cMini, err := redis.Dial("tcp", sMini.Addr())
 		ok(t, err)
 
@@ -160,8 +168,35 @@ func runCommands(t *testing.T, realAddr, miniAddr string, commands []command) {
 
 func runCommand(t *testing.T, cMini, cReal redis.Conn, p command) {
 	t.Helper()
-	vReal, errReal := cReal.Do(p.cmd, p.args...)
-	vMini, errMini := cMini.Do(p.cmd, p.args...)
+	var (
+		vReal, vMini     interface{}
+		errReal, errMini error
+	)
+	if p.receiveOnly {
+		vReal, errReal = cReal.Receive()
+		dump(vReal, "-real-")
+		vMini, errMini = cMini.Receive()
+		dump(vMini, "-mini-")
+		for _, k := range vReal.([]interface{}) {
+			switch k := k.(type) {
+			case []byte:
+				t.Errorf(" -real- %s", string(k))
+			default:
+				t.Errorf(" -real- %#v", k)
+			}
+		}
+		for _, k := range vMini.([]interface{}) {
+			switch k := k.(type) {
+			case []byte:
+				t.Errorf(" -mini- %s", string(k))
+			default:
+				t.Errorf(" -mini- %#v", k)
+			}
+		}
+	} else {
+		vReal, errReal = cReal.Do(p.cmd, p.args...)
+		vMini, errMini = cMini.Do(p.cmd, p.args...)
+	}
 	if p.error {
 		if errReal == nil {
 			t.Errorf("got no error from realredis. case: %#v", p)
@@ -211,6 +246,8 @@ func runCommand(t *testing.T, cMini, cReal redis.Conn, p command) {
 	} else {
 		if !reflect.DeepEqual(vReal, vMini) {
 			t.Errorf("value error. expected: %#v got: %#v case: %#v", vReal, vMini, p)
+			dump(vReal, " --real-")
+			dump(vMini, " --mini-")
 			return
 		}
 	}
@@ -257,5 +294,18 @@ func looselyEqual(a, b interface{}) bool {
 		return true
 	default:
 		panic(fmt.Sprintf("unhandled case, got a %#v", a))
+	}
+}
+
+func dump(r interface{}, prefix string) {
+	if ls, ok := r.([]interface{}); ok {
+		for _, k := range ls {
+			switch k := k.(type) {
+			case []byte:
+				fmt.Printf(" %s %s\n", prefix, string(k))
+			default:
+				fmt.Printf(" %s %#v\n", prefix, k)
+			}
+		}
 	}
 }
