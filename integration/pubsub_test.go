@@ -197,3 +197,63 @@ func TestPubsubUnsub(t *testing.T) {
 		c2 <- succSorted("PUBSUB", "CHANNELS")
 	})
 }
+
+func TestPubsubTx(t *testing.T) {
+	// publish is in a tx
+	testClients2(t, func(c1, c2 chan<- command) {
+		c1 <- succ("SUBSCRIBE", "foo")
+		c2 <- succ("MULTI")
+		c2 <- succ("PUBSUB", "CHANNELS")
+		c2 <- succ("PUBLISH", "foo", "hello one")
+		c2 <- fail("GET")
+		c2 <- succ("PUBLISH", "foo", "hello two")
+		c2 <- fail("EXEC")
+
+		c2 <- succ("PUBLISH", "foo", "post tx")
+		c1 <- receive()
+	})
+
+	// SUBSCRIBE is in a tx
+	testClients2(t, func(c1, c2 chan<- command) {
+		c1 <- succ("MULTI")
+		c1 <- succ("SUBSCRIBE", "foo")
+		c2 <- succ("PUBSUB", "CHANNELS")
+		c1 <- succ("EXEC")
+		c2 <- succ("PUBSUB", "CHANNELS")
+
+		c1 <- fail("MULTI") // we're in SUBSCRIBE mode
+	})
+
+	// UNSUBSCRIBE is in a tx
+	testClients2(t, func(c1, c2 chan<- command) {
+		c1 <- succ("MULTI")
+		c1 <- succ("SUBSCRIBE", "foo")
+		c1 <- succ("UNSUBSCRIBE", "foo")
+		c2 <- succ("PUBSUB", "CHANNELS")
+		c1 <- succ("EXEC")
+		c2 <- succ("PUBSUB", "CHANNELS")
+		c1 <- succ("PUBSUB", "CHANNELS")
+	})
+
+	// PSUBSCRIBE is in a tx
+	testClients2(t, func(c1, c2 chan<- command) {
+		c1 <- succ("MULTI")
+		c1 <- succ("PSUBSCRIBE", "foo")
+		c2 <- succ("PUBSUB", "NUMPAT")
+		c1 <- succ("EXEC")
+		c2 <- succ("PUBSUB", "NUMPAT")
+
+		c1 <- fail("MULTI") // we're in SUBSCRIBE mode
+	})
+
+	// PUNSUBSCRIBE is in a tx
+	testClients2(t, func(c1, c2 chan<- command) {
+		c1 <- succ("MULTI")
+		c1 <- succ("PSUBSCRIBE", "foo")
+		c1 <- succ("PUNSUBSCRIBE", "foo")
+		c2 <- succ("PUBSUB", "NUMPAT")
+		c1 <- succ("EXEC")
+		c2 <- succ("PUBSUB", "NUMPAT")
+		c1 <- succ("PUBSUB", "NUMPAT")
+	})
+}

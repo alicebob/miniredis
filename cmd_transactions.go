@@ -24,6 +24,9 @@ func (m *Miniredis) cmdMulti(c *server.Peer, cmd string, args []string) {
 	if !m.handleAuth(c) {
 		return
 	}
+	if m.checkPubsub(c) {
+		return
+	}
 
 	ctx := getCtx(c)
 
@@ -57,6 +60,8 @@ func (m *Miniredis) cmdExec(c *server.Peer, cmd string, args []string) {
 
 	if ctx.dirtyTransaction {
 		c.WriteError("EXECABORT Transaction discarded because of previous errors.")
+		// a failed EXEC finishes the tx
+		stopTx(ctx)
 		return
 	}
 

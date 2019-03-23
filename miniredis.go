@@ -396,17 +396,13 @@ func setAuthenticated(c *server.Peer) {
 }
 
 func (m *Miniredis) addSubscriber(s *Subscriber) {
-	m.Lock()
 	m.subscribers[s] = struct{}{}
-	m.Unlock()
 }
 
-// closes and remove the subscriber
+// closes and remove the subscriber.
 func (m *Miniredis) removeSubscriber(s *Subscriber) {
-	m.Lock()
 	_, ok := m.subscribers[s]
 	delete(m.subscribers, s)
-	m.Unlock()
 	if ok {
 		s.Close()
 	}
@@ -428,9 +424,13 @@ func (m *Miniredis) subscribedState(c *server.Peer) *Subscriber {
 		return sub
 	}
 
-	sub = m.NewSubscriber()
+	sub = newSubscriber()
+	m.addSubscriber(sub)
+
 	c.OnDisconnect(func() {
+		m.Lock()
 		m.removeSubscriber(sub)
+		m.Unlock()
 	})
 
 	ctx.subscriber = sub
@@ -456,7 +456,11 @@ func endSubscriber(m *Miniredis, c *server.Peer) {
 // Does not close itself when there are no subscriptions left.
 func (m *Miniredis) NewSubscriber() *Subscriber {
 	sub := newSubscriber()
+
+	m.Lock()
 	m.addSubscriber(sub)
+	m.Unlock()
+
 	return sub
 }
 

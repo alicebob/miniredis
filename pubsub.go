@@ -187,8 +187,8 @@ func countPsubs(subs []*Subscriber) int {
 	return n
 }
 
-func monitorPublish(conn *server.Peer, c <-chan PubsubMessage) {
-	for msg := range c {
+func monitorPublish(conn *server.Peer, msgs <-chan PubsubMessage) {
+	for msg := range msgs {
 		conn.Block(func(c *server.Peer) {
 			c.WriteLen(3)
 			c.WriteBulk("message")

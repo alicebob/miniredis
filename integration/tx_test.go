@@ -142,4 +142,28 @@ func TestTx(t *testing.T) {
 		succ("BITOP", "BROKEN", "str", ""),
 		succ("EXEC"),
 	)
+
+	// fail on invalid command
+	testCommands(t,
+		succ("MULTI"),
+		fail("GET"),
+		fail("EXEC"),
+	)
+
+	/* FIXME
+	// fail on unknown command
+	testCommands(t,
+		succ("MULTI"),
+		fail("NOSUCH"),
+		fail("EXEC"),
+	)
+	*/
+
+	// failed EXEC cleaned up the tx
+	testCommands(t,
+		succ("MULTI"),
+		fail("GET"),
+		fail("EXEC"),
+		succ("MULTI"),
+	)
 }

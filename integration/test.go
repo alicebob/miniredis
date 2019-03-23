@@ -227,9 +227,7 @@ func runCommand(t *testing.T, cMini, cReal redis.Conn, p command) {
 	)
 	if p.receiveOnly {
 		vReal, errReal = cReal.Receive()
-		dump(vReal, "-real-")
 		vMini, errMini = cMini.Receive()
-		dump(vMini, "-mini-")
 	} else {
 		vReal, errReal = cReal.Do(p.cmd, p.args...)
 		vMini, errMini = cMini.Do(p.cmd, p.args...)

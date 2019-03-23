@@ -22,7 +22,6 @@ func commandsPubsub(m *Miniredis) {
 
 // SUBSCRIBE
 func (m *Miniredis) cmdSubscribe(c *server.Peer, cmd string, args []string) {
-	// TODO: figure out transactions.
 	if len(args) < 1 {
 		setDirty(c)
 		c.WriteError(errWrongNumber(cmd))
@@ -32,16 +31,18 @@ func (m *Miniredis) cmdSubscribe(c *server.Peer, cmd string, args []string) {
 		return
 	}
 
-	sub := m.subscribedState(c)
-	for _, channel := range args {
-		n := sub.Subscribe(channel)
-		c.Block(func(c *server.Peer) {
-			c.WriteLen(3)
-			c.WriteBulk("subscribe")
-			c.WriteBulk(channel)
-			c.WriteInt(n)
-		})
-	}
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
+		sub := m.subscribedState(c)
+		for _, channel := range args {
+			n := sub.Subscribe(channel)
+			c.Block(func(c *server.Peer) {
+				c.WriteLen(3)
+				c.WriteBulk("subscribe")
+				c.WriteBulk(channel)
+				c.WriteInt(n)
+			})
+		}
+	})
 }
 
 // UNSUBSCRIBE
@@ -52,27 +53,28 @@ func (m *Miniredis) cmdUnsubscribe(c *server.Peer, cmd string, args []string) {
 
 	sub := m.subscribedState(c)
 
-	// TODO: tx, which also locks.
-
 	channels := args
-	if len(channels) == 0 {
-		channels = sub.Channels()
-	}
 
-	// there is no de-duplication
-	for _, channel := range channels {
-		n := sub.Unsubscribe(channel)
-		c.Block(func(c *server.Peer) {
-			c.WriteLen(3)
-			c.WriteBulk("unsubscribe")
-			c.WriteBulk(channel)
-			c.WriteInt(n)
-		})
-	}
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
+		if len(channels) == 0 {
+			channels = sub.Channels()
+		}
 
-	if sub.Count() == 0 {
-		endSubscriber(m, c)
-	}
+		// there is no de-duplication
+		for _, channel := range channels {
+			n := sub.Unsubscribe(channel)
+			c.Block(func(c *server.Peer) {
+				c.WriteLen(3)
+				c.WriteBulk("unsubscribe")
+				c.WriteBulk(channel)
+				c.WriteInt(n)
+			})
+		}
+
+		if sub.Count() == 0 {
+			endSubscriber(m, c)
+		}
+	})
 }
 
 // PSUBSCRIBE
@@ -86,16 +88,18 @@ func (m *Miniredis) cmdPsubscribe(c *server.Peer, cmd string, args []string) {
 		return
 	}
 
-	sub := m.subscribedState(c)
-	for _, pat := range args {
-		n := sub.Psubscribe(pat)
-		c.Block(func(c *server.Peer) {
-			c.WriteLen(3)
-			c.WriteBulk("psubscribe")
-			c.WriteBulk(pat)
-			c.WriteInt(n)
-		})
-	}
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
+		sub := m.subscribedState(c)
+		for _, pat := range args {
+			n := sub.Psubscribe(pat)
+			c.Block(func(c *server.Peer) {
+				c.WriteLen(3)
+				c.WriteBulk("psubscribe")
+				c.WriteBulk(pat)
+				c.WriteInt(n)
+			})
+		}
+	})
 }
 
 func compileChannelPattern(pattern string) *regexp.Regexp {
@@ -207,25 +211,27 @@ func (m *Miniredis) cmdPunsubscribe(c *server.Peer, cmd string, args []string) {
 	sub := m.subscribedState(c)
 
 	patterns := args
-	if len(patterns) == 0 {
-		patterns = sub.Patterns()
-	}
 
-	// there is no de-duplication
-	for _, pat := range patterns {
-		n := sub.Punsubscribe(pat)
-		c.Block(func(c *server.Peer) {
-			c.WriteLen(3)
-			c.WriteBulk("punsubscribe")
-			c.WriteBulk(pat)
-			c.WriteInt(n)
-		})
-	}
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
+		if len(patterns) == 0 {
+			patterns = sub.Patterns()
+		}
 
-	if sub.Count() == 0 {
-		endSubscriber(m, c)
-	}
+		// there is no de-duplication
+		for _, pat := range patterns {
+			n := sub.Punsubscribe(pat)
+			c.Block(func(c *server.Peer) {
+				c.WriteLen(3)
+				c.WriteBulk("punsubscribe")
+				c.WriteBulk(pat)
+				c.WriteInt(n)
+			})
+		}
 
+		if sub.Count() == 0 {
+			endSubscriber(m, c)
+		}
+	})
 }
 
 // PUBLISH
