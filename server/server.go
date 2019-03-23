@@ -41,7 +41,6 @@ func NewServer(addr string) (*Server, error) {
 	s := Server{
 		cmds:  map[string]Cmd{},
 		peers: map[net.Conn]struct{}{},
-		// onDisconnect: func(c *Peer) {},
 	}
 
 	l, err := net.Listen("tcp", addr)
@@ -143,7 +142,10 @@ func (s *Server) servePeer(c net.Conn) {
 		}
 		s.dispatch(peer, args)
 		peer.Flush()
-		if peer.closed {
+		s.mu.Lock()
+		closed := peer.closed
+		s.mu.Unlock()
+		if closed {
 			c.Close()
 		}
 	}
@@ -206,6 +208,8 @@ func (c *Peer) Flush() {
 
 // Close the client connection after the current command is done.
 func (c *Peer) Close() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	c.closed = true
 }
 

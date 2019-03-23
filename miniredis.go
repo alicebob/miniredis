@@ -158,16 +158,18 @@ func (m *Miniredis) Restart() error {
 // Close shuts down a Miniredis.
 func (m *Miniredis) Close() {
 	m.Lock()
+
 	if m.srv == nil {
+		m.Unlock()
 		return
 	}
-	m.Unlock()
-
-	m.srv.Close()
-
-	m.Lock()
+	srv := m.srv
 	m.srv = nil
 	m.Unlock()
+
+	// the OnDisconnect callbacks can lock m, so run Close() outside the lock.
+	srv.Close()
+
 }
 
 // RequireAuth makes every connection need to AUTH first. Disable again by
