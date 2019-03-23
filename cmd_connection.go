@@ -57,6 +57,10 @@ func (m *Miniredis) cmdAuth(c *server.Peer, cmd string, args []string) {
 		c.WriteError(errWrongNumber(cmd))
 		return
 	}
+	if m.checkPubsub(c) {
+		return
+	}
+
 	pw := args[0]
 
 	m.Lock()
@@ -100,6 +104,9 @@ func (m *Miniredis) cmdSelect(c *server.Peer, cmd string, args []string) {
 		return
 	}
 	if !m.handleAuth(c) {
+		return
+	}
+	if m.checkPubsub(c) {
 		return
 	}
 

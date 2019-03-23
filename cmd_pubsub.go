@@ -51,11 +51,11 @@ func (m *Miniredis) cmdUnsubscribe(c *server.Peer, cmd string, args []string) {
 		return
 	}
 
-	sub := m.subscribedState(c)
-
 	channels := args
 
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
+		sub := m.subscribedState(c)
+
 		if len(channels) == 0 {
 			channels = sub.Channels()
 		}
@@ -208,11 +208,11 @@ func (m *Miniredis) cmdPunsubscribe(c *server.Peer, cmd string, args []string) {
 		return
 	}
 
-	sub := m.subscribedState(c)
-
 	patterns := args
 
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
+		sub := m.subscribedState(c)
+
 		if len(patterns) == 0 {
 			patterns = sub.Patterns()
 		}
