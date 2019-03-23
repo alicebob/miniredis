@@ -35,7 +35,7 @@ func (m *Miniredis) cmdPing(c *server.Peer, cmd string, args []string) {
 
 	// PING is allowed in subscribed state
 	if sub := getCtx(c).subscriber; sub != nil {
-		c.Block(func(c *server.Peer) {
+		c.Block(func(c *server.Writer) {
 			c.WriteLen(2)
 			c.WriteBulk("pong")
 			c.WriteBulk(payload)

@@ -142,7 +142,7 @@ func (s *Server) servePeer(c net.Conn) {
 			return
 		}
 		s.dispatch(peer, args)
-		peer.w.Flush()
+		peer.Flush()
 		if peer.closed {
 			c.Close()
 		}
@@ -194,15 +194,14 @@ type Peer struct {
 	closed       bool
 	Ctx          interface{} // anything goes, server won't touch this
 	onDisconnect []func()    // list of callbacks
-	Error        error       // set if any Write* call had an error
 	mu           sync.Mutex  // for Block()
 }
 
 // Flush the write buffer. Called automatically after every redis command
 func (c *Peer) Flush() {
-	if err := c.w.Flush(); err != nil {
-		c.Error = err
-	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.w.Flush()
 }
 
 // Close the client connection after the current command is done.
@@ -217,24 +216,24 @@ func (c *Peer) OnDisconnect(f func()) {
 }
 
 // issue multiple calls, guarded with a mutex
-func (c *Peer) Block(f func(*Peer)) {
+func (c *Peer) Block(f func(*Writer)) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	f(c)
+	f(&Writer{c.w})
 }
 
 // WriteError writes a redis 'Error'
 func (c *Peer) WriteError(e string) {
-	if _, err := fmt.Fprintf(c.w, "-%s\r\n", toInline(e)); err != nil {
-		c.Error = err
-	}
+	c.Block(func(w *Writer) {
+		w.WriteError(e)
+	})
 }
 
 // WriteInline writes a redis inline string
 func (c *Peer) WriteInline(s string) {
-	if _, err := fmt.Fprintf(c.w, "+%s\r\n", toInline(s)); err != nil {
-		c.Error = err
-	}
+	c.Block(func(w *Writer) {
+		w.WriteInline(s)
+	})
 }
 
 // WriteOK write the inline string `OK`
@@ -244,30 +243,30 @@ func (c *Peer) WriteOK() {
 
 // WriteBulk writes a bulk string
 func (c *Peer) WriteBulk(s string) {
-	if _, err := fmt.Fprintf(c.w, "$%d\r\n%s\r\n", len(s), s); err != nil {
-		c.Error = err
-	}
+	c.Block(func(w *Writer) {
+		w.WriteBulk(s)
+	})
 }
 
 // WriteNull writes a redis Null element
 func (c *Peer) WriteNull() {
-	if _, err := fmt.Fprintf(c.w, "$-1\r\n"); err != nil {
-		c.Error = err
-	}
+	c.Block(func(w *Writer) {
+		w.WriteNull()
+	})
 }
 
 // WriteLen starts an array with the given length
 func (c *Peer) WriteLen(n int) {
-	if _, err := fmt.Fprintf(c.w, "*%d\r\n", n); err != nil {
-		c.Error = err
-	}
+	c.Block(func(w *Writer) {
+		w.WriteLen(n)
+	})
 }
 
 // WriteInt writes an integer
 func (c *Peer) WriteInt(i int) {
-	if _, err := fmt.Fprintf(c.w, ":%d\r\n", i); err != nil {
-		c.Error = err
-	}
+	c.Block(func(w *Writer) {
+		w.WriteInt(i)
+	})
 }
 
 func toInline(s string) string {
@@ -277,4 +276,42 @@ func toInline(s string) string {
 		}
 		return r
 	}, s)
+}
+
+// A Writer is given to the callback in Block()
+type Writer struct {
+	w *bufio.Writer
+}
+
+// WriteError writes a redis 'Error'
+func (w *Writer) WriteError(e string) {
+	fmt.Fprintf(w.w, "-%s\r\n", toInline(e))
+}
+
+func (w *Writer) WriteLen(n int) {
+	fmt.Fprintf(w.w, "*%d\r\n", n)
+}
+
+// WriteBulk writes a bulk string
+func (w *Writer) WriteBulk(s string) {
+	fmt.Fprintf(w.w, "$%d\r\n%s\r\n", len(s), s)
+}
+
+// WriteInt writes an integer
+func (w *Writer) WriteInt(i int) {
+	fmt.Fprintf(w.w, ":%d\r\n", i)
+}
+
+// WriteNull writes a redis Null element
+func (w *Writer) WriteNull() {
+	fmt.Fprintf(w.w, "$-1\r\n")
+}
+
+// WriteInline writes a redis inline string
+func (w *Writer) WriteInline(s string) {
+	fmt.Fprintf(w.w, "+%s\r\n", toInline(s))
+}
+
+func (w *Writer) Flush() {
+	w.w.Flush()
 }

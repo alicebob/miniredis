@@ -35,7 +35,7 @@ func (m *Miniredis) cmdSubscribe(c *server.Peer, cmd string, args []string) {
 		sub := m.subscribedState(c)
 		for _, channel := range args {
 			n := sub.Subscribe(channel)
-			c.Block(func(c *server.Peer) {
+			c.Block(func(c *server.Writer) {
 				c.WriteLen(3)
 				c.WriteBulk("subscribe")
 				c.WriteBulk(channel)
@@ -63,7 +63,7 @@ func (m *Miniredis) cmdUnsubscribe(c *server.Peer, cmd string, args []string) {
 		// there is no de-duplication
 		for _, channel := range channels {
 			n := sub.Unsubscribe(channel)
-			c.Block(func(c *server.Peer) {
+			c.Block(func(c *server.Writer) {
 				c.WriteLen(3)
 				c.WriteBulk("unsubscribe")
 				c.WriteBulk(channel)
@@ -92,7 +92,7 @@ func (m *Miniredis) cmdPsubscribe(c *server.Peer, cmd string, args []string) {
 		sub := m.subscribedState(c)
 		for _, pat := range args {
 			n := sub.Psubscribe(pat)
-			c.Block(func(c *server.Peer) {
+			c.Block(func(c *server.Writer) {
 				c.WriteLen(3)
 				c.WriteBulk("psubscribe")
 				c.WriteBulk(pat)
@@ -220,7 +220,7 @@ func (m *Miniredis) cmdPunsubscribe(c *server.Peer, cmd string, args []string) {
 		// there is no de-duplication
 		for _, pat := range patterns {
 			n := sub.Punsubscribe(pat)
-			c.Block(func(c *server.Peer) {
+			c.Block(func(c *server.Writer) {
 				c.WriteLen(3)
 				c.WriteBulk("punsubscribe")
 				c.WriteBulk(pat)
