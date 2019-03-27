@@ -74,7 +74,7 @@ This should be the change needed to upgrade:
 1.0:
 
     m.Expire() == 4
-   
+
 2.0:
 
     m.TTL() == 4 * time.Second
@@ -92,7 +92,7 @@ Implemented commands:
    - PING
    - SELECT
    - QUIT
- - Key 
+ - Key
    - DEL
    - EXISTS
    - EXPIRE
@@ -328,7 +328,7 @@ Commands which will probably not be implemented:
     - ~~SLAVEOF~~
     - ~~SLOWLOG~~
     - ~~SYNC~~
-    
+
 
 ## &c.
 
@@ -336,5 +336,5 @@ Tests are run against Redis 5.0.3. The [./integration](./integration/) subdir
 compares miniredis against a real redis instance.
 
 
-[![Build Status](https://travis-ci.org/alicebob/miniredis.svg?branch=master)](https://travis-ci.org/alicebob/miniredis) 
+[![Build Status](https://travis-ci.org/alicebob/miniredis.svg?branch=master)](https://travis-ci.org/alicebob/miniredis)
 [![GoDoc](https://godoc.org/github.com/alicebob/miniredis?status.svg)](https://godoc.org/github.com/alicebob/miniredis)

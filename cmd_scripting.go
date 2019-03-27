@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	luajson "github.com/alicebob/gopher-json"
-	"github.com/yuin/gopher-lua"
+	lua "github.com/yuin/gopher-lua"
 	"github.com/yuin/gopher-lua/parse"
 
 	"github.com/alicebob/miniredis/server"

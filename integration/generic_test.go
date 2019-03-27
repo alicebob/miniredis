@@ -213,3 +213,12 @@ func TestProto(t *testing.T) {
 		succ("ECHO", strings.Repeat("X", 1<<24)),
 	)
 }
+
+func TestSwapdb(t *testing.T) {
+	testCommands(t,
+		succ("SET", "key1", "val1"),
+		succ("SWAPDB", "0", "1"),
+		succ("SELECT", "1"),
+		succ("GET", "key1"),
+	)
+}

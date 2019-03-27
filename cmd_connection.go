@@ -13,6 +13,7 @@ func commandsConnection(m *Miniredis) {
 	m.srv.Register("ECHO", m.cmdEcho)
 	m.srv.Register("PING", m.cmdPing)
 	m.srv.Register("SELECT", m.cmdSelect)
+	m.srv.Register("SWAPDB", m.cmdSwapdb)
 	m.srv.Register("QUIT", m.cmdQuit)
 }
 
@@ -120,6 +121,34 @@ func (m *Miniredis) cmdSelect(c *server.Peer, cmd string, args []string) {
 
 	ctx := getCtx(c)
 	ctx.selectedDB = id
+
+	c.WriteOK()
+}
+
+//SWAP
+func (m *Miniredis) cmdSwapdb(c *server.Peer, cmd string, args []string) {
+	if len(args) != 2 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
+	}
+	if !m.handleAuth(c) {
+		return
+	}
+
+	id1, err := strconv.Atoi(args[0])
+	if err != nil {
+		id1 = 0
+	}
+	id2, err := strconv.Atoi(args[1])
+	if err != nil {
+		id2 = 0
+	}
+
+	m.Lock()
+	defer m.Unlock()
+
+	m.SwapDB(id1, id2)
 
 	c.WriteOK()
 }

@@ -197,6 +197,25 @@ func (m *Miniredis) db(i int) *RedisDB {
 	return &db
 }
 
+// SwapDB swaps DBs by IDs.
+func (m *Miniredis) SwapDB(i, j int) bool {
+	return m.swapDB(i, j)
+}
+
+// swap DB. No locks!
+func (m *Miniredis) swapDB(i, j int) bool {
+	db1 := m.db(i)
+	db2 := m.db(j)
+
+	db1.id = j
+	db2.id = i
+
+	m.dbs[i] = db2
+	m.dbs[j] = db1
+
+	return true
+}
+
 // Addr returns '127.0.0.1:12345'. Can be given to a Dial(). See also Host()
 // and Port(), which return the same things.
 func (m *Miniredis) Addr() string {
