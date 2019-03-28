@@ -107,7 +107,7 @@ func (m *Miniredis) cmdTime(c *server.Peer, cmd string, args []string) {
 
 // INFO: returns info
 func (m *Miniredis) cmdInfo(c *server.Peer, cmd string, args []string) {
-	if len(args) > 0 {
+	if len(args) > 1 {
 		setDirty(c)
 		c.WriteError(errWrongNumber(cmd))
 		return
@@ -115,7 +115,7 @@ func (m *Miniredis) cmdInfo(c *server.Peer, cmd string, args []string) {
 	if !m.handleAuth(c) {
 		return
 	}
-	response := `
+	serverInfo := `
 # Server
 redis_version:999.999.999
 redis_git_sha1:3c968ff0
@@ -136,13 +136,15 @@ hz:10
 lru_clock:10294713
 executable:/usr/local/bin/redis-server
 config_file:
-
+`
+	clientsInfo := `
 # Clients
 connected_clients:1
 client_longest_output_list:0
 client_biggest_input_buf:0
 blocked_clients:0
-
+`
+	memoryInfo := `
 # Memory
 used_memory:454939440
 used_memory_human:433.86M
@@ -176,7 +178,8 @@ mem_fragmentation_bytes:13918496
 mem_allocator:jemalloc-4.0.3
 active_defrag_running:0
 lazyfree_pending_objects:0
-
+`
+	persistenceInfo := `
 # Persistence
 loading:0
 rdb_changes_since_last_save:1024830782
@@ -194,7 +197,8 @@ aof_current_rewrite_time_sec:-1
 aof_last_bgrewrite_status:ok
 aof_last_write_status:ok
 aof_last_cow_size:0
-
+`
+	statsInfo := `
 # Stats
 total_connections_received:70
 total_commands_processed:38582982
@@ -222,7 +226,8 @@ active_defrag_hits:0
 active_defrag_misses:0
 active_defrag_key_hits:0
 active_defrag_key_misses:0
-
+`
+	replicationInfo := `
 # Replication
 role:master
 connected_slaves:0
@@ -234,16 +239,19 @@ repl_backlog_active:0
 repl_backlog_size:1048576
 repl_backlog_first_byte_offset:0
 repl_backlog_histlen:0
-
+`
+	cpuInfo := `
 # CPU
 used_cpu_sys:3087.21
 used_cpu_user:35192.17
 used_cpu_sys_children:0.00
 used_cpu_user_children:0.00
-
+`
+	clusterInfo := `
 # Cluster
 cluster_enabled:0
-
+`
+	keyspaceInfo := `
 # Keyspace
 `
 	for _, db := range m.dbs {
@@ -256,7 +264,11 @@ cluster_enabled:0
 		}
 
 		ks := fmt.Sprintf("db%d:keys=%d,expires=0,avg_ttl=%d\n", db.id, len(db.keys), ttlAvg)
-		response += ks
+		keyspaceInfo += ks
+	}
+	response := keyspaceInfo
+	if len(args) == 0 {
+		response = serverInfo + clientsInfo + memoryInfo + persistenceInfo + statsInfo + replicationInfo + cpuInfo + clusterInfo + keyspaceInfo
 	}
 	c.WriteBulk(response)
 }
