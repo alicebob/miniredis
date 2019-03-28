@@ -270,5 +270,6 @@ cluster_enabled:0
 	if len(args) == 0 {
 		response = serverInfo + clientsInfo + memoryInfo + persistenceInfo + statsInfo + replicationInfo + cpuInfo + clusterInfo + keyspaceInfo
 	}
+	c.WriteLen(1)
 	c.WriteBulk(response)
 }
