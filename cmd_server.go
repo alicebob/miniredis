@@ -115,6 +115,6 @@ func (m *Miniredis) cmdInfo(c *server.Peer, cmd string, args []string) {
 	if !m.handleAuth(c) {
 		return
 	}
-	res := fmt.Sprintf("%d", len(m.dbs))
+	res := fmt.Sprintf("%d\n", len(m.dbs))
 	c.WriteBulk(res)
 }
