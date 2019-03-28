@@ -255,7 +255,7 @@ cluster_enabled:0
 			ttlAvg = ttlAvg / int64(l)
 		}
 
-		ks := fmt.Sprintf("db%d:keys=%d,expires=2177,agv_ttl=%d\n", db.id, len(db.keys), ttlAvg)
+		ks := fmt.Sprintf("db%d:keys=%d,expires=0,avg_ttl=%d\n", db.id, len(db.keys), ttlAvg)
 		response += ks
 	}
 	c.WriteBulk(response)
