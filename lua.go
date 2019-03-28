@@ -2,9 +2,9 @@ package miniredis
 
 import (
 	redigo "github.com/gomodule/redigo/redis"
-	"github.com/yuin/gopher-lua"
+	lua "github.com/yuin/gopher-lua"
 
-	"github.com/alicebob/miniredis/server"
+	"github.com/linuxfreak003/miniredis/server"
 )
 
 func mkLuaFuncs(conn redigo.Conn) map[string]lua.LGFunction {

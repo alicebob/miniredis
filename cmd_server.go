@@ -3,11 +3,12 @@
 package miniredis
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/alicebob/miniredis/server"
+	"github.com/linuxfreak003/miniredis/server"
 )
 
 func commandsServer(m *Miniredis) {
@@ -15,6 +16,7 @@ func commandsServer(m *Miniredis) {
 	m.srv.Register("FLUSHALL", m.cmdFlushall)
 	m.srv.Register("FLUSHDB", m.cmdFlushdb)
 	m.srv.Register("TIME", m.cmdTime)
+	m.srv.Register("INFO", m.cmdInfo)
 }
 
 // DBSIZE
@@ -101,4 +103,18 @@ func (m *Miniredis) cmdTime(c *server.Peer, cmd string, args []string) {
 		c.WriteBulk(strconv.FormatInt(seconds, 10))
 		c.WriteBulk(strconv.FormatInt(microseconds, 10))
 	})
+}
+
+// INFO: returns info
+func (m *Miniredis) cmdInfo(c *server.Peer, cmd string, args []string) {
+	if len(args) > 0 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
+	}
+	if !m.handleAuth(c) {
+		return
+	}
+	res := fmt.Sprintf("%d", len(m.dbs))
+	c.WriteBulk(res)
 }

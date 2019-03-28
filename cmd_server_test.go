@@ -1,6 +1,7 @@
 package miniredis
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -116,4 +117,17 @@ func TestCmdServerTime(t *testing.T) {
 
 	_, err = redis.MultiBulk(c.Do("TIME", "FOO"))
 	assert(t, err != nil, "no TIME error")
+}
+
+// Test INFO
+func TestCmdServerInfo(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	res, err := redis.String(c.Do("INFO"))
+	ok(t, err)
+	fmt.Println("RESPONSE:", res)
 }
