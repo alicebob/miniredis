@@ -109,6 +109,9 @@ func (m *Miniredis) cmdSwapdb(c *server.Peer, cmd string, args []string) {
 		id2 = 0
 	}
 
+	m.Lock()
+	defer m.Unlock()
+
 	m.SwapDB(id1, id2)
 
 	c.WriteOK()

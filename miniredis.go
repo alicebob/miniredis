@@ -189,8 +189,6 @@ func (m *Miniredis) db(i int) *RedisDB {
 
 // SwapDB swaps DBs by IDs.
 func (m *Miniredis) SwapDB(i, j int) bool {
-	m.Lock()
-	defer m.Unlock()
 	return m.swapDB(i, j)
 }
 
