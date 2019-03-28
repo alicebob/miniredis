@@ -247,7 +247,15 @@ cluster_enabled:0
 # Keyspace
 `
 	for _, db := range m.dbs {
-		ks := fmt.Sprintf("db%d:keys=%d,expires=2177,agv_ttl=807674923604\n", db.id, len(db.keys))
+		var ttlAvg int64
+		if l := len(db.ttl); l > 0 {
+			for _, ttl := range db.ttl {
+				ttlAvg += ttl.Nanoseconds()
+			}
+			ttlAvg = ttlAvg / int64(l)
+		}
+
+		ks := fmt.Sprintf("db%d:keys=%d,expires=2177,agv_ttl=%d\n", db.id, len(db.keys), ttlAvg)
 		response += ks
 	}
 	c.WriteBulk(response)
