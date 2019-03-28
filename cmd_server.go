@@ -138,7 +138,7 @@ executable:/usr/local/bin/redis-server
 config_file:
 
 # Clients
-connected_clients:4
+connected_clients:1
 client_longest_output_list:0
 client_biggest_input_buf:0
 blocked_clients:0
@@ -245,7 +245,6 @@ used_cpu_user_children:0.00
 cluster_enabled:0
 
 # Keyspace
-db0:keys=2586217,expires=2177,avg_ttl=807674923604
 `
 	for _, db := range m.dbs {
 		ks := fmt.Sprintf("db%d:keys=%d,expires=2177,agv_ttl=807674923604\n", db.id, len(db.keys))
