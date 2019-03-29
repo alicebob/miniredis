@@ -49,6 +49,9 @@ func makeCmdExpire(m *Miniredis, unix bool, d time.Duration) func(*server.Peer, 
 		if !m.handleAuth(c) {
 			return
 		}
+		if m.checkPubsub(c) {
+			return
+		}
 
 		key := args[0]
 		value := args[1]
@@ -102,6 +105,10 @@ func (m *Miniredis) cmdTTL(c *server.Peer, cmd string, args []string) {
 	if !m.handleAuth(c) {
 		return
 	}
+	if m.checkPubsub(c) {
+		return
+	}
+
 	key := args[0]
 
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
@@ -133,6 +140,10 @@ func (m *Miniredis) cmdPTTL(c *server.Peer, cmd string, args []string) {
 	if !m.handleAuth(c) {
 		return
 	}
+	if m.checkPubsub(c) {
+		return
+	}
+
 	key := args[0]
 
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
@@ -164,6 +175,10 @@ func (m *Miniredis) cmdPersist(c *server.Peer, cmd string, args []string) {
 	if !m.handleAuth(c) {
 		return
 	}
+	if m.checkPubsub(c) {
+		return
+	}
+
 	key := args[0]
 
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
@@ -191,6 +206,9 @@ func (m *Miniredis) cmdDel(c *server.Peer, cmd string, args []string) {
 	if !m.handleAuth(c) {
 		return
 	}
+	if m.checkPubsub(c) {
+		return
+	}
 
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
@@ -214,6 +232,9 @@ func (m *Miniredis) cmdType(c *server.Peer, cmd string, args []string) {
 		return
 	}
 	if !m.handleAuth(c) {
+		return
+	}
+	if m.checkPubsub(c) {
 		return
 	}
 
@@ -242,6 +263,9 @@ func (m *Miniredis) cmdExists(c *server.Peer, cmd string, args []string) {
 	if !m.handleAuth(c) {
 		return
 	}
+	if m.checkPubsub(c) {
+		return
+	}
 
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
@@ -264,6 +288,9 @@ func (m *Miniredis) cmdMove(c *server.Peer, cmd string, args []string) {
 		return
 	}
 	if !m.handleAuth(c) {
+		return
+	}
+	if m.checkPubsub(c) {
 		return
 	}
 
@@ -299,6 +326,9 @@ func (m *Miniredis) cmdKeys(c *server.Peer, cmd string, args []string) {
 	if !m.handleAuth(c) {
 		return
 	}
+	if m.checkPubsub(c) {
+		return
+	}
 
 	key := args[0]
 
@@ -321,6 +351,9 @@ func (m *Miniredis) cmdRandomkey(c *server.Peer, cmd string, args []string) {
 		return
 	}
 	if !m.handleAuth(c) {
+		return
+	}
+	if m.checkPubsub(c) {
 		return
 	}
 
@@ -352,6 +385,9 @@ func (m *Miniredis) cmdRename(c *server.Peer, cmd string, args []string) {
 	if !m.handleAuth(c) {
 		return
 	}
+	if m.checkPubsub(c) {
+		return
+	}
 
 	from, to := args[0], args[1]
 
@@ -376,6 +412,9 @@ func (m *Miniredis) cmdRenamenx(c *server.Peer, cmd string, args []string) {
 		return
 	}
 	if !m.handleAuth(c) {
+		return
+	}
+	if m.checkPubsub(c) {
 		return
 	}
 
@@ -407,6 +446,9 @@ func (m *Miniredis) cmdScan(c *server.Peer, cmd string, args []string) {
 		return
 	}
 	if !m.handleAuth(c) {
+		return
+	}
+	if m.checkPubsub(c) {
 		return
 	}
 

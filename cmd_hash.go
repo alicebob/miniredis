@@ -37,6 +37,9 @@ func (m *Miniredis) cmdHset(c *server.Peer, cmd string, args []string) {
 	if !m.handleAuth(c) {
 		return
 	}
+	if m.checkPubsub(c) {
+		return
+	}
 
 	key, field, value := args[0], args[1], args[2]
 
@@ -64,6 +67,9 @@ func (m *Miniredis) cmdHsetnx(c *server.Peer, cmd string, args []string) {
 		return
 	}
 	if !m.handleAuth(c) {
+		return
+	}
+	if m.checkPubsub(c) {
 		return
 	}
 
@@ -102,6 +108,9 @@ func (m *Miniredis) cmdHmset(c *server.Peer, cmd string, args []string) {
 	if !m.handleAuth(c) {
 		return
 	}
+	if m.checkPubsub(c) {
+		return
+	}
 
 	key, args := args[0], args[1:]
 	if len(args)%2 != 0 {
@@ -138,6 +147,9 @@ func (m *Miniredis) cmdHget(c *server.Peer, cmd string, args []string) {
 	if !m.handleAuth(c) {
 		return
 	}
+	if m.checkPubsub(c) {
+		return
+	}
 
 	key, field := args[0], args[1]
 
@@ -170,6 +182,9 @@ func (m *Miniredis) cmdHdel(c *server.Peer, cmd string, args []string) {
 		return
 	}
 	if !m.handleAuth(c) {
+		return
+	}
+	if m.checkPubsub(c) {
 		return
 	}
 
@@ -217,6 +232,9 @@ func (m *Miniredis) cmdHexists(c *server.Peer, cmd string, args []string) {
 	if !m.handleAuth(c) {
 		return
 	}
+	if m.checkPubsub(c) {
+		return
+	}
 
 	key, field := args[0], args[1]
 
@@ -249,6 +267,9 @@ func (m *Miniredis) cmdHgetall(c *server.Peer, cmd string, args []string) {
 		return
 	}
 	if !m.handleAuth(c) {
+		return
+	}
+	if m.checkPubsub(c) {
 		return
 	}
 
@@ -285,6 +306,9 @@ func (m *Miniredis) cmdHkeys(c *server.Peer, cmd string, args []string) {
 	if !m.handleAuth(c) {
 		return
 	}
+	if m.checkPubsub(c) {
+		return
+	}
 
 	key := args[0]
 
@@ -316,6 +340,9 @@ func (m *Miniredis) cmdHvals(c *server.Peer, cmd string, args []string) {
 		return
 	}
 	if !m.handleAuth(c) {
+		return
+	}
+	if m.checkPubsub(c) {
 		return
 	}
 
@@ -351,6 +378,9 @@ func (m *Miniredis) cmdHlen(c *server.Peer, cmd string, args []string) {
 	if !m.handleAuth(c) {
 		return
 	}
+	if m.checkPubsub(c) {
+		return
+	}
 
 	key := args[0]
 
@@ -379,6 +409,9 @@ func (m *Miniredis) cmdHmget(c *server.Peer, cmd string, args []string) {
 		return
 	}
 	if !m.handleAuth(c) {
+		return
+	}
+	if m.checkPubsub(c) {
 		return
 	}
 
@@ -419,6 +452,9 @@ func (m *Miniredis) cmdHincrby(c *server.Peer, cmd string, args []string) {
 	if !m.handleAuth(c) {
 		return
 	}
+	if m.checkPubsub(c) {
+		return
+	}
 
 	key, field, deltas := args[0], args[1], args[2]
 
@@ -456,6 +492,9 @@ func (m *Miniredis) cmdHincrbyfloat(c *server.Peer, cmd string, args []string) {
 	if !m.handleAuth(c) {
 		return
 	}
+	if m.checkPubsub(c) {
+		return
+	}
 
 	key, field, deltas := args[0], args[1], args[2]
 
@@ -491,6 +530,9 @@ func (m *Miniredis) cmdHscan(c *server.Peer, cmd string, args []string) {
 		return
 	}
 	if !m.handleAuth(c) {
+		return
+	}
+	if m.checkPubsub(c) {
 		return
 	}
 
