@@ -22,6 +22,8 @@ type Subscriber struct {
 	mu       sync.Mutex
 }
 
+// Make a new subscriber. The channel is not buffered, so you will need to keep
+// reading using Messages(). Use Close() when done, or unsubscribe.
 func newSubscriber() *Subscriber {
 	return &Subscriber{
 		publish:  make(chan PubsubMessage),
@@ -30,11 +32,12 @@ func newSubscriber() *Subscriber {
 	}
 }
 
+// Close the listening channel
 func (s *Subscriber) Close() {
 	close(s.publish)
 }
 
-// total number of channels and patterns
+// Count the total number of channels and patterns
 func (s *Subscriber) Count() int {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -45,6 +48,8 @@ func (s *Subscriber) count() int {
 	return len(s.channels) + len(s.patterns)
 }
 
+// Subscribe to a channel. Returns the total number of (p)subscriptions after
+// subscribing.
 func (s *Subscriber) Subscribe(c string) int {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -53,6 +58,8 @@ func (s *Subscriber) Subscribe(c string) int {
 	return s.count()
 }
 
+// Unsubscribe a channel. Returns the total number of (p)subscriptions after
+// unsubscribing.
 func (s *Subscriber) Unsubscribe(c string) int {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -61,6 +68,8 @@ func (s *Subscriber) Unsubscribe(c string) int {
 	return s.count()
 }
 
+// Subscribe to a pattern. Returns the total number of (p)subscriptions after
+// subscribing.
 func (s *Subscriber) Psubscribe(pat string) int {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -69,6 +78,8 @@ func (s *Subscriber) Psubscribe(pat string) int {
 	return s.count()
 }
 
+// Unsubscribe a pattern. Returns the total number of (p)subscriptions after
+// unsubscribing.
 func (s *Subscriber) Punsubscribe(pat string) int {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -77,7 +88,7 @@ func (s *Subscriber) Punsubscribe(pat string) int {
 	return s.count()
 }
 
-// List all subscribed channels
+// List all subscribed channels, in alphabetical order
 func (s *Subscriber) Channels() []string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -90,7 +101,7 @@ func (s *Subscriber) Channels() []string {
 	return cs
 }
 
-// List all subscribed patters
+// List all subscribed patterns, in alphabetical order
 func (s *Subscriber) Patterns() []string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -132,7 +143,7 @@ pats:
 	return found
 }
 
-// reads the subscriptions
+// The channel to read messages for this subscriber
 func (s *Subscriber) Messages() <-chan PubsubMessage {
 	return s.publish
 }
