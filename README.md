@@ -18,7 +18,11 @@ There are no dependencies on external binaries, so you can easily integrate it i
 
 ## Changelog
 
-### 2.5.0
+### v2.6.0
+
+PUBSUB (thanks @Al2Klimov)
+
+### v2.5.0
 
 Added ZPopMin and ZPopMax
 
@@ -173,6 +177,13 @@ Implemented commands:
    - RPOPLPUSH
    - RPUSH
    - RPUSHX
+ - Pub/Sub (complete)
+   - PSUBSCRIBE
+   - PUBLISH
+   - PUBSUB
+   - PUNSUBSCRIBE
+   - SUBSCRIBE
+   - UNSUBSCRIBE
  - Set keys (complete)
    - SADD
    - SCARD
@@ -298,13 +309,6 @@ Commands which will probably not be implemented:
     - ~~OBJECT~~
     - ~~RESTORE~~
     - ~~WAIT~~
- - Pub/Sub (all)
-    - ~~PSUBSCRIBE~~
-    - ~~PUBLISH~~
-    - ~~PUBSUB~~
-    - ~~PUNSUBSCRIBE~~
-    - ~~SUBSCRIBE~~
-    - ~~UNSUBSCRIBE~~
  - Scripting
     - ~~SCRIPT DEBUG~~
     - ~~SCRIPT KILL~~
