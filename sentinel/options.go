@@ -10,14 +10,23 @@ type Option func(*Options)
 
 // Options = how options are represented
 type Options struct {
-	master   *miniredis.Miniredis
-	replicas []*miniredis.Miniredis
+	masterName string
+	master     *miniredis.Miniredis
+	replicas   []*miniredis.Miniredis
 }
 
 // defaultOptions - some defs Options - always deep copy this thing!!!!!
 var defaultOptions = Options{
-	master:   nil,
-	replicas: nil,
+	masterName: "mymaster",
+	master:     nil,
+	replicas:   nil,
+}
+
+// WithMasterName - set the name of the master
+func WithMasterName(name string) Option {
+	return func(o *Options) {
+		o.masterName = name
+	}
 }
 
 // WithMaster - set the primary miniredis for the sentinel
