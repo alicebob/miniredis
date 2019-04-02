@@ -15,6 +15,5 @@ func (s *Sentinel) cmdPing(c *server.Peer, cmd string, args []string) {
 	if !s.handleAuth(c) {
 		return
 	}
-
 	c.WriteInline("PONG")
 }
