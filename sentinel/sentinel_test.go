@@ -15,7 +15,7 @@ func TestNewSentinel(t *testing.T) {
 	is.NoErr(err)
 	defer m.Close()
 
-	s := NewSentinel(WithMaster(m), WithReplicas([]*miniredis.Miniredis{m}))
+	s := NewSentinel(m, WithReplicas([]*miniredis.Miniredis{m}))
 	is.Equal(s.Master(), m)      // make sure the master is correctly set
 	is.Equal(s.Replicas()[0], m) // make sure the replicas are correctly set
 
