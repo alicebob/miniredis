@@ -17,12 +17,13 @@ func errWrongNumber(cmd string) string {
 // Sentinel - a redis sentinel server implementation.
 type Sentinel struct {
 	sync.Mutex
-	srv      *server.Server
-	port     int
-	password string
-	signal   *sync.Cond
-	master   *miniredis.Miniredis
-	replicas []*miniredis.Miniredis
+	srv        *server.Server
+	port       int
+	password   string
+	signal     *sync.Cond
+	masterInfo MasterInfo
+	master     *miniredis.Miniredis
+	replicas   []*miniredis.Miniredis
 }
 
 // connCtx has all state for a single connection.
@@ -31,22 +32,22 @@ type connCtx struct {
 }
 
 // NewSentinel makes a new, non-started, Miniredis object.
-func NewSentinel(opts ...Option) *Sentinel {
+func NewSentinel(master *miniredis.Miniredis, opts ...Option) *Sentinel {
 	s := Sentinel{}
 	s.signal = sync.NewCond(&s)
 	o := GetOpts(opts...)
-	if o.master != nil {
-		s.master = o.master
-		s.replicas = []*miniredis.Miniredis{o.master} // set a reasonable default
-	}
+	s.master = master
+	s.replicas = []*miniredis.Miniredis{o.master} // set a reasonable default
+
 	if o.replicas != nil {
 		s.replicas = o.replicas
 	}
+	s.MasterInfo(opts...) // init and return masterInfo
 	return &s
 }
 
 // WithMaster - set the master
-func (s *Sentinel) WithMaster(m *miniredis.Miniredis) {
+func (s *Sentinel) WithMaster(m *miniredis.Miniredis, opts ...Option) {
 	s.master = m
 }
 
@@ -71,9 +72,9 @@ func (s *Sentinel) Replicas() []*miniredis.Miniredis {
 }
 
 // Run creates and Start()s a Sentinel.
-func Run() (*Sentinel, error) {
-	m := NewSentinel()
-	return m, m.Start()
+func Run(master *miniredis.Miniredis, opts ...Option) (*Sentinel, error) {
+	s := NewSentinel(master)
+	return s, s.Start()
 }
 
 // Start starts a server. It listens on a random port on localhost. See also
@@ -103,6 +104,7 @@ func (s *Sentinel) start(srv *server.Server) error {
 	s.port = srv.Addr().Port
 
 	commandsPing(s)
+	commandsSentinel(s)
 	return nil
 }
 
@@ -171,6 +173,10 @@ func (s *Sentinel) TotalConnectionCount() int {
 	s.Lock()
 	defer s.Unlock()
 	return int(s.srv.TotalConnections())
+}
+
+func (s *Sentinel) MasterInfo(opts ...Option) MasterInfo {
+	return initMasterInfo(s, opts...)
 }
 
 // handleAuth returns false if connection has no access. It sends the reply.
