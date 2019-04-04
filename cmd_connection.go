@@ -22,7 +22,33 @@ func (m *Miniredis) cmdPing(c *server.Peer, cmd string, args []string) {
 	if !m.handleAuth(c) {
 		return
 	}
-	c.WriteInline("PONG")
+
+	if len(args) > 1 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
+	}
+
+	payload := ""
+	if len(args) > 0 {
+		payload = args[0]
+	}
+
+	// PING is allowed in subscribed state
+	if sub := getCtx(c).subscriber; sub != nil {
+		c.Block(func(c *server.Writer) {
+			c.WriteLen(2)
+			c.WriteBulk("pong")
+			c.WriteBulk(payload)
+		})
+		return
+	}
+
+	if payload == "" {
+		c.WriteInline("PONG")
+		return
+	}
+	c.WriteBulk(payload)
 }
 
 // AUTH
@@ -32,6 +58,10 @@ func (m *Miniredis) cmdAuth(c *server.Peer, cmd string, args []string) {
 		c.WriteError(errWrongNumber(cmd))
 		return
 	}
+	if m.checkPubsub(c) {
+		return
+	}
+
 	pw := args[0]
 
 	m.Lock()
@@ -59,6 +89,9 @@ func (m *Miniredis) cmdEcho(c *server.Peer, cmd string, args []string) {
 	if !m.handleAuth(c) {
 		return
 	}
+	if m.checkPubsub(c) {
+		return
+	}
 
 	msg := args[0]
 	c.WriteBulk(msg)
@@ -72,6 +105,9 @@ func (m *Miniredis) cmdSelect(c *server.Peer, cmd string, args []string) {
 		return
 	}
 	if !m.handleAuth(c) {
+		return
+	}
+	if m.checkPubsub(c) {
 		return
 	}
 

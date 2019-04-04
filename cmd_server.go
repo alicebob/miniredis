@@ -27,6 +27,9 @@ func (m *Miniredis) cmdDbsize(c *server.Peer, cmd string, args []string) {
 	if !m.handleAuth(c) {
 		return
 	}
+	if m.checkPubsub(c) {
+		return
+	}
 
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
@@ -45,8 +48,10 @@ func (m *Miniredis) cmdFlushall(c *server.Peer, cmd string, args []string) {
 		c.WriteError(msgSyntaxError)
 		return
 	}
-
 	if !m.handleAuth(c) {
+		return
+	}
+	if m.checkPubsub(c) {
 		return
 	}
 
@@ -66,8 +71,10 @@ func (m *Miniredis) cmdFlushdb(c *server.Peer, cmd string, args []string) {
 		c.WriteError(msgSyntaxError)
 		return
 	}
-
 	if !m.handleAuth(c) {
+		return
+	}
+	if m.checkPubsub(c) {
 		return
 	}
 
@@ -77,7 +84,7 @@ func (m *Miniredis) cmdFlushdb(c *server.Peer, cmd string, args []string) {
 	})
 }
 
-// TIME: time values are returned in string format instead of int
+// TIME
 func (m *Miniredis) cmdTime(c *server.Peer, cmd string, args []string) {
 	if len(args) > 0 {
 		setDirty(c)
@@ -85,6 +92,9 @@ func (m *Miniredis) cmdTime(c *server.Peer, cmd string, args []string) {
 		return
 	}
 	if !m.handleAuth(c) {
+		return
+	}
+	if m.checkPubsub(c) {
 		return
 	}
 

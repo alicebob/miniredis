@@ -547,3 +547,42 @@ func (db *RedisDB) ZScore(k, member string) (float64, error) {
 	}
 	return db.ssetScore(k, member), nil
 }
+
+// Publish a message to subscribers. Returns the number of receivers.
+func (m *Miniredis) Publish(channel, message string) int {
+	m.Lock()
+	defer m.Unlock()
+	return m.publish(channel, message)
+}
+
+// PubSubChannels is "PUBSUB CHANNELS <pattern>". An empty pattern is fine
+// (meaning all channels).
+// Returned channels will be ordered alphabetically.
+func (m *Miniredis) PubSubChannels(pattern string) []string {
+	m.Lock()
+	defer m.Unlock()
+
+	return activeChannels(m.allSubscribers(), pattern)
+}
+
+// PubSubNumSub is "PUBSUB NUMSUB [channels]". It returns all channels with their
+// subscriber count.
+func (m *Miniredis) PubSubNumSub(channels ...string) map[string]int {
+	m.Lock()
+	defer m.Unlock()
+
+	subs := m.allSubscribers()
+	res := map[string]int{}
+	for _, channel := range channels {
+		res[channel] = countSubs(subs, channel)
+	}
+	return res
+}
+
+// PubSubNumPat is "PUBSUB NUMPAT"
+func (m *Miniredis) PubSubNumPat() int {
+	m.Lock()
+	defer m.Unlock()
+
+	return countPsubs(m.allSubscribers())
+}

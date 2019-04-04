@@ -4,6 +4,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"reflect"
 	"sort"
@@ -16,12 +17,13 @@ import (
 )
 
 type command struct {
-	cmd      string // 'GET', 'SET', &c.
-	args     []interface{}
-	error    bool   // Whether the command should return an error or not.
-	sort     bool   // Sort real redis's result. Used for 'keys'.
-	loosely  bool   // Don't compare values, only structure. (for random things)
-	errorSub string // Both errors need this substring
+	cmd         string // 'GET', 'SET', &c.
+	args        []interface{}
+	error       bool   // Whether the command should return an error or not.
+	sort        bool   // Sort real redis's result. Used for 'keys'.
+	loosely     bool   // Don't compare values, only structure. (for random things)
+	errorSub    string // Both errors need this substring
+	receiveOnly bool   // no command, only receive. For pubsub messages.
 }
 
 func succ(cmd string, args ...interface{}) command {
@@ -78,6 +80,13 @@ func failLoosely(cmd string, args ...interface{}) command {
 	}
 }
 
+// don't send a message, only read one. For pubsub messages.
+func receive() command {
+	return command{
+		receiveOnly: true,
+	}
+}
+
 // ok fails the test if an err is not nil.
 func ok(tb testing.TB, err error) {
 	tb.Helper()
@@ -109,7 +118,7 @@ func testMultiCommands(t *testing.T, cs ...func(chan<- command, *miniredis.Minir
 
 	var wg sync.WaitGroup
 	for _, c := range cs {
-		// one connections per cs
+		// one connection per cs
 		cMini, err := redis.Dial("tcp", sMini.Addr())
 		ok(t, err)
 
@@ -132,6 +141,58 @@ func testMultiCommands(t *testing.T, cs ...func(chan<- command, *miniredis.Minir
 		}(c)
 	}
 	wg.Wait()
+}
+
+// like testCommands, but multiple connections
+func testClients2(t *testing.T, f func(c1, c2 chan<- command)) {
+	t.Helper()
+	sMini, err := miniredis.Run()
+	ok(t, err)
+	defer sMini.Close()
+
+	sReal, realAddr := Redis()
+	defer sReal.Close()
+
+	type aChan struct {
+		c            chan command
+		cMini, cReal redis.Conn
+	}
+	chans := [2]aChan{}
+	for i := range chans {
+		gen := make(chan command)
+		cMini, err := redis.Dial("tcp", sMini.Addr())
+		ok(t, err)
+
+		cReal, err := redis.Dial("tcp", realAddr)
+		ok(t, err)
+		chans[i] = aChan{
+			c:     gen,
+			cMini: cMini,
+			cReal: cReal,
+		}
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	go func() {
+		f(chans[0].c, chans[1].c)
+		cancel()
+		for _, c := range chans {
+			close(c.c)
+		}
+	}()
+
+loop:
+	for {
+		select {
+		case <-ctx.Done():
+			break loop
+		case cm := <-chans[0].c:
+			runCommand(t, chans[0].cMini, chans[0].cReal, cm)
+		case cm := <-chans[1].c:
+			runCommand(t, chans[1].cMini, chans[1].cReal, cm)
+		}
+	}
 }
 
 func testAuthCommands(t *testing.T, passwd string, commands ...command) {
@@ -160,8 +221,17 @@ func runCommands(t *testing.T, realAddr, miniAddr string, commands []command) {
 
 func runCommand(t *testing.T, cMini, cReal redis.Conn, p command) {
 	t.Helper()
-	vReal, errReal := cReal.Do(p.cmd, p.args...)
-	vMini, errMini := cMini.Do(p.cmd, p.args...)
+	var (
+		vReal, vMini     interface{}
+		errReal, errMini error
+	)
+	if p.receiveOnly {
+		vReal, errReal = cReal.Receive()
+		vMini, errMini = cMini.Receive()
+	} else {
+		vReal, errReal = cReal.Do(p.cmd, p.args...)
+		vMini, errMini = cMini.Do(p.cmd, p.args...)
+	}
 	if p.error {
 		if errReal == nil {
 			t.Errorf("got no error from realredis. case: %#v", p)
@@ -211,6 +281,8 @@ func runCommand(t *testing.T, cMini, cReal redis.Conn, p command) {
 	} else {
 		if !reflect.DeepEqual(vReal, vMini) {
 			t.Errorf("value error. expected: %#v got: %#v case: %#v", vReal, vMini, p)
+			dump(vReal, " --real-")
+			dump(vMini, " --mini-")
 			return
 		}
 	}
@@ -257,5 +329,18 @@ func looselyEqual(a, b interface{}) bool {
 		return true
 	default:
 		panic(fmt.Sprintf("unhandled case, got a %#v", a))
+	}
+}
+
+func dump(r interface{}, prefix string) {
+	if ls, ok := r.([]interface{}); ok {
+		for _, k := range ls {
+			switch k := k.(type) {
+			case []byte:
+				fmt.Printf(" %s %s\n", prefix, string(k))
+			default:
+				fmt.Printf(" %s %#v\n", prefix, k)
+			}
+		}
 	}
 }

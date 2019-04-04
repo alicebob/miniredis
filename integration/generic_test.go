@@ -18,6 +18,14 @@ func TestEcho(t *testing.T) {
 	)
 }
 
+func TestPing(t *testing.T) {
+	testCommands(t,
+		succ("PING"),
+		succ("PING", "hello world"),
+		fail("PING", "hello", "world"),
+	)
+}
+
 func TestKeys(t *testing.T) {
 	testCommands(t,
 		succ("SET", "one", "1"),

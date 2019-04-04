@@ -47,6 +47,9 @@ func (m *Miniredis) cmdSet(c *server.Peer, cmd string, args []string) {
 	if !m.handleAuth(c) {
 		return
 	}
+	if m.checkPubsub(c) {
+		return
+	}
 
 	var (
 		nx  = false // set iff not exists
@@ -133,6 +136,9 @@ func (m *Miniredis) cmdSetex(c *server.Peer, cmd string, args []string) {
 	if !m.handleAuth(c) {
 		return
 	}
+	if m.checkPubsub(c) {
+		return
+	}
 
 	key := args[0]
 	ttl, err := strconv.Atoi(args[1])
@@ -166,6 +172,9 @@ func (m *Miniredis) cmdPsetex(c *server.Peer, cmd string, args []string) {
 		return
 	}
 	if !m.handleAuth(c) {
+		return
+	}
+	if m.checkPubsub(c) {
 		return
 	}
 
@@ -203,6 +212,9 @@ func (m *Miniredis) cmdSetnx(c *server.Peer, cmd string, args []string) {
 	if !m.handleAuth(c) {
 		return
 	}
+	if m.checkPubsub(c) {
+		return
+	}
 
 	key, value := args[0], args[1]
 
@@ -227,6 +239,9 @@ func (m *Miniredis) cmdMset(c *server.Peer, cmd string, args []string) {
 		return
 	}
 	if !m.handleAuth(c) {
+		return
+	}
+	if m.checkPubsub(c) {
 		return
 	}
 
@@ -259,6 +274,9 @@ func (m *Miniredis) cmdMsetnx(c *server.Peer, cmd string, args []string) {
 		return
 	}
 	if !m.handleAuth(c) {
+		return
+	}
+	if m.checkPubsub(c) {
 		return
 	}
 
@@ -306,6 +324,9 @@ func (m *Miniredis) cmdGet(c *server.Peer, cmd string, args []string) {
 	if !m.handleAuth(c) {
 		return
 	}
+	if m.checkPubsub(c) {
+		return
+	}
 
 	key := args[0]
 
@@ -333,6 +354,9 @@ func (m *Miniredis) cmdGetset(c *server.Peer, cmd string, args []string) {
 		return
 	}
 	if !m.handleAuth(c) {
+		return
+	}
+	if m.checkPubsub(c) {
 		return
 	}
 
@@ -369,6 +393,9 @@ func (m *Miniredis) cmdMget(c *server.Peer, cmd string, args []string) {
 	if !m.handleAuth(c) {
 		return
 	}
+	if m.checkPubsub(c) {
+		return
+	}
 
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
@@ -400,6 +427,9 @@ func (m *Miniredis) cmdIncr(c *server.Peer, cmd string, args []string) {
 	if !m.handleAuth(c) {
 		return
 	}
+	if m.checkPubsub(c) {
+		return
+	}
 
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
@@ -427,6 +457,9 @@ func (m *Miniredis) cmdIncrby(c *server.Peer, cmd string, args []string) {
 		return
 	}
 	if !m.handleAuth(c) {
+		return
+	}
+	if m.checkPubsub(c) {
 		return
 	}
 
@@ -466,6 +499,9 @@ func (m *Miniredis) cmdIncrbyfloat(c *server.Peer, cmd string, args []string) {
 	if !m.handleAuth(c) {
 		return
 	}
+	if m.checkPubsub(c) {
+		return
+	}
 
 	key := args[0]
 	delta, err := strconv.ParseFloat(args[1], 64)
@@ -503,6 +539,9 @@ func (m *Miniredis) cmdDecr(c *server.Peer, cmd string, args []string) {
 	if !m.handleAuth(c) {
 		return
 	}
+	if m.checkPubsub(c) {
+		return
+	}
 
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
@@ -530,6 +569,9 @@ func (m *Miniredis) cmdDecrby(c *server.Peer, cmd string, args []string) {
 		return
 	}
 	if !m.handleAuth(c) {
+		return
+	}
+	if m.checkPubsub(c) {
 		return
 	}
 
@@ -569,6 +611,9 @@ func (m *Miniredis) cmdStrlen(c *server.Peer, cmd string, args []string) {
 	if !m.handleAuth(c) {
 		return
 	}
+	if m.checkPubsub(c) {
+		return
+	}
 
 	key := args[0]
 
@@ -592,6 +637,9 @@ func (m *Miniredis) cmdAppend(c *server.Peer, cmd string, args []string) {
 		return
 	}
 	if !m.handleAuth(c) {
+		return
+	}
+	if m.checkPubsub(c) {
 		return
 	}
 
@@ -620,6 +668,9 @@ func (m *Miniredis) cmdGetrange(c *server.Peer, cmd string, args []string) {
 		return
 	}
 	if !m.handleAuth(c) {
+		return
+	}
+	if m.checkPubsub(c) {
 		return
 	}
 
@@ -658,6 +709,9 @@ func (m *Miniredis) cmdSetrange(c *server.Peer, cmd string, args []string) {
 		return
 	}
 	if !m.handleAuth(c) {
+		return
+	}
+	if m.checkPubsub(c) {
 		return
 	}
 
@@ -703,6 +757,9 @@ func (m *Miniredis) cmdBitcount(c *server.Peer, cmd string, args []string) {
 		return
 	}
 	if !m.handleAuth(c) {
+		return
+	}
+	if m.checkPubsub(c) {
 		return
 	}
 
@@ -765,6 +822,9 @@ func (m *Miniredis) cmdBitop(c *server.Peer, cmd string, args []string) {
 		return
 	}
 	if !m.handleAuth(c) {
+		return
+	}
+	if m.checkPubsub(c) {
 		return
 	}
 
@@ -842,6 +902,9 @@ func (m *Miniredis) cmdBitpos(c *server.Peer, cmd string, args []string) {
 		return
 	}
 	if !m.handleAuth(c) {
+		return
+	}
+	if m.checkPubsub(c) {
 		return
 	}
 
@@ -926,6 +989,9 @@ func (m *Miniredis) cmdGetbit(c *server.Peer, cmd string, args []string) {
 	if !m.handleAuth(c) {
 		return
 	}
+	if m.checkPubsub(c) {
+		return
+	}
 
 	key := args[0]
 	bit, err := strconv.Atoi(args[1])
@@ -967,6 +1033,9 @@ func (m *Miniredis) cmdSetbit(c *server.Peer, cmd string, args []string) {
 		return
 	}
 	if !m.handleAuth(c) {
+		return
+	}
+	if m.checkPubsub(c) {
 		return
 	}
 

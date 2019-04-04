@@ -24,6 +24,9 @@ func (m *Miniredis) cmdMulti(c *server.Peer, cmd string, args []string) {
 	if !m.handleAuth(c) {
 		return
 	}
+	if m.checkPubsub(c) {
+		return
+	}
 
 	ctx := getCtx(c)
 
@@ -47,6 +50,9 @@ func (m *Miniredis) cmdExec(c *server.Peer, cmd string, args []string) {
 	if !m.handleAuth(c) {
 		return
 	}
+	if m.checkPubsub(c) {
+		return
+	}
 
 	ctx := getCtx(c)
 
@@ -57,6 +63,8 @@ func (m *Miniredis) cmdExec(c *server.Peer, cmd string, args []string) {
 
 	if ctx.dirtyTransaction {
 		c.WriteError("EXECABORT Transaction discarded because of previous errors.")
+		// a failed EXEC finishes the tx
+		stopTx(ctx)
 		return
 	}
 
@@ -93,6 +101,9 @@ func (m *Miniredis) cmdDiscard(c *server.Peer, cmd string, args []string) {
 	if !m.handleAuth(c) {
 		return
 	}
+	if m.checkPubsub(c) {
+		return
+	}
 
 	ctx := getCtx(c)
 	if !inTx(ctx) {
@@ -112,6 +123,9 @@ func (m *Miniredis) cmdWatch(c *server.Peer, cmd string, args []string) {
 		return
 	}
 	if !m.handleAuth(c) {
+		return
+	}
+	if m.checkPubsub(c) {
 		return
 	}
 
@@ -139,6 +153,9 @@ func (m *Miniredis) cmdUnwatch(c *server.Peer, cmd string, args []string) {
 		return
 	}
 	if !m.handleAuth(c) {
+		return
+	}
+	if m.checkPubsub(c) {
 		return
 	}
 
