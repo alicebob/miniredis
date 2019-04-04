@@ -11,8 +11,8 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/alicebob/miniredis"
 	"github.com/gomodule/redigo/redis"
-	"github.com/linuxfreak003/miniredis"
 )
 
 type command struct {

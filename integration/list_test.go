@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/linuxfreak003/miniredis"
+	"github.com/alicebob/miniredis"
 )
 
 func TestLPush(t *testing.T) {

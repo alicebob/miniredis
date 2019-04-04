@@ -332,5 +332,5 @@ Tests are run against Redis 5.0.3. The [./integration](./integration/) subdir
 compares miniredis against a real redis instance.
 
 
-[![Build Status](https://travis-ci.org/linuxfreak003/miniredis.svg?branch=master)](https://travis-ci.org/linuxfreak003/miniredis)
-[![GoDoc](https://godoc.org/github.com/linuxfreak003/miniredis?status.svg)](https://godoc.org/github.com/linuxfreak003/miniredis)
+[![Build Status](https://travis-ci.org/alicebob/miniredis.svg?branch=master)](https://travis-ci.org/alicebob/miniredis)
+[![GoDoc](https://godoc.org/github.com/alicebob/miniredis?status.svg)](https://godoc.org/github.com/alicebob/miniredis)

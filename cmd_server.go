@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/linuxfreak003/miniredis/server"
+	"github.com/alicebob/miniredis/server"
 )
 
 func commandsServer(m *Miniredis) {
