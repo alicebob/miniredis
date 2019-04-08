@@ -218,6 +218,7 @@ func TestSwapdb(t *testing.T) {
 	testCommands(t,
 		succ("SET", "key1", "val1"),
 		succ("SWAPDB", "0", "1"),
-		fail("GET", "key1"),
+		succ("SELECT", "1"),
+		succ("GET", "key1"),
 	)
 }
