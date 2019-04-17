@@ -18,6 +18,10 @@ There are no dependencies on external binaries, so you can easily integrate it i
 
 ## Changelog
 
+### v2.7.0
+
+SWAPDB
+
 ### v2.6.0
 
 PUBSUB (thanks @Al2Klimov)
@@ -91,6 +95,7 @@ Implemented commands:
    - ECHO
    - PING
    - SELECT
+   - SWAPDB
    - QUIT
  - Key
    - DEL
