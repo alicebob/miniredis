@@ -220,5 +220,32 @@ func TestSwapdb(t *testing.T) {
 		succ("SWAPDB", "0", "1"),
 		succ("SELECT", "1"),
 		succ("GET", "key1"),
+
+		succ("SWAPDB", "1", "1"),
+		succ("GET", "key1"),
+
+		fail("SWAPDB"),
+		fail("SWAPDB", 1),
+		fail("SWAPDB", 1, 2, 3),
+		fail("SWAPDB", "foo", 2),
+		fail("SWAPDB", 1, "bar"),
+		fail("SWAPDB", "foo", "bar"),
+		fail("SWAPDB", -1, 2),
+		fail("SWAPDB", 1, -2),
+		// fail("SWAPDB", 1, 1000), // miniredis has no upperlimit
 	)
+
+	// SWAPDB with transactions
+	testClients2(t, func(r1, r2 chan<- command) {
+		r1 <- succ("SET", "foo", "foooooo")
+
+		r1 <- succ("MULTI")
+		r1 <- succ("SWAPDB", 0, 2)
+		r1 <- succ("GET", "foo")
+		r2 <- succ("GET", "foo")
+
+		r1 <- succ("EXEC")
+		r1 <- succ("GET", "foo")
+		r2 <- succ("GET", "foo")
+	})
 }

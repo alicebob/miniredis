@@ -111,10 +111,10 @@ func TestSwapdb(t *testing.T) {
 	_, err = redis.String(c.Do("SET", "foo", "baz"))
 	ok(t, err)
 
-	_, err = redis.String(c.Do("SWAPDB", "0", "5"))
+	res, err := redis.String(c.Do("SWAPDB", "0", "5"))
 	ok(t, err)
+	equals(t, "OK", res)
 
-	// Direct access.
 	got, err := s.Get("foo")
 	ok(t, err)
 	equals(t, "baz", got)
@@ -129,6 +129,30 @@ func TestSwapdb(t *testing.T) {
 	v, err := redis.String(c2.Do("GET", "foo"))
 	ok(t, err)
 	equals(t, "baz", v)
+
+	// errors
+	{
+		_, err := redis.String(c.Do("SWAPDB"))
+		mustFail(t, err, errWrongNumber("SWAPDB"))
+
+		_, err = redis.String(c.Do("SWAPDB", 1, 2, 3))
+		mustFail(t, err, errWrongNumber("SWAPDB"))
+
+		_, err = redis.String(c.Do("SWAPDB", "foo", 2))
+		mustFail(t, err, "ERR invalid first DB index")
+
+		_, err = redis.String(c.Do("SWAPDB", 1, "bar"))
+		mustFail(t, err, "ERR invalid second DB index")
+
+		_, err = redis.String(c.Do("SWAPDB", "foo", "bar"))
+		mustFail(t, err, "ERR invalid first DB index")
+
+		_, err = redis.String(c.Do("SWAPDB", -1, 2))
+		mustFail(t, err, "ERR DB index is out of range")
+
+		_, err = redis.String(c.Do("SWAPDB", 1, -2))
+		mustFail(t, err, "ERR DB index is out of range")
+	}
 }
 
 func TestQuit(t *testing.T) {
