@@ -95,6 +95,66 @@ func TestSelect(t *testing.T) {
 	equals(t, "bar", v)
 }
 
+func TestSwapdb(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	_, err = redis.String(c.Do("SET", "foo", "bar"))
+	ok(t, err)
+
+	_, err = redis.String(c.Do("SELECT", "5"))
+	ok(t, err)
+
+	_, err = redis.String(c.Do("SET", "foo", "baz"))
+	ok(t, err)
+
+	res, err := redis.String(c.Do("SWAPDB", "0", "5"))
+	ok(t, err)
+	equals(t, "OK", res)
+
+	got, err := s.Get("foo")
+	ok(t, err)
+	equals(t, "baz", got)
+	s.Select(5)
+	got, err = s.Get("foo")
+	ok(t, err)
+	equals(t, "bar", got)
+
+	// Another connection should have its own idea of the db:
+	c2, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+	v, err := redis.String(c2.Do("GET", "foo"))
+	ok(t, err)
+	equals(t, "baz", v)
+
+	// errors
+	{
+		_, err := redis.String(c.Do("SWAPDB"))
+		mustFail(t, err, errWrongNumber("SWAPDB"))
+
+		_, err = redis.String(c.Do("SWAPDB", 1, 2, 3))
+		mustFail(t, err, errWrongNumber("SWAPDB"))
+
+		_, err = redis.String(c.Do("SWAPDB", "foo", 2))
+		mustFail(t, err, "ERR invalid first DB index")
+
+		_, err = redis.String(c.Do("SWAPDB", 1, "bar"))
+		mustFail(t, err, "ERR invalid second DB index")
+
+		_, err = redis.String(c.Do("SWAPDB", "foo", "bar"))
+		mustFail(t, err, "ERR invalid first DB index")
+
+		_, err = redis.String(c.Do("SWAPDB", -1, 2))
+		mustFail(t, err, "ERR DB index is out of range")
+
+		_, err = redis.String(c.Do("SWAPDB", 1, -2))
+		mustFail(t, err, "ERR DB index is out of range")
+	}
+}
+
 func TestQuit(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
