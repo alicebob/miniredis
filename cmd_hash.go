@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/alicebob/miniredis/server"
+	"github.com/alicebob/miniredis/v2/server"
 )
 
 // commandsHash handles all hash value operations.
