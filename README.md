@@ -18,6 +18,10 @@ There are no dependencies on external binaries, so you can easily integrate it i
 
 ## Changelog
 
+### v2.8.0
+
+Proper `v2` in go.mod.
+
 ### v2.7.0
 
 SWAPDB
