@@ -22,68 +22,9 @@ There are no dependencies on external binaries, so you can easily integrate it i
 
 SWAPDB
 
-### v2.6.0
+### older
 
-PUBSUB (thanks @Al2Klimov)
-
-### v2.5.0
-
-Added ZPopMin and ZPopMax
-
-### v2.4.6
-
-support for TIME (thanks @leon-barrett and @lirao)
-support for ZREVRANGEBYLEX
-fix for SINTER (thanks @robstein)
-updates for latest redis
-
-### 2.4.4
-
-Fixed nil Lua return value (#43)
-
-### 2.4.3
-
-Fixed using Lua with authenticated redis.
-
-### 2.4.2
-
-Changed redigo import path.
-
-### 2.4
-
-Minor cleanups. Miniredis now requires Go >= 1.9 (only for the tests. If you don't run the tests you can use an older Go version).
-
-### 2.3.1
-
-Lua changes: added `cjson` library, and `redis.sha1hex()`.
-
-### 2.3
-
-Added the `EVAL`, `EVALSHA`, and `SCRIPT` commands. Uses a pure Go Lua interpreter. Please open an issue if there are problems with any Lua code.
-
-### 2.2
-
-Introduced `StartAddr()`.
-
-### 2.1
-
-Internal cleanups. No changes in functionality.
-
-### 2.0
-
-2.0.0 improves TTLs to be `time.Duration` values. `.Expire()` is removed and
-replaced by `.TTL()`, which returns the TTL as a `time.Duration`.
-This should be the change needed to upgrade:
-
-1.0:
-
-    m.Expire() == 4
-
-2.0:
-
-    m.TTL() == 4 * time.Second
-
-Furthermore, `.SetTime()` is added to help with `EXPIREAT` commands, and `.FastForward()` is introduced to test keys expiration.
+See https://github.com/alicebob/miniredis/releases for the full changelog
 
 
 ## Commands
