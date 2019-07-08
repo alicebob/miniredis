@@ -143,11 +143,19 @@ func (m *Miniredis) cmdGeoRadius(c *server.Peer, cmd string, args []string) {
 		c.WriteLen(len(membersWithinRadius))
 		for _, member := range membersWithinRadius {
 			if withDist {
-				c.WriteLen(3)
+				if withCoord {
+					c.WriteLen(3)
+				} else {
+					c.WriteLen(2)
+				}
 				c.WriteBulk(member.Name)
 				c.WriteBulk(fmt.Sprintf("%f", member.Distance))
 			} else {
-				c.WriteLen(2)
+				if withCoord {
+					c.WriteLen(2)
+				} else {
+					c.WriteLen(1)
+				}
 				c.WriteBulk(member.Name)
 			}
 
