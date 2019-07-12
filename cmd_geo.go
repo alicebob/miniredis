@@ -79,19 +79,19 @@ func (m *Miniredis) cmdGeoRadius(c *server.Peer, cmd string, args []string) {
 
 	key := args[0]
 	longitude, err := strconv.ParseFloat(args[1], 64)
-	if err != nil {
+	if err != nil || longitude < 0 {
 		setDirty(c)
 		c.WriteError(errWrongNumber(cmd))
 		return
 	}
 	latitude, err := strconv.ParseFloat(args[2], 64)
-	if err != nil {
+	if err != nil || latitude < 0 {
 		setDirty(c)
 		c.WriteError(errWrongNumber(cmd))
 		return
 	}
 	radius, err := strconv.ParseFloat(args[3], 64)
-	if err != nil {
+	if err != nil || radius < 0 {
 		setDirty(c)
 		c.WriteError(errWrongNumber(cmd))
 		return
