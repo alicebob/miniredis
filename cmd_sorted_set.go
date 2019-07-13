@@ -1125,10 +1125,12 @@ func withLexRange(members []string, min string, minIncl bool, max string, maxInc
 		return nil
 	}
 	if min != "-" {
+		found := false
 		if minIncl {
 			for i, m := range members {
 				if m >= min {
 					members = members[i:]
+					found = true
 					break
 				}
 			}
@@ -1137,9 +1139,13 @@ func withLexRange(members []string, min string, minIncl bool, max string, maxInc
 			for i, m := range members {
 				if m > min {
 					members = members[i:]
+					found = true
 					break
 				}
 			}
+		}
+		if !found {
+			return nil
 		}
 	}
 	if max != "+" {
@@ -1354,8 +1360,7 @@ func (m *Miniredis) cmdZscan(c *server.Peer, cmd string, args []string) {
 
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
-		// We return _all_ (matched) keys every time.
-
+		// Paging is not implementend, all results are returned for cursor 0.
 		if cursor != 0 {
 			// Invalid cursor.
 			c.WriteLen(2)
@@ -1370,7 +1375,7 @@ func (m *Miniredis) cmdZscan(c *server.Peer, cmd string, args []string) {
 
 		members := db.ssetMembers(key)
 		if withMatch {
-			members = matchKeys(members, match)
+			members, _ = matchKeys(members, match)
 		}
 
 		c.WriteLen(2)

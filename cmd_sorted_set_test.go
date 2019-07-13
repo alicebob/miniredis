@@ -886,6 +886,10 @@ func TestSortedSetRangeByLex(t *testing.T) {
 			"zwei",
 		}, b)
 
+		b, err = redis.Strings(c.Do("ZRANGEBYLEX", "z", "[zz", "+"))
+		ok(t, err)
+		equals(t, []string{}, b)
+
 		b, err = redis.Strings(c.Do("ZREVRANGEBYLEX", "z", "+", "-"))
 		ok(t, err)
 		equals(t, []string{

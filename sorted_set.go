@@ -10,7 +10,8 @@ import (
 type direction int
 
 const (
-	asc direction = iota
+	unsorted direction = iota
+	asc
 	desc
 )
 

@@ -83,7 +83,17 @@ func TestSortedSet(t *testing.T) {
 		succ("DEL", "z2"),
 		succ("EXISTS", "z2"),
 	)
+
+	testCommands(t,
+		succ("ZADD", "z", 0, "new\nline\n"),
+		succ("ZADD", "z", 0, "line"),
+		succ("ZADD", "z", 0, "another\nnew\nline\n"),
+		succ("ZSCAN", "z", 0, "MATCH", "*"),
+		succ("ZRANGEBYLEX", "z", "[a", "[z"),
+		succ("ZRANGE", "z", 0, -1, "WITHSCORES"),
+	)
 }
+
 func TestSortedSetAdd(t *testing.T) {
 	testCommands(t,
 		succ("ZADD", "z",
@@ -484,8 +494,8 @@ func TestSortedSetRangeByLex(t *testing.T) {
 		fail("ZRANGEBYLEX", "key", "!a", "[b"),
 		fail("ZRANGEBYLEX", "key", "[a", "!b"),
 		fail("ZRANGEBYLEX", "key", "[a", "b]"),
-		fail("ZRANGEBYLEX", "key", "[a", ""),
-		fail("ZRANGEBYLEX", "key", "", "[b"),
+		failWith("not valid string range item", "ZRANGEBYLEX", "key", "[a", ""),
+		failWith("not valid string range item", "ZRANGEBYLEX", "key", "", "[b"),
 		fail("ZRANGEBYLEX", "key", "[a", "[b", "LIMIT"),
 		fail("ZRANGEBYLEX", "key", "[a", "[b", "LIMIT", 1),
 		fail("ZRANGEBYLEX", "key", "[a", "[b", "LIMIT", "a", 1),
@@ -500,6 +510,12 @@ func TestSortedSetRangeByLex(t *testing.T) {
 		fail("ZLEXCOUNT", "key", "[a", "[b", "c"),
 		fail("ZLEXCOUNT", "key", "!a", "[b"),
 		fail("ZLEXCOUNT", "str", "[a", "[b"),
+	)
+
+	testCommands(t,
+		succ("ZADD", "idx", 0, "ccc"),
+		succ("ZRANGEBYLEX", "idx", "[d", "[e"),
+		succ("ZRANGEBYLEX", "idx", "[c", "[d"),
 	)
 }
 

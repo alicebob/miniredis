@@ -661,7 +661,7 @@ func (m *Miniredis) cmdSscan(c *server.Peer, cmd string, args []string) {
 
 		members := db.setMembers(key)
 		if withMatch {
-			members = matchKeys(members, match)
+			members, _ = matchKeys(members, match)
 		}
 
 		c.WriteLen(2)

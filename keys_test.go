@@ -121,3 +121,22 @@ func TestKeysSel(t *testing.T) {
 	test2(`[]ap`) // empty char class
 	test2(`ap\`)  // trailing \
 }
+
+func TestMatchKeys(t *testing.T) {
+	t.Run("simple", func(t *testing.T) {
+		m, ok := matchKeys([]string{"a", "b", "c"}, "*")
+		equals(t, true, ok)
+		equals(t, []string{"a", "b", "c"}, m)
+	})
+
+	t.Run("newlines", func(t *testing.T) {
+		m, ok := matchKeys([]string{"a", "b\nb", "c"}, "*")
+		equals(t, true, ok)
+		equals(t, []string{"a", "b\nb", "c"}, m)
+	})
+
+	t.Run("invalid", func(t *testing.T) {
+		_, ok := matchKeys([]string{"a", "b", "c"}, "[")
+		equals(t, false, ok)
+	})
+}

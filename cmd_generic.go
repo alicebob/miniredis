@@ -13,6 +13,7 @@ import (
 // commandsGeneric handles EXPIRE, TTL, PERSIST, &c.
 func commandsGeneric(m *Miniredis) {
 	m.srv.Register("DEL", m.cmdDel)
+	m.srv.Register("UNLINK", m.cmdDel)
 	// DUMP
 	m.srv.Register("EXISTS", m.cmdExists)
 	m.srv.Register("EXPIRE", makeCmdExpire(m, false, time.Second))
@@ -200,12 +201,18 @@ func (m *Miniredis) cmdPersist(c *server.Peer, cmd string, args []string) {
 	})
 }
 
-// DEL
+// DEL and UNLINK
 func (m *Miniredis) cmdDel(c *server.Peer, cmd string, args []string) {
 	if !m.handleAuth(c) {
 		return
 	}
 	if m.checkPubsub(c) {
+		return
+	}
+
+	if len(args) == 0 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
 		return
 	}
 
@@ -334,7 +341,7 @@ func (m *Miniredis) cmdKeys(c *server.Peer, cmd string, args []string) {
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
-		keys := matchKeys(db.allKeys(), key)
+		keys, _ := matchKeys(db.allKeys(), key)
 		c.WriteLen(len(keys))
 		for _, s := range keys {
 			c.WriteBulk(s)
@@ -507,7 +514,7 @@ func (m *Miniredis) cmdScan(c *server.Peer, cmd string, args []string) {
 
 		keys := db.allKeys()
 		if withMatch {
-			keys = matchKeys(keys, match)
+			keys, _ = matchKeys(keys, match)
 		}
 
 		c.WriteLen(2)

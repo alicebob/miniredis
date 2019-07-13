@@ -227,22 +227,58 @@ func TestDel(t *testing.T) {
 	c, err := redis.Dial("tcp", s.Addr())
 	ok(t, err)
 
-	s.Set("foo", "bar")
-	s.HSet("aap", "noot", "mies")
-	s.Set("one", "two")
-	s.SetTTL("one", time.Second*1234)
-	s.Set("three", "four")
-	r, err := redis.Int(c.Do("DEL", "one", "aap", "nosuch"))
-	ok(t, err)
-	equals(t, 2, r)
-	equals(t, time.Duration(0), s.TTL("one"))
+	t.Run("simple", func(t *testing.T) {
+		s.Set("foo", "bar")
+		s.HSet("aap", "noot", "mies")
+		s.Set("one", "two")
+		s.SetTTL("one", time.Second*1234)
+		s.Set("three", "four")
+		r, err := redis.Int(c.Do("DEL", "one", "aap", "nosuch"))
+		ok(t, err)
+		equals(t, 2, r)
+		equals(t, time.Duration(0), s.TTL("one"))
+	})
 
-	// Direct also works:
-	s.Set("foo", "bar")
-	s.Del("foo")
-	got, err := s.Get("foo")
-	equals(t, ErrKeyNotFound, err)
-	equals(t, "", got)
+	t.Run("failure cases", func(t *testing.T) {
+		_, err := c.Do("DEL")
+		mustFail(t, err, "ERR wrong number of arguments for 'del' command")
+	})
+
+	t.Run("direct", func(t *testing.T) {
+		s.Set("foo", "bar")
+		s.Del("foo")
+		got, err := s.Get("foo")
+		equals(t, ErrKeyNotFound, err)
+		equals(t, "", got)
+	})
+}
+
+func TestUnlink(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	t.Run("simple", func(t *testing.T) {
+		s.Set("foo", "bar")
+		s.HSet("aap", "noot", "mies")
+		s.Set("one", "two")
+		s.SetTTL("one", time.Second*1234)
+		s.Set("three", "four")
+		r, err := redis.Int(c.Do("UNLINK", "one", "aap", "nosuch"))
+		ok(t, err)
+		equals(t, 2, r)
+		equals(t, time.Duration(0), s.TTL("one"))
+	})
+
+	t.Run("direct", func(t *testing.T) {
+		s.Set("foo", "bar")
+		s.Unlink("foo")
+		got, err := s.Get("foo")
+		equals(t, ErrKeyNotFound, err)
+		equals(t, "", got)
+	})
 }
 
 func TestType(t *testing.T) {
