@@ -55,7 +55,7 @@ Implemented commands:
    - PTTL
    - RENAME
    - RENAMENX
-   - RANDOMKEY -- call math.rand.Seed(...) once before using.
+   - RANDOMKEY -- see m.Seed(...)
    - TTL
    - TYPE
    - SCAN
@@ -144,8 +144,8 @@ Implemented commands:
    - SISMEMBER
    - SMEMBERS
    - SMOVE
-   - SPOP -- call math.rand.Seed(...) once before using.
-   - SRANDMEMBER -- call math.rand.Seed(...) once before using.
+   - SPOP -- see m.Seed(...)
+   - SRANDMEMBER -- see m.Seed(...)
    - SREM
    - SUNION
    - SUNIONSTORE
@@ -197,6 +197,14 @@ which case time.Now() will be used.
 
 SetTime() also sets the value returned by TIME, which defaults to time.Now().
 It is not updated by FastForward, only by SetTime.
+
+## Randomness and Seed()
+
+Miniredis has its own seed, which you can set via `m.Seed(...)`. The default
+seed is initialized via the global default source, so as long as you call
+`rand.Seed(...)` once, you'll get some randomness.
+
+Commands which use randomness are: RANDOMKEY, SPOP, and SRANDMEMBER.
 
 ## Example
 

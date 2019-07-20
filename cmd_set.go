@@ -395,7 +395,7 @@ func (m *Miniredis) cmdSpop(c *server.Peer, cmd string, args []string) {
 			if len(members) == 0 {
 				break
 			}
-			member := members[rand.Intn(len(members))]
+			member := members[m.rand.Intn(len(members))]
 			db.setRem(key, member)
 			deleted = append(deleted, member)
 		}
@@ -467,7 +467,7 @@ func (m *Miniredis) cmdSrandmember(c *server.Peer, cmd string, args []string) {
 			// Non-unique elements is allowed with negative count.
 			c.WriteLen(-count)
 			for count != 0 {
-				member := members[rand.Intn(len(members))]
+				member := members[m.rand.Intn(len(members))]
 				c.WriteBulk(member)
 				count++
 			}
@@ -475,7 +475,7 @@ func (m *Miniredis) cmdSrandmember(c *server.Peer, cmd string, args []string) {
 		}
 
 		// Must be unique elements.
-		shuffle(members)
+		shuffle(m.rand, members)
 		if count > len(members) {
 			count = len(members)
 		}
@@ -675,10 +675,10 @@ func (m *Miniredis) cmdSscan(c *server.Peer, cmd string, args []string) {
 }
 
 // shuffle shuffles a string. Kinda.
-func shuffle(m []string) {
-	for _ = range m {
-		i := rand.Intn(len(m))
-		j := rand.Intn(len(m))
-		m[i], m[j] = m[j], m[i]
+func shuffle(r *rand.Rand, s []string) {
+	for _ = range s {
+		i := r.Intn(len(s))
+		j := r.Intn(len(s))
+		s[i], s[j] = s[j], s[i]
 	}
 }

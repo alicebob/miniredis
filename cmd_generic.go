@@ -3,7 +3,6 @@
 package miniredis
 
 import (
-	"math/rand"
 	"strconv"
 	"strings"
 	"time"
@@ -364,7 +363,7 @@ func (m *Miniredis) cmdRandomkey(c *server.Peer, cmd string, args []string) {
 			c.WriteNull()
 			return
 		}
-		nr := rand.Intn(len(db.keys))
+		nr := m.rand.Intn(len(db.keys))
 		for k := range db.keys {
 			if nr == 0 {
 				c.WriteBulk(k)

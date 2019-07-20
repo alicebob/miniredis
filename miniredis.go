@@ -16,6 +16,7 @@ package miniredis
 
 import (
 	"fmt"
+	"math/rand"
 	"net"
 	"strconv"
 	"sync"
@@ -56,6 +57,7 @@ type Miniredis struct {
 	signal      *sync.Cond
 	now         time.Time // used to make a duration from EXPIREAT. time.Now() if not set.
 	subscribers map[*Subscriber]struct{}
+	rand        *rand.Rand
 }
 
 type txCmd func(*server.Peer, *connCtx)
@@ -78,10 +80,12 @@ type connCtx struct {
 
 // NewMiniRedis makes a new, non-started, Miniredis object.
 func NewMiniRedis() *Miniredis {
+	source := rand.NewSource(rand.Int63())
 	m := Miniredis{
 		dbs:         map[int]*RedisDB{},
 		scripts:     map[string]string{},
 		subscribers: map[*Subscriber]struct{}{},
+		rand:        rand.New(source),
 	}
 	m.signal = sync.NewCond(&m)
 	return &m
@@ -493,4 +497,10 @@ func (m *Miniredis) allSubscribers() []*Subscriber {
 		subs = append(subs, s)
 	}
 	return subs
+}
+
+func (m *Miniredis) Seed(seed int64) {
+	m.Lock()
+	defer m.Unlock()
+	m.rand.Seed(seed)
 }
