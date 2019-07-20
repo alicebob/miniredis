@@ -4,7 +4,6 @@ package miniredis
 
 import (
 	"fmt"
-	"regexp"
 	"strings"
 
 	"github.com/alicebob/miniredis/v2/server"
@@ -92,114 +91,15 @@ func (m *Miniredis) cmdPsubscribe(c *server.Peer, cmd string, args []string) {
 		sub := m.subscribedState(c)
 		for _, pat := range args {
 			n := sub.Psubscribe(pat)
-			c.Block(func(c *server.Writer) {
-				c.WriteLen(3)
-				c.WriteBulk("psubscribe")
-				c.WriteBulk(pat)
-				c.WriteInt(n)
+			c.Block(func(w *server.Writer) {
+				w.WriteLen(3)
+				w.WriteBulk("psubscribe")
+				w.WriteBulk(pat)
+				w.WriteInt(n)
 			})
+			c.Flush()
 		}
 	})
-}
-
-func compileChannelPattern(pattern string) *regexp.Regexp {
-	const readingLiteral uint8 = 0
-	const afterEscape uint8 = 1
-	const inClass uint8 = 2
-
-	rgx := []rune{'\\', 'A'}
-	state := readingLiteral
-	literals := []rune{}
-	klass := map[rune]struct{}{}
-
-	for _, c := range pattern {
-		switch state {
-		case readingLiteral:
-			switch c {
-			case '\\':
-				state = afterEscape
-			case '?':
-				rgx = append(rgx, append([]rune(regexp.QuoteMeta(string(literals))), '.')...)
-				literals = []rune{}
-			case '*':
-				rgx = append(rgx, append([]rune(regexp.QuoteMeta(string(literals))), '.', '*')...)
-				literals = []rune{}
-			case '[':
-				rgx = append(rgx, []rune(regexp.QuoteMeta(string(literals)))...)
-				literals = []rune{}
-				state = inClass
-			default:
-				literals = append(literals, c)
-			}
-		case afterEscape:
-			literals = append(literals, c)
-			state = readingLiteral
-		case inClass:
-			if c == ']' {
-				expr := []rune{'['}
-
-				if _, hasDash := klass['-']; hasDash {
-					delete(klass, '-')
-					expr = append(expr, '-')
-				}
-
-				flatClass := make([]rune, len(klass))
-				i := 0
-
-				for c := range klass {
-					flatClass[i] = c
-					i++
-				}
-
-				klass = map[rune]struct{}{}
-				expr = append(append(expr, []rune(regexp.QuoteMeta(string(flatClass)))...), ']')
-
-				if len(expr) < 3 {
-					rgx = append(rgx, 'x', '\\', 'b', 'y')
-				} else {
-					rgx = append(rgx, expr...)
-				}
-
-				state = readingLiteral
-			} else {
-				klass[c] = struct{}{}
-			}
-		}
-	}
-
-	switch state {
-	case afterEscape:
-		rgx = append(rgx, '\\', '\\')
-	case inClass:
-		if len(klass) < 0 {
-			rgx = append(rgx, '\\', '[')
-		} else {
-			expr := []rune{'['}
-
-			if _, hasDash := klass['-']; hasDash {
-				delete(klass, '-')
-				expr = append(expr, '-')
-			}
-
-			flatClass := make([]rune, len(klass))
-			i := 0
-
-			for c := range klass {
-				flatClass[i] = c
-				i++
-			}
-
-			expr = append(append(expr, []rune(regexp.QuoteMeta(string(flatClass)))...), ']')
-
-			if len(expr) < 3 {
-				rgx = append(rgx, 'x', '\\', 'b', 'y')
-			} else {
-				rgx = append(rgx, expr...)
-			}
-		}
-	}
-
-	return regexp.MustCompile(string(append(rgx, '\\', 'z')))
 }
 
 // PUNSUBSCRIBE

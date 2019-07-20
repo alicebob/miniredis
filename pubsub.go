@@ -83,7 +83,7 @@ func (s *Subscriber) Psubscribe(pat string) int {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	s.patterns[pat] = compileChannelPattern(pat)
+	s.patterns[pat] = patternRE(pat)
 	return s.count()
 }
 
@@ -176,7 +176,7 @@ func activeChannels(subs []*Subscriber, pat string) []string {
 
 	var cpat *regexp.Regexp
 	if pat != "" {
-		cpat = compileChannelPattern(pat)
+		cpat = patternRE(pat)
 	}
 
 	var cs []string
