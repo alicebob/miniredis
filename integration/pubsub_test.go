@@ -27,43 +27,77 @@ func TestSubscribe(t *testing.T) {
 	)
 }
 
-func TestPSubscribe(t *testing.T) {
-	testCommands(t,
-		fail("PSUBSCRIBE"),
+func TestPsubscribe(t *testing.T) {
+	testClients2(t, func(c1, c2 chan<- command) {
+		c1 <- fail("PSUBSCRIBE")
 
-		succ("PSUBSCRIBE", "foo"),
-		succ("PUNSUBSCRIBE"),
+		c1 <- succ("PSUBSCRIBE", "foo")
+		c2 <- succ("PUBLISH", "foo", "hi")
+		c1 <- receive()
+		c1 <- succ("PUNSUBSCRIBE")
 
-		succ("PSUBSCRIBE", "foo"),
-		succ("PUNSUBSCRIBE", "foo"),
+		c1 <- succ("PSUBSCRIBE", "foo")
+		c2 <- succ("PUBLISH", "foo", "hi")
+		c1 <- receive()
+		c1 <- succ("PUNSUBSCRIBE", "foo")
 
-		succ("PSUBSCRIBE", "foo", "bar"),
-		succ("PUNSUBSCRIBE", "foo", "bar"),
+		c1 <- succ("PSUBSCRIBE", "foo", "bar")
+		c2 <- succ("PUBLISH", "foo", "hi")
+		c1 <- receive()
+		c1 <- succ("PUNSUBSCRIBE", "foo", "bar")
 
-		succ("PSUBSCRIBE", "f?o"),
-		succ("PUNSUBSCRIBE", "f?o"),
+		c1 <- succ("PSUBSCRIBE", "f?o")
+		c2 <- succ("PUBLISH", "foo", "hi")
+		c1 <- receive()
+		c1 <- succ("PUNSUBSCRIBE", "f?o")
 
-		succ("PSUBSCRIBE", "f*o"),
-		succ("PUNSUBSCRIBE", "f*o"),
+		c1 <- succ("PSUBSCRIBE", "f*o")
+		c2 <- succ("PUBLISH", "foo", "hi")
+		c1 <- receive()
+		c1 <- succ("PUNSUBSCRIBE", "f*o")
 
-		succ("PSUBSCRIBE", "f[oO]o"),
-		succ("PUNSUBSCRIBE", "f[oO]o"),
+		c1 <- succ("PSUBSCRIBE", "f[oO]o")
+		c2 <- succ("PUBLISH", "foo", "hi")
+		c1 <- receive()
+		c1 <- succ("PUNSUBSCRIBE", "f[oO]o")
 
-		succ("PSUBSCRIBE", "f\\?o"),
-		succ("PUNSUBSCRIBE", "f\\?o"),
+		c1 <- succ("PSUBSCRIBE", "f\\?o")
+		c2 <- succ("PUBLISH", "f?o", "hi")
+		c1 <- receive()
+		c1 <- succ("PUNSUBSCRIBE", "f\\?o")
 
-		succ("PSUBSCRIBE", "f\\*o"),
-		succ("PUNSUBSCRIBE", "f\\*o"),
+		c1 <- succ("PSUBSCRIBE", "f\\*o")
+		c2 <- succ("PUBLISH", "f*o", "hi")
+		c1 <- receive()
+		c1 <- succ("PUNSUBSCRIBE", "f\\*o")
 
-		succ("PSUBSCRIBE", "f\\[oO]o"),
-		succ("PUNSUBSCRIBE", "f\\[oO]o"),
+		c1 <- succ("PSUBSCRIBE", "f\\[oO]o")
+		c2 <- succ("PUBLISH", "f[oO]o", "hi")
+		c1 <- receive()
+		c1 <- succ("PUNSUBSCRIBE", "f\\[oO]o")
 
-		succ("PSUBSCRIBE", "f\\\\oo"),
-		succ("PUNSUBSCRIBE", "f\\\\oo"),
+		c1 <- succ("PSUBSCRIBE", "f\\\\oo")
+		c2 <- succ("PUBLISH", "f\\\\oo", "hi")
+		c1 <- receive()
+		c1 <- succ("PUNSUBSCRIBE", "f\\\\oo")
 
-		succ("PSUBSCRIBE", -1),
-		succ("PUNSUBSCRIBE", -1),
-	)
+		c1 <- succ("PSUBSCRIBE", -1)
+		c2 <- succ("PUBLISH", "foo", "hi")
+		c1 <- receive()
+		c1 <- succ("PUNSUBSCRIBE", -1)
+	})
+
+	testClients2(t, func(c1, c2 chan<- command) {
+		c1 <- succ("PSUBSCRIBE", "news*")
+		c2 <- succ("PUBLISH", "news", "fire!")
+		c1 <- receive()
+	})
+
+	testClients2(t, func(c1, c2 chan<- command) {
+		c1 <- succ("PSUBSCRIBE", "news") // no pattern
+		c2 <- succ("PUBLISH", "news", "fire!")
+		c1 <- receive()
+	})
 }
 
 func TestPublish(t *testing.T) {
@@ -115,20 +149,6 @@ func TestPubsubFull(t *testing.T) {
 		c1 <- receive()
 		c1 <- receive()
 		c1 <- succ("UNSUBSCRIBE", "news", "sport")
-		c1 <- receive()
-	})
-}
-
-func TestPubsubPsubscribe(t *testing.T) {
-	testClients2(t, func(c1, c2 chan<- command) {
-		c1 <- succ("PSUBSCRIBE", "news*")
-		c2 <- succ("PUBLISH", "news", "fire!")
-		c1 <- receive()
-	})
-
-	testClients2(t, func(c1, c2 chan<- command) {
-		c1 <- succ("PSUBSCRIBE", "news") // no pattern
-		c2 <- succ("PUBLISH", "news", "fire!")
 		c1 <- receive()
 	})
 }
