@@ -104,27 +104,19 @@ func TestPubSub(t *testing.T) {
 }
 
 func TestPubsubFull(t *testing.T) {
-	var wg1 sync.WaitGroup
-	wg1.Add(1)
-	testMultiCommands(t,
-		func(r chan<- command, _ *miniredis.Miniredis) {
-			r <- succ("SUBSCRIBE", "news", "sport")
-			r <- receive()
-			wg1.Done()
-			r <- receive()
-			r <- receive()
-			r <- receive()
-			r <- succ("UNSUBSCRIBE", "news", "sport")
-			r <- receive()
-		},
-		func(r chan<- command, _ *miniredis.Miniredis) {
-			wg1.Wait()
-			r <- succ("PUBLISH", "news", "revolution!")
-			r <- succ("PUBLISH", "news", "alien invasion!")
-			r <- succ("PUBLISH", "sport", "lady biked too fast")
-			r <- succ("PUBLISH", "gossip", "man bites dog")
-		},
-	)
+	testClients2(t, func(c1, c2 chan<- command) {
+		c1 <- succ("SUBSCRIBE", "news", "sport")
+		c1 <- receive()
+		c2 <- succ("PUBLISH", "news", "revolution!")
+		c2 <- succ("PUBLISH", "news", "alien invasion!")
+		c2 <- succ("PUBLISH", "sport", "lady biked too fast")
+		c2 <- succ("PUBLISH", "gossip", "man bites dog")
+		c1 <- receive()
+		c1 <- receive()
+		c1 <- receive()
+		c1 <- succ("UNSUBSCRIBE", "news", "sport")
+		c1 <- receive()
+	})
 }
 
 func TestPubsubMulti(t *testing.T) {
