@@ -285,6 +285,7 @@ Commands which will probably not be implemented:
 Tests are run against Redis 5.0.3. The [./integration](./integration/) subdir
 compares miniredis against a real redis instance.
 
+If you want to test Redis Sentinel have a look at [minisentinel](https://github.com/Bose/minisentinel).
 
 [![Build Status](https://travis-ci.org/alicebob/miniredis.svg?branch=master)](https://travis-ci.org/alicebob/miniredis)
 [![GoDoc](https://godoc.org/github.com/alicebob/miniredis?status.svg)](https://godoc.org/github.com/alicebob/miniredis)
