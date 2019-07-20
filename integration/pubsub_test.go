@@ -119,6 +119,20 @@ func TestPubsubFull(t *testing.T) {
 	})
 }
 
+func TestPubsubPsubscribe(t *testing.T) {
+	testClients2(t, func(c1, c2 chan<- command) {
+		c1 <- succ("PSUBSCRIBE", "news*")
+		c2 <- succ("PUBLISH", "news", "fire!")
+		c1 <- receive()
+	})
+
+	testClients2(t, func(c1, c2 chan<- command) {
+		c1 <- succ("PSUBSCRIBE", "news") // no pattern
+		c2 <- succ("PUBLISH", "news", "fire!")
+		c1 <- receive()
+	})
+}
+
 func TestPubsubMulti(t *testing.T) {
 	var wg1 sync.WaitGroup
 	wg1.Add(2)

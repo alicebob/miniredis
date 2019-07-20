@@ -147,7 +147,7 @@ func TestPsubscribe(t *testing.T) {
 
 		s, err := redis.Strings(c.Receive())
 		ok(t, err)
-		equals(t, []string{"message", "event4b", "hello 4b!"}, s)
+		equals(t, []string{"pmessage", "event4[abc]", "event4b", "hello 4b!"}, s)
 	}
 }
 

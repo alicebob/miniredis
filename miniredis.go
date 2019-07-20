@@ -459,6 +459,7 @@ func (m *Miniredis) subscribedState(c *server.Peer) *Subscriber {
 	ctx.subscriber = sub
 
 	go monitorPublish(c, sub.publish)
+	go monitorPpublish(c, sub.ppublish)
 
 	return sub
 }
