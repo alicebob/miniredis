@@ -506,6 +506,8 @@ func TestRename(t *testing.T) {
 		equals(t, false, s.Exists("from"))
 		equals(t, true, s.Exists("to"))
 		s.CheckGet(t, "to", "value")
+		_, ok := s.dbs[0].ttl["to"]
+		equals(t, ok, false)
 	}
 
 	// Move a hash key
@@ -517,6 +519,22 @@ func TestRename(t *testing.T) {
 		equals(t, false, s.Exists("from"))
 		equals(t, true, s.Exists("to"))
 		equals(t, "value", s.HGet("to", "key"))
+		_, ok := s.dbs[0].ttl["to"]
+		equals(t, ok, false)
+	}
+
+	// Ensure dest ttl nil if source does not have a ttl
+
+	{
+		s.Set("TTLfrom", "value")
+		s.Set("TTLto", "value")
+		s.SetTTL("TTLto", time.Second*99999)
+		equals(t, time.Second*99999, s.TTL("TTLto"))
+		str, err := redis.String(c.Do("RENAME", "TTLfrom", "TTLto"))
+		ok(t, err)
+		equals(t, "OK", str)
+		_, ok := s.dbs[0].ttl["TTLto"]
+		equals(t, ok, false)
 	}
 
 	// Move over something which exists

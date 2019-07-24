@@ -117,6 +117,12 @@ func TestRename(t *testing.T) {
 		succ("TYPE", "b"),
 		succ("TTL", "b"),
 
+		// move a key without TTL
+		succ("SET", "nottl", "3"),
+		succ("RENAME", "nottl", "stillnottl"),
+		succ("TTL", "nottl"),
+		succ("TTL", "stillnottl"),
+
 		// Error cases
 		fail("RENAME"),
 		fail("RENAME", "a"),
