@@ -331,6 +331,7 @@ func TestSrandmember(t *testing.T) {
 
 	s.SetAdd("s", "aap", "noot", "mies")
 
+	s.Seed(42)
 	// No count
 	{
 		el, err := redis.String(c.Do("SRANDMEMBER", "s"))
@@ -343,6 +344,8 @@ func TestSrandmember(t *testing.T) {
 		els, err := redis.Strings(c.Do("SRANDMEMBER", "s", 2))
 		ok(t, err)
 		equals(t, 2, len(els))
+		equals(t, "noot", els[0])
+		equals(t, "mies", els[1])
 	}
 
 	// Negative count
@@ -350,6 +353,8 @@ func TestSrandmember(t *testing.T) {
 		els, err := redis.Strings(c.Do("SRANDMEMBER", "s", -2))
 		ok(t, err)
 		equals(t, 2, len(els))
+		equals(t, "aap", els[0])
+		equals(t, "mies", els[1])
 	}
 
 	// a nonexisting key

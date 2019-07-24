@@ -16,6 +16,7 @@ package miniredis
 
 import (
 	"fmt"
+	"math/rand"
 	"net"
 	"strconv"
 	"sync"
@@ -56,6 +57,7 @@ type Miniredis struct {
 	signal      *sync.Cond
 	now         time.Time // used to make a duration from EXPIREAT. time.Now() if not set.
 	subscribers map[*Subscriber]struct{}
+	rand        *rand.Rand
 }
 
 type txCmd func(*server.Peer, *connCtx)
@@ -494,4 +496,28 @@ func (m *Miniredis) allSubscribers() []*Subscriber {
 		subs = append(subs, s)
 	}
 	return subs
+}
+
+func (m *Miniredis) Seed(seed int) {
+	m.Lock()
+	defer m.Unlock()
+
+	// m.rand is not safe for concurrent use.
+	m.rand = rand.New(rand.NewSource(int64(seed)))
+}
+
+func (m *Miniredis) randIntn(n int) int {
+	if m.rand == nil {
+		return rand.Intn(n)
+	}
+	return m.rand.Intn(n)
+}
+
+// shuffle shuffles a string. Kinda.
+func (m *Miniredis) shuffle(l []string) {
+	for range l {
+		i := m.randIntn(len(l))
+		j := m.randIntn(len(l))
+		l[i], l[j] = l[j], l[i]
+	}
 }

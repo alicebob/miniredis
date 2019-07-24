@@ -55,7 +55,7 @@ Implemented commands:
    - PTTL
    - RENAME
    - RENAMENX
-   - RANDOMKEY -- call math.rand.Seed(...) once before using.
+   - RANDOMKEY -- see m.Seed(...)
    - TTL
    - TYPE
    - SCAN
@@ -144,8 +144,8 @@ Implemented commands:
    - SISMEMBER
    - SMEMBERS
    - SMOVE
-   - SPOP -- call math.rand.Seed(...) once before using.
-   - SRANDMEMBER -- call math.rand.Seed(...) once before using.
+   - SPOP -- see m.Seed(...)
+   - SRANDMEMBER -- see m.Seed(...)
    - SREM
    - SUNION
    - SUNIONSTORE
@@ -197,6 +197,14 @@ which case time.Now() will be used.
 
 SetTime() also sets the value returned by TIME, which defaults to time.Now().
 It is not updated by FastForward, only by SetTime.
+
+## Randomness and Seed()
+
+Miniredis will use `math/rand`'s global RNG for randomness unless a seed is
+provided by calling `m.Seed(...)`. If a seed is provided, then miniredis will
+use its own RNG based on that seed.
+
+Commands which use randomness are: RANDOMKEY, SPOP, and SRANDMEMBER.
 
 ## Example
 
@@ -285,6 +293,7 @@ Commands which will probably not be implemented:
 Tests are run against Redis 5.0.3. The [./integration](./integration/) subdir
 compares miniredis against a real redis instance.
 
+If you want to test Redis Sentinel have a look at [minisentinel](https://github.com/Bose/minisentinel).
 
 [![Build Status](https://travis-ci.org/alicebob/miniredis.svg?branch=master)](https://travis-ci.org/alicebob/miniredis)
 [![GoDoc](https://godoc.org/github.com/alicebob/miniredis?status.svg)](https://godoc.org/github.com/alicebob/miniredis)
