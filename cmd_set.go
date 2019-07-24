@@ -3,7 +3,6 @@
 package miniredis
 
 import (
-	"math/rand"
 	"strconv"
 	"strings"
 
@@ -395,7 +394,7 @@ func (m *Miniredis) cmdSpop(c *server.Peer, cmd string, args []string) {
 			if len(members) == 0 {
 				break
 			}
-			member := members[rand.Intn(len(members))]
+			member := members[m.randIntn(len(members))]
 			db.setRem(key, member)
 			deleted = append(deleted, member)
 		}
@@ -467,7 +466,7 @@ func (m *Miniredis) cmdSrandmember(c *server.Peer, cmd string, args []string) {
 			// Non-unique elements is allowed with negative count.
 			c.WriteLen(-count)
 			for count != 0 {
-				member := members[rand.Intn(len(members))]
+				member := members[m.randIntn(len(members))]
 				c.WriteBulk(member)
 				count++
 			}
@@ -475,7 +474,7 @@ func (m *Miniredis) cmdSrandmember(c *server.Peer, cmd string, args []string) {
 		}
 
 		// Must be unique elements.
-		shuffle(members)
+		m.shuffle(members)
 		if count > len(members) {
 			count = len(members)
 		}
@@ -672,13 +671,4 @@ func (m *Miniredis) cmdSscan(c *server.Peer, cmd string, args []string) {
 			c.WriteBulk(k)
 		}
 	})
-}
-
-// shuffle shuffles a string. Kinda.
-func shuffle(m []string) {
-	for _ = range m {
-		i := rand.Intn(len(m))
-		j := rand.Intn(len(m))
-		m[i], m[j] = m[j], m[i]
-	}
 }
