@@ -14,9 +14,16 @@ type PubsubMessage struct {
 	Message string
 }
 
+type PubsubPmessage struct {
+	Pattern string
+	Channel string
+	Message string
+}
+
 // Subscriber has the (p)subscriptions.
 type Subscriber struct {
 	publish  chan PubsubMessage
+	ppublish chan PubsubPmessage
 	channels map[string]struct{}
 	patterns map[string]*regexp.Regexp
 	mu       sync.Mutex
@@ -27,6 +34,7 @@ type Subscriber struct {
 func newSubscriber() *Subscriber {
 	return &Subscriber{
 		publish:  make(chan PubsubMessage),
+		ppublish: make(chan PubsubPmessage),
 		channels: map[string]struct{}{},
 		patterns: map[string]*regexp.Regexp{},
 	}
@@ -35,6 +43,7 @@ func newSubscriber() *Subscriber {
 // Close the listening channel
 func (s *Subscriber) Close() {
 	close(s.publish)
+	close(s.ppublish)
 }
 
 // Count the total number of channels and patterns
@@ -74,7 +83,7 @@ func (s *Subscriber) Psubscribe(pat string) int {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	s.patterns[pat] = compileChannelPattern(pat)
+	s.patterns[pat] = patternRE(pat)
 	return s.count()
 }
 
@@ -132,9 +141,9 @@ subs:
 	}
 
 pats:
-	for _, pat := range s.patterns {
-		if pat.MatchString(c) {
-			s.publish <- PubsubMessage{c, msg}
+	for orig, pat := range s.patterns {
+		if pat != nil && pat.MatchString(c) {
+			s.ppublish <- PubsubPmessage{orig, c, msg}
 			found++
 			break pats
 		}
@@ -143,9 +152,16 @@ pats:
 	return found
 }
 
-// The channel to read messages for this subscriber
+// The channel to read messages for this subscriber. Only for messages matching
+// a SUBSCRIBE.
 func (s *Subscriber) Messages() <-chan PubsubMessage {
 	return s.publish
+}
+
+// The channel to read messages for this subscriber. Only for messages matching
+// a PSUBSCRIBE.
+func (s *Subscriber) Pmessages() <-chan PubsubPmessage {
+	return s.ppublish
 }
 
 // List all pubsub channels. If `pat` isn't empty channels names must match the
@@ -160,7 +176,7 @@ func activeChannels(subs []*Subscriber, pat string) []string {
 
 	var cpat *regexp.Regexp
 	if pat != "" {
-		cpat = compileChannelPattern(pat)
+		cpat = patternRE(pat)
 	}
 
 	var cs []string
@@ -203,6 +219,19 @@ func monitorPublish(conn *server.Peer, msgs <-chan PubsubMessage) {
 		conn.Block(func(c *server.Writer) {
 			c.WriteLen(3)
 			c.WriteBulk("message")
+			c.WriteBulk(msg.Channel)
+			c.WriteBulk(msg.Message)
+			c.Flush()
+		})
+	}
+}
+
+func monitorPpublish(conn *server.Peer, msgs <-chan PubsubPmessage) {
+	for msg := range msgs {
+		conn.Block(func(c *server.Writer) {
+			c.WriteLen(4)
+			c.WriteBulk("pmessage")
+			c.WriteBulk(msg.Pattern)
 			c.WriteBulk(msg.Channel)
 			c.WriteBulk(msg.Message)
 			c.Flush()

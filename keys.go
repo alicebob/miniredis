@@ -1,13 +1,13 @@
 package miniredis
 
-// Translate the 'KEYS' argument ('foo*', 'f??', &c.) into a regexp.
+// Translate the 'KEYS' or 'PSUBSCRIBE' argument ('foo*', 'f??', &c.) into a regexp.
 
 import (
 	"bytes"
 	"regexp"
 )
 
-// patternRE compiles a KEYS argument to a regexp. Returns nil if the given
+// patternRE compiles a glob to a regexp. Returns nil if the given
 // pattern will never match anything.
 // The general strategy is to sandwich all non-meta characters between \Q...\E.
 func patternRE(k string) *regexp.Regexp {
