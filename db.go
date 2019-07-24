@@ -88,7 +88,6 @@ func (db *RedisDB) rename(from, to string) {
 	}
 	db.keys[to] = db.keys[from]
 	db.keyVersion[to]++
-
 	if v, ok := db.ttl[from]; ok {
 		db.ttl[to] = v
 	}
