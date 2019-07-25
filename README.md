@@ -280,5 +280,7 @@ compares miniredis against a real redis instance.
 
 If you want to test Redis Sentinel have a look at [minisentinel](https://github.com/Bose/minisentinel).
 
+A changelog is kept at [CHANGELOG.md](https://github.com/alicebob/miniredis/blob/master/CHANGELOG.md).
+
 [![Build Status](https://travis-ci.org/alicebob/miniredis.svg?branch=master)](https://travis-ci.org/alicebob/miniredis)
 [![GoDoc](https://godoc.org/github.com/alicebob/miniredis?status.svg)](https://godoc.org/github.com/alicebob/miniredis)
