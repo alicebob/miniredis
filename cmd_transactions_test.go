@@ -208,9 +208,8 @@ func TestTxWatchErr(t *testing.T) {
 	ok(t, err)
 	equals(t, "QUEUED", b)
 
-	v, err := redis.Values(c.Do("EXEC"))
-	ok(t, err)
-	equals(t, 0, len(v))
+	_, err = redis.Values(c.Do("EXEC"))
+	equals(t, err, redis.ErrNil)
 
 	// It did get updated, and we're not in a transaction anymore.
 	b, err = redis.String(c.Do("GET", "one"))
