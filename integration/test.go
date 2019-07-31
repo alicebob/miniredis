@@ -342,5 +342,7 @@ func dump(r interface{}, prefix string) {
 				fmt.Printf(" %s %#v\n", prefix, k)
 			}
 		}
+	} else {
+		fmt.Printf(" %s %#v\n", prefix, r)
 	}
 }

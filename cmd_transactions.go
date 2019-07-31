@@ -76,7 +76,7 @@ func (m *Miniredis) cmdExec(c *server.Peer, cmd string, args []string) {
 		if m.db(t.db).keyVersion[t.key] > version {
 			// Abort! Abort!
 			stopTx(ctx)
-			c.WriteLen(0)
+			c.WriteNull()
 			return
 		}
 	}

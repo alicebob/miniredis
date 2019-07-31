@@ -166,4 +166,11 @@ func TestTx(t *testing.T) {
 		fail("EXEC"),
 		succ("MULTI"),
 	)
+
+	testClients2(t, func(c1, c2 chan<- command) {
+		c1 <- succ("WATCH", "foo")
+		c1 <- succ("MULTI")
+		c2 <- succ("SET", "foo", "12")
+		c1 <- succ("EXEC") // nil
+	})
 }
