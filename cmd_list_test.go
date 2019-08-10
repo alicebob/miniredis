@@ -29,7 +29,7 @@ func TestLpush(t *testing.T) {
 	s, c, done := setup(t)
 	defer done()
 
-	{
+	t.Run("basic", func(t *testing.T) {
 		b, err := redis.Int(c.Do("LPUSH", "l", "aap", "noot", "mies"))
 		ok(t, err)
 		equals(t, 3, b) // New length.
@@ -41,25 +41,21 @@ func TestLpush(t *testing.T) {
 		r, err = redis.Strings(c.Do("LRANGE", "l", "-1", "-1"))
 		ok(t, err)
 		equals(t, []string{"aap"}, r)
-	}
 
-	// Push more.
-	{
-		b, err := redis.Int(c.Do("LPUSH", "l", "aap2", "noot2", "mies2"))
+		b, err = redis.Int(c.Do("LPUSH", "l", "aap2", "noot2", "mies2"))
 		ok(t, err)
 		equals(t, 6, b) // New length.
 
-		r, err := redis.Strings(c.Do("LRANGE", "l", "0", "0"))
+		r, err = redis.Strings(c.Do("LRANGE", "l", "0", "0"))
 		ok(t, err)
 		equals(t, []string{"mies2"}, r)
 
 		r, err = redis.Strings(c.Do("LRANGE", "l", "-1", "-1"))
 		ok(t, err)
 		equals(t, []string{"aap"}, r)
-	}
+	})
 
-	// Direct usage
-	{
+	t.Run("direct", func(t *testing.T) {
 		l, err := s.Lpush("l2", "a")
 		ok(t, err)
 		equals(t, 1, l)
@@ -78,10 +74,10 @@ func TestLpush(t *testing.T) {
 		equals(t, "a", el)
 		// Key is removed on pop-empty.
 		equals(t, false, s.Exists("l2"))
-	}
+	})
 
-	// Various errors
-	{
+
+	t.Run("errors", func(t *testing.T) {
 		_, err := redis.Int(c.Do("LPUSH"))
 		assert(t, err != nil, "LPUSH error")
 		_, err = redis.Int(c.Do("LPUSH", "l"))
@@ -90,8 +86,7 @@ func TestLpush(t *testing.T) {
 		ok(t, err)
 		_, err = redis.Int(c.Do("LPUSH", "str", "noot", "mies"))
 		assert(t, err != nil, "LPUSH error")
-	}
-
+	})
 }
 
 func TestLpushx(t *testing.T) {

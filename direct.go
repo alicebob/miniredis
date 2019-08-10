@@ -10,10 +10,13 @@ import (
 var (
 	// ErrKeyNotFound is returned when a key doesn't exist.
 	ErrKeyNotFound = errors.New(msgKeyNotFound)
+
 	// ErrWrongType when a key is not the right type.
 	ErrWrongType = errors.New(msgWrongType)
+
 	// ErrIntValueError can returned by INCRBY
 	ErrIntValueError = errors.New(msgInvalidInt)
+
 	// ErrFloatValueError can returned by INCRBYFLOAT
 	ErrFloatValueError = errors.New(msgInvalidFloat)
 )
