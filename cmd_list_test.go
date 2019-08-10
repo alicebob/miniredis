@@ -76,6 +76,18 @@ func TestLpush(t *testing.T) {
 		equals(t, false, s.Exists("l2"))
 	})
 
+	t.Run("direct, wakeup", func(t *testing.T) {
+		go func() {
+			time.Sleep(30 * time.Millisecond)
+			l, err := s.Lpush("q1", "a")
+			ok(t, err)
+			equals(t, 1, l)
+		}()
+
+		v, err := redis.String(c.Do("BRPOPLPUSH", "q1", "q2", "1"))
+		ok(t, err)
+		equals(t, "a", v)
+	})
 
 	t.Run("errors", func(t *testing.T) {
 		_, err := redis.Int(c.Do("LPUSH"))

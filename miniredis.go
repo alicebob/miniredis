@@ -33,7 +33,7 @@ type setKey map[string]struct{}
 
 // RedisDB holds a single (numbered) Redis database.
 type RedisDB struct {
-	master        *sync.Mutex              // pointer to the lock in Miniredis
+	master        *Miniredis               // pointer to the lock in Miniredis
 	id            int                      // db id
 	keys          map[string]string        // Master map of keys with their type
 	stringKeys    map[string]string        // GET/SET &c. keys
@@ -89,10 +89,10 @@ func NewMiniRedis() *Miniredis {
 	return &m
 }
 
-func newRedisDB(id int, l *sync.Mutex) RedisDB {
+func newRedisDB(id int, m *Miniredis) RedisDB {
 	return RedisDB{
 		id:            id,
-		master:        l,
+		master:        m,
 		keys:          map[string]string{},
 		stringKeys:    map[string]string{},
 		hashKeys:      map[string]hashKey{},
@@ -194,7 +194,7 @@ func (m *Miniredis) db(i int) *RedisDB {
 	if db, ok := m.dbs[i]; ok {
 		return db
 	}
-	db := newRedisDB(i, &m.Mutex) // the DB has our lock.
+	db := newRedisDB(i, m) // main miniredis has our mutex.
 	m.dbs[i] = &db
 	return &db
 }
