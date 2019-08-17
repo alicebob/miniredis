@@ -501,6 +501,12 @@ func TestSortedSetRangeByLex(t *testing.T) {
 		fail("ZLEXCOUNT", "key", "!a", "[b"),
 		fail("ZLEXCOUNT", "str", "[a", "[b"),
 	)
+
+	testCommands(t,
+		succ("ZADD", "idx", 0, "ccc"),
+		succ("ZRANGEBYLEX", "idx", "[d", "[e"),
+		succ("ZRANGEBYLEX", "idx", "[c", "[d"),
+	)
 }
 
 func TestSortedSetIncyby(t *testing.T) {
