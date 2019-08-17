@@ -1125,10 +1125,12 @@ func withLexRange(members []string, min string, minIncl bool, max string, maxInc
 		return nil
 	}
 	if min != "-" {
+		found := false
 		if minIncl {
 			for i, m := range members {
 				if m >= min {
 					members = members[i:]
+					found = true
 					break
 				}
 			}
@@ -1137,9 +1139,13 @@ func withLexRange(members []string, min string, minIncl bool, max string, maxInc
 			for i, m := range members {
 				if m > min {
 					members = members[i:]
+					found = true
 					break
 				}
 			}
+		}
+		if !found {
+			return nil
 		}
 	}
 	if max != "+" {
