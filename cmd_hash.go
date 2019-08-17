@@ -598,7 +598,7 @@ func (m *Miniredis) cmdHscan(c *server.Peer, cmd string, args []string) {
 
 		members := db.hashFields(key)
 		if withMatch {
-			members = matchKeys(members, match)
+			members, _ = matchKeys(members, match)
 		}
 
 		c.WriteLen(2)
