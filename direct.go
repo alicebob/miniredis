@@ -10,10 +10,13 @@ import (
 var (
 	// ErrKeyNotFound is returned when a key doesn't exist.
 	ErrKeyNotFound = errors.New(msgKeyNotFound)
+
 	// ErrWrongType when a key is not the right type.
 	ErrWrongType = errors.New(msgWrongType)
+
 	// ErrIntValueError can returned by INCRBY
 	ErrIntValueError = errors.New(msgInvalidInt)
+
 	// ErrFloatValueError can returned by INCRBYFLOAT
 	ErrFloatValueError = errors.New(msgInvalidFloat)
 )
@@ -34,6 +37,7 @@ func (m *Miniredis) Keys() []string {
 func (db *RedisDB) Keys() []string {
 	db.master.Lock()
 	defer db.master.Unlock()
+
 	return db.allKeys()
 }
 
@@ -41,6 +45,8 @@ func (db *RedisDB) Keys() []string {
 func (m *Miniredis) FlushAll() {
 	m.Lock()
 	defer m.Unlock()
+	defer m.signal.Broadcast()
+
 	m.flushAll()
 }
 
@@ -59,6 +65,8 @@ func (m *Miniredis) FlushDB() {
 func (db *RedisDB) FlushDB() {
 	db.master.Lock()
 	defer db.master.Unlock()
+	defer db.master.signal.Broadcast()
+
 	db.flush()
 }
 
@@ -71,6 +79,7 @@ func (m *Miniredis) Get(k string) (string, error) {
 func (db *RedisDB) Get(k string) (string, error) {
 	db.master.Lock()
 	defer db.master.Unlock()
+
 	if !db.exists(k) {
 		return "", ErrKeyNotFound
 	}
@@ -90,6 +99,7 @@ func (m *Miniredis) Set(k, v string) error {
 func (db *RedisDB) Set(k, v string) error {
 	db.master.Lock()
 	defer db.master.Unlock()
+	defer db.master.signal.Broadcast()
 
 	if db.exists(k) && db.t(k) != "string" {
 		return ErrWrongType
@@ -108,6 +118,7 @@ func (m *Miniredis) Incr(k string, delta int) (int, error) {
 func (db *RedisDB) Incr(k string, delta int) (int, error) {
 	db.master.Lock()
 	defer db.master.Unlock()
+	defer db.master.signal.Broadcast()
 
 	if db.exists(k) && db.t(k) != "string" {
 		return 0, ErrWrongType
@@ -125,6 +136,7 @@ func (m *Miniredis) Incrfloat(k string, delta float64) (float64, error) {
 func (db *RedisDB) Incrfloat(k string, delta float64) (float64, error) {
 	db.master.Lock()
 	defer db.master.Unlock()
+	defer db.master.signal.Broadcast()
 
 	if db.exists(k) && db.t(k) != "string" {
 		return 0, ErrWrongType
@@ -165,6 +177,7 @@ func (m *Miniredis) Lpush(k, v string) (int, error) {
 func (db *RedisDB) Lpush(k, v string) (int, error) {
 	db.master.Lock()
 	defer db.master.Unlock()
+	defer db.master.signal.Broadcast()
 
 	if db.exists(k) && db.t(k) != "list" {
 		return 0, ErrWrongType
@@ -181,6 +194,7 @@ func (m *Miniredis) Lpop(k string) (string, error) {
 func (db *RedisDB) Lpop(k string) (string, error) {
 	db.master.Lock()
 	defer db.master.Unlock()
+	defer db.master.signal.Broadcast()
 
 	if !db.exists(k) {
 		return "", ErrKeyNotFound
@@ -200,6 +214,7 @@ func (m *Miniredis) Push(k string, v ...string) (int, error) {
 func (db *RedisDB) Push(k string, v ...string) (int, error) {
 	db.master.Lock()
 	defer db.master.Unlock()
+	defer db.master.signal.Broadcast()
 
 	if db.exists(k) && db.t(k) != "list" {
 		return 0, ErrWrongType
@@ -216,6 +231,7 @@ func (m *Miniredis) Pop(k string) (string, error) {
 func (db *RedisDB) Pop(k string) (string, error) {
 	db.master.Lock()
 	defer db.master.Unlock()
+	defer db.master.signal.Broadcast()
 
 	if !db.exists(k) {
 		return "", ErrKeyNotFound
@@ -236,6 +252,8 @@ func (m *Miniredis) SetAdd(k string, elems ...string) (int, error) {
 func (db *RedisDB) SetAdd(k string, elems ...string) (int, error) {
 	db.master.Lock()
 	defer db.master.Unlock()
+	defer db.master.signal.Broadcast()
+
 	if db.exists(k) && db.t(k) != "set" {
 		return 0, ErrWrongType
 	}
@@ -251,6 +269,7 @@ func (m *Miniredis) Members(k string) ([]string, error) {
 func (db *RedisDB) Members(k string) ([]string, error) {
 	db.master.Lock()
 	defer db.master.Unlock()
+
 	if !db.exists(k) {
 		return nil, ErrKeyNotFound
 	}
@@ -269,6 +288,7 @@ func (m *Miniredis) IsMember(k, v string) (bool, error) {
 func (db *RedisDB) IsMember(k, v string) (bool, error) {
 	db.master.Lock()
 	defer db.master.Unlock()
+
 	if !db.exists(k) {
 		return false, ErrKeyNotFound
 	}
@@ -287,6 +307,7 @@ func (m *Miniredis) HKeys(k string) ([]string, error) {
 func (db *RedisDB) HKeys(key string) ([]string, error) {
 	db.master.Lock()
 	defer db.master.Unlock()
+
 	if !db.exists(key) {
 		return nil, ErrKeyNotFound
 	}
@@ -305,6 +326,8 @@ func (m *Miniredis) Del(k string) bool {
 func (db *RedisDB) Del(k string) bool {
 	db.master.Lock()
 	defer db.master.Unlock()
+	defer db.master.signal.Broadcast()
+
 	if !db.exists(k) {
 		return false
 	}
@@ -325,6 +348,7 @@ func (m *Miniredis) TTL(k string) time.Duration {
 func (db *RedisDB) TTL(k string) time.Duration {
 	db.master.Lock()
 	defer db.master.Unlock()
+
 	return db.ttl[k]
 }
 
@@ -337,6 +361,8 @@ func (m *Miniredis) SetTTL(k string, ttl time.Duration) {
 func (db *RedisDB) SetTTL(k string, ttl time.Duration) {
 	db.master.Lock()
 	defer db.master.Unlock()
+	defer db.master.signal.Broadcast()
+
 	db.ttl[k] = ttl
 	db.keyVersion[k]++
 }
@@ -350,6 +376,7 @@ func (m *Miniredis) Type(k string) string {
 func (db *RedisDB) Type(k string) string {
 	db.master.Lock()
 	defer db.master.Unlock()
+
 	return db.t(k)
 }
 
@@ -362,6 +389,7 @@ func (m *Miniredis) Exists(k string) bool {
 func (db *RedisDB) Exists(k string) bool {
 	db.master.Lock()
 	defer db.master.Unlock()
+
 	return db.exists(k)
 }
 
@@ -378,6 +406,7 @@ func (m *Miniredis) HGet(k, f string) string {
 func (db *RedisDB) HGet(k, f string) string {
 	db.master.Lock()
 	defer db.master.Unlock()
+
 	h, ok := db.hashKeys[k]
 	if !ok {
 		return ""
@@ -396,6 +425,8 @@ func (m *Miniredis) HSet(k, f, v string) {
 func (db *RedisDB) HSet(k, f, v string) {
 	db.master.Lock()
 	defer db.master.Unlock()
+	defer db.master.signal.Broadcast()
+
 	db.hashSet(k, f, v)
 }
 
@@ -408,6 +439,8 @@ func (m *Miniredis) HDel(k, f string) {
 func (db *RedisDB) HDel(k, f string) {
 	db.master.Lock()
 	defer db.master.Unlock()
+	defer db.master.signal.Broadcast()
+
 	db.hdel(k, f)
 }
 
@@ -428,6 +461,8 @@ func (m *Miniredis) HIncr(k, f string, delta int) (int, error) {
 func (db *RedisDB) HIncr(k, f string, delta int) (int, error) {
 	db.master.Lock()
 	defer db.master.Unlock()
+	defer db.master.signal.Broadcast()
+
 	return db.hashIncr(k, f, delta)
 }
 
@@ -440,6 +475,8 @@ func (m *Miniredis) HIncrfloat(k, f string, delta float64) (float64, error) {
 func (db *RedisDB) HIncrfloat(k, f string, delta float64) (float64, error) {
 	db.master.Lock()
 	defer db.master.Unlock()
+	defer db.master.signal.Broadcast()
+
 	return db.hashIncrfloat(k, f, delta)
 }
 
@@ -452,6 +489,8 @@ func (m *Miniredis) SRem(k string, fields ...string) (int, error) {
 func (db *RedisDB) SRem(k string, fields ...string) (int, error) {
 	db.master.Lock()
 	defer db.master.Unlock()
+	defer db.master.signal.Broadcast()
+
 	if !db.exists(k) {
 		return 0, ErrKeyNotFound
 	}
@@ -470,6 +509,8 @@ func (m *Miniredis) ZAdd(k string, score float64, member string) (bool, error) {
 func (db *RedisDB) ZAdd(k string, score float64, member string) (bool, error) {
 	db.master.Lock()
 	defer db.master.Unlock()
+	defer db.master.signal.Broadcast()
+
 	if db.exists(k) && db.t(k) != "zset" {
 		return false, ErrWrongType
 	}
@@ -485,6 +526,7 @@ func (m *Miniredis) ZMembers(k string) ([]string, error) {
 func (db *RedisDB) ZMembers(k string) ([]string, error) {
 	db.master.Lock()
 	defer db.master.Unlock()
+
 	if !db.exists(k) {
 		return nil, ErrKeyNotFound
 	}
@@ -503,6 +545,7 @@ func (m *Miniredis) SortedSet(k string) (map[string]float64, error) {
 func (db *RedisDB) SortedSet(k string) (map[string]float64, error) {
 	db.master.Lock()
 	defer db.master.Unlock()
+
 	if !db.exists(k) {
 		return nil, ErrKeyNotFound
 	}
@@ -521,6 +564,8 @@ func (m *Miniredis) ZRem(k, member string) (bool, error) {
 func (db *RedisDB) ZRem(k, member string) (bool, error) {
 	db.master.Lock()
 	defer db.master.Unlock()
+	defer db.master.signal.Broadcast()
+
 	if !db.exists(k) {
 		return false, ErrKeyNotFound
 	}
@@ -539,6 +584,7 @@ func (m *Miniredis) ZScore(k, member string) (float64, error) {
 func (db *RedisDB) ZScore(k, member string) (float64, error) {
 	db.master.Lock()
 	defer db.master.Unlock()
+
 	if !db.exists(k) {
 		return 0, ErrKeyNotFound
 	}
@@ -552,6 +598,7 @@ func (db *RedisDB) ZScore(k, member string) (float64, error) {
 func (m *Miniredis) Publish(channel, message string) int {
 	m.Lock()
 	defer m.Unlock()
+
 	return m.publish(channel, message)
 }
 
