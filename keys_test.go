@@ -130,7 +130,6 @@ func TestMatchKeys(t *testing.T) {
 	})
 
 	t.Run("newlines", func(t *testing.T) {
-		t.Skip("broken")
 		m, ok := matchKeys([]string{"a", "b\nb", "c"}, "*")
 		equals(t, true, ok)
 		equals(t, []string{"a", "b\nb", "c"}, m)

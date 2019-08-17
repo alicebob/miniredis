@@ -12,7 +12,7 @@ import (
 // The general strategy is to sandwich all non-meta characters between \Q...\E.
 func patternRE(k string) *regexp.Regexp {
 	re := bytes.Buffer{}
-	re.WriteString(`^\Q`)
+	re.WriteString(`(?s)^\Q`)
 	for i := 0; i < len(k); i++ {
 		p := k[i]
 		switch p {
