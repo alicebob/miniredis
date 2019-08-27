@@ -12,7 +12,7 @@ import (
 // The general strategy is to sandwich all non-meta characters between \Q...\E.
 func patternRE(k string) *regexp.Regexp {
 	re := bytes.Buffer{}
-	re.WriteString(`^\Q`)
+	re.WriteString(`(?s)^\Q`)
 	for i := 0; i < len(k); i++ {
 		p := k[i]
 		switch p {
@@ -62,4 +62,22 @@ func patternRE(k string) *regexp.Regexp {
 	}
 	re.WriteString(`\E$`)
 	return regexp.MustCompile(re.String())
+}
+
+// matchKeys filters only matching keys.
+// The returned boolean is whether the match pattern was valid
+func matchKeys(keys []string, match string) ([]string, bool) {
+	re := patternRE(match)
+	if re == nil {
+		// Special case: the given pattern won't match anything or is invalid.
+		return nil, false
+	}
+	var res []string
+	for _, k := range keys {
+		if !re.MatchString(k) {
+			continue
+		}
+		res = append(res, k)
+	}
+	return res, true
 }

@@ -334,7 +334,7 @@ func (m *Miniredis) cmdKeys(c *server.Peer, cmd string, args []string) {
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
-		keys := matchKeys(db.allKeys(), key)
+		keys, _ := matchKeys(db.allKeys(), key)
 		c.WriteLen(len(keys))
 		for _, s := range keys {
 			c.WriteBulk(s)
@@ -507,7 +507,7 @@ func (m *Miniredis) cmdScan(c *server.Peer, cmd string, args []string) {
 
 		keys := db.allKeys()
 		if withMatch {
-			keys = matchKeys(keys, match)
+			keys, _ = matchKeys(keys, match)
 		}
 
 		c.WriteLen(2)

@@ -60,7 +60,7 @@ func fail(cmd string, args ...interface{}) command {
 	}
 }
 
-// expect an error, with `sub` in both errors
+// expect an error, with both errors containing `sub`
 func failWith(sub string, cmd string, args ...interface{}) command {
 	return command{
 		cmd:      cmd,
