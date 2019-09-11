@@ -127,6 +127,12 @@ func (db *RedisDB) Incr(k string, delta int) (int, error) {
 	return db.stringIncr(k, delta)
 }
 
+// IncrByFloat increments the float value of a key by the given delta.
+// is an alias for Miniredis.Incrfloat
+func (m *Miniredis) IncrByFloat(k string, delta float64) (float64, error) {
+	return m.Incrfloat(k, delta)
+}
+
 // Incrfloat changes a float string value by delta.
 func (m *Miniredis) Incrfloat(k string, delta float64) (float64, error) {
 	return m.DB(m.selectedDB).Incrfloat(k, delta)
@@ -168,12 +174,12 @@ func (db *RedisDB) List(k string) ([]string, error) {
 	return db.listKeys[k], nil
 }
 
-// Lpush is an unshift. Returns the new length.
+// Lpush prepends one value to a list. Returns the new length.
 func (m *Miniredis) Lpush(k, v string) (int, error) {
 	return m.DB(m.selectedDB).Lpush(k, v)
 }
 
-// Lpush is an unshift. Returns the new length.
+// Lpush prepends one value to a list. Returns the new length.
 func (db *RedisDB) Lpush(k, v string) (int, error) {
 	db.master.Lock()
 	defer db.master.Unlock()
@@ -185,12 +191,12 @@ func (db *RedisDB) Lpush(k, v string) (int, error) {
 	return db.listLpush(k, v), nil
 }
 
-// Lpop is a shift. Returns the popped element.
+// Lpop removes and returns the last element in a list.
 func (m *Miniredis) Lpop(k string) (string, error) {
 	return m.DB(m.selectedDB).Lpop(k)
 }
 
-// Lpop is a shift. Returns the popped element.
+// Lpop removes and returns the last element in a list.
 func (db *RedisDB) Lpop(k string) (string, error) {
 	db.master.Lock()
 	defer db.master.Unlock()
@@ -205,7 +211,13 @@ func (db *RedisDB) Lpop(k string) (string, error) {
 	return db.listLpop(k), nil
 }
 
-// Push add element at the end. Is called RPUSH in redis. Returns the new length.
+// RPush appends one or multiple values to a list. Returns the new length.
+// An alias for Push
+func (m *Miniredis) RPush(k string, v ...string) (int, error) {
+	return m.Push(k, v...)
+}
+
+// Push add element at the end. Returns the new length.
 func (m *Miniredis) Push(k string, v ...string) (int, error) {
 	return m.DB(m.selectedDB).Push(k, v...)
 }
@@ -220,6 +232,11 @@ func (db *RedisDB) Push(k string, v ...string) (int, error) {
 		return 0, ErrWrongType
 	}
 	return db.listPush(k, v...), nil
+}
+
+// RPop is an alias for Pop
+func (m *Miniredis) RPop(k string) (string, error) {
+	return m.Pop(k)
 }
 
 // Pop removes and returns the last element. Is called RPOP in Redis.
@@ -243,6 +260,12 @@ func (db *RedisDB) Pop(k string) (string, error) {
 	return db.listPop(k), nil
 }
 
+// SAdd adds keys to a set. Returns the number of new keys.
+// Alias for SetAdd
+func (m *Miniredis) SAdd(k string, elems ...string) (int, error) {
+	return m.SetAdd(k, elems...)
+}
+
 // SetAdd adds keys to a set. Returns the number of new keys.
 func (m *Miniredis) SetAdd(k string, elems ...string) (int, error) {
 	return m.DB(m.selectedDB).SetAdd(k, elems...)
@@ -260,7 +283,13 @@ func (db *RedisDB) SetAdd(k string, elems ...string) (int, error) {
 	return db.setAdd(k, elems...), nil
 }
 
-// Members gives all set keys. Sorted.
+// SMembers returns all keys in a set, sorted.
+// Alias for Members.
+func (m *Miniredis) SMembers(k string) ([]string, error) {
+	return m.Members(k)
+}
+
+// Members returns all keys in a set, sorted.
 func (m *Miniredis) Members(k string) ([]string, error) {
 	return m.DB(m.selectedDB).Members(k)
 }
@@ -277,6 +306,12 @@ func (db *RedisDB) Members(k string) ([]string, error) {
 		return nil, ErrWrongType
 	}
 	return db.setMembers(k), nil
+}
+
+// SIsMember tells if value is in the set.
+// Alias for IsMember
+func (m *Miniredis) SIsMember(k, v string) (bool, error) {
+	return m.IsMember(k, v)
 }
 
 // IsMember tells if value is in the set.
@@ -452,6 +487,11 @@ func (db *RedisDB) hdel(k, f string) {
 	db.keyVersion[k]++
 }
 
+// HIncrBy increases the integer value of a hash field by delta (int).
+func (m *Miniredis) HIncrBy(k, f string, delta int) (int, error) {
+	return m.HIncr(k, f, delta)
+}
+
 // HIncr increases a key/field by delta (int).
 func (m *Miniredis) HIncr(k, f string, delta int) (int, error) {
 	return m.DB(m.selectedDB).HIncr(k, f, delta)
@@ -464,6 +504,11 @@ func (db *RedisDB) HIncr(k, f string, delta int) (int, error) {
 	defer db.master.signal.Broadcast()
 
 	return db.hashIncr(k, f, delta)
+}
+
+// HIncrByFloat increases a key/field by delta (float).
+func (m *Miniredis) HIncrByFloat(k, f string, delta float64) (float64, error) {
+	return m.HIncrfloat(k, f, delta)
 }
 
 // HIncrfloat increases a key/field by delta (float).
@@ -517,12 +562,12 @@ func (db *RedisDB) ZAdd(k string, score float64, member string) (bool, error) {
 	return db.ssetAdd(k, score, member), nil
 }
 
-// ZMembers returns all members by score
+// ZMembers returns all members of a sorted set by score
 func (m *Miniredis) ZMembers(k string) ([]string, error) {
 	return m.DB(m.selectedDB).ZMembers(k)
 }
 
-// ZMembers returns all members by score
+// ZMembers returns all members of a sorted set by score
 func (db *RedisDB) ZMembers(k string) ([]string, error) {
 	db.master.Lock()
 	defer db.master.Unlock()
