@@ -245,6 +245,31 @@ func TestDel(t *testing.T) {
 	equals(t, "", got)
 }
 
+func TestUnlink(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	s.Set("foo", "bar")
+	s.HSet("aap", "noot", "mies")
+	s.Set("one", "two")
+	s.SetTTL("one", time.Second*1234)
+	s.Set("three", "four")
+	r, err := redis.Int(c.Do("UNLINK", "one", "aap", "nosuch"))
+	ok(t, err)
+	equals(t, 2, r)
+	equals(t, time.Duration(0), s.TTL("one"))
+
+	// Direct also works:
+	s.Set("foo", "bar")
+	s.Unlink("foo")
+	got, err := s.Get("foo")
+	equals(t, ErrKeyNotFound, err)
+	equals(t, "", got)
+}
+
 func TestType(t *testing.T) {
 	s, err := Run()
 	ok(t, err)

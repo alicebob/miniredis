@@ -13,6 +13,7 @@ import (
 // commandsGeneric handles EXPIRE, TTL, PERSIST, &c.
 func commandsGeneric(m *Miniredis) {
 	m.srv.Register("DEL", m.cmdDel)
+	m.srv.Register("UNLINK", m.cmdDel)
 	// DUMP
 	m.srv.Register("EXISTS", m.cmdExists)
 	m.srv.Register("EXPIRE", makeCmdExpire(m, false, time.Second))

@@ -335,6 +335,19 @@ func (db *RedisDB) Del(k string) bool {
 	return true
 }
 
+// Unlink deletes a key and any expiration value. Returns where there was a key.
+// It's exactly the same as Del() and is not async. It is here for the consistency.
+func (m *Miniredis) Unlink(k string) bool {
+	return m.Del(k)
+}
+
+// Unlink deletes a key and any expiration value. Returns where there was a key.
+// It's exactly the same as Del() and is not async. It is here for the consistency.
+func (db *RedisDB) Unlink(k string) bool {
+	return db.Del(k)
+}
+
+
 // TTL is the left over time to live. As set via EXPIRE, PEXPIRE, EXPIREAT,
 // PEXPIREAT.
 // 0 if not set.
