@@ -166,6 +166,15 @@ Implemented commands:
    - SCRIPT LOAD
    - SCRIPT EXISTS
    - SCRIPT FLUSH
+ - GEO
+   - GEOADD
+   - ~~GEODIST~~
+   - ~~GEOHASH~~
+   - GEOPOS
+   - GEORADIUS
+   - GEORADIUS_RO
+   - ~~GEORADIUSBYMEMBER~~
+   - ~~GEORADIUSBYMEMBER_RO~~
 
 ## TTLs, key expiration, and time
 
@@ -236,13 +245,6 @@ Commands which will probably not be implemented:
     - ~~CLUSTER *~~
     - ~~READONLY~~
     - ~~READWRITE~~
- - GEO (all) -- unless someone needs these
-    - ~~GEOADD~~
-    - ~~GEODIST~~
-    - ~~GEOHASH~~
-    - ~~GEOPOS~~
-    - ~~GEORADIUS~~
-    - ~~GEORADIUSBYMEMBER~~
  - HyperLogLog (all) -- unless someone needs these
     - ~~PFADD~~
     - ~~PFCOUNT~~

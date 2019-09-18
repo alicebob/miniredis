@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -24,6 +25,7 @@ type command struct {
 	loosely     bool   // Don't compare values, only structure. (for random things)
 	errorSub    string // Both errors need this substring
 	receiveOnly bool   // no command, only receive. For pubsub messages.
+	roundFloats int    // if > 0 round floats to this many places before DeepEqual
 }
 
 func succ(cmd string, args ...interface{}) command {
@@ -49,6 +51,16 @@ func succLoosely(cmd string, args ...interface{}) command {
 		args:    args,
 		error:   false,
 		loosely: true,
+	}
+}
+
+// round all floats to 3 decimal places
+func succRound3(cmd string, args ...interface{}) command {
+	return command{
+		cmd:         cmd,
+		args:        args,
+		error:       false,
+		roundFloats: 3,
 	}
 }
 
@@ -264,6 +276,11 @@ func runCommand(t *testing.T, cMini, cReal redis.Conn, p command) {
 		return
 	}
 
+	if p.roundFloats > 0 {
+		vReal = roundFloats(vReal, p.roundFloats)
+		vMini = roundFloats(vMini, p.roundFloats)
+	}
+
 	if !reflect.DeepEqual(errReal, errMini) {
 		t.Errorf("error error. expected: %#v got: %#v case: %#v", vReal, vMini, p)
 		return
@@ -333,16 +350,45 @@ func looselyEqual(a, b interface{}) bool {
 }
 
 func dump(r interface{}, prefix string) {
-	if ls, ok := r.([]interface{}); ok {
+	switch ls := r.(type) {
+	case []interface{}:
 		for _, k := range ls {
 			switch k := k.(type) {
 			case []byte:
 				fmt.Printf(" %s %s\n", prefix, string(k))
+			case []interface{}:
+				fmt.Printf(" %s:\n", prefix)
+				for _, c := range k {
+					dump(c, "      -")
+				}
 			default:
 				fmt.Printf(" %s %#v\n", prefix, k)
 			}
 		}
-	} else {
-		fmt.Printf(" %s %#v\n", prefix, r)
+	case []byte:
+		fmt.Printf(" %s %v\n", prefix, string(ls))
+	default:
+		fmt.Printf(" %s %v\n", prefix, ls)
+	}
+}
+
+// round all floats
+func roundFloats(r interface{}, pos int) interface{} {
+	switch ls := r.(type) {
+	case []interface{}:
+		var new []interface{}
+		for _, k := range ls {
+			new = append(new, roundFloats(k, pos))
+		}
+		return new
+	case []byte:
+		f, err := strconv.ParseFloat(string(ls), 64)
+		if err != nil {
+			return ls
+		}
+		return []byte(fmt.Sprintf("%.[1]*f", pos, f))
+	default:
+		fmt.Printf("unhandled type: %T FIXME\n", r)
+		return nil
 	}
 }
