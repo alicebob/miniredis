@@ -41,9 +41,10 @@ Implemented commands:
    - RENAME
    - RENAMENX
    - RANDOMKEY -- see m.Seed(...)
+   - SCAN
    - TTL
    - TYPE
-   - SCAN
+   - UNLINK
  - Transactions (complete)
    - DISCARD
    - EXEC

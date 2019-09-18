@@ -1,5 +1,11 @@
 ## Changelog
 
+### unreleased
+
+- added UNLINK
+- fix DEL zero-argument case
+
+
 ### v2.9.1
 
 - fix issue with ZRANGEBYLEX
