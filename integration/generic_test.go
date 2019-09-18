@@ -255,3 +255,23 @@ func TestSwapdb(t *testing.T) {
 		r2 <- succ("GET", "foo")
 	})
 }
+
+func TestDel(t *testing.T) {
+	testCommands(t,
+		succ("SET", "one", "1"),
+		succ("SET", "two", "2"),
+		succ("SET", "three", "3"),
+		succ("SET", "four", "4"),
+		succ("DEL", "one"),
+		succSorted("KEYS", "*"),
+
+		succ("DEL", "twoooo"),
+		succSorted("KEYS", "*"),
+
+		succ("DEL", "two", "four"),
+		succSorted("KEYS", "*"),
+
+		fail("DEL"),
+		succSorted("KEYS", "*"),
+	)
+}

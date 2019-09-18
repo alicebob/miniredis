@@ -201,12 +201,18 @@ func (m *Miniredis) cmdPersist(c *server.Peer, cmd string, args []string) {
 	})
 }
 
-// DEL
+// DEL and UNLINK
 func (m *Miniredis) cmdDel(c *server.Peer, cmd string, args []string) {
 	if !m.handleAuth(c) {
 		return
 	}
 	if m.checkPubsub(c) {
+		return
+	}
+
+	if len(args) == 0 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
 		return
 	}
 
