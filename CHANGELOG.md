@@ -1,9 +1,11 @@
 ## Changelog
 
-### unreleased
+### v2.10.0
 
 - added UNLINK
 - fix DEL zero-argument case
+- cleanup some direct access commands
+- added GEOADD, GEOPOS, GEORADIUS, and GEORADIUS_RO
 
 
 ### v2.9.1
