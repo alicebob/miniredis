@@ -1,6 +1,7 @@
 package miniredis
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -167,6 +168,32 @@ func TestDumpSortedSet(t *testing.T) {
    2.000000: "wind"
    3.000000: "earth"
 `; have != want {
+		t.Errorf("have: %q, want: %q", have, want)
+	}
+}
+
+func TestDumpStream(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	s.XAdd("elements", "123456789-0", map[string]string{"name": "wind"})
+	s.XAdd("elements", "0-1", map[string]string{"name": "earth"})
+	s.XAdd("elements", "123456789-1", map[string]string{"name": "fire"})
+	if have, want := s.Dump(), `- elements
+   0-1
+      "name": "earth"
+   123456789-0
+      "name": "wind"
+   123456789-1
+      "name": "fire"
+`; have != want {
+		t.Errorf("have: %q, want: %q", have, want)
+	}
+
+	s.XAdd("elements", "*", map[string]string{"name": "Leeloo"})
+	fullHave := s.Dump()
+	have := strings.Split(fullHave, "\n")[8]
+	want := `      "name": "Leeloo"`
+	if have != want {
 		t.Errorf("have: %q, want: %q", have, want)
 	}
 }

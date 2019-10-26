@@ -41,6 +41,7 @@ type RedisDB struct {
 	listKeys      map[string]listKey       // LPUSH &c. keys
 	setKeys       map[string]setKey        // SADD &c. keys
 	sortedsetKeys map[string]sortedSet     // ZADD &c. keys
+	streamKeys    map[string]streamKey     // XADD &c. keys
 	ttl           map[string]time.Duration // effective TTL values
 	keyVersion    map[string]uint          // used to watch values
 }
@@ -99,6 +100,7 @@ func newRedisDB(id int, m *Miniredis) RedisDB {
 		listKeys:      map[string]listKey{},
 		setKeys:       map[string]setKey{},
 		sortedsetKeys: map[string]sortedSet{},
+		streamKeys:    map[string]streamKey{},
 		ttl:           map[string]time.Duration{},
 		keyVersion:    map[string]uint{},
 	}
@@ -145,6 +147,7 @@ func (m *Miniredis) start(s *server.Server) error {
 	commandsPubsub(m)
 	commandsSet(m)
 	commandsSortedSet(m)
+	commandsStream(m)
 	commandsTransaction(m)
 	commandsScripting(m)
 	commandsGeo(m)
@@ -332,6 +335,13 @@ func (m *Miniredis) Dump() string {
 		case "zset":
 			for _, el := range db.ssetElements(k) {
 				r += fmt.Sprintf("%s%f: %s\n", indent, el.score, v(el.member))
+			}
+		case "stream":
+			for _, entry := range db.streamKeys[k] {
+				r += fmt.Sprintf("%s%s\n", indent, entry.id.String())
+				for key, val := range entry.values {
+					r += fmt.Sprintf("%s%s%s: %s\n", indent, indent, v(key), v(val))
+				}
 			}
 		default:
 			r += fmt.Sprintf("%s(a %s, fixme!)\n", indent, t)

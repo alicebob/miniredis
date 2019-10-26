@@ -382,7 +382,6 @@ func (db *RedisDB) Unlink(k string) bool {
 	return db.Del(k)
 }
 
-
 // TTL is the left over time to live. As set via EXPIRE, PEXPIRE, EXPIREAT,
 // PEXPIREAT.
 // 0 if not set.
@@ -650,6 +649,56 @@ func (db *RedisDB) ZScore(k, member string) (float64, error) {
 		return 0, ErrWrongType
 	}
 	return db.ssetScore(k, member), nil
+}
+
+// XAdd adds an entry to a stream.
+func (m *Miniredis) XAdd(k string, id string, values map[string]string) (string, error) {
+	return m.DB(m.selectedDB).XAdd(k, id, values)
+}
+
+// XAdd adds an entry to a stream.
+// Any valid ID is accepted regardless of the current latest ID.
+func (db *RedisDB) XAdd(k string, id string, values map[string]string) (string, error) {
+	db.master.Lock()
+	defer db.master.Unlock()
+	defer db.master.signal.Broadcast()
+
+	if db.exists(k) && db.t(k) != "stream" {
+		return "", ErrWrongType
+	}
+
+	var entryID streamEntryID
+
+	if id == "*" {
+		return db.streamAdd(k, entryID, values)
+	}
+
+	var err error
+	entryID, err = formatStreamEntryID(id)
+	if err != nil {
+		return "", err
+	}
+
+	return db.streamForceAdd(k, entryID, values)
+}
+
+// Stream returns a slice of stream entries id->values maps.
+func (m *Miniredis) Stream(k string) ([]map[string]map[string]string, error) {
+	return m.DB(m.selectedDB).Stream(k)
+}
+
+// Stream returns a slice of stream entries id->values maps.
+func (db *RedisDB) Stream(k string) ([]map[string]map[string]string, error) {
+	db.master.Lock()
+	defer db.master.Unlock()
+
+	if !db.exists(k) {
+		return nil, ErrKeyNotFound
+	}
+	if db.t(k) != "stream" {
+		return nil, ErrWrongType
+	}
+	return db.stream(k), nil
 }
 
 // Publish a message to subscribers. Returns the number of receivers.
