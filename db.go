@@ -59,6 +59,8 @@ func (db *RedisDB) move(key string, to *RedisDB) bool {
 		to.setKeys[key] = db.setKeys[key]
 	case "zset":
 		to.sortedsetKeys[key] = db.sortedsetKeys[key]
+	case "stream":
+		to.streamKeys[key] = db.streamKeys[key]
 	default:
 		panic("unhandled key type")
 	}
@@ -83,6 +85,8 @@ func (db *RedisDB) rename(from, to string) {
 		db.setKeys[to] = db.setKeys[from]
 	case "zset":
 		db.sortedsetKeys[to] = db.sortedsetKeys[from]
+	case "stream":
+		db.streamKeys[to] = db.streamKeys[from]
 	default:
 		panic("missing case")
 	}
@@ -116,6 +120,8 @@ func (db *RedisDB) del(k string, delTTL bool) {
 		delete(db.setKeys, k)
 	case "zset":
 		delete(db.sortedsetKeys, k)
+	case "stream":
+		delete(db.streamKeys, k)
 	default:
 		panic("Unknown key type: " + t)
 	}
@@ -534,6 +540,76 @@ func (db *RedisDB) setUnion(keys []string) (setKey, error) {
 		}
 	}
 	return s, nil
+}
+
+// stream set returns a stream as a slice.
+func (db *RedisDB) stream(key string) []map[string]map[string]string {
+	stream := db.streamKeys[key]
+	if len(stream) == 0 {
+		return nil
+	}
+
+	rawStream := make([]map[string]map[string]string, len(stream))
+	for i, entry := range stream {
+		rawStream[i] = map[string]map[string]string{entry.id.String(): entry.values}
+	}
+
+	return rawStream
+}
+
+// streamAdd adds an entry to a stream. Returns entry ID.
+// If entryID corresponds to the zero value, the ID will be generated automatically.
+func (db *RedisDB) streamAdd(key string, entryID streamEntryID, values map[string]string) (string, error) {
+	stream, ok := db.streamKeys[key]
+	if !ok {
+		stream = newStream()
+		db.keys[key] = "stream"
+	}
+
+	if entryID[0] == 0 && entryID[1] == 0 {
+		entryID = stream.nextEntryID()
+	}
+
+	if err := stream.isValidNextEntryID(entryID); err != nil {
+		return "", err
+	}
+
+	stream.append(entryID, values)
+	db.streamKeys[key] = stream
+	db.keyVersion[key]++
+
+	return entryID.String(), nil
+}
+
+// streamForceInsert adds an entry to a stream, regardless of whether the provided entry would be the last.
+// Returns entry ID.
+func (db *RedisDB) streamForceAdd(key string, entryID streamEntryID, values map[string]string) (string, error) {
+	stream, ok := db.streamKeys[key]
+	if !ok {
+		return db.streamAdd(key, entryID, values)
+	}
+
+	newStream := make(streamKey, 0, len(stream)+1)
+
+	for i, entry := range stream {
+		if entryID.Less(entry.id) {
+			newStream = append(newStream, streamEntry{id: entryID, values: values})
+			newStream = append(newStream, stream[i:]...)
+
+			break
+		}
+
+		newStream = append(newStream, entry)
+
+		if i == len(stream)-1 {
+			newStream = append(newStream, streamEntry{id: entryID, values: values})
+		}
+	}
+
+	db.streamKeys[key] = newStream
+	db.keyVersion[key]++
+
+	return entryID.String(), nil
 }
 
 // fastForward proceeds the current timestamp with duration, works as a time machine

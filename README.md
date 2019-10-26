@@ -160,6 +160,9 @@ Implemented commands:
    - ZSCORE
    - ZUNIONSTORE
    - ZSCAN
+ - Stream keys
+   - XADD
+   - XLEN
  - Scripting
    - EVAL
    - EVALSHA
