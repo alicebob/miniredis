@@ -9,7 +9,7 @@ import (
 	"github.com/gomodule/redigo/redis"
 )
 
-// Test XADD / XLEN
+// Test XADD / XLEN / XRANGE
 func TestStream(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
@@ -154,5 +154,85 @@ func TestStreamLen(t *testing.T) {
 
 		_, err = redis.Int(c.Do("XLEN", "str"))
 		mustFail(t, err, msgWrongType)
+	})
+}
+
+// Test XRANGE / XREVRANGE
+func TestStreamRange(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+	defer c.Close()
+
+	_, err = redis.String(c.Do("XADD", "planets", "0-1", "name", "Mercury"))
+	ok(t, err)
+	_, err = redis.String(c.Do("XADD", "planets", "1-0", "name", "Venus"))
+	ok(t, err)
+	_, err = redis.String(c.Do("XADD", "planets", "2-1", "name", "Earth"))
+	ok(t, err)
+	_, err = redis.String(c.Do("XADD", "planets", "3-0", "name", "Mars"))
+	ok(t, err)
+	_, err = redis.String(c.Do("XADD", "planets", "4-1", "name", "Jupiter"))
+	ok(t, err)
+
+	t.Run("XRANGE", func(t *testing.T) {
+		res, err := redis.Values(c.Do("XRANGE", "planets", "1", "+"))
+		ok(t, err)
+		equals(t, 4, len(res))
+
+		item := res[1].([]interface{})
+		id := string(item[0].([]byte))
+
+		vals := item[1].([]interface{})
+		field := string(vals[0].([]byte))
+		value := string(vals[1].([]byte))
+
+		equals(t, "2-1", id)
+		equals(t, "name", field)
+		equals(t, "Earth", value)
+
+		res, err = redis.Values(c.Do("XREVRANGE", "planets", "3", "1"))
+		ok(t, err)
+		equals(t, 3, len(res))
+
+		item = res[2].([]interface{})
+		id = string(item[0].([]byte))
+
+		vals = item[1].([]interface{})
+		field = string(vals[0].([]byte))
+		value = string(vals[1].([]byte))
+
+		equals(t, "1-0", id)
+		equals(t, "name", field)
+		equals(t, "Venus", value)
+	})
+
+	t.Run("error cases", func(t *testing.T) {
+		// Wrong type of key
+		_, err := redis.String(c.Do("SET", "str", "value"))
+		ok(t, err)
+
+		_, err = redis.Int(c.Do("XRANGE", "str", "-", "+"))
+		mustFail(t, err, msgWrongType)
+
+		_, err = redis.Int(c.Do("XRANGE", "str", "-", "+"))
+		mustFail(t, err, msgWrongType)
+
+		_, err = redis.Int(c.Do("XRANGE"))
+		mustFail(t, err, errWrongNumber("xrange"))
+		_, err = redis.Int(c.Do("XRANGE", "foo"))
+		mustFail(t, err, errWrongNumber("xrange"))
+		_, err = redis.Int(c.Do("XRANGE", "foo", 1))
+		mustFail(t, err, errWrongNumber("xrange"))
+		_, err = redis.Int(c.Do("XRANGE", "foo", 2, 3, "toomany"))
+		mustFail(t, err, msgSyntaxError)
+		_, err = redis.Int(c.Do("XRANGE", "foo", 2, 3, "COUNT", "noint"))
+		mustFail(t, err, msgInvalidInt)
+		_, err = redis.Int(c.Do("XRANGE", "foo", 2, 3, "COUNT", 1, "toomany"))
+		mustFail(t, err, msgSyntaxError)
+		_, err = redis.Int(c.Do("XRANGE", "foo", "-", "noint"))
+		mustFail(t, err, errInvalidStreamIDFormat.Error())
 	})
 }

@@ -163,6 +163,8 @@ Implemented commands:
  - Stream keys
    - XADD
    - XLEN
+   - XRANGE
+   - XREVRANGE
  - Scripting
    - EVAL
    - EVALSHA

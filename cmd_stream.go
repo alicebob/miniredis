@@ -3,6 +3,7 @@
 package miniredis
 
 import (
+	"strconv"
 	"strings"
 
 	"github.com/alicebob/miniredis/v2/server"
@@ -11,9 +12,9 @@ import (
 // commandsStream handles all stream operations.
 func commandsStream(m *Miniredis) {
 	m.srv.Register("XADD", m.cmdXadd)
-	// XRANGE key start end [COUNT count]
-	// XREVRANGE key end start [COUNT count]
 	m.srv.Register("XLEN", m.cmdXlen)
+	m.srv.Register("XRANGE", m.makeCmdXrange(false))
+	m.srv.Register("XREVRANGE", m.makeCmdXrange(true))
 }
 
 // XADD
@@ -111,4 +112,132 @@ func (m *Miniredis) cmdXlen(c *server.Peer, cmd string, args []string) {
 
 		c.WriteInt(len(db.streamKeys[key]))
 	})
+}
+
+// XRANGE and XREVRANGE
+func (m *Miniredis) makeCmdXrange(reverse bool) server.Cmd {
+	return func(c *server.Peer, cmd string, args []string) {
+		if len(args) < 3 {
+			setDirty(c)
+			c.WriteError(errWrongNumber(cmd))
+			return
+		}
+		if len(args) == 4 || len(args) > 5 {
+			setDirty(c)
+			c.WriteError(msgSyntaxError)
+			return
+		}
+		if !m.handleAuth(c) {
+			return
+		}
+		if m.checkPubsub(c) {
+			return
+		}
+
+		key := args[0]
+
+		var start streamEntryID
+		start, err := formatStreamRangeBound(args[1], true, reverse)
+		if err != nil {
+			setDirty(c)
+			c.WriteError(err.Error())
+			return
+		}
+		var end streamEntryID
+		end, err = formatStreamRangeBound(args[2], false, reverse)
+		if err != nil {
+			setDirty(c)
+			c.WriteError(err.Error())
+			return
+		}
+
+		count := 0
+		if len(args) == 5 {
+			if strings.ToLower(args[3]) != "count" {
+				setDirty(c)
+				c.WriteError(msgSyntaxError)
+				return
+			}
+
+			count, err = strconv.Atoi(args[4])
+			if err != nil {
+				setDirty(c)
+				c.WriteError(msgInvalidInt)
+				return
+			}
+
+			if count == 0 {
+				c.WriteLen(0)
+				return
+			}
+		}
+
+		withTx(m, c, func(c *server.Peer, ctx *connCtx) {
+			db := m.db(ctx.selectedDB)
+
+			if !db.exists(key) {
+				c.WriteLen(0)
+				return
+			}
+
+			if db.t(key) != "stream" {
+				c.WriteError(ErrWrongType.Error())
+				return
+			}
+
+			var entries []streamEntry = db.streamKeys[key]
+			if reverse {
+				entries = reversedStreamEntries(entries)
+			}
+
+			if count == 0 {
+				count = len(entries)
+			}
+
+			returnedEntries := make([]streamEntry, 0, count)
+			returnedItemsCount := 0
+
+			for _, entry := range entries {
+				if len(returnedEntries) == count {
+					break
+				}
+
+				if !reverse {
+					// Break if entry ID > end
+					if end.Less(entry.id) {
+						break
+					}
+
+					// Continue if entry ID < start
+					if entry.id.Less(start) {
+						continue
+					}
+				} else {
+					// Break if entry iD < end
+					if entry.id.Less(end) {
+						break
+					}
+
+					// Continue if entry ID > start.
+					if start.Less(entry.id) {
+						continue
+					}
+				}
+
+				returnedEntries = append(returnedEntries, entry)
+				returnedItemsCount += 1 + len(entry.values)
+			}
+
+			c.WriteLen(len(returnedEntries))
+			for _, entry := range returnedEntries {
+				c.WriteLen(2)
+				c.WriteBulk(entry.id.String())
+				c.WriteLen(2 * len(entry.values))
+				for k, v := range entry.values {
+					c.WriteBulk(k)
+					c.WriteBulk(v)
+				}
+			}
+		})
+	}
 }
