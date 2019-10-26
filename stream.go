@@ -3,6 +3,7 @@ package miniredis
 import (
 	"errors"
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -103,4 +104,45 @@ func formatStreamEntryID(id string) (fmtid streamEntryID, err error) {
 	}
 
 	return streamEntryID{ts, seq}, nil
+}
+
+func formatStreamRangeBound(id string, start bool, reverse bool) (fmtid streamEntryID, err error) {
+	if id == "-" {
+		return streamEntryID{0, 0}, nil
+	}
+
+	if id == "+" {
+		return streamEntryID{math.MaxUint64, math.MaxUint64}, nil
+	}
+
+	if id == "0" {
+		return streamEntryID{0, 0}, nil
+	}
+
+	parts := strings.Split(id, "-")
+	if len(parts) == 2 {
+		return formatStreamEntryID(id)
+	}
+
+	// Incomplete IDs case
+	ts, err := strconv.ParseUint(parts[0], 10, 64)
+	if err != nil {
+		return fmtid, errInvalidStreamIDFormat
+	}
+
+	if (!start && !reverse) || (start && reverse) {
+		return streamEntryID{ts, math.MaxUint64}, nil
+	}
+
+	return streamEntryID{ts, 0}, nil
+}
+
+func reversedStreamEntries(o []streamEntry) []streamEntry {
+	newStream := make([]streamEntry, len(o))
+
+	for i, e := range o {
+		newStream[len(o)-i-1] = e
+	}
+
+	return newStream
 }
