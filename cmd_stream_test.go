@@ -33,17 +33,17 @@ func TestStream(t *testing.T) {
 	})
 
 	t.Run("direct usage", func(t *testing.T) {
-		_, err := s.XAdd("s1", "0-0", map[string]string{"name": "foo"})
+		_, err := s.XAdd("s1", "0-0", [][2]string{{"name", "foo"}})
 		assert(t, err != nil, "XAdd error")
 
-		id, err := s.XAdd("s1", "12345-67", map[string]string{"name": "bar"})
+		id, err := s.XAdd("s1", "12345-67", [][2]string{{"name", "bar"}})
 		ok(t, err)
 		equals(t, "12345-67", id)
 
-		id, err = s.XAdd("s1", "12345-0", map[string]string{"name": "foo"})
+		id, err = s.XAdd("s1", "12345-0", [][2]string{{"name", "foo"}})
 		ok(t, err)
 
-		id, err = s.XAdd("s1", "*", map[string]string{"name": "baz"})
+		id, err = s.XAdd("s1", "*", [][2]string{{"name", "baz"}})
 		ok(t, err)
 		exp := `\d+-0`
 		matched, err := regexp.MatchString(exp, id)
@@ -53,7 +53,7 @@ func TestStream(t *testing.T) {
 		stream, err := s.Stream("s1")
 		ok(t, err)
 		equals(t, 3, len(stream))
-		equals(t, map[string]string{"name": "bar"}, stream[1]["12345-67"])
+		equals(t, [][2]string{{"name", "bar"}}, stream[1]["12345-67"])
 	})
 }
 
@@ -93,7 +93,7 @@ func TestStreamAdd(t *testing.T) {
 		_, err := redis.String(c.Do("SET", "str", "value"))
 		ok(t, err)
 
-		_, err = s.XAdd("str", "*", map[string]string{"hi": "1"})
+		_, err = s.XAdd("str", "*", [][2]string{{"hi", "1"}})
 		mustFail(t, err, msgWrongType)
 
 		_, err = redis.String(c.Do("XADD", "str", "*", "hi", "1"))
@@ -166,15 +166,15 @@ func TestStreamRange(t *testing.T) {
 	ok(t, err)
 	defer c.Close()
 
-	_, err = redis.String(c.Do("XADD", "planets", "0-1", "name", "Mercury"))
+	_, err = redis.String(c.Do("XADD", "planets", "0-1", "name", "Mercury", "greek-god", "Hermes", "idx", "1"))
 	ok(t, err)
-	_, err = redis.String(c.Do("XADD", "planets", "1-0", "name", "Venus"))
+	_, err = redis.String(c.Do("XADD", "planets", "1-0", "name", "Venus", "greek-god", "Aphrodite", "idx", "2"))
 	ok(t, err)
-	_, err = redis.String(c.Do("XADD", "planets", "2-1", "name", "Earth"))
+	_, err = redis.String(c.Do("XADD", "planets", "2-1", "name", "Earth", "greek-god", "", "idx", "3"))
 	ok(t, err)
-	_, err = redis.String(c.Do("XADD", "planets", "3-0", "name", "Mars"))
+	_, err = redis.String(c.Do("XADD", "planets", "3-0", "greek-god", "Ares", "name", "Mars", "idx", "4"))
 	ok(t, err)
-	_, err = redis.String(c.Do("XADD", "planets", "4-1", "name", "Jupiter"))
+	_, err = redis.String(c.Do("XADD", "planets", "4-1", "name", "Jupiter", "greek-god", "Dias", "idx", "5"))
 	ok(t, err)
 
 	t.Run("XRANGE", func(t *testing.T) {

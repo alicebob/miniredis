@@ -543,15 +543,15 @@ func (db *RedisDB) setUnion(keys []string) (setKey, error) {
 }
 
 // stream set returns a stream as a slice.
-func (db *RedisDB) stream(key string) []map[string]map[string]string {
+func (db *RedisDB) stream(key string) []map[string][][2]string {
 	stream := db.streamKeys[key]
 	if len(stream) == 0 {
 		return nil
 	}
 
-	rawStream := make([]map[string]map[string]string, len(stream))
+	rawStream := make([]map[string][][2]string, len(stream))
 	for i, entry := range stream {
-		rawStream[i] = map[string]map[string]string{entry.id.String(): entry.values}
+		rawStream[i] = map[string][][2]string{entry.id.String(): entry.values}
 	}
 
 	return rawStream
@@ -559,7 +559,7 @@ func (db *RedisDB) stream(key string) []map[string]map[string]string {
 
 // streamAdd adds an entry to a stream. Returns entry ID.
 // If entryID corresponds to the zero value, the ID will be generated automatically.
-func (db *RedisDB) streamAdd(key string, entryID streamEntryID, values map[string]string) (string, error) {
+func (db *RedisDB) streamAdd(key string, entryID streamEntryID, values [][2]string) (string, error) {
 	stream, ok := db.streamKeys[key]
 	if !ok {
 		stream = newStream()
@@ -583,7 +583,7 @@ func (db *RedisDB) streamAdd(key string, entryID streamEntryID, values map[strin
 
 // streamForceInsert adds an entry to a stream, regardless of whether the provided entry would be the last.
 // Returns entry ID.
-func (db *RedisDB) streamForceAdd(key string, entryID streamEntryID, values map[string]string) (string, error) {
+func (db *RedisDB) streamForceAdd(key string, entryID streamEntryID, values [][2]string) (string, error) {
 	stream, ok := db.streamKeys[key]
 	if !ok {
 		return db.streamAdd(key, entryID, values)
