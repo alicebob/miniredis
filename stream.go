@@ -19,7 +19,7 @@ type streamKey []streamEntry
 
 type streamEntry struct {
 	id     streamEntryID
-	values map[string]string
+	values [][2]string
 }
 
 type streamEntryID [2]uint64
@@ -44,7 +44,7 @@ func newStream() streamKey {
 	return streamKey{}
 }
 
-func (ss *streamKey) append(id streamEntryID, values map[string]string) {
+func (ss *streamKey) append(id streamEntryID, values [][2]string) {
 	*ss = append(*ss, streamEntry{id: id, values: values})
 }
 
