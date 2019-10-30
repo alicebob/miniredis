@@ -204,6 +204,13 @@ Commands which use randomness are: RANDOMKEY, SPOP, and SRANDMEMBER.
 ## Example
 
 ``` Go
+
+import (
+    ...
+    "github.com/alicebob/miniredis/v2"
+    ...
+)
+
 func TestSomething(t *testing.T) {
 	s, err := miniredis.Run()
 	if err != nil {
