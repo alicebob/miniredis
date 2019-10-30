@@ -1,5 +1,9 @@
 ## Changelog
 
+### v2.10.1
+
+- added m.Server()
+
 ### v2.10.0
 
 - added UNLINK
