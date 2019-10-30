@@ -567,7 +567,7 @@ func (db *RedisDB) streamAdd(key string, entryID streamEntryID, values [][2]stri
 	}
 
 	if entryID[0] == 0 && entryID[1] == 0 {
-		entryID = stream.nextEntryID()
+		entryID = stream.nextEntryID(db.master.effectiveNow())
 	}
 
 	if err := stream.isValidNextEntryID(entryID); err != nil {

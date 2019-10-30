@@ -5,7 +5,6 @@ package miniredis
 import (
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/alicebob/miniredis/v2/server"
 )
@@ -99,10 +98,7 @@ func (m *Miniredis) cmdTime(c *server.Peer, cmd string, args []string) {
 	}
 
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
-		now := m.now
-		if now.IsZero() {
-			now = time.Now()
-		}
+		now := m.effectiveNow()
 		nanos := now.UnixNano()
 		seconds := nanos / 1000000000
 		microseconds := (nanos / 1000) % 1000000

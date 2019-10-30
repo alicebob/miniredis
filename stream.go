@@ -48,8 +48,8 @@ func (ss *streamKey) append(id streamEntryID, values [][2]string) {
 	*ss = append(*ss, streamEntry{id: id, values: values})
 }
 
-func (ss *streamKey) nextEntryID() streamEntryID {
-	curTime := uint64(time.Now().UnixNano() / int64(time.Millisecond))
+func (ss *streamKey) nextEntryID(now time.Time) streamEntryID {
+	curTime := uint64(now.UnixNano()) / 1000
 
 	lastID := ss.getLastEntryID()
 

@@ -5,6 +5,7 @@ import (
 	"math"
 	"regexp"
 	"testing"
+	"time"
 
 	"github.com/gomodule/redigo/redis"
 )
@@ -86,6 +87,18 @@ func TestStreamAdd(t *testing.T) {
 		res, err = redis.String(c.Do("XADD", "s", "*", "one", "111", "two", "222"))
 		ok(t, err)
 		equals(t, fmt.Sprintf("%d-1", uint64(math.MaxUint64-100)), res)
+	})
+
+	t.Run("XADD SetTime", func(t *testing.T) {
+		now := time.Date(2001, 1, 1, 4, 4, 5, 4000, time.UTC)
+		s.SetTime(now)
+		id, err := redis.String(c.Do("XADD", "now", "*", "one", "1"))
+		ok(t, err)
+		equals(t, "978321845000004-0", id)
+
+		id, err = redis.String(c.Do("XADD", "now", "*", "two", "2"))
+		ok(t, err)
+		equals(t, "978321845000004-1", id)
 	})
 
 	t.Run("error cases", func(t *testing.T) {
