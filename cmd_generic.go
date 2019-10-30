@@ -80,10 +80,7 @@ func makeCmdExpire(m *Miniredis, unix bool, d time.Duration) func(*server.Peer, 
 				default:
 					panic("invalid time unit (d). Fixme!")
 				}
-				now := m.now
-				if now.IsZero() {
-					now = time.Now().UTC()
-				}
+				now := m.effectiveNow()
 				db.ttl[key] = ts.Sub(now)
 			} else {
 				db.ttl[key] = time.Duration(i) * d

@@ -56,7 +56,7 @@ type Miniredis struct {
 	selectedDB  int               // DB id used in the direct Get(), Set() &c.
 	scripts     map[string]string // sha1 -> lua src
 	signal      *sync.Cond
-	now         time.Time // used to make a duration from EXPIREAT. time.Now() if not set.
+	now         time.Time // time.Now() if not set.
 	subscribers map[*Subscriber]struct{}
 	rand        *rand.Rand
 }
@@ -350,8 +350,8 @@ func (m *Miniredis) Dump() string {
 	return r
 }
 
-// SetTime sets the time against which EXPIREAT values are compared. EXPIREAT
-// will use time.Now() if this is not set.
+// SetTime sets the time against which EXPIREAT values are compared, and the
+// time used in stream entry IDs.  Will use time.Now() if this is not set.
 func (m *Miniredis) SetTime(t time.Time) {
 	m.Lock()
 	defer m.Unlock()
@@ -536,4 +536,11 @@ func (m *Miniredis) shuffle(l []string) {
 		j := m.randIntn(len(l))
 		l[i], l[j] = l[j], l[i]
 	}
+}
+
+func (m *Miniredis) effectiveNow() time.Time {
+	if !m.now.IsZero() {
+		return m.now
+	}
+	return time.Now().UTC()
 }
