@@ -175,8 +175,8 @@ func TestDumpSortedSet(t *testing.T) {
 func TestDumpStream(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
-	s.XAdd("elements", "123456789-0", [][2]string{{"name", "wind"}})
 	s.XAdd("elements", "0-1", [][2]string{{"name", "earth"}})
+	s.XAdd("elements", "123456789-0", [][2]string{{"name", "wind"}})
 	s.XAdd("elements", "123456789-1", [][2]string{{"name", "fire"}})
 	if have, want := s.Dump(), `- elements
    0-1

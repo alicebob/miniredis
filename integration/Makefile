@@ -3,6 +3,7 @@
 all: test
 
 test:
+	rm -f ./dump.rdb
 	go test -tags int
 
 commands.txt: ../*.go

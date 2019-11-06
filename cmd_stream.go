@@ -31,34 +31,24 @@ func (m *Miniredis) cmdXadd(c *server.Peer, cmd string, args []string) {
 		return
 	}
 
-	key, id, args := args[0], args[1], args[2:]
-	var entryID streamEntryID
+	key, entryID, args := args[0], args[1], args[2:]
 
-	if strings.ToLower(id) == "maxlen" {
+	if strings.ToLower(entryID) == "maxlen" {
 		setDirty(c)
 		c.WriteError("ERR option MAXLEN is not supported")
 		return
-	}
-	if id != "*" {
-		var err error
-		entryID, err = formatStreamEntryID(id)
-		if err != nil {
-			setDirty(c)
-			c.WriteError(err.Error())
-			return
-		}
 	}
 
 	// args must be composed of field/value pairs.
 	if len(args) == 0 || len(args)%2 != 0 {
 		setDirty(c)
-		c.WriteError(errWrongNumber(cmd))
+		c.WriteError("ERR wrong number of arguments for XADD") // non-default message
 		return
 	}
 
-	entryDict := make([][2]string, 0, len(args)/2)
+	var values [][2]string
 	for len(args) > 0 {
-		entryDict = append(entryDict, [2]string{args[0], args[1]})
+		values = append(values, [2]string{args[0], args[1]})
 		args = args[2:]
 	}
 
@@ -70,9 +60,16 @@ func (m *Miniredis) cmdXadd(c *server.Peer, cmd string, args []string) {
 			return
 		}
 
-		newID, err := db.streamAdd(key, entryID, entryDict)
+		newID, err := db.streamAdd(key, entryID, values)
 		if err != nil {
-			c.WriteError(err.Error())
+			switch err {
+			case errInvalidEntryID:
+				c.WriteError(msgInvalidStreamID)
+			case errInvalidStreamValue:
+				c.WriteError(msgStreamIDTooSmall)
+			default:
+				c.WriteError(err.Error())
+			}
 			return
 		}
 
@@ -134,45 +131,40 @@ func (m *Miniredis) makeCmdXrange(reverse bool) server.Cmd {
 			return
 		}
 
-		key := args[0]
+		var (
+			key      = args[0]
+			startKey = args[1]
+			endKey   = args[2]
+		)
 
-		var start streamEntryID
-		start, err := formatStreamRangeBound(args[1], true, reverse)
-		if err != nil {
-			setDirty(c)
-			c.WriteError(err.Error())
-			return
-		}
-		var end streamEntryID
-		end, err = formatStreamRangeBound(args[2], false, reverse)
-		if err != nil {
-			setDirty(c)
-			c.WriteError(err.Error())
-			return
-		}
-
-		count := 0
+		countArg := "0"
 		if len(args) == 5 {
 			if strings.ToLower(args[3]) != "count" {
 				setDirty(c)
 				c.WriteError(msgSyntaxError)
 				return
 			}
+			countArg = args[4]
+		}
 
-			count, err = strconv.Atoi(args[4])
+		withTx(m, c, func(c *server.Peer, ctx *connCtx) {
+
+			start, err := formatStreamRangeBound(startKey, true, reverse)
 			if err != nil {
-				setDirty(c)
+				c.WriteError(msgInvalidStreamID)
+				return
+			}
+			end, err := formatStreamRangeBound(endKey, false, reverse)
+			if err != nil {
+				c.WriteError(msgInvalidStreamID)
+				return
+			}
+			count, err := strconv.Atoi(countArg)
+			if err != nil {
 				c.WriteError(msgInvalidInt)
 				return
 			}
 
-			if count == 0 {
-				c.WriteLen(0)
-				return
-			}
-		}
-
-		withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 			db := m.db(ctx.selectedDB)
 
 			if !db.exists(key) {
@@ -185,17 +177,15 @@ func (m *Miniredis) makeCmdXrange(reverse bool) server.Cmd {
 				return
 			}
 
-			var entries []streamEntry = db.streamKeys[key]
+			var entries = db.streamKeys[key]
 			if reverse {
 				entries = reversedStreamEntries(entries)
 			}
-
 			if count == 0 {
 				count = len(entries)
 			}
 
-			returnedEntries := make([]streamEntry, 0, count)
-			returnedItemsCount := 0
+			returnedEntries := make([]StreamEntry, 0, count)
 
 			for _, entry := range entries {
 				if len(returnedEntries) == count {
@@ -204,36 +194,35 @@ func (m *Miniredis) makeCmdXrange(reverse bool) server.Cmd {
 
 				if !reverse {
 					// Break if entry ID > end
-					if end.Less(entry.id) {
+					if streamCmp(entry.ID, end) == 1 {
 						break
 					}
 
 					// Continue if entry ID < start
-					if entry.id.Less(start) {
+					if streamCmp(entry.ID, start) == -1 {
 						continue
 					}
 				} else {
 					// Break if entry iD < end
-					if entry.id.Less(end) {
+					if streamCmp(entry.ID, end) == -1 {
 						break
 					}
 
 					// Continue if entry ID > start.
-					if start.Less(entry.id) {
+					if streamCmp(entry.ID, start) == 1 {
 						continue
 					}
 				}
 
 				returnedEntries = append(returnedEntries, entry)
-				returnedItemsCount += 1 + len(entry.values)
 			}
 
 			c.WriteLen(len(returnedEntries))
 			for _, entry := range returnedEntries {
 				c.WriteLen(2)
-				c.WriteBulk(entry.id.String())
-				c.WriteLen(2 * len(entry.values))
-				for _, kv := range entry.values {
+				c.WriteBulk(entry.ID)
+				c.WriteLen(2 * len(entry.Values))
+				for _, kv := range entry.Values {
 					c.WriteBulk(kv[0])
 					c.WriteBulk(kv[1])
 				}

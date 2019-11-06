@@ -667,28 +667,16 @@ func (db *RedisDB) XAdd(k string, id string, values [][2]string) (string, error)
 		return "", ErrWrongType
 	}
 
-	var entryID streamEntryID
-
-	if id == "*" {
-		return db.streamAdd(k, entryID, values)
-	}
-
-	var err error
-	entryID, err = formatStreamEntryID(id)
-	if err != nil {
-		return "", err
-	}
-
-	return db.streamForceAdd(k, entryID, values)
+	return db.streamAdd(k, id, values)
 }
 
-// Stream returns a slice of stream entries id->values maps.
-func (m *Miniredis) Stream(k string) ([]map[string][][2]string, error) {
+// Stream returns a slice of stream entries. Oldest first.
+func (m *Miniredis) Stream(k string) ([]StreamEntry, error) {
 	return m.DB(m.selectedDB).Stream(k)
 }
 
-// Stream returns a slice of stream entries id->values maps.
-func (db *RedisDB) Stream(k string) ([]map[string][][2]string, error) {
+// Stream returns a slice of stream entries. Oldest first.
+func (db *RedisDB) Stream(k string) ([]StreamEntry, error) {
 	db.master.Lock()
 	defer db.master.Unlock()
 

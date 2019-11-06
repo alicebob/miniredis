@@ -12,133 +12,121 @@ import (
 // Basic stream implementation.
 
 var (
-	errInvalidStreamIDFormat = errors.New("ERR Invalid stream ID specified as stream command argument")
+	errInvalidStreamValue = errors.New("stream id is not bigger than the top item")
 )
 
-type streamKey []streamEntry
+type streamKey []StreamEntry
 
-type streamEntry struct {
-	id     streamEntryID
-	values [][2]string
+type StreamEntry struct {
+	ID     string
+	Values [][2]string
 }
 
-type streamEntryID [2]uint64
+func (ss *streamKey) generateID(now time.Time) string {
+	ts := uint64(now.UnixNano()) / 1_000_000
 
-func (id *streamEntryID) Less(other streamEntryID) bool {
-	if other[0] > id[0] {
-		return true
+	lastID := ss.lastID()
+
+	next := fmt.Sprintf("%d-%d", ts, 0)
+	if streamCmp(lastID, next) == -1 {
+		return next
 	}
-
-	if other[0] == id[0] {
-		return other[1] > id[1]
-	}
-
-	return false
+	last := parseStreamID(lastID)
+	return fmt.Sprintf("%d-%d", last[0], last[1]+1)
 }
 
-func (id *streamEntryID) String() string {
-	return fmt.Sprintf("%d-%d", id[0], id[1])
-}
-
-func newStream() streamKey {
-	return streamKey{}
-}
-
-func (ss *streamKey) append(id streamEntryID, values [][2]string) {
-	*ss = append(*ss, streamEntry{id: id, values: values})
-}
-
-func (ss *streamKey) nextEntryID(now time.Time) streamEntryID {
-	curTime := uint64(now.UnixNano()) / 1000
-
-	lastID := ss.getLastEntryID()
-
-	if lastID[0] < curTime {
-		return streamEntryID{curTime, 0}
-	}
-
-	return streamEntryID{lastID[0], lastID[1] + 1}
-}
-
-func (ss *streamKey) isValidNextEntryID(next streamEntryID) error {
-	last := ss.getLastEntryID()
-
-	if !last.Less(next) {
-		return errors.New("ERR The ID specified in XADD is equal or smaller than the target stream top item")
-	}
-
-	return nil
-}
-
-func (ss *streamKey) getLastEntryID() streamEntryID {
-	// Return a zero value in case there is no entry
-	// Note that deleted entries will also need to be tracked
+func (ss *streamKey) lastID() string {
 	if len(*ss) == 0 {
-		return streamEntryID{}
+		return "0-0"
 	}
 
-	return (*ss)[len(*ss)-1].id
+	return (*ss)[len(*ss)-1].ID
 }
 
-func formatStreamEntryID(id string) (fmtid streamEntryID, err error) {
-	parts := strings.Split(id, "-")
-	if len(parts) != 1 && len(parts) != 2 {
-		return fmtid, errInvalidStreamIDFormat
-	}
-
-	ts, err := strconv.ParseUint(parts[0], 10, 64)
-	if err != nil {
-		return fmtid, errInvalidStreamIDFormat
-	}
-
-	var seq uint64
+func parseStreamID(id string) [2]uint64 {
+	var res [2]uint64
+	parts := strings.SplitN(id, "-", 2)
+	res[0], _ = strconv.ParseUint(parts[0], 10, 64)
 	if len(parts) == 2 {
-		seq, err = strconv.ParseUint(parts[1], 10, 64)
-		if err != nil {
-			return fmtid, errInvalidStreamIDFormat
-		}
+		res[1], _ = strconv.ParseUint(parts[1], 10, 64)
 	}
-
-	if ts == 0 && seq == 0 {
-		return fmtid, errInvalidStreamIDFormat
-	}
-
-	return streamEntryID{ts, seq}, nil
+	return res
 }
 
-func formatStreamRangeBound(id string, start bool, reverse bool) (fmtid streamEntryID, err error) {
+// compares two stream IDs (of the full format: "123-123"). Returns: -1, 0, 1
+func streamCmp(a, b string) int {
+	ap := parseStreamID(a)
+	bp := parseStreamID(b)
+	if ap[0] < bp[0] {
+		return -1
+	}
+	if ap[0] > bp[0] {
+		return 1
+	}
+	if ap[1] < bp[1] {
+		return -1
+	}
+	if ap[1] > bp[1] {
+		return 1
+	}
+	return 0
+}
+
+// formatStreamID makes a full id ("42-42") out of a partial one ("42")
+func formatStreamID(id string) (string, error) {
+	var ts [2]uint64
+	parts := strings.SplitN(id, "-", 2)
+
+	if len(parts) > 0 {
+		p, err := strconv.ParseUint(parts[0], 10, 64)
+		if err != nil {
+			return "", errInvalidEntryID
+		}
+		ts[0] = p
+	}
+	if len(parts) > 1 {
+		p, err := strconv.ParseUint(parts[1], 10, 64)
+		if err != nil {
+			return "", errInvalidEntryID
+		}
+		ts[1] = p
+	}
+	return fmt.Sprintf("%d-%d", ts[0], ts[1]), nil
+}
+
+func formatStreamRangeBound(id string, start bool, reverse bool) (string, error) {
 	if id == "-" {
-		return streamEntryID{0, 0}, nil
+		return "0-0", nil
 	}
 
 	if id == "+" {
-		return streamEntryID{math.MaxUint64, math.MaxUint64}, nil
+		return fmt.Sprintf("%d-%d", uint64(math.MaxUint64), uint64(math.MaxUint64)), nil
 	}
 
 	if id == "0" {
-		return streamEntryID{0, 0}, nil
+		return "0-0", nil
 	}
 
 	parts := strings.Split(id, "-")
 	if len(parts) == 2 {
-		return formatStreamEntryID(id)
+		return formatStreamID(id)
 	}
 
 	// Incomplete IDs case
 	ts, err := strconv.ParseUint(parts[0], 10, 64)
 	if err != nil {
-		return fmtid, errInvalidStreamIDFormat
+		return "", errInvalidEntryID
 	}
 
 	if (!start && !reverse) || (start && reverse) {
-		return streamEntryID{ts, math.MaxUint64}, nil
+		return fmt.Sprintf("%d-%d", ts, uint64(math.MaxUint64)), nil
 	}
 
-	return streamEntryID{ts, 0}, nil
+	return fmt.Sprintf("%d-%d", ts, 0), nil
 }
 
-func reversedStreamEntries(o []streamEntry) []streamEntry {
-	newStream := make([]streamEntry, len(o))
+func reversedStreamEntries(o []StreamEntry) []StreamEntry {
+	newStream := make([]StreamEntry, len(o))
 
 	for i, e := range o {
 		newStream[len(o)-i-1] = e

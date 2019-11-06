@@ -1,9 +1,14 @@
 package miniredis
 
 import (
+	"errors"
 	"sort"
 	"strconv"
 	"time"
+)
+
+var (
+	errInvalidEntryID = errors.New("stream ID is invalid")
 )
 
 func (db *RedisDB) exists(k string) bool {
@@ -542,74 +547,35 @@ func (db *RedisDB) setUnion(keys []string) (setKey, error) {
 	return s, nil
 }
 
-// stream set returns a stream as a slice.
-func (db *RedisDB) stream(key string) []map[string][][2]string {
-	stream := db.streamKeys[key]
-	if len(stream) == 0 {
-		return nil
-	}
-
-	rawStream := make([]map[string][][2]string, len(stream))
-	for i, entry := range stream {
-		rawStream[i] = map[string][][2]string{entry.id.String(): entry.values}
-	}
-
-	return rawStream
+// stream set returns a stream as a slice. Lowest ID first.
+func (db *RedisDB) stream(key string) []StreamEntry {
+	return db.streamKeys[key]
 }
 
-// streamAdd adds an entry to a stream. Returns entry ID.
-// If entryID corresponds to the zero value, the ID will be generated automatically.
-func (db *RedisDB) streamAdd(key string, entryID streamEntryID, values [][2]string) (string, error) {
+// streamAdd adds an entry to a stream. Returns the new entry ID.
+// If id is empty or "*" the ID will be generated automatically.
+func (db *RedisDB) streamAdd(key, entryID string, values [][2]string) (string, error) {
 	stream, ok := db.streamKeys[key]
 	if !ok {
-		stream = newStream()
 		db.keys[key] = "stream"
 	}
 
-	if entryID[0] == 0 && entryID[1] == 0 {
-		entryID = stream.nextEntryID(db.master.effectiveNow())
+	if entryID == "" || entryID == "*" {
+		entryID = stream.generateID(db.master.effectiveNow())
 	}
-
-	if err := stream.isValidNextEntryID(entryID); err != nil {
+	entryID, err := formatStreamID(entryID)
+	if err != nil {
 		return "", err
 	}
-
-	stream.append(entryID, values)
-	db.streamKeys[key] = stream
-	db.keyVersion[key]++
-
-	return entryID.String(), nil
-}
-
-// streamForceInsert adds an entry to a stream, regardless of whether the provided entry would be the last.
-// Returns entry ID.
-func (db *RedisDB) streamForceAdd(key string, entryID streamEntryID, values [][2]string) (string, error) {
-	stream, ok := db.streamKeys[key]
-	if !ok {
-		return db.streamAdd(key, entryID, values)
+	if entryID == "0-0" || streamCmp(stream.lastID(), entryID) != -1 {
+		return "", errInvalidStreamValue
 	}
-
-	newStream := make(streamKey, 0, len(stream)+1)
-
-	for i, entry := range stream {
-		if entryID.Less(entry.id) {
-			newStream = append(newStream, streamEntry{id: entryID, values: values})
-			newStream = append(newStream, stream[i:]...)
-
-			break
-		}
-
-		newStream = append(newStream, entry)
-
-		if i == len(stream)-1 {
-			newStream = append(newStream, streamEntry{id: entryID, values: values})
-		}
-	}
-
-	db.streamKeys[key] = newStream
+	db.streamKeys[key] = append(stream, StreamEntry{
+		ID:     entryID,
+		Values: values,
+	})
 	db.keyVersion[key]++
-
-	return entryID.String(), nil
+	return entryID, nil
 }
 
 // fastForward proceeds the current timestamp with duration, works as a time machine

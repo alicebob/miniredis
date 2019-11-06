@@ -33,28 +33,35 @@ func TestStream(t *testing.T) {
 		equals(t, "stream", s)
 	})
 
+	now := time.Date(2001, 1, 1, 4, 4, 5, 4_000_000, time.UTC)
+	s.SetTime(now)
+
 	t.Run("direct usage", func(t *testing.T) {
 		_, err := s.XAdd("s1", "0-0", [][2]string{{"name", "foo"}})
-		assert(t, err != nil, "XAdd error")
+		mustFail(t, err, errInvalidStreamValue.Error())
 
 		id, err := s.XAdd("s1", "12345-67", [][2]string{{"name", "bar"}})
 		ok(t, err)
 		equals(t, "12345-67", id)
 
-		id, err = s.XAdd("s1", "12345-0", [][2]string{{"name", "foo"}})
-		ok(t, err)
+		_, err = s.XAdd("s1", "12345-0", [][2]string{{"name", "foo"}})
+		mustFail(t, err, errInvalidStreamValue.Error())
 
 		id, err = s.XAdd("s1", "*", [][2]string{{"name", "baz"}})
 		ok(t, err)
-		exp := `\d+-0`
-		matched, err := regexp.MatchString(exp, id)
-		ok(t, err)
-		assert(t, matched, "expected: %#v got: %#v", exp, id)
+		equals(t, "978321845004-0", id)
 
 		stream, err := s.Stream("s1")
 		ok(t, err)
-		equals(t, 3, len(stream))
-		equals(t, [][2]string{{"name", "bar"}}, stream[1]["12345-67"])
+		equals(t, 2, len(stream))
+		equals(t, StreamEntry{
+			ID:     "12345-67",
+			Values: [][2]string{{"name", "bar"}},
+		}, stream[0])
+		equals(t, StreamEntry{
+			ID:     "978321845004-0",
+			Values: []string{"name", "baz"},
+		}, stream[1])
 	})
 }
 
@@ -90,15 +97,15 @@ func TestStreamAdd(t *testing.T) {
 	})
 
 	t.Run("XADD SetTime", func(t *testing.T) {
-		now := time.Date(2001, 1, 1, 4, 4, 5, 4000, time.UTC)
+		now := time.Date(2001, 1, 1, 4, 4, 5, 4_000_000, time.UTC)
 		s.SetTime(now)
 		id, err := redis.String(c.Do("XADD", "now", "*", "one", "1"))
 		ok(t, err)
-		equals(t, "978321845000004-0", id)
+		equals(t, "978321845004-0", id)
 
 		id, err = redis.String(c.Do("XADD", "now", "*", "two", "2"))
 		ok(t, err)
-		equals(t, "978321845000004-1", id)
+		equals(t, "978321845004-1", id)
 	})
 
 	t.Run("error cases", func(t *testing.T) {
@@ -241,11 +248,11 @@ func TestStreamRange(t *testing.T) {
 		mustFail(t, err, errWrongNumber("xrange"))
 		_, err = redis.Int(c.Do("XRANGE", "foo", 2, 3, "toomany"))
 		mustFail(t, err, msgSyntaxError)
-		_, err = redis.Int(c.Do("XRANGE", "foo", 2, 3, "COUNT", "noint"))
+		_, err = c.Do("XRANGE", "foo", 2, 3, "COUNT", "noint")
 		mustFail(t, err, msgInvalidInt)
-		_, err = redis.Int(c.Do("XRANGE", "foo", 2, 3, "COUNT", 1, "toomany"))
+		_, err = c.Do("XRANGE", "foo", 2, 3, "COUNT", 1, "toomany")
 		mustFail(t, err, msgSyntaxError)
-		_, err = redis.Int(c.Do("XRANGE", "foo", "-", "noint"))
-		mustFail(t, err, errInvalidStreamIDFormat.Error())
+		_, err = c.Do("XRANGE", "foo", "-", "noint")
+		mustFail(t, err, msgInvalidStreamID)
 	})
 }
