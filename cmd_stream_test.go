@@ -33,7 +33,7 @@ func TestStream(t *testing.T) {
 		equals(t, "stream", s)
 	})
 
-	now := time.Date(2001, 1, 1, 4, 4, 5, 4_000_000, time.UTC)
+	now := time.Date(2001, 1, 1, 4, 4, 5, 4000000, time.UTC)
 	s.SetTime(now)
 
 	t.Run("direct usage", func(t *testing.T) {
@@ -97,7 +97,7 @@ func TestStreamAdd(t *testing.T) {
 	})
 
 	t.Run("XADD SetTime", func(t *testing.T) {
-		now := time.Date(2001, 1, 1, 4, 4, 5, 4_000_000, time.UTC)
+		now := time.Date(2001, 1, 1, 4, 4, 5, 4000000, time.UTC)
 		s.SetTime(now)
 		id, err := redis.String(c.Do("XADD", "now", "*", "one", "1"))
 		ok(t, err)
@@ -109,7 +109,7 @@ func TestStreamAdd(t *testing.T) {
 	})
 
 	t.Run("XADD MAXLEN", func(t *testing.T) {
-		now := time.Date(2001, 1, 1, 4, 4, 5, 4_000_000, time.UTC)
+		now := time.Date(2001, 1, 1, 4, 4, 5, 4000000, time.UTC)
 		s.SetTime(now)
 
 		for i := 0; i < 100; i++ {

@@ -25,7 +25,7 @@ type StreamEntry struct {
 }
 
 func (ss *streamKey) generateID(now time.Time) string {
-	ts := uint64(now.UnixNano()) / 1_000_000
+	ts := uint64(now.UnixNano()) / 1000000
 
 	lastID := ss.lastID()
 
