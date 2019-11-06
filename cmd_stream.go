@@ -46,9 +46,9 @@ func (m *Miniredis) cmdXadd(c *server.Peer, cmd string, args []string) {
 		return
 	}
 
-	var values [][2]string
+	var values []string
 	for len(args) > 0 {
-		values = append(values, [2]string{args[0], args[1]})
+		values = append(values, args[0], args[1])
 		args = args[2:]
 	}
 
@@ -221,10 +221,9 @@ func (m *Miniredis) makeCmdXrange(reverse bool) server.Cmd {
 			for _, entry := range returnedEntries {
 				c.WriteLen(2)
 				c.WriteBulk(entry.ID)
-				c.WriteLen(2 * len(entry.Values))
-				for _, kv := range entry.Values {
-					c.WriteBulk(kv[0])
-					c.WriteBulk(kv[1])
+				c.WriteLen(len(entry.Values))
+				for _, v := range entry.Values {
+					c.WriteBulk(v)
 				}
 			}
 		})

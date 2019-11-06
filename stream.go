@@ -1,3 +1,5 @@
+// Basic stream implementation.
+
 package miniredis
 
 import (
@@ -9,17 +11,17 @@ import (
 	"time"
 )
 
-// Basic stream implementation.
-
 var (
 	errInvalidStreamValue = errors.New("stream id is not bigger than the top item")
 )
 
 type streamKey []StreamEntry
 
+// A StreamEntry is an entry in a stream. The ID is always of the form
+// "123-123". Values should have an even length of entries.
 type StreamEntry struct {
 	ID     string
-	Values [][2]string
+	Values []string
 }
 
 func (ss *streamKey) generateID(now time.Time) string {

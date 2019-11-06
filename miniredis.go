@@ -339,8 +339,9 @@ func (m *Miniredis) Dump() string {
 		case "stream":
 			for _, entry := range db.streamKeys[k] {
 				r += fmt.Sprintf("%s%s\n", indent, entry.ID)
-				for _, kv := range entry.Values {
-					r += fmt.Sprintf("%s%s%s: %s\n", indent, indent, v(kv[0]), v(kv[1]))
+				ev := entry.Values
+				for i := 0; i < len(ev)/2; i++ {
+					r += fmt.Sprintf("%s%s%s: %s\n", indent, indent, v(ev[2*i]), v(ev[2*i+1]))
 				}
 			}
 		default:

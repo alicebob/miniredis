@@ -651,14 +651,17 @@ func (db *RedisDB) ZScore(k, member string) (float64, error) {
 	return db.ssetScore(k, member), nil
 }
 
-// XAdd adds an entry to a stream.
-func (m *Miniredis) XAdd(k string, id string, values [][2]string) (string, error) {
+// XAdd adds an entry to a stream. `id` can be left empty or be '*'.
+// If a value is given normal XADD rules apply. Values should be an even
+// length.
+func (m *Miniredis) XAdd(k string, id string, values []string) (string, error) {
 	return m.DB(m.selectedDB).XAdd(k, id, values)
 }
 
-// XAdd adds an entry to a stream.
-// Any valid ID is accepted regardless of the current latest ID.
-func (db *RedisDB) XAdd(k string, id string, values [][2]string) (string, error) {
+// XAdd adds an entry to a stream. `id` can be left empty or be '*'.
+// If a value is given normal XADD rules apply. Values should be an even
+// length.
+func (db *RedisDB) XAdd(k string, id string, values []string) (string, error) {
 	db.master.Lock()
 	defer db.master.Unlock()
 	defer db.master.signal.Broadcast()

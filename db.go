@@ -554,7 +554,8 @@ func (db *RedisDB) stream(key string) []StreamEntry {
 
 // streamAdd adds an entry to a stream. Returns the new entry ID.
 // If id is empty or "*" the ID will be generated automatically.
-func (db *RedisDB) streamAdd(key, entryID string, values [][2]string) (string, error) {
+// `values` should have an even length.
+func (db *RedisDB) streamAdd(key, entryID string, values []string) (string, error) {
 	stream, ok := db.streamKeys[key]
 	if !ok {
 		db.keys[key] = "stream"

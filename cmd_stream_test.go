@@ -37,17 +37,17 @@ func TestStream(t *testing.T) {
 	s.SetTime(now)
 
 	t.Run("direct usage", func(t *testing.T) {
-		_, err := s.XAdd("s1", "0-0", [][2]string{{"name", "foo"}})
+		_, err := s.XAdd("s1", "0-0", []string{"name", "foo"})
 		mustFail(t, err, errInvalidStreamValue.Error())
 
-		id, err := s.XAdd("s1", "12345-67", [][2]string{{"name", "bar"}})
+		id, err := s.XAdd("s1", "12345-67", []string{"name", "bar"})
 		ok(t, err)
 		equals(t, "12345-67", id)
 
-		_, err = s.XAdd("s1", "12345-0", [][2]string{{"name", "foo"}})
+		_, err = s.XAdd("s1", "12345-0", []string{"name", "foo"})
 		mustFail(t, err, errInvalidStreamValue.Error())
 
-		id, err = s.XAdd("s1", "*", [][2]string{{"name", "baz"}})
+		id, err = s.XAdd("s1", "*", []string{"name", "baz"})
 		ok(t, err)
 		equals(t, "978321845004-0", id)
 
@@ -56,7 +56,7 @@ func TestStream(t *testing.T) {
 		equals(t, 2, len(stream))
 		equals(t, StreamEntry{
 			ID:     "12345-67",
-			Values: [][2]string{{"name", "bar"}},
+			Values: []string{"name", "bar"},
 		}, stream[0])
 		equals(t, StreamEntry{
 			ID:     "978321845004-0",
@@ -113,7 +113,7 @@ func TestStreamAdd(t *testing.T) {
 		_, err := redis.String(c.Do("SET", "str", "value"))
 		ok(t, err)
 
-		_, err = s.XAdd("str", "*", [][2]string{{"hi", "1"}})
+		_, err = s.XAdd("str", "*", []string{"hi", "1"})
 		mustFail(t, err, msgWrongType)
 
 		_, err = redis.String(c.Do("XADD", "str", "*", "hi", "1"))
