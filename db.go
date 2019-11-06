@@ -579,6 +579,16 @@ func (db *RedisDB) streamAdd(key, entryID string, values []string) (string, erro
 	return entryID, nil
 }
 
+func (db *RedisDB) streamMaxlen(key string, n int) {
+	stream, ok := db.streamKeys[key]
+	if !ok {
+		return
+	}
+	if len(stream) > n {
+		db.streamKeys[key] = stream[len(stream)-n:]
+	}
+}
+
 // fastForward proceeds the current timestamp with duration, works as a time machine
 func (db *RedisDB) fastForward(duration time.Duration) {
 	for _, key := range db.allKeys() {

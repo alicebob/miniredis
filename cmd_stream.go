@@ -31,30 +31,48 @@ func (m *Miniredis) cmdXadd(c *server.Peer, cmd string, args []string) {
 		return
 	}
 
-	key, entryID, args := args[0], args[1], args[2:]
-
-	if strings.ToLower(entryID) == "maxlen" {
-		setDirty(c)
-		c.WriteError("ERR option MAXLEN is not supported")
-		return
-	}
-
-	// args must be composed of field/value pairs.
-	if len(args) == 0 || len(args)%2 != 0 {
-		setDirty(c)
-		c.WriteError("ERR wrong number of arguments for XADD") // non-default message
-		return
-	}
-
-	var values []string
-	for len(args) > 0 {
-		values = append(values, args[0], args[1])
-		args = args[2:]
-	}
+	key, args := args[0], args[1:]
 
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
-		db := m.db(ctx.selectedDB)
 
+		maxlen := -1
+		if strings.ToLower(args[0]) == "maxlen" {
+			args = args[1:]
+			// we don't treat "~" special
+			if args[0] == "~" {
+				args = args[1:]
+			}
+			n, err := strconv.Atoi(args[0])
+			if err != nil {
+				c.WriteError(msgInvalidInt)
+				return
+			}
+			if n < 0 {
+				c.WriteError("ERR The MAXLEN argument must be >= 0.")
+				return
+			}
+			maxlen = n
+			args = args[1:]
+		}
+		if len(args) < 1 {
+			c.WriteError(errWrongNumber(cmd))
+			return
+		}
+		entryID, args := args[0], args[1:]
+
+		// args must be composed of field/value pairs.
+		if len(args) == 0 || len(args)%2 != 0 {
+			c.WriteError("ERR wrong number of arguments for XADD") // non-default message
+			return
+		}
+
+		var values []string
+		for len(args) > 0 {
+			values = append(values, args[0], args[1])
+			args = args[2:]
+		}
+
+		db := m.db(ctx.selectedDB)
 		if db.exists(key) && db.t(key) != "stream" {
 			c.WriteError(ErrWrongType.Error())
 			return
@@ -71,6 +89,10 @@ func (m *Miniredis) cmdXadd(c *server.Peer, cmd string, args []string) {
 				c.WriteError(err.Error())
 			}
 			return
+		}
+
+		if maxlen >= 0 {
+			db.streamMaxlen(key, maxlen)
 		}
 
 		c.WriteBulk(newID)

@@ -327,6 +327,9 @@ func looselyEqual(a, b interface{}) bool {
 	case []byte:
 		_, ok := b.([]byte)
 		return ok
+	case int64:
+		_, ok := b.(int64)
+		return ok
 	case error:
 		_, ok := b.(error)
 		return ok
@@ -345,7 +348,7 @@ func looselyEqual(a, b interface{}) bool {
 		}
 		return true
 	default:
-		panic(fmt.Sprintf("unhandled case, got a %#v", a))
+		panic(fmt.Sprintf("unhandled case, got a %#v / %T", a, a))
 	}
 }
 

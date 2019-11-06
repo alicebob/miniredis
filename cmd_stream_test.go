@@ -108,11 +108,33 @@ func TestStreamAdd(t *testing.T) {
 		equals(t, "978321845004-1", id)
 	})
 
+	t.Run("XADD MAXLEN", func(t *testing.T) {
+		now := time.Date(2001, 1, 1, 4, 4, 5, 4_000_000, time.UTC)
+		s.SetTime(now)
+
+		for i := 0; i < 100; i++ {
+			_, err := redis.String(c.Do("XADD", "nowy", "MAXLEN", "10", "*", "one", "1"))
+			ok(t, err)
+			nowy, _ := s.Stream("nowy")
+			assert(t, len(nowy) <= 10, "deleted entries")
+		}
+		nowy, _ := s.Stream("nowy")
+		equals(t, 10, len(nowy))
+
+		for i := 0; i < 100; i++ {
+			_, err := redis.String(c.Do("XADD", "nowz", "MAXLEN", "~", "10", "*", "one", "1"))
+			ok(t, err)
+			nowz, _ := s.Stream("nowz")
+			assert(t, len(nowz) <= 10, "deleted entries")
+		}
+		nowz, _ := s.Stream("nowz")
+		equals(t, 10, len(nowz))
+	})
+
 	t.Run("error cases", func(t *testing.T) {
 		// Wrong type of key
 		_, err := redis.String(c.Do("SET", "str", "value"))
 		ok(t, err)
-
 		_, err = s.XAdd("str", "*", []string{"hi", "1"})
 		mustFail(t, err, msgWrongType)
 
@@ -126,7 +148,9 @@ func TestStreamAdd(t *testing.T) {
 		assert(t, err != nil, "XADD error")
 		_, err = redis.String(c.Do("XADD", "s", "*", "key")) // odd
 		assert(t, err != nil, "XADD error")
-		_, err = redis.String(c.Do("XADD", "s", "MAXLEN", "~", "1000", "*", "key")) // MAXLEN
+		_, err = redis.String(c.Do("XADD", "s", "MAXLEN", "!!!", "1000", "*", "key"))
+		assert(t, err != nil, "XADD error")
+		_, err = redis.String(c.Do("XADD", "s", "MAXLEN", "~", "thousand", "*", "key"))
 		assert(t, err != nil, "XADD error")
 
 		_, err = redis.String(c.Do("XADD", "s", "a-b", "one", "111", "two", "222")) // invalid id format

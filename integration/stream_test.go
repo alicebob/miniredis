@@ -49,7 +49,37 @@ func TestStream(t *testing.T) {
 		fail("XADD", "newplanets", "bar-123", "foo", "bar"),
 		fail("XADD", "newplanets", "123-123-123", "foo", "bar"),
 		succ("SET", "str", "I am a string"),
-		fail("XADD", "str", "1000", "foo", "bar"),
+		// fail("XADD", "str", "1000", "foo", "bar"),
+		// fail("XADD", "str", "invalid-key", "foo", "bar"),
+
+		fail("XADD", "planets"),
+		fail("XADD"),
+	)
+
+	testCommands(t,
+		succLoosely("XADD", "planets", "MAXLEN", "4", "*", "name", "Mercury"),
+		succLoosely("XADD", "planets", "MAXLEN", "4", "*", "name", "Mercury"),
+		succLoosely("XADD", "planets", "MAXLEN", "4", "*", "name", "Mercury"),
+		succLoosely("XADD", "planets", "MAXLEN", "4", "*", "name", "Mercury"),
+		succLoosely("XADD", "planets", "MAXLEN", "4", "*", "name", "Mercury"),
+		succLoosely("XADD", "planets", "MAXLEN", "4", "*", "name", "Mercury"),
+		succLoosely("XLEN", "planets"),
+		succLoosely("XADD", "planets", "MAXLEN", "~", "4", "*", "name", "Mercury"),
+
+		fail("XADD", "planets", "MAXLEN", "!", "4", "*", "name", "Mercury"),
+		fail("XADD", "planets", "MAXLEN", " ~", "4", "*", "name", "Mercury"),
+		fail("XADD", "planets", "MAXLEN", "-4", "*", "name", "Mercury"),
+		fail("XADD", "planets", "MAXLEN", "", "*", "name", "Mercury"),
+		fail("XADD", "planets", "MAXLEN", "!", "four", "*", "name", "Mercury"),
+		fail("XADD", "planets", "MAXLEN", "~", "four"),
+		fail("XADD", "planets", "MAXLEN", "~"),
+		fail("XADD", "planets", "MAXLEN"),
+
+		succ("XADD", "planets", "MAXLEN", "0", "*", "name", "Mercury"),
+		succ("XLEN", "planets"),
+
+		succ("SET", "str", "I am a string"),
+		fail("XADD", "str", "MAXLEN", "four", "*", "foo", "bar"),
 	)
 
 	testCommands(t,
@@ -63,6 +93,10 @@ func TestStream(t *testing.T) {
 
 		succ("MULTI"),
 		succ("XADD", "planets", "foo-bar", "name", "Mercury"),
+		succ("EXEC"),
+
+		succ("MULTI"),
+		succ("XADD", "planets", "MAXLEN", "four", "*", "name", "Mercury"),
 		succ("EXEC"),
 	)
 }
