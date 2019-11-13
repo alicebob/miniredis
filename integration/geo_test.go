@@ -88,6 +88,34 @@ func TestGeopos(t *testing.T) {
 	)
 }
 
+func TestGeodist(t *testing.T) {
+	testCommands(t,
+		succ("GEOADD",
+			"Sicily",
+			"13.361389", "38.115556", "Palermo",
+			"15.087269", "37.502669", "Catania",
+		),
+		succLoosely("GEODIST", "Sicily", "Palermo", "Catania"),
+		succLoosely("GEODIST", "Sicily", "Catania", "Palermo"),
+		succ("GEODIST", "Sicily", "nosuch", "Palermo"),
+		succ("GEODIST", "Sicily", "Catania", "nosuch"),
+		succ("GEODIST", "nosuch", "Catania", "Palermo"),
+		succLoosely("GEODIST", "Sicily", "Palermo", "Catania", "m"),
+		succLoosely("GEODIST", "Sicily", "Palermo", "Catania", "km"),
+		succLoosely("GEODIST", "Sicily", "Palermo", "Catania", "mi"),
+		succLoosely("GEODIST", "Sicily", "Palermo", "Catania", "ft"),
+		succLoosely("GEODIST", "Sicily", "Palermo", "Palermo"),
+
+		fail("GEODIST", "Sicily", "Palermo", "Palermo", "yards"),
+		fail("GEODIST"),
+		fail("GEODIST", "Sicily"),
+		fail("GEODIST", "Sicily", "Palermo"),
+		fail("GEODIST", "Sicily", "Palermo", "Palermo", "miles", "too many"),
+		succ("SET", "string", "123"),
+		fail("GEODIST", "string", "a", "b"),
+	)
+}
+
 func TestGeoradius(t *testing.T) {
 	t.Run("basic", func(t *testing.T) {
 		testCommands(t,
