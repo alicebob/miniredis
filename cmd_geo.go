@@ -169,8 +169,8 @@ func (m *Miniredis) cmdGeopos(c *server.Peer, cmd string, args []string) {
 			score := db.ssetScore(key, l)
 			c.WriteLen(2)
 			long, lat := fromGeohash(uint64(score))
-			c.WriteBulk(formatGeo(long))
-			c.WriteBulk(formatGeo(lat))
+			c.WriteBulk(fmt.Sprintf("%f", long))
+			c.WriteBulk(fmt.Sprintf("%f", lat))
 		}
 	})
 }
@@ -363,8 +363,8 @@ func (m *Miniredis) cmdGeoradius(c *server.Peer, cmd string, args []string) {
 			}
 			if withCoord {
 				c.WriteLen(2)
-				c.WriteBulk(formatGeo(member.Longitude))
-				c.WriteBulk(formatGeo(member.Latitude))
+				c.WriteBulk(fmt.Sprintf("%f", member.Longitude))
+				c.WriteBulk(fmt.Sprintf("%f", member.Latitude))
 			}
 		}
 	})

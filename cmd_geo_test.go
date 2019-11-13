@@ -53,7 +53,7 @@ func TestGeopos(t *testing.T) {
 		pos, err := redis.Positions(c.Do("GEOPOS", "Sicily", "Palermo"))
 		ok(t, err)
 		equals(t, 1, len(pos))
-		equals(t, [2]float64{13.36139, 38.11556}, *pos[0])
+		equals(t, [2]float64{13.361389, 38.115556}, *pos[0])
 	})
 
 	t.Run("no location", func(t *testing.T) {
@@ -144,11 +144,11 @@ func TestGeo(t *testing.T) {
 		ok(t, err)
 		equals(t, 0, len(leftover))
 		equals(t, "Palermo", name1)
-		equals(t, 190.4426, dist1) // in km
+		equals(t, 190.4424, dist1) // in km
 		_, err = redis.Scan(res[1].([]interface{}), &name2, &dist2)
 		ok(t, err)
 		equals(t, "Catania", name2)
-		equals(t, 56.4412, dist2)
+		equals(t, 56.4413, dist2)
 
 		// in meter
 		res, err = redis.Values(c.Do("GEORADIUS", "Sicily", 15, 37, 200000, "m", "WITHDIST"))
@@ -156,7 +156,7 @@ func TestGeo(t *testing.T) {
 		equals(t, 2, len(res))
 		distance, err := redis.Float64(res[0].([]interface{})[1], nil)
 		ok(t, err)
-		equals(t, 190442.5579, distance) // in meter
+		equals(t, 190442.4351, distance) // in meter
 	})
 
 	t.Run("ASC DESC", func(t *testing.T) {
@@ -249,11 +249,11 @@ func TestGeodist(t *testing.T) {
 	t.Run("no unit", func(t *testing.T) {
 		d, err := redis.Float64(c.Do("GEODIST", "Sicily", "Palermo", "Catania"))
 		ok(t, err)
-		equals(t, 166274.1440, d)
+		equals(t, 166274.1514, d)
 
 		d, err = redis.Float64(c.Do("GEODIST", "Sicily", "Palermo", "Catania", "km"))
 		ok(t, err)
-		equals(t, 166.2741, d)
+		equals(t, 166.2742, d)
 	})
 
 	t.Run("no such key", func(t *testing.T) {

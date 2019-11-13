@@ -54,6 +54,16 @@ func succLoosely(cmd string, args ...interface{}) command {
 	}
 }
 
+// round all floats to 2 decimal places
+func succRound2(cmd string, args ...interface{}) command {
+	return command{
+		cmd:         cmd,
+		args:        args,
+		error:       false,
+		roundFloats: 2,
+	}
+}
+
 // round all floats to 3 decimal places
 func succRound3(cmd string, args ...interface{}) command {
 	return command{
