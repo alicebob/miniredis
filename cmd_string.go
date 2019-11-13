@@ -3,6 +3,7 @@
 package miniredis
 
 import (
+	"math/big"
 	"strconv"
 	"strings"
 	"time"
@@ -504,7 +505,7 @@ func (m *Miniredis) cmdIncrbyfloat(c *server.Peer, cmd string, args []string) {
 	}
 
 	key := args[0]
-	delta, err := strconv.ParseFloat(args[1], 64)
+	delta, _, err := big.ParseFloat(args[1], 10, 128, 0)
 	if err != nil {
 		setDirty(c)
 		c.WriteError(msgInvalidFloat)
@@ -525,7 +526,7 @@ func (m *Miniredis) cmdIncrbyfloat(c *server.Peer, cmd string, args []string) {
 			return
 		}
 		// Don't touch TTL
-		c.WriteBulk(formatFloat(v))
+		c.WriteBulk(formatBig(v))
 	})
 }
 
