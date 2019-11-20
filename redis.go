@@ -34,6 +34,7 @@ const (
 	msgInvalidStreamID    = "ERR Invalid stream ID specified as stream command argument"
 	msgStreamIDTooSmall   = "ERR The ID specified in XADD is equal or smaller than the target stream top item"
 	msgNoScriptFound      = "NOSCRIPT No matching script. Please use EVAL."
+	msgUnsupportedUnit    = "ERR unsupported unit provided. please use m, km, ft, mi"
 )
 
 func errWrongNumber(cmd string) string {

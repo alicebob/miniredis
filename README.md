@@ -173,7 +173,7 @@ Implemented commands:
    - SCRIPT FLUSH
  - GEO
    - GEOADD
-   - ~~GEODIST~~
+   - GEODIST
    - ~~GEOHASH~~
    - GEOPOS
    - GEORADIUS

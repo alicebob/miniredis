@@ -75,16 +75,44 @@ func TestGeopos(t *testing.T) {
 			"15.087269", "37.502669", "Catania",
 		),
 		succ("GEOPOS", "Sicily"),
-		succLoosely("GEOPOS", "Sicily", "Palermo"),
+		succRound3("GEOPOS", "Sicily", "Palermo"),
 		succ("GEOPOS", "Sicily", "nosuch"),
-		succLoosely("GEOPOS", "Sicily", "Catania", "Palermo"),
-		succLoosely("GEOPOS", "Sicily", "Catania", "Catania", "Palermo"),
+		succRound3("GEOPOS", "Sicily", "Catania", "Palermo"),
+		succRound3("GEOPOS", "Sicily", "Catania", "Catania", "Palermo"),
 		succ("GEOPOS", "nosuch", "Palermo"),
 
 		// failure cases
 		fail("GEOPOS"),
 		succ("SET", "foo", "bar"),
 		fail("GEOPOS", "foo", "Palermo"),
+	)
+}
+
+func TestGeodist(t *testing.T) {
+	testCommands(t,
+		succ("GEOADD",
+			"Sicily",
+			"13.361389", "38.115556", "Palermo",
+			"15.087269", "37.502669", "Catania",
+		),
+		succRound2("GEODIST", "Sicily", "Palermo", "Catania"),
+		succRound2("GEODIST", "Sicily", "Catania", "Palermo"),
+		succ("GEODIST", "Sicily", "nosuch", "Palermo"),
+		succ("GEODIST", "Sicily", "Catania", "nosuch"),
+		succ("GEODIST", "nosuch", "Catania", "Palermo"),
+		succRound2("GEODIST", "Sicily", "Palermo", "Catania", "m"),
+		succ("GEODIST", "Sicily", "Palermo", "Catania", "km"),
+		succ("GEODIST", "Sicily", "Palermo", "Catania", "mi"),
+		succRound2("GEODIST", "Sicily", "Palermo", "Catania", "ft"),
+		succ("GEODIST", "Sicily", "Palermo", "Palermo"),
+
+		fail("GEODIST", "Sicily", "Palermo", "Palermo", "yards"),
+		fail("GEODIST"),
+		fail("GEODIST", "Sicily"),
+		fail("GEODIST", "Sicily", "Palermo"),
+		fail("GEODIST", "Sicily", "Palermo", "Palermo", "miles", "too many"),
+		succ("SET", "string", "123"),
+		fail("GEODIST", "string", "a", "b"),
 	)
 }
 
@@ -720,9 +748,9 @@ func TestGeo(t *testing.T) {
 		),
 		succ("ZRANGE", "stations", 0, -1),
 		succ("ZRANGE", "stations", 0, -1, "WITHSCORES"),
-		succLoosely("GEORADIUS", "stations", -73.9718893, 40.7728773, 4, "km"),
-		succLoosely("GEORADIUS", "stations", -73.9718893, 40.7728773, 4, "km", "WITHDIST"),
-		succLoosely("GEORADIUS", "stations", -73.9718893, 40.7728773, 4, "km", "WITHCOORD"),
+		succ("GEORADIUS", "stations", -73.9718893, 40.7728773, 4, "km"),
+		succRound3("GEORADIUS", "stations", -73.9718893, 40.7728773, 4, "km", "WITHDIST"),
+		succRound3("GEORADIUS", "stations", -73.9718893, 40.7728773, 4, "km", "WITHCOORD"),
 		succRound3("GEORADIUS", "stations", -73.9718893, 40.7728773, 4, "km", "ASC"),
 		succRound3("GEORADIUS", "stations", -73.9718893, 40.7728773, 4, "km", "DESC"),
 		succRound3("GEORADIUS", "stations", -73.9718893, 40.7728773, 4, "km", "DESC", "COUNT", 3),

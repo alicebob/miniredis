@@ -1,6 +1,7 @@
 package miniredis
 
 import (
+	"math"
 	"testing"
 )
 
@@ -11,6 +12,6 @@ func TestGeolib(t *testing.T) {
 	equals(t, v, uint64(3479099956230698))
 
 	longBack, latBack := fromGeohash(uint64(float64(v)))
-	equals(t, formatGeo(long), formatGeo(longBack))
-	equals(t, formatGeo(lat), formatGeo(latBack))
+	assert(t, math.Abs(long-longBack) < 0.000001, "long")
+	assert(t, math.Abs(lat-latBack) < 0.000001, "lat")
 }

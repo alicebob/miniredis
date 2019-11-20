@@ -1,7 +1,6 @@
 package miniredis
 
 import (
-	"fmt"
 	"math"
 
 	"github.com/alicebob/miniredis/v2/geohash"
@@ -14,15 +13,6 @@ func toGeohash(long, lat float64) uint64 {
 func fromGeohash(score uint64) (float64, float64) {
 	lat, long := geohash.DecodeIntWithPrecision(score, 52)
 	return long, lat
-}
-
-// FormatGeo format a longitude or latitude as a string, used in replies.
-//
-// Redis dumps the raw floating point, but we are off by a little from that
-// number so we don't. The first 5 digits do match with Redis, which will do:
-// https://www.xkcd.com/2170/
-func formatGeo(longlat float64) string {
-	return fmt.Sprintf("%.5f", longlat)
 }
 
 // haversin(θ) function

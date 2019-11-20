@@ -79,25 +79,6 @@ func (b Box) Contains(lat, lng float64) bool {
 		b.MinLng <= lng && lng <= b.MaxLng)
 }
 
-// minDecimalPlaces returns the minimum number of decimal places such that
-// there must exist an number with that many places within any range of width
-// r. This is intended for returning minimal precision coordinates inside a
-// box.
-func maxDecimalPower(r float64) float64 {
-	m := int(math.Floor(math.Log10(r)))
-	return math.Pow10(m)
-}
-
-// Round returns a point inside the box, making an effort to round to minimal
-// precision.
-func (b Box) Round() (lat, lng float64) {
-	x := maxDecimalPower(b.MaxLat - b.MinLat)
-	lat = math.Ceil(b.MinLat/x) * x
-	x = maxDecimalPower(b.MaxLng - b.MinLng)
-	lng = math.Ceil(b.MinLng/x) * x
-	return
-}
-
 // errorWithPrecision returns the error range in latitude and longitude for in
 // integer geohash with bits of precision.
 func errorWithPrecision(bits uint) (latErr, lngErr float64) {
@@ -138,12 +119,6 @@ func BoundingBoxInt(hash uint64) Box {
 	return BoundingBoxIntWithPrecision(hash, 64)
 }
 
-// Decode the string geohash to a (lat, lng) point.
-func Decode(hash string) (lat, lng float64) {
-	box := BoundingBox(hash)
-	return box.Round()
-}
-
 // DecodeCenter decodes the string geohash to the central point of the bounding box.
 func DecodeCenter(hash string) (lat, lng float64) {
 	box := BoundingBox(hash)
@@ -154,7 +129,7 @@ func DecodeCenter(hash string) (lat, lng float64) {
 // precision to a (lat, lng) point.
 func DecodeIntWithPrecision(hash uint64, bits uint) (lat, lng float64) {
 	box := BoundingBoxIntWithPrecision(hash, bits)
-	return box.Round()
+	return box.Center()
 }
 
 // DecodeInt decodes the provided 64-bit integer geohash to a (lat, lng) point.

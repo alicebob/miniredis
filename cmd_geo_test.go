@@ -53,7 +53,7 @@ func TestGeopos(t *testing.T) {
 		pos, err := redis.Positions(c.Do("GEOPOS", "Sicily", "Palermo"))
 		ok(t, err)
 		equals(t, 1, len(pos))
-		equals(t, [2]float64{13.36139, 38.11556}, *pos[0])
+		equals(t, [2]float64{13.361389, 38.115556}, *pos[0])
 	})
 
 	t.Run("no location", func(t *testing.T) {
@@ -144,11 +144,11 @@ func TestGeo(t *testing.T) {
 		ok(t, err)
 		equals(t, 0, len(leftover))
 		equals(t, "Palermo", name1)
-		equals(t, 190.4426, dist1) // in km
+		equals(t, 190.4424, dist1) // in km
 		_, err = redis.Scan(res[1].([]interface{}), &name2, &dist2)
 		ok(t, err)
 		equals(t, "Catania", name2)
-		equals(t, 56.4412, dist2)
+		equals(t, 56.4413, dist2)
 
 		// in meter
 		res, err = redis.Values(c.Do("GEORADIUS", "Sicily", 15, 37, 200000, "m", "WITHDIST"))
@@ -156,7 +156,7 @@ func TestGeo(t *testing.T) {
 		equals(t, 2, len(res))
 		distance, err := redis.Float64(res[0].([]interface{})[1], nil)
 		ok(t, err)
-		equals(t, 190442.5579, distance) // in meter
+		equals(t, 190442.4351, distance) // in meter
 	})
 
 	t.Run("ASC DESC", func(t *testing.T) {
@@ -230,5 +230,62 @@ func TestGeo(t *testing.T) {
 
 		_, err = c.Do("GEORADIUS_RO", "Sicily", 15, 37, 200, "km", "STOREDIST", "foo")
 		mustFail(t, err, "ERR syntax error")
+	})
+}
+
+func TestGeodist(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+	defer c.Close()
+
+	_, err = c.Do("GEOADD", "Sicily", 13.361389, 38.115556, "Palermo")
+	ok(t, err)
+	_, err = c.Do("GEOADD", "Sicily", 15.087269, 37.502669, "Catania")
+	ok(t, err)
+
+	t.Run("no unit", func(t *testing.T) {
+		d, err := redis.Float64(c.Do("GEODIST", "Sicily", "Palermo", "Catania"))
+		ok(t, err)
+		equals(t, 166274.1514, d)
+
+		d, err = redis.Float64(c.Do("GEODIST", "Sicily", "Palermo", "Catania", "km"))
+		ok(t, err)
+		equals(t, 166.2742, d)
+	})
+
+	t.Run("no such key", func(t *testing.T) {
+		n, err := c.Do("GEODIST", "nosuch", "nosuch", "nosuch")
+		ok(t, err)
+		equals(t, nil, n)
+
+		n, err = c.Do("GEODIST", "Sicily", "Palermo", "nosuch")
+		ok(t, err)
+		equals(t, nil, n)
+
+		n, err = c.Do("GEODIST", "Sicily", "nosuch", "Catania")
+		ok(t, err)
+		equals(t, nil, n)
+	})
+
+	t.Run("failure cases", func(t *testing.T) {
+		_, err = c.Do("GEODIST")
+		mustFail(t, err, "ERR wrong number of arguments for 'geodist' command")
+		_, err = c.Do("GEODIST", "Sicily")
+		mustFail(t, err, "ERR wrong number of arguments for 'geodist' command")
+		_, err = c.Do("GEODIST", "Sicily", "Palermo")
+		mustFail(t, err, "ERR wrong number of arguments for 'geodist' command")
+		_, err = c.Do("GEODIST", "Sicily", "Palermo", "Catania", "miles")
+		mustFail(t, err, "ERR unsupported unit provided. please use m, km, ft, mi")
+		_, err = c.Do("GEODIST", "Sicily", "Palermo", "Catania", "m", "too many")
+		mustFail(t, err, "ERR syntax error")
+
+		_, err = c.Do("SET", "foo", "bar")
+		ok(t, err)
+
+		_, err = c.Do("GEODIST", "foo", "Palermo", "Catania")
+		mustFail(t, err, "WRONGTYPE Operation against a key holding the wrong kind of value")
 	})
 }

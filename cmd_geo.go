@@ -14,6 +14,7 @@ import (
 // commandsGeo handles GEOADD, GEORADIUS etc.
 func commandsGeo(m *Miniredis) {
 	m.srv.Register("GEOADD", m.cmdGeoadd)
+	m.srv.Register("GEODIST", m.cmdGeodist)
 	m.srv.Register("GEOPOS", m.cmdGeopos)
 	m.srv.Register("GEORADIUS", m.cmdGeoradius)
 	m.srv.Register("GEORADIUS_RO", m.cmdGeoradius)
@@ -78,6 +79,64 @@ func (m *Miniredis) cmdGeoadd(c *server.Peer, cmd string, args []string) {
 	})
 }
 
+// GEODIST
+func (m *Miniredis) cmdGeodist(c *server.Peer, cmd string, args []string) {
+	if len(args) < 3 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
+	}
+	if !m.handleAuth(c) {
+		return
+	}
+	if m.checkPubsub(c) {
+		return
+	}
+
+	key, from, to, args := args[0], args[1], args[2], args[3:]
+
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
+		db := m.db(ctx.selectedDB)
+		if !db.exists(key) {
+			c.WriteNull()
+			return
+		}
+		if db.t(key) != "zset" {
+			c.WriteError(ErrWrongType.Error())
+			return
+		}
+
+		unit := "m"
+		if len(args) > 0 {
+			unit, args = args[0], args[1:]
+		}
+		if len(args) > 0 {
+			c.WriteError(msgSyntaxError)
+			return
+		}
+
+		toMeter := parseUnit(unit)
+		if toMeter == 0 {
+			c.WriteError(msgUnsupportedUnit)
+			return
+		}
+
+		members := db.sortedsetKeys[key]
+		fromD, okFrom := members.get(from)
+		toD, okTo := members.get(to)
+		if !okFrom || !okTo {
+			c.WriteNull()
+			return
+		}
+
+		fromLo, fromLat := fromGeohash(uint64(fromD))
+		toLo, toLat := fromGeohash(uint64(toD))
+
+		dist := distance(fromLat, fromLo, toLat, toLo) / toMeter
+		c.WriteBulk(fmt.Sprintf("%.4f", dist))
+	})
+}
+
 // GEOPOS
 func (m *Miniredis) cmdGeopos(c *server.Peer, cmd string, args []string) {
 	if len(args) < 1 {
@@ -110,8 +169,8 @@ func (m *Miniredis) cmdGeopos(c *server.Peer, cmd string, args []string) {
 			score := db.ssetScore(key, l)
 			c.WriteLen(2)
 			long, lat := fromGeohash(uint64(score))
-			c.WriteBulk(formatGeo(long))
-			c.WriteBulk(formatGeo(lat))
+			c.WriteBulk(fmt.Sprintf("%f", long))
+			c.WriteBulk(fmt.Sprintf("%f", lat))
 		}
 	})
 }
@@ -157,17 +216,8 @@ func (m *Miniredis) cmdGeoradius(c *server.Peer, cmd string, args []string) {
 		c.WriteError(errWrongNumber(cmd))
 		return
 	}
-	toMeter := 1.0
-	switch args[4] {
-	case "m":
-		toMeter = 1
-	case "km":
-		toMeter = 1000
-	case "mi":
-		toMeter = 1609.34
-	case "ft":
-		toMeter = 0.3048
-	default:
+	toMeter := parseUnit(args[4])
+	if toMeter == 0 {
 		setDirty(c)
 		c.WriteError(errWrongNumber(cmd))
 		return
@@ -313,8 +363,8 @@ func (m *Miniredis) cmdGeoradius(c *server.Peer, cmd string, args []string) {
 			}
 			if withCoord {
 				c.WriteLen(2)
-				c.WriteBulk(formatGeo(member.Longitude))
-				c.WriteBulk(formatGeo(member.Latitude))
+				c.WriteBulk(fmt.Sprintf("%f", member.Longitude))
+				c.WriteBulk(fmt.Sprintf("%f", member.Latitude))
 			}
 		}
 	})
@@ -337,4 +387,19 @@ func withinRadius(members []ssElem, longitude, latitude, radius float64) []geoDi
 		}
 	}
 	return matches
+}
+
+func parseUnit(u string) float64 {
+	switch u {
+	case "m":
+		return 1
+	case "km":
+		return 1000
+	case "mi":
+		return 1609.34
+	case "ft":
+		return 0.3048
+	default:
+		return 0
+	}
 }
