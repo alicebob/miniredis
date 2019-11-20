@@ -1,5 +1,12 @@
 ## Changelog
 
+### v2.11.0
+
+- added XRANGE/XREVRANGE, XADD, and XLEN (thanks @skateinmars)
+- added GEODIST
+- improved precision for geohashes, closer to what real redis does
+- use 128bit floats internally for INCRBYFLOAT and related (thanks @timnd)
+
 ### v2.10.1
 
 - added m.Server()
