@@ -4,6 +4,7 @@ package miniredis
 
 import (
 	"errors"
+	"math/big"
 	"time"
 )
 
@@ -148,7 +149,12 @@ func (db *RedisDB) Incrfloat(k string, delta float64) (float64, error) {
 		return 0, ErrWrongType
 	}
 
-	return db.stringIncrfloat(k, delta)
+	v, err := db.stringIncrfloat(k, big.NewFloat(delta))
+	if err != nil {
+		return 0, err
+	}
+	vf, _ := v.Float64()
+	return vf, nil
 }
 
 // List returns the list k, or an error if it's not there or something else.
@@ -534,7 +540,12 @@ func (db *RedisDB) HIncrfloat(k, f string, delta float64) (float64, error) {
 	defer db.master.Unlock()
 	defer db.master.signal.Broadcast()
 
-	return db.hashIncrfloat(k, f, delta)
+	v, err := db.hashIncrfloat(k, f, big.NewFloat(delta))
+	if err != nil {
+		return 0, err
+	}
+	vf, _ := v.Float64()
+	return vf, nil
 }
 
 // SRem removes fields from a set. Returns number of deleted fields.

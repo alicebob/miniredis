@@ -3,6 +3,7 @@ package miniredis
 import (
 	"fmt"
 	"math"
+	"math/big"
 	"strings"
 	"sync"
 	"time"
@@ -130,16 +131,28 @@ func blocking(
 
 // formatFloat formats a float the way redis does (sort-of)
 func formatFloat(v float64) string {
-	// Format with %f and strip trailing 0s. This is the most like Redis does
-	// it :(
-	// .12 is the magic number where most output is the same as Redis.
-	if math.IsInf(v, +1) {
+	if math.IsInf(v, 1) {
 		return "inf"
 	}
 	if math.IsInf(v, -1) {
 		return "-inf"
 	}
-	sv := fmt.Sprintf("%.12f", v)
+	return stripZeros(fmt.Sprintf("%.12f", v))
+}
+
+// formatBig formats a float the way redis does
+func formatBig(v *big.Float) string {
+	// Format with %f and strip trailing 0s.
+	if v.IsInf() {
+		return "inf"
+	}
+	// if math.IsInf(v, -1) {
+	// return "-inf"
+	// }
+	return stripZeros(fmt.Sprintf("%.17f", v))
+}
+
+func stripZeros(sv string) string {
 	for strings.Contains(sv, ".") {
 		if sv[len(sv)-1] != '0' {
 			break
