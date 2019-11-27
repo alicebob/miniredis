@@ -1,6 +1,7 @@
 package miniredis
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/gomodule/redigo/redis"
@@ -58,6 +59,16 @@ func TestEval(t *testing.T) {
 		b, err := redis.String(c.Do("EVAL", `return string.gsub("foo", "o", "a")`, 0))
 		ok(t, err)
 		equals(t, "faa", b)
+	}
+
+	_, err = c.Do("EVAL", "return someGlobal", 0)
+	if err == nil || !strings.Contains(err.Error(), "Script attempted to access nonexistent global variable 'someGlobal'") {
+		t.Error("unexpected error", err)
+	}
+
+	_, err = c.Do("EVAL", "someGlobal = 5", 0)
+	if err == nil || !strings.Contains(err.Error(), "Script attempted to create global variable 'someGlobal'") {
+		t.Error("unexpected error", err)
 	}
 }
 

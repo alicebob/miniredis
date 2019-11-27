@@ -37,6 +37,7 @@ func (m *Miniredis) runLuaScript(c *server.Peer, script string, args []string) {
 		{lua.TabLibName, lua.OpenTable},
 		{lua.StringLibName, lua.OpenString},
 		{lua.MathLibName, lua.OpenMath},
+		{lua.DebugLibName, lua.OpenDebug},
 	} {
 		if err := l.CallByParam(lua.P{
 			Fn:      l.NewFunction(pair.f),
@@ -90,6 +91,8 @@ func (m *Miniredis) runLuaScript(c *server.Peer, script string, args []string) {
 		l.Push(mod)
 		return 1
 	}))
+
+	l.DoString(protectGlobals)
 
 	l.Push(lua.LString("redis"))
 	l.Call(1, 0)
@@ -228,3 +231,28 @@ func requireGlobal(l *lua.LState, id, modName string) {
 
 	l.SetGlobal(id, mod)
 }
+
+// the following script protects globals
+// it is based on:  http://metalua.luaforge.net/src/lib/strict.lua.html
+var protectGlobals = `
+local dbg=debug
+local mt = {}
+setmetatable(_G, mt)
+mt.__newindex = function (t, n, v)
+  if dbg.getinfo(2) then
+    local w = dbg.getinfo(2, "S").what
+    if w ~= "C" then
+      error("Script attempted to create global variable '"..tostring(n).."'", 2)
+    end
+  end
+  rawset(t, n, v)
+end
+mt.__index = function (t, n)
+  if dbg.getinfo(2) and dbg.getinfo(2, "S").what ~= "C" then
+    error("Script attempted to access nonexistent global variable '"..tostring(n).."'", 2)
+  end
+  return rawget(t, n)
+end
+debug = nil
+
+`
