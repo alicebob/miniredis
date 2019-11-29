@@ -994,6 +994,25 @@ func TestBlpop(t *testing.T) {
 	}
 }
 
+func TestBlpopResourceCleanup(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	// Let's say a client issued BLPOP and then the client was closed
+	go func() {
+		_, err = redis.String(c.Do("BLPOP", "key", 0))
+		assert(t, err != nil, "BLPOP error")
+	}()
+
+	time.Sleep(2 * time.Second)
+
+	c.Close()
+	s.Close() // expect BLPOP to stop blocking
+}
+
 func TestBrpoplpush(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
