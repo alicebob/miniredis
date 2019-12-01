@@ -467,20 +467,20 @@ func (db *RedisDB) HGet(k, f string) string {
 	return h[f]
 }
 
-// HSet sets a hash key.
+// HSet sets hash keys.
 // If there is another key by the same name it will be gone.
-func (m *Miniredis) HSet(k, f, v string) {
-	m.DB(m.selectedDB).HSet(k, f, v)
+func (m *Miniredis) HSet(k string, fv ...string) {
+	m.DB(m.selectedDB).HSet(k, fv...)
 }
 
-// HSet sets a hash key.
+// HSet sets hash keys.
 // If there is another key by the same name it will be gone.
-func (db *RedisDB) HSet(k, f, v string) {
+func (db *RedisDB) HSet(k string, fv ...string) {
 	db.master.Lock()
 	defer db.master.Unlock()
 	defer db.master.signal.Broadcast()
 
-	db.hashSet(k, f, v)
+	db.hashSet(k, fv...)
 }
 
 // HDel deletes a hash key.

@@ -35,12 +35,35 @@ func TestHash(t *testing.T) {
 		equals(t, 0, b) // Existing field.
 	}
 
+	{
+		b, err := redis.Int(c.Do("HSET", "aaa", "bbb", "cc", "ddd", "ee"))
+		ok(t, err)
+		equals(t, 2, b) // Multiple fields.
+	}
+
+	{
+		v1, err := redis.String(c.Do("HGET", "aaa", "bbb"))
+		ok(t, err)
+		equals(t, "cc", v1)
+		equals(t, "cc", s.HGet("aaa", "bbb"))
+		v2, err := redis.String(c.Do("HGET", "aaa", "ddd"))
+		ok(t, err)
+		equals(t, "ee", v2)
+		equals(t, "ee", s.HGet("aaa", "ddd"))
+	}
+
 	// Wrong type of key
 	{
 		_, err := redis.String(c.Do("SET", "foo", "bar"))
 		ok(t, err)
 		_, err = redis.Int(c.Do("HSET", "foo", "noot", "mies"))
 		assert(t, err != nil, "HSET error")
+	}
+
+	// HSET with unmatched pairs
+	{
+		_, err := redis.Int(c.Do("HSET", "a", "b", "c", "d"))
+		assert(t, err != nil, "HSET unmatched error")
 	}
 
 	// hash exists, key doesn't.
@@ -70,6 +93,17 @@ func TestHash(t *testing.T) {
 		v, err := redis.String(c.Do("HGET", "wim", "zus"))
 		ok(t, err)
 		equals(t, "jet", v)
+	}
+
+	// Direct HSet() multiple
+	{
+		s.HSet("xxx", "yyy", "a", "zzz", "b")
+		v1, err := redis.String(c.Do("HGET", "xxx", "yyy"))
+		ok(t, err)
+		equals(t, "a", v1)
+		v2, err := redis.String(c.Do("HGET", "xxx", "zzz"))
+		ok(t, err)
+		equals(t, "b", v2)
 	}
 }
 

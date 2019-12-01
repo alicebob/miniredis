@@ -30,7 +30,7 @@ func commandsHash(m *Miniredis) {
 
 // HSET
 func (m *Miniredis) cmdHset(c *server.Peer, cmd string, args []string) {
-	if len(args) != 3 {
+	if len(args) < 3 || len(args)%2 == 0 {
 		setDirty(c)
 		c.WriteError(errWrongNumber(cmd))
 		return
@@ -42,7 +42,7 @@ func (m *Miniredis) cmdHset(c *server.Peer, cmd string, args []string) {
 		return
 	}
 
-	key, field, value := args[0], args[1], args[2]
+	key, pairs := args[0], args[1:]
 
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
@@ -52,11 +52,8 @@ func (m *Miniredis) cmdHset(c *server.Peer, cmd string, args []string) {
 			return
 		}
 
-		if db.hashSet(key, field, value) {
-			c.WriteInt(0)
-		} else {
-			c.WriteInt(1)
-		}
+		new := db.hashSet(key, pairs...)
+		c.WriteInt(new)
 	})
 }
 

@@ -16,6 +16,9 @@ func TestHash(t *testing.T) {
 		succ("HLEN", "aap"),
 		succ("HKEYS", "aap"),
 		succ("HVALS", "aap"),
+		succ("HSET", "aaa", "bb", "1", "cc", "2"),
+		succ("HGET", "aaa", "bb"),
+		succ("HGET", "aaa", "cc"),
 
 		succ("HDEL", "aap", "noot"),
 		succ("HGET", "aap", "noot"),
@@ -35,6 +38,8 @@ func TestHash(t *testing.T) {
 		fail("HLEN", "str"),
 		fail("HKEYS", "str"),
 		fail("HVALS", "str"),
+		fail("HSET", "a1", "b"),
+		// fail("HSET", "a2", "b", "c", "d"), // TODO redis refers to HMSET
 	)
 }
 
