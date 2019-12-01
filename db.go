@@ -315,8 +315,8 @@ func (db *RedisDB) hashGet(key, field string) string {
 	return db.hashKeys[key][field]
 }
 
-// hashSet returns whether the key already existed
-func (db *RedisDB) hashSet(k, f, v string) bool {
+// hashSet returns the number of new keys
+func (db *RedisDB) hashSet(k string, fv ...string) int {
 	if t, ok := db.keys[k]; ok && t != "hash" {
 		db.del(k, true)
 	}
@@ -324,10 +324,17 @@ func (db *RedisDB) hashSet(k, f, v string) bool {
 	if _, ok := db.hashKeys[k]; !ok {
 		db.hashKeys[k] = map[string]string{}
 	}
-	_, ok := db.hashKeys[k][f]
-	db.hashKeys[k][f] = v
-	db.keyVersion[k]++
-	return ok
+	new := 0
+	for idx := 0; idx < len(fv)-1; idx = idx + 2 {
+		f, v := fv[idx], fv[idx+1]
+		_, ok := db.hashKeys[k][f]
+		db.hashKeys[k][f] = v
+		db.keyVersion[k]++
+		if !ok {
+			new++
+		}
+	}
+	return new
 }
 
 // hashIncr changes int key value
