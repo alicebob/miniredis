@@ -1007,7 +1007,7 @@ func TestBlpopResourceCleanup(t *testing.T) {
 		assert(t, err != nil, "BLPOP error")
 	}()
 
-	time.Sleep(2 * time.Second)
+	time.Sleep(100 * time.Millisecond)
 
 	c.Close()
 	s.Close() // expect BLPOP to stop blocking
