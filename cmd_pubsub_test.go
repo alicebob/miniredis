@@ -300,12 +300,18 @@ func TestPubsubChannels(t *testing.T) {
 	ok(t, err)
 	equals(t, []string{}, a)
 
-	_, err = c2.Do("SUBSCRIBE", "event1", "event1b", "event1c")
+	n, err := redis.Values(c2.Do("SUBSCRIBE", "event1", "event1b", "event1c"))
 	ok(t, err)
+	ni, _ := n[2].(int64)
+	equals(t, 1, int(ni))
 
 	a, err = redis.Strings(c1.Do("PUBSUB", "CHANNELS"))
 	ok(t, err)
 	equals(t, []string{"event1", "event1b", "event1c"}, a)
+
+	a, err = redis.Strings(c1.Do("PUBSUB", "CHANNELS", "event1b"))
+	ok(t, err)
+	equals(t, []string{"event1b"}, a)
 
 	a, err = redis.Strings(c1.Do("PUBSUB", "CHANNELS", "event1[abc]"))
 	ok(t, err)
