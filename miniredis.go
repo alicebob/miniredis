@@ -15,6 +15,7 @@
 package miniredis
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 	"net"
@@ -59,6 +60,8 @@ type Miniredis struct {
 	now         time.Time // time.Now() if not set.
 	subscribers map[*Subscriber]struct{}
 	rand        *rand.Rand
+	Ctx         context.Context
+	CtxCancel   context.CancelFunc
 }
 
 type txCmd func(*server.Peer, *connCtx)
@@ -86,6 +89,7 @@ func NewMiniRedis() *Miniredis {
 		scripts:     map[string]string{},
 		subscribers: map[*Subscriber]struct{}{},
 	}
+	m.Ctx, m.CtxCancel = context.WithCancel(context.Background())
 	m.signal = sync.NewCond(&m)
 	return &m
 }
@@ -171,6 +175,7 @@ func (m *Miniredis) Close() {
 	}
 	srv := m.srv
 	m.srv = nil
+	m.CtxCancel()
 	m.Unlock()
 
 	// the OnDisconnect callbacks can lock m, so run Close() outside the lock.
