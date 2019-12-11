@@ -38,8 +38,20 @@ func TestHash(t *testing.T) {
 		fail("HLEN", "str"),
 		fail("HKEYS", "str"),
 		fail("HVALS", "str"),
+		fail("HSET"),
+		fail("HSET", "a1"),
 		fail("HSET", "a1", "b"),
-		// fail("HSET", "a2", "b", "c", "d"), // TODO redis refers to HMSET
+		fail("HSET", "a2", "b", "c", "d"),
+	)
+
+	testCommands(t,
+		succ("MULTI"),
+		succ("HSET", "aap", "noot", "mies", "vuur", "wim"),
+		succ("EXEC"),
+
+		succ("MULTI"),
+		succ("HSET", "aap", "noot", "mies", "vuur"), // uneven arg count
+		succ("EXEC"),
 	)
 }
 
