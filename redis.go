@@ -124,6 +124,10 @@ func blocking(
 			m.signal.Broadcast() // to kill the wakeup go routine
 			wg.Wait()
 			return
+		case <-m.Ctx.Done():
+			m.signal.Broadcast() // to kill the wakeup go routine
+			wg.Wait()
+			return
 		}
 		wg.Wait()
 	}
