@@ -219,6 +219,10 @@ func TestLuaCall(t *testing.T) {
 			"EVAL", `redis.call(1)`, 0,
 		),
 		failWith(
+			"Unknown Redis command called from Lua script",
+			"EVAL", `redis.call("1")`, 0,
+		),
+		failWith(
 			"Lua redis() command arguments must be strings or integers",
 			"EVAL", `redis.call("ECHO", true)`, 0,
 		),

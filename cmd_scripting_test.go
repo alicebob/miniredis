@@ -70,6 +70,13 @@ func TestEval(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "Script attempted to create global variable 'someGlobal'") {
 		t.Error("unexpected error", err)
 	}
+
+	t.Run("bigger float value", func(t *testing.T) {
+		_, err = c.Do("EVAL", "return redis.call('expire','foo', 999999)", 0)
+		ok(t, err)
+		_, err = c.Do("EVAL", "return redis.call('expire','foo',1000000)", 0)
+		ok(t, err)
+	})
 }
 
 func TestEvalCall(t *testing.T) {
