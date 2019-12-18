@@ -219,6 +219,10 @@ func TestLuaCall(t *testing.T) {
 			"EVAL", `redis.call(1)`, 0,
 		),
 		failWith(
+			"Unknown Redis command called from Lua script",
+			"EVAL", `redis.call("1")`, 0,
+		),
+		failWith(
 			"Lua redis() command arguments must be strings or integers",
 			"EVAL", `redis.call("ECHO", true)`, 0,
 		),
@@ -271,6 +275,22 @@ func TestLuaCall(t *testing.T) {
 		),
 		succ("GET", "foo"),
 		succ("GET", "res"),
+	)
+
+	// call() with transaction commands
+	testCommands(t,
+		succ("SET", "foo", 1),
+
+		failWith(
+			"This Redis command is not allowed from scripts",
+			"EVAL", `redis.call("MULTI")`, 0,
+		),
+		failWith(
+			"This Redis command is not allowed from scripts",
+			"EVAL", `redis.call("EXEC")`, 0,
+		),
+		succ("EVAL", `redis.pcall("EXEC")`, 0),
+		succ("GET", "foo"),
 	)
 }
 

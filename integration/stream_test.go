@@ -75,7 +75,7 @@ func TestStream(t *testing.T) {
 		fail("XADD", "planets", "MAXLEN", "~"),
 		fail("XADD", "planets", "MAXLEN"),
 
-		succ("XADD", "planets", "MAXLEN", "0", "*", "name", "Mercury"),
+		succLoosely("XADD", "planets", "MAXLEN", "0", "*", "name", "Mercury"),
 		succ("XLEN", "planets"),
 
 		succ("SET", "str", "I am a string"),
