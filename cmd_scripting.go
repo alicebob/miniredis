@@ -51,11 +51,6 @@ func (m *Miniredis) runLuaScript(c *server.Peer, script string, args []string) {
 	luajson.Preload(l)
 	requireGlobal(l, "cjson", "json")
 
-	// m.Unlock()
-	// conn := m.redigo()
-	// m.Lock()
-	// defer conn.Close()
-
 	// set global variable KEYS
 	keysTable := l.NewTable()
 	keysS, args := args[0], args[1:]

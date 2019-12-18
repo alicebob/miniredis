@@ -238,23 +238,3 @@ func TestExpireWithFastForward(t *testing.T) {
 	s.FastForward(5 * time.Second)
 	equals(t, 1, len(s.Keys()))
 }
-
-/*
-func TestRedigo(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-
-	r := s.redigo()
-	defer r.Close()
-
-	_, err = r.Do("SELECT", 2)
-	ok(t, err)
-
-	_, err = r.Do("SET", "foo", "bar")
-	ok(t, err)
-
-	v, err := redis.String(r.Do("GET", "foo"))
-	ok(t, err)
-	equals(t, "bar", v)
-}
-*/

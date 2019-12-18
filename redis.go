@@ -55,9 +55,9 @@ func withTx(
 ) {
 	ctx := getCtx(c)
 
-	if c.Nested {
+	if ctx.nested {
+		// this is a call via Lua's .call(). It's already locked.
 		cb(c, ctx)
-		// done, wake up anyone who waits on anything.
 		m.signal.Broadcast()
 		return
 	}

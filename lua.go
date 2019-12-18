@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"strings"
 
-	// redigo "github.com/gomodule/redigo/redis"
 	lua "github.com/yuin/gopher-lua"
 
 	"github.com/alicebob/miniredis/v2/server"
@@ -49,10 +48,11 @@ func mkLuaFuncs(srv *server.Server, c *server.Peer) map[string]lua.LGFunction {
 
 			buf := &bytes.Buffer{}
 			wr := bufio.NewWriter(buf)
-			peer := server.NewPeerNested(wr)
+			peer := server.NewPeer(wr)
 			if getCtx(c).authenticated {
 				setAuthenticated(peer)
 			}
+			getCtx(peer).nested = true
 			srv.Dispatch(peer, args)
 			wr.Flush()
 

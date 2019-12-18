@@ -196,14 +196,12 @@ type Peer struct {
 	closed       bool
 	Ctx          interface{} // anything goes, server won't touch this
 	onDisconnect []func()    // list of callbacks
-	Nested       bool        // no locks on the server
 	mu           sync.Mutex  // for Block()
 }
 
-func NewPeerNested(w *bufio.Writer) *Peer {
+func NewPeer(w *bufio.Writer) *Peer {
 	return &Peer{
-		w:      w,
-		Nested: true,
+		w: w,
 	}
 }
 
