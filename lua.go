@@ -34,6 +34,16 @@ func mkLuaFuncs(conn redigo.Conn) map[string]lua.LGFunction {
 				l.Error(lua.LString("Unknown Redis command called from Lua script"), 1)
 				return 0
 			}
+			switch strings.ToUpper(cmd) {
+			case "MULTI", "EXEC":
+				if failFast {
+					l.Error(lua.LString("This Redis command is not allowed from scripts"), 1)
+					return 0
+				}
+				l.Push(lua.LNil)
+				return 1
+			}
+
 			res, err := conn.Do(cmd, args[1:]...)
 			if err != nil {
 				if failFast {
