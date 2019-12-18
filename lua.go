@@ -13,6 +13,13 @@ import (
 
 func mkLuaFuncs(srv *server.Server, c *server.Peer) map[string]lua.LGFunction {
 	mkCall := func(failFast bool) func(l *lua.LState) int {
+		// one server.Ctx for a single Lua run
+		pCtx := &connCtx{}
+		if getCtx(c).authenticated {
+			pCtx.authenticated = true
+		}
+		pCtx.nested = true
+
 		return func(l *lua.LState) int {
 			top := l.GetTop()
 			if top == 0 {
@@ -32,7 +39,6 @@ func mkLuaFuncs(srv *server.Server, c *server.Peer) map[string]lua.LGFunction {
 				}
 			}
 			if len(args) == 0 {
-				// FIXME
 				l.Error(lua.LString("This Redis command is not allowed from scripts"), 1)
 				return 0
 			}
@@ -49,10 +55,7 @@ func mkLuaFuncs(srv *server.Server, c *server.Peer) map[string]lua.LGFunction {
 			buf := &bytes.Buffer{}
 			wr := bufio.NewWriter(buf)
 			peer := server.NewPeer(wr)
-			if getCtx(c).authenticated {
-				setAuthenticated(peer)
-			}
-			getCtx(peer).nested = true
+			peer.Ctx = pCtx
 			srv.Dispatch(peer, args)
 			wr.Flush()
 

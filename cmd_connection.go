@@ -116,8 +116,10 @@ func (m *Miniredis) cmdSelect(c *server.Peer, cmd string, args []string) {
 		id = 0
 	}
 
-	m.Lock()
-	defer m.Unlock()
+	if !getCtx(c).nested {
+		m.Lock()
+		defer m.Unlock()
+	}
 
 	ctx := getCtx(c)
 	ctx.selectedDB = id

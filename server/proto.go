@@ -101,7 +101,7 @@ func ParseReply(rd *bufio.Reader) (interface{}, error) {
 		return string(line[1 : len(line)-2]), nil
 	case '-':
 		// -: errors
-		return errors.New(string(line[1 : len(line)-2])), nil
+		return nil, errors.New(string(line[1 : len(line)-2]))
 	case ':':
 		// :: integer
 		v := line[1 : len(line)-2]

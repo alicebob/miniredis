@@ -135,7 +135,7 @@ func TestParseReply(t *testing.T) {
 		},
 		{
 			payload: "-some error\r\n",
-			res:     errors.New("some error"),
+			err:     errors.New("some error"),
 		},
 		{
 			payload: ":42\r\n",
