@@ -97,8 +97,6 @@ func (m *Miniredis) runLuaScript(c *server.Peer, script string, args []string) {
 	l.Push(lua.LString("redis"))
 	l.Call(1, 0)
 
-	m.Unlock() // This runs in a transaction, but can access our db recursively
-	defer m.Lock()
 	if err := l.DoString(script); err != nil {
 		c.WriteError(errLuaParseError(err))
 		return
