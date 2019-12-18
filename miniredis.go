@@ -18,12 +18,11 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
-	"net"
 	"strconv"
 	"sync"
 	"time"
 
-	redigo "github.com/gomodule/redigo/redis"
+	// redigo "github.com/gomodule/redigo/redis"
 
 	"github.com/alicebob/miniredis/v2/server"
 )
@@ -287,6 +286,7 @@ func (m *Miniredis) Server() *server.Server {
 	return m.srv
 }
 
+/*
 // redigo returns a redigo.Conn, connected using net.Pipe
 func (m *Miniredis) redigo() redigo.Conn {
 	c1, c2 := net.Pipe()
@@ -299,6 +299,7 @@ func (m *Miniredis) redigo() redigo.Conn {
 	}
 	return c
 }
+*/
 
 // Dump returns a text version of the selected DB, usable for debugging.
 func (m *Miniredis) Dump() string {

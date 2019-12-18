@@ -51,10 +51,10 @@ func (m *Miniredis) runLuaScript(c *server.Peer, script string, args []string) {
 	luajson.Preload(l)
 	requireGlobal(l, "cjson", "json")
 
-	m.Unlock()
-	conn := m.redigo()
-	m.Lock()
-	defer conn.Close()
+	// m.Unlock()
+	// conn := m.redigo()
+	// m.Lock()
+	// defer conn.Close()
 
 	// set global variable KEYS
 	keysTable := l.NewTable()
@@ -84,7 +84,7 @@ func (m *Miniredis) runLuaScript(c *server.Peer, script string, args []string) {
 	}
 	l.SetGlobal("ARGV", argvTable)
 
-	redisFuncs := mkLuaFuncs(conn)
+	redisFuncs := mkLuaFuncs(m.srv, c)
 	// Register command handlers
 	l.Push(l.NewFunction(func(l *lua.LState) int {
 		mod := l.RegisterModule("redis", redisFuncs).(*lua.LTable)

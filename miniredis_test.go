@@ -239,6 +239,7 @@ func TestExpireWithFastForward(t *testing.T) {
 	equals(t, 1, len(s.Keys()))
 }
 
+/*
 func TestRedigo(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
@@ -256,3 +257,4 @@ func TestRedigo(t *testing.T) {
 	ok(t, err)
 	equals(t, "bar", v)
 }
+*/

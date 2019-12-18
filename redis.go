@@ -54,6 +54,14 @@ func withTx(
 	cb txCmd,
 ) {
 	ctx := getCtx(c)
+
+	if c.Nested {
+		cb(c, ctx)
+		// done, wake up anyone who waits on anything.
+		m.signal.Broadcast()
+		return
+	}
+
 	if inTx(ctx) {
 		addTxCmd(ctx, cb)
 		c.WriteInline("QUEUED")

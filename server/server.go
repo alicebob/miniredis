@@ -140,7 +140,7 @@ func (s *Server) servePeer(c net.Conn) {
 		if err != nil {
 			return
 		}
-		s.dispatch(peer, args)
+		s.Dispatch(peer, args)
 		peer.Flush()
 		s.mu.Lock()
 		closed := peer.closed
@@ -151,7 +151,7 @@ func (s *Server) servePeer(c net.Conn) {
 	}
 }
 
-func (s *Server) dispatch(c *Peer, args []string) {
+func (s *Server) Dispatch(c *Peer, args []string) {
 	cmd, args := args[0], args[1:]
 	cmdUp := strings.ToUpper(cmd)
 	s.mu.Lock()
@@ -196,7 +196,15 @@ type Peer struct {
 	closed       bool
 	Ctx          interface{} // anything goes, server won't touch this
 	onDisconnect []func()    // list of callbacks
+	Nested       bool        // no locks on the server
 	mu           sync.Mutex  // for Block()
+}
+
+func NewPeerNested(w *bufio.Writer) *Peer {
+	return &Peer{
+		w:      w,
+		Nested: true,
+	}
 }
 
 // Flush the write buffer. Called automatically after every redis command
