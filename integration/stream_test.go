@@ -57,14 +57,14 @@ func TestStream(t *testing.T) {
 	)
 
 	testCommands(t,
-		succLoosely("XADD", "planets", "MAXLEN", "4", "456-1", "name", "Mercury"),
-		succLoosely("XADD", "planets", "MAXLEN", "4", "456-2", "name", "Mercury"),
-		succLoosely("XADD", "planets", "MAXLEN", "4", "456-3", "name", "Mercury"),
-		succLoosely("XADD", "planets", "MAXLEN", "4", "456-4", "name", "Mercury"),
-		succLoosely("XADD", "planets", "MAXLEN", "4", "456-5", "name", "Mercury"),
-		succLoosely("XADD", "planets", "MAXLEN", "4", "456-6", "name", "Mercury"),
-		succLoosely("XLEN", "planets"),
-		succLoosely("XADD", "planets", "MAXLEN", "~", "4", "456-7", "name", "Mercury"),
+		succ("XADD", "planets", "MAXLEN", "4", "456-1", "name", "Mercury"),
+		succ("XADD", "planets", "MAXLEN", "4", "456-2", "name", "Mercury"),
+		succ("XADD", "planets", "MAXLEN", "4", "456-3", "name", "Mercury"),
+		succ("XADD", "planets", "MAXLEN", "4", "456-4", "name", "Mercury"),
+		succ("XADD", "planets", "MAXLEN", "4", "456-5", "name", "Mercury"),
+		succ("XADD", "planets", "MAXLEN", "4", "456-6", "name", "Mercury"),
+		succ("XLEN", "planets"),
+		succ("XADD", "planets", "MAXLEN", "~", "4", "456-7", "name", "Mercury"),
 
 		fail("XADD", "planets", "MAXLEN", "!", "4", "*", "name", "Mercury"),
 		fail("XADD", "planets", "MAXLEN", " ~", "4", "*", "name", "Mercury"),
