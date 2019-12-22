@@ -199,7 +199,8 @@ func (m *Miniredis) cmdPubSub(c *server.Peer, cmd string, args []string) {
 				pat = subargs[0]
 			}
 
-			channels := activeChannels(m.allSubscribers(), pat)
+			allsubs := m.allSubscribers()
+			channels := activeChannels(allsubs, pat)
 
 			c.WriteLen(len(channels))
 			for _, channel := range channels {
@@ -213,6 +214,7 @@ func (m *Miniredis) cmdPubSub(c *server.Peer, cmd string, args []string) {
 				c.WriteBulk(channel)
 				c.WriteInt(countSubs(subs, channel))
 			}
+
 		case "NUMPAT":
 			c.WriteInt(countPsubs(m.allSubscribers()))
 		}

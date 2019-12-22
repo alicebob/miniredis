@@ -4,7 +4,6 @@ package main
 
 import (
 	"bytes"
-	"context"
 	"fmt"
 	"reflect"
 	"sort"
@@ -26,6 +25,7 @@ type command struct {
 	errorSub    string // Both errors need this substring
 	receiveOnly bool   // no command, only receive. For pubsub messages.
 	roundFloats int    // if > 0 round floats to this many places before DeepEqual
+	closeChan   bool   // helper for testClients2()
 }
 
 func succ(cmd string, args ...interface{}) command {
@@ -194,24 +194,27 @@ func testClients2(t *testing.T, f func(c1, c2 chan<- command)) {
 		}
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-
 	go func() {
 		f(chans[0].c, chans[1].c)
-		cancel()
-		for _, c := range chans {
-			close(c.c)
-		}
+		chans[0].c <- command{closeChan: true}
+		chans[1].c <- command{closeChan: true}
 	}()
 
-loop:
-	for {
+	for chans[0].c != nil || chans[1].c != nil {
 		select {
-		case <-ctx.Done():
-			break loop
 		case cm := <-chans[0].c:
+			if cm.closeChan {
+				close(chans[0].c)
+				chans[0].c = nil
+				continue
+			}
 			runCommand(t, chans[0].cMini, chans[0].cReal, cm)
 		case cm := <-chans[1].c:
+			if cm.closeChan {
+				close(chans[1].c)
+				chans[1].c = nil
+				continue
+			}
 			runCommand(t, chans[1].cMini, chans[1].cReal, cm)
 		}
 	}
