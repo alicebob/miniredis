@@ -1,6 +1,8 @@
 package miniredis
 
 import (
+	"strings"
+
 	redigo "github.com/gomodule/redigo/redis"
 	lua "github.com/yuin/gopher-lua"
 
@@ -18,11 +20,8 @@ func mkLuaFuncs(conn redigo.Conn) map[string]lua.LGFunction {
 			var args []interface{}
 			for i := 1; i <= top; i++ {
 				switch a := l.Get(i).(type) {
-				// case lua.LBool:
-				// args[i-2] = a
 				case lua.LNumber:
-					// value, _ := strconv.ParseFloat(lua.LVAsString(arg), 64)
-					args = append(args, float64(a))
+					args = append(args, a.String())
 				case lua.LString:
 					args = append(args, string(a))
 				default:
@@ -35,11 +34,25 @@ func mkLuaFuncs(conn redigo.Conn) map[string]lua.LGFunction {
 				l.Error(lua.LString("Unknown Redis command called from Lua script"), 1)
 				return 0
 			}
+			switch strings.ToUpper(cmd) {
+			case "MULTI", "EXEC":
+				if failFast {
+					l.Error(lua.LString("This Redis command is not allowed from scripts"), 1)
+					return 0
+				}
+				l.Push(lua.LNil)
+				return 1
+			}
+
 			res, err := conn.Do(cmd, args[1:]...)
 			if err != nil {
 				if failFast {
 					// call() mode
-					l.Error(lua.LString(err.Error()), 1)
+					if strings.Contains(err.Error(), "ERR unknown command") {
+						l.Error(lua.LString("Unknown Redis command called from Lua script"), 1)
+					} else {
+						l.Error(lua.LString(err.Error()), 1)
+					}
 					return 0
 				}
 				// pcall() mode

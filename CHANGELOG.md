@@ -1,5 +1,11 @@
 ## Changelog
 
+### v2.11.1
+
+- globals protection for LUA code (thanks @vk-outreach)
+- HSET update (thanks @carlgreen)
+- fix BLPOP block on shutdown (thanks @Asalle)
+
 ### v2.11.0
 
 - added XRANGE/XREVRANGE, XADD, and XLEN (thanks @skateinmars)
