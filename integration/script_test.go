@@ -277,7 +277,7 @@ func TestLuaCall(t *testing.T) {
 		succ("GET", "res"),
 	)
 
-	// call() with transaction commands
+	// call() with non-allowed commands
 	testCommands(t,
 		succ("SET", "foo", 1),
 
@@ -288,6 +288,18 @@ func TestLuaCall(t *testing.T) {
 		failWith(
 			"This Redis command is not allowed from scripts",
 			"EVAL", `redis.call("EXEC")`, 0,
+		),
+		failWith(
+			"This Redis command is not allowed from scripts",
+			"EVAL", `redis.call("EVAL", "redis.call(\"GET\", \"foo\")", 0)`, 0,
+		),
+		failWith(
+			"This Redis command is not allowed from scripts",
+			"EVAL", `redis.call("SCRIPT", "LOAD", "return 42")`, 0,
+		),
+		failWith(
+			"This Redis command is not allowed from scripts",
+			"EVAL", `redis.call("EVALSHA", "123", "0")`, 0,
 		),
 		succ("EVAL", `redis.pcall("EXEC")`, 0),
 		succ("GET", "foo"),

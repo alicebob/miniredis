@@ -42,15 +42,6 @@ func mkLuaFuncs(srv *server.Server, c *server.Peer) map[string]lua.LGFunction {
 				l.Error(lua.LString("This Redis command is not allowed from scripts"), 1)
 				return 0
 			}
-			switch strings.ToUpper(args[0]) {
-			case "MULTI", "EXEC":
-				if failFast {
-					l.Error(lua.LString("This Redis command is not allowed from scripts"), 1)
-					return 0
-				}
-				l.Push(lua.LNil)
-				return 1
-			}
 
 			buf := &bytes.Buffer{}
 			wr := bufio.NewWriter(buf)

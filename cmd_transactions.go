@@ -29,7 +29,10 @@ func (m *Miniredis) cmdMulti(c *server.Peer, cmd string, args []string) {
 	}
 
 	ctx := getCtx(c)
-
+	if ctx.nested {
+		c.WriteError("This Redis command is not allowed from scripts")
+		return
+	}
 	if inTx(ctx) {
 		c.WriteError("ERR MULTI calls can not be nested")
 		return
@@ -55,7 +58,10 @@ func (m *Miniredis) cmdExec(c *server.Peer, cmd string, args []string) {
 	}
 
 	ctx := getCtx(c)
-
+	if ctx.nested {
+		c.WriteError("This Redis command is not allowed from scripts")
+		return
+	}
 	if !inTx(ctx) {
 		c.WriteError("ERR EXEC without MULTI")
 		return

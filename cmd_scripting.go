@@ -113,6 +113,11 @@ func (m *Miniredis) cmdEval(c *server.Peer, cmd string, args []string) {
 		return
 	}
 
+	if getCtx(c).nested {
+		c.WriteError("This Redis command is not allowed from scripts")
+		return
+	}
+
 	script, args := args[0], args[1:]
 
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
@@ -130,6 +135,10 @@ func (m *Miniredis) cmdEvalsha(c *server.Peer, cmd string, args []string) {
 		return
 	}
 	if m.checkPubsub(c) {
+		return
+	}
+	if getCtx(c).nested {
+		c.WriteError("This Redis command is not allowed from scripts")
 		return
 	}
 
@@ -156,6 +165,11 @@ func (m *Miniredis) cmdScript(c *server.Peer, cmd string, args []string) {
 		return
 	}
 	if m.checkPubsub(c) {
+		return
+	}
+
+	if getCtx(c).nested {
+		c.WriteError("This Redis command is not allowed from scripts")
 		return
 	}
 
