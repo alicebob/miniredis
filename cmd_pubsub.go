@@ -29,6 +29,10 @@ func (m *Miniredis) cmdSubscribe(c *server.Peer, cmd string, args []string) {
 	if !m.handleAuth(c) {
 		return
 	}
+	if getCtx(c).nested {
+		c.WriteError("This Redis command is not allowed from scripts")
+		return
+	}
 
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		sub := m.subscribedState(c)
@@ -47,6 +51,10 @@ func (m *Miniredis) cmdSubscribe(c *server.Peer, cmd string, args []string) {
 // UNSUBSCRIBE
 func (m *Miniredis) cmdUnsubscribe(c *server.Peer, cmd string, args []string) {
 	if !m.handleAuth(c) {
+		return
+	}
+	if getCtx(c).nested {
+		c.WriteError("This Redis command is not allowed from scripts")
 		return
 	}
 
@@ -86,6 +94,10 @@ func (m *Miniredis) cmdPsubscribe(c *server.Peer, cmd string, args []string) {
 	if !m.handleAuth(c) {
 		return
 	}
+	if getCtx(c).nested {
+		c.WriteError("This Redis command is not allowed from scripts")
+		return
+	}
 
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		sub := m.subscribedState(c)
@@ -104,6 +116,10 @@ func (m *Miniredis) cmdPsubscribe(c *server.Peer, cmd string, args []string) {
 // PUNSUBSCRIBE
 func (m *Miniredis) cmdPunsubscribe(c *server.Peer, cmd string, args []string) {
 	if !m.handleAuth(c) {
+		return
+	}
+	if getCtx(c).nested {
+		c.WriteError("This Redis command is not allowed from scripts")
 		return
 	}
 

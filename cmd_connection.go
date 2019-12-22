@@ -61,6 +61,10 @@ func (m *Miniredis) cmdAuth(c *server.Peer, cmd string, args []string) {
 	if m.checkPubsub(c) {
 		return
 	}
+	if getCtx(c).nested {
+		c.WriteError("This Redis command is not allowed from scripts")
+		return
+	}
 
 	pw := args[0]
 

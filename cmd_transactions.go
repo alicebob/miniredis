@@ -136,6 +136,10 @@ func (m *Miniredis) cmdWatch(c *server.Peer, cmd string, args []string) {
 	}
 
 	ctx := getCtx(c)
+	if ctx.nested {
+		c.WriteError("This Redis command is not allowed from scripts")
+		return
+	}
 	if inTx(ctx) {
 		c.WriteError("ERR WATCH in MULTI")
 		return

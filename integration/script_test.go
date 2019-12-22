@@ -301,6 +301,30 @@ func TestLuaCall(t *testing.T) {
 			"This Redis command is not allowed from scripts",
 			"EVAL", `redis.call("EVALSHA", "123", "0")`, 0,
 		),
+		failWith(
+			"This Redis command is not allowed from scripts",
+			"EVAL", `redis.call("AUTH", "foobar")`, 0,
+		),
+		failWith(
+			"This Redis command is not allowed from scripts",
+			"EVAL", `redis.call("WATCH", "foobar")`, 0,
+		),
+		failWith(
+			"This Redis command is not allowed from scripts",
+			"EVAL", `redis.call("SUBSCRIBE", "foo")`, 0,
+		),
+		failWith(
+			"This Redis command is not allowed from scripts",
+			"EVAL", `redis.call("UNSUBSCRIBE", "foo")`, 0,
+		),
+		failWith(
+			"This Redis command is not allowed from scripts",
+			"EVAL", `redis.call("PSUBSCRIBE", "foo")`, 0,
+		),
+		failWith(
+			"This Redis command is not allowed from scripts",
+			"EVAL", `redis.call("PUNSUBSCRIBE", "foo")`, 0,
+		),
 		succ("EVAL", `redis.pcall("EXEC")`, 0),
 		succ("GET", "foo"),
 	)
