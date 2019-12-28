@@ -326,6 +326,12 @@ func TestPubsubChannels(t *testing.T) {
 	a, err = redis.Strings(c1.Do("PUBSUB", "CHANNELS", "event1[abc]"))
 	ok(t, err)
 	equals(t, []string{"event1b", "event1c"}, a)
+
+	// workaround to make sure c2 stays alive; likely a go1.12-ism
+	_, err = c1.Do("PING")
+	ok(t, err)
+	_, err = c2.Do("PING")
+	ok(t, err)
 }
 
 func TestPubsubNumsub(t *testing.T) {
