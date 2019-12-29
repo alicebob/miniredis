@@ -30,7 +30,7 @@ func (m *Miniredis) cmdMulti(c *server.Peer, cmd string, args []string) {
 
 	ctx := getCtx(c)
 	if ctx.nested {
-		c.WriteError("This Redis command is not allowed from scripts")
+		c.WriteError(msgNotFromScripts)
 		return
 	}
 	if inTx(ctx) {
@@ -59,7 +59,7 @@ func (m *Miniredis) cmdExec(c *server.Peer, cmd string, args []string) {
 
 	ctx := getCtx(c)
 	if ctx.nested {
-		c.WriteError("This Redis command is not allowed from scripts")
+		c.WriteError(msgNotFromScripts)
 		return
 	}
 	if !inTx(ctx) {
@@ -137,7 +137,7 @@ func (m *Miniredis) cmdWatch(c *server.Peer, cmd string, args []string) {
 
 	ctx := getCtx(c)
 	if ctx.nested {
-		c.WriteError("This Redis command is not allowed from scripts")
+		c.WriteError(msgNotFromScripts)
 		return
 	}
 	if inTx(ctx) {

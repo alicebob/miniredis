@@ -39,7 +39,7 @@ func mkLuaFuncs(srv *server.Server, c *server.Peer) map[string]lua.LGFunction {
 				}
 			}
 			if len(args) == 0 {
-				l.Error(lua.LString("This Redis command is not allowed from scripts"), 1)
+				l.Error(lua.LString(msgNotFromScripts), 1)
 				return 0
 			}
 

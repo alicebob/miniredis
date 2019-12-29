@@ -62,7 +62,7 @@ func (m *Miniredis) cmdAuth(c *server.Peer, cmd string, args []string) {
 		return
 	}
 	if getCtx(c).nested {
-		c.WriteError("This Redis command is not allowed from scripts")
+		c.WriteError(msgNotFromScripts)
 		return
 	}
 

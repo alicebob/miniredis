@@ -36,6 +36,7 @@ const (
 	msgStreamIDTooSmall   = "ERR The ID specified in XADD is equal or smaller than the target stream top item"
 	msgNoScriptFound      = "NOSCRIPT No matching script. Please use EVAL."
 	msgUnsupportedUnit    = "ERR unsupported unit provided. please use m, km, ft, mi"
+	msgNotFromScripts     = "This Redis command is not allowed from scripts"
 )
 
 func errWrongNumber(cmd string) string {
