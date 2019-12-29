@@ -20,6 +20,8 @@ func TestEval(t *testing.T) {
 		succ("EVAL", "return redis.call('GET', 'nosuch')==nil", 0),
 		succ("EVAL", "local a = redis.call('MGET', 'bar'); return a[1] == false", 0),
 		succ("EVAL", "local a = redis.call('MGET', 'bar'); return a[1] == nil", 0),
+		succ("EVAL", "return redis.call('ZRANGE', 'q', 0, -1)", 0),
+		succ("EVAL", "return redis.call('LPOP', 'foo')", 0),
 
 		// failure cases
 		fail("EVAL"),
@@ -98,6 +100,7 @@ func TestLua(t *testing.T) {
 		succ("EVAL", "return 3.9999+0.201", 0),
 		succ("EVAL", "return {{1}}", 0),
 		succ("EVAL", "return {1,{1,{1,'bar'}}}", 0),
+		succ("EVAL", "return nil", 0),
 	)
 
 	// special returns
