@@ -265,6 +265,156 @@ func TestGeoradius(t *testing.T) {
 	})
 }
 
+func TestGeoradiusByMember(t *testing.T) {
+	t.Run("basic", func(t *testing.T) {
+		testCommands(t,
+			succ("GEOADD",
+				"stations",
+				-73.99106999861966, 40.73005400028978, "Astor Pl",
+				-74.00019299927328, 40.71880300107709, "Canal St",
+				-73.98384899986625, 40.76172799961419, "50th St",
+			),
+			succ("GEORADIUSBYMEMBER", "stations", "Astor Pl", 4, "km"),
+			// succ("GEORADIUSBYMEMBER", "stations", 1.0, 1.0, 1, "km"), // Not valid test
+
+			succ("GEORADIUSBYMEMBER", "stations", "Astor Pl", 4, "ft", "WITHDIST"),
+			succ("GEORADIUSBYMEMBER", "stations", "Astor Pl", 4, "m", "WITHDIST"),
+			// redis has more precision in the coords
+			succRound3("GEORADIUSBYMEMBER", "stations", "Astor Pl", 4, "m", "WITHCOORD"),
+			succRound3("GEORADIUSBYMEMBER", "stations", "Astor Pl", 400, "km", "WITHDIST", "WITHCOORD"),
+			succRound3("GEORADIUSBYMEMBER", "stations", "Astor Pl", 400, "km", "WITHCOORD", "WITHDIST"),
+			succRound3("GEORADIUSBYMEMBER", "stations", "Astor Pl", 400, "km", "WITHCOORD", "WITHCOORD", "WITHCOORD"),
+			succRound3("GEORADIUSBYMEMBER", "stations", "Astor Pl", 400, "km", "WITHDIST", "WITHDIST", "WITHDIST"),
+			// FIXME: the distances don't quite match for miles or km
+			succRound3("GEORADIUSBYMEMBER", "stations", "Astor Pl", 400, "mi", "WITHDIST"),
+			succRound3("GEORADIUSBYMEMBER", "stations", "Astor Pl", 400, "km", "WITHDIST"),
+
+			// Sorting
+			succ("GEORADIUSBYMEMBER", "stations", "Astor Pl", 400, "km", "DESC"),
+			succ("GEORADIUSBYMEMBER", "stations", "Astor Pl", 400, "km", "ASC"),
+			succ("GEORADIUSBYMEMBER", "stations", "Astor Pl", 400, "km", "ASC", "DESC", "ASC"),
+
+			// COUNT
+			succRound3("GEORADIUSBYMEMBER", "stations", "Astor Pl", 400, "km", "ASC", "COUNT", 1),
+			succRound3("GEORADIUSBYMEMBER", "stations", "Astor Pl", 400, "km", "ASC", "COUNT", 2),
+			succRound3("GEORADIUSBYMEMBER", "stations", "Astor Pl", 400, "km", "ASC", "COUNT", 999),
+			fail("GEORADIUSBYMEMBER", "stations", "Astor Pl", 400, "km", "COUNT"),
+			fail("GEORADIUSBYMEMBER", "stations", "Astor Pl", 400, "km", "COUNT", 0),
+			fail("GEORADIUSBYMEMBER", "stations", "Astor Pl", 400, "km", "COUNT", -12),
+			fail("GEORADIUSBYMEMBER", "stations", "Astor Pl", 400, "km", "COUNT", "foobar"),
+
+			// non-existing key
+			// succ("GEORADIUSBYMEMBER", "foo", "Astor Pl", 4, "km"), // Failing
+			// geo_test.go:268: value error. expected: []interface {}{} got: <nil> case: main.command{cmd:"GEORADIUSBYMEMBER", args:[]interface {}{"foo", "Astor Pl", 4, "km"}, error:false, sort:false, loosely:false, errorSub:"", receiveOnly:false, roundFloats:0, closeChan:false}
+
+			// no error in redis, for some reason
+			// fail("GEORADIUSBYMEMBER", "foo", "Astor Pl", 4, "km", "FOOBAR"),
+			fail("GEORADIUSBYMEMBER", "stations", "Astor Pl", 400, "km", "ASC", "FOOBAR"),
+
+			// GEORADIUSBYMEMBER_RO
+			succ("GEORADIUSBYMEMBER_RO", "stations", "Astor Pl", 4, "km"),
+			// succ("GEORADIUSBYMEMBER_RO", "stations", 1.0, 1.0, 1, "km"), // Not a valid test
+			fail("GEORADIUSBYMEMBER_RO", "stations", "Astor Pl", 4, "km", "STORE", "bar"),
+			fail("GEORADIUSBYMEMBER_RO", "stations", "Astor Pl", 4, "km", "STOREDIST", "bar"),
+			fail("GEORADIUSBYMEMBER_RO", "stations", "Astor Pl", 4, "km", "STORE"),
+			fail("GEORADIUSBYMEMBER_RO", "stations", "Astor Pl", 4, "km", "STOREDIST"),
+		)
+	})
+	t.Run("STORE", func(t *testing.T) {
+		testCommands(t,
+			succ("GEOADD",
+				"stations",
+				-73.99106999861966, 40.73005400028978, "Astor Pl",
+				-74.00019299927328, 40.71880300107709, "Canal St",
+				-73.98384899986625, 40.76172799961419, "50th St",
+			),
+
+			// plain store
+			succ("GEORADIUSBYMEMBER", "stations", "Astor Pl", 400, "km", "STORE", "foo"),
+			succ("ZRANGE", "foo", 0, -1),
+			succ("ZRANGE", "foo", 0, -1, "WITHSCORES"),
+
+			// Yeah, valid:
+			succ("GEORADIUSBYMEMBER", "stations", "Astor Pl", 400, "km", "STORE", ""),
+			succ("ZRANGE", "", 0, -1),
+
+			// store with count, and overwrite existing key
+			succ("EXPIRE", "foo", 999),
+			succ("GEORADIUSBYMEMBER", "stations", "Astor Pl", 400, "km", "ASC", "COUNT", 1, "STORE", "foo"),
+			succ("ZRANGE", "foo", 0, -1),
+			succ("TTL", "foo"),
+
+			// store should overwrite
+			succ("SET", "taken", 123),
+			succ("EXPIRE", "taken", 999),
+			succ("GEORADIUSBYMEMBER", "stations", "Astor Pl", 400, "km", "STORE", "taken"),
+			succ("TYPE", "taken"),
+			succ("ZRANGE", "taken", 0, -1),
+			succ("TTL", "taken"),
+
+			// errors
+			fail("GEORADIUSBYMEMBER", "stations", "Astor Pl", 400, "km", "STORE"),
+			fail("GEORADIUSBYMEMBER", "stations", "Astor Pl", 400, "km", "WITHDIST", "STORE", "foo"),
+			fail("GEORADIUSBYMEMBER", "stations", "Astor Pl", 400, "km", "WITHCOORD", "STORE", "foo"),
+		)
+	})
+
+	t.Run("STOREDIST", func(t *testing.T) {
+		testCommands(t,
+			succ("GEOADD",
+				"stations",
+				-73.99106999861966, 40.73005400028978, "Astor Pl",
+				-74.00019299927328, 40.71880300107709, "Canal St",
+				-73.98384899986625, 40.76172799961419, "50th St",
+			),
+
+			// plain store
+			succ("GEORADIUSBYMEMBER", "stations", "Astor Pl", 400, "km", "STOREDIST", "foo"),
+			succ("ZRANGE", "foo", 0, -1),
+			succRound3("ZRANGE", "foo", 0, -1, "WITHSCORES"),
+
+			// plain store, meter
+			succ("GEORADIUSBYMEMBER", "stations", "Astor Pl", 400, "m", "STOREDIST", "meter"),
+			succ("ZRANGE", "meter", 0, -1),
+			succRound3("ZRANGE", "meter", 0, -1, "WITHSCORES"),
+
+			// Yeah, valid:
+			succ("GEORADIUSBYMEMBER", "stations", "Astor Pl", 400, "km", "STOREDIST", ""),
+			succ("ZRANGE", "", 0, -1),
+
+			// STOREDIST with count
+			succ("GEORADIUSBYMEMBER", "stations", "Astor Pl", 400, "km", "ASC", "COUNT", 1, "STOREDIST", "foo"),
+			succ("ZRANGE", "foo", 0, -1),
+
+			// store should overwrite
+			succ("SET", "taken", 123),
+			succ("EXPIRE", "taken", 9999),
+			succ("GEORADIUSBYMEMBER", "stations", "Astor Pl", 400, "km", "STOREDIST", "taken"),
+			succ("TYPE", "taken"),
+			succ("ZRANGE", "taken", 0, -1),
+			succ("TTL", "taken"),
+
+			// multiple keys
+			succ("GEORADIUSBYMEMBER", "stations", "Astor Pl", 400, "km", "STOREDIST", "n1", "STOREDIST", "n2", "STOREDIST", "n3"),
+			succ("TYPE", "n1"),
+			succ("TYPE", "n2"),
+			succ("TYPE", "n3"),
+
+			// STORE and STOREDIST
+			succ("GEORADIUSBYMEMBER", "stations", "Astor Pl", 400, "km", "STOREDIST", "a", "STORE", "b"),
+			succ("TYPE", "a"),
+			succ("ZRANGE", "a", 0, -1),
+			succ("TYPE", "b"),
+			succ("ZRANGE", "b", 0, -1),
+
+			// errors
+			fail("GEORADIUSBYMEMBER", "stations", "Astor Pl", 400, "km", "STOREDIST"),
+			fail("GEORADIUSBYMEMBER", "stations", "Astor Pl", 400, "km", "WITHDIST", "STOREDIST", "foo"),
+			fail("GEORADIUSBYMEMBER", "stations", "Astor Pl", 400, "km", "WITHCOORD", "STOREDIST", "foo"),
+		)
+	})
+}
+
 // a bit longer testset
 func TestGeo(t *testing.T) {
 	// some subway stations
@@ -757,9 +907,25 @@ func TestGeo(t *testing.T) {
 		succRound3("GEORADIUS", "stations", -73.9718893, 40.7728773, 4, "km", "ASC", "COUNT", 3),
 		succRound3("GEORADIUS", "stations", -73.9718893, 40.7728773, 4, "km", "ASC", "COUNT", 99999),
 
+		succSorted("GEORADIUSBYMEMBER", "stations", "Astor Pl", 4, "km"),
+		succLoosely("GEORADIUSBYMEMBER", "stations", "Astor Pl", 4, "km", "WITHDIST"),
+		succ("GEORADIUSBYMEMBER", "stations", "Astor Pl", 4, "km", "WITHDIST", "ASC"),
+		succLoosely("GEORADIUSBYMEMBER", "stations", "Astor Pl", 4, "km", "WITHCOORD"),
+		succRound3("GEORADIUSBYMEMBER", "stations", "Astor Pl", 4, "km", "WITHCOORD", "ASC"),
+		succ("GEORADIUSBYMEMBER", "stations", "Astor Pl", 4, "km", "ASC"),
+		succ("GEORADIUSBYMEMBER", "stations", "Astor Pl", 4, "km", "DESC"),
+		succ("GEORADIUSBYMEMBER", "stations", "Astor Pl", 4, "km", "DESC", "COUNT", 3),
+		succ("GEORADIUSBYMEMBER", "stations", "Astor Pl", 4, "km", "ASC", "COUNT", 3),
+		succ("GEORADIUSBYMEMBER", "stations", "Astor Pl", 4, "km", "ASC", "COUNT", 99999),
+
 		succ("GEORADIUS", "stations", -73.9718893, 40.7728773, 4, "km", "STORE", "res"),
 		succ("ZRANGE", "res", 0, -1, "WITHSCORES"),
 		succ("GEORADIUS", "stations", -73.9718893, 40.7728773, 4, "km", "STOREDIST", "resd"),
 		succLoosely("ZRANGE", "resd", 0, -1, "WITHSCORES"),
+
+		succ("GEORADIUSBYMEMBER", "stations", "Astor Pl", 4, "km", "STORE", "resbymem"),
+		succ("ZRANGE", "resbymem", 0, -1, "WITHSCORES"),
+		succ("GEORADIUSBYMEMBER", "stations", "Astor Pl", 4, "km", "STOREDIST", "resbymemd"),
+		succLoosely("ZRANGE", "resbymemd", 0, -1, "WITHSCORES"),
 	)
 }

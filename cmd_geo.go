@@ -18,6 +18,8 @@ func commandsGeo(m *Miniredis) {
 	m.srv.Register("GEOPOS", m.cmdGeopos)
 	m.srv.Register("GEORADIUS", m.cmdGeoradius)
 	m.srv.Register("GEORADIUS_RO", m.cmdGeoradius)
+	m.srv.Register("GEORADIUSBYMEMBER", m.cmdGeoradiusbymember)
+	m.srv.Register("GEORADIUSBYMEMBER_RO", m.cmdGeoradiusbymember)
 }
 
 // GEOADD
@@ -305,6 +307,200 @@ func (m *Miniredis) cmdGeoradius(c *server.Peer, cmd string, args []string) {
 		db := m.db(ctx.selectedDB)
 		members := db.ssetElements(key)
 
+		matches := withinRadius(members, longitude, latitude, radius*toMeter)
+
+		// deal with ASC/DESC
+		if direction != unsorted {
+			sort.Slice(matches, func(i, j int) bool {
+				if direction == desc {
+					return matches[i].Distance > matches[j].Distance
+				}
+				return matches[i].Distance < matches[j].Distance
+			})
+		}
+
+		// deal with COUNT
+		if count > 0 && len(matches) > count {
+			matches = matches[:count]
+		}
+
+		// deal with "STORE x"
+		if withStore {
+			db.del(storeKey, true)
+			for _, member := range matches {
+				db.ssetAdd(storeKey, member.Score, member.Name)
+			}
+			c.WriteInt(len(matches))
+			return
+		}
+
+		// deal with "STOREDIST x"
+		if withStoredist {
+			db.del(storedistKey, true)
+			for _, member := range matches {
+				db.ssetAdd(storedistKey, member.Distance/toMeter, member.Name)
+			}
+			c.WriteInt(len(matches))
+			return
+		}
+
+		c.WriteLen(len(matches))
+		for _, member := range matches {
+			if !withDist && !withCoord {
+				c.WriteBulk(member.Name)
+				continue
+			}
+
+			len := 1
+			if withDist {
+				len++
+			}
+			if withCoord {
+				len++
+			}
+			c.WriteLen(len)
+			c.WriteBulk(member.Name)
+			if withDist {
+				c.WriteBulk(fmt.Sprintf("%.4f", member.Distance/toMeter))
+			}
+			if withCoord {
+				c.WriteLen(2)
+				c.WriteBulk(fmt.Sprintf("%f", member.Longitude))
+				c.WriteBulk(fmt.Sprintf("%f", member.Latitude))
+			}
+		}
+	})
+}
+
+// GEORADIUSBYMEMBER and GEORADIUSBYMEMBER_RO
+func (m *Miniredis) cmdGeoradiusbymember(c *server.Peer, cmd string, args []string) {
+	if len(args) < 4 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
+	}
+	if !m.handleAuth(c) {
+		return
+	}
+	if m.checkPubsub(c) {
+		return
+	}
+
+	key := args[0]
+	member := args[1]
+
+	radius, err := strconv.ParseFloat(args[2], 64)
+	if err != nil || radius < 0 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
+	}
+	toMeter := parseUnit(args[3])
+	if toMeter == 0 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
+	}
+	args = args[4:]
+
+	var (
+		withDist      = false
+		withCoord     = false
+		direction     = unsorted
+		count         = 0
+		withStore     = false
+		storeKey      = ""
+		withStoredist = false
+		storedistKey  = ""
+	)
+	for len(args) > 0 {
+		arg := args[0]
+		args = args[1:]
+		switch strings.ToUpper(arg) {
+		case "WITHCOORD":
+			withCoord = true
+		case "WITHDIST":
+			withDist = true
+		case "ASC":
+			direction = asc
+		case "DESC":
+			direction = desc
+		case "COUNT":
+			if len(args) == 0 {
+				setDirty(c)
+				c.WriteError("ERR syntax error")
+				return
+			}
+			n, err := strconv.Atoi(args[0])
+			if err != nil {
+				setDirty(c)
+				c.WriteError(msgInvalidInt)
+				return
+			}
+			if n <= 0 {
+				setDirty(c)
+				c.WriteError("ERR COUNT must be > 0")
+				return
+			}
+			args = args[1:]
+			count = n
+		case "STORE":
+			if len(args) == 0 {
+				setDirty(c)
+				c.WriteError("ERR syntax error")
+				return
+			}
+			withStore = true
+			storeKey = args[0]
+			args = args[1:]
+		case "STOREDIST":
+			if len(args) == 0 {
+				setDirty(c)
+				c.WriteError("ERR syntax error")
+				return
+			}
+			withStoredist = true
+			storedistKey = args[0]
+			args = args[1:]
+		default:
+			setDirty(c)
+			c.WriteError("ERR syntax error")
+			return
+		}
+	}
+
+	if strings.ToUpper(cmd) == "GEORADIUSBYMEMBER_RO" && (withStore || withStoredist) {
+		setDirty(c)
+		c.WriteError("ERR syntax error")
+		return
+	}
+
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
+		if (withStore || withStoredist) && (withDist || withCoord) {
+			c.WriteError("ERR STORE option in GEORADIUS is not compatible with WITHDIST, WITHHASH and WITHCOORDS options")
+			return
+		}
+
+		db := m.db(ctx.selectedDB)
+		if !db.exists(key) {
+			c.WriteNull()
+			return
+		}
+
+		if db.t(key) != "zset" {
+			c.WriteError(ErrWrongType.Error())
+			return
+		}
+
+		// get position of member
+		if !db.ssetExists(key, member) {
+			c.WriteError("ERR could not decode requested zset member")
+			return
+		}
+		score := db.ssetScore(key, member)
+		longitude, latitude := fromGeohash(uint64(score))
+
+		members := db.ssetElements(key)
 		matches := withinRadius(members, longitude, latitude, radius*toMeter)
 
 		// deal with ASC/DESC
