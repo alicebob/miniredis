@@ -111,18 +111,22 @@ func (m *Miniredis) cmdSelect(c *server.Peer, cmd string, args []string) {
 		return
 	}
 
-	id, err := strconv.Atoi(args[0])
-	if err != nil {
-		id = 0
-	}
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
+		id, err := strconv.Atoi(args[0])
+		if err != nil {
+			c.WriteError("ERR invalid DB index")
+			setDirty(c)
+			return
+		}
+		if id < 0 {
+			c.WriteError("ERR DB index is out of range")
+			setDirty(c)
+			return
+		}
 
-	m.Lock()
-	defer m.Unlock()
-
-	ctx := getCtx(c)
-	ctx.selectedDB = id
-
-	c.WriteOK()
+		ctx.selectedDB = id
+		c.WriteOK()
+	})
 }
 
 // SWAPDB
