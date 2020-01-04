@@ -82,3 +82,74 @@ func readString(rd *bufio.Reader) (string, error) {
 		return string(buf[:length]), nil
 	}
 }
+
+// parse a reply
+func ParseReply(rd *bufio.Reader) (interface{}, error) {
+	line, err := rd.ReadString('\n')
+	if err != nil {
+		return nil, err
+	}
+	if len(line) < 3 {
+		return nil, ErrProtocol
+	}
+
+	switch line[0] {
+	default:
+		return nil, ErrProtocol
+	case '+':
+		// +: simple string
+		return string(line[1 : len(line)-2]), nil
+	case '-':
+		// -: errors
+		return nil, errors.New(string(line[1 : len(line)-2]))
+	case ':':
+		// :: integer
+		v := line[1 : len(line)-2]
+		if v == "" {
+			return 0, nil
+		}
+		n, err := strconv.Atoi(v)
+		if err != nil {
+			return nil, ErrProtocol
+		}
+		return n, nil
+	case '$':
+		// bulk strings are: `$5\r\nhello\r\n`
+		length, err := strconv.Atoi(line[1 : len(line)-2])
+		if err != nil {
+			return "", err
+		}
+		if length < 0 {
+			// -1 is a nil response
+			return nil, nil
+		}
+		var (
+			buf = make([]byte, length+2)
+			pos = 0
+		)
+		for pos < length+2 {
+			n, err := rd.Read(buf[pos:])
+			if err != nil {
+				return "", err
+			}
+			pos += n
+		}
+		return string(buf[:length]), nil
+	case '*':
+		// array
+		l, err := strconv.Atoi(line[1 : len(line)-2])
+		if err != nil {
+			return nil, ErrProtocol
+		}
+		// l can be -1
+		var fields []interface{}
+		for ; l > 0; l-- {
+			s, err := ParseReply(rd)
+			if err != nil {
+				return nil, err
+			}
+			fields = append(fields, s)
+		}
+		return fields, nil
+	}
+}

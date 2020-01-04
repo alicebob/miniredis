@@ -1,23 +1,32 @@
 package miniredis
 
 import (
+	"bufio"
+	"bytes"
+	"fmt"
 	"strings"
 
-	redigo "github.com/gomodule/redigo/redis"
 	lua "github.com/yuin/gopher-lua"
 
 	"github.com/alicebob/miniredis/v2/server"
 )
 
-func mkLuaFuncs(conn redigo.Conn) map[string]lua.LGFunction {
+func mkLuaFuncs(srv *server.Server, c *server.Peer) map[string]lua.LGFunction {
 	mkCall := func(failFast bool) func(l *lua.LState) int {
+		// one server.Ctx for a single Lua run
+		pCtx := &connCtx{}
+		if getCtx(c).authenticated {
+			pCtx.authenticated = true
+		}
+		pCtx.nested = true
+
 		return func(l *lua.LState) int {
 			top := l.GetTop()
 			if top == 0 {
 				l.Error(lua.LString("Please specify at least one argument for redis.call()"), 1)
 				return 0
 			}
-			var args []interface{}
+			var args []string
 			for i := 1; i <= top; i++ {
 				switch a := l.Get(i).(type) {
 				case lua.LNumber:
@@ -29,22 +38,19 @@ func mkLuaFuncs(conn redigo.Conn) map[string]lua.LGFunction {
 					return 0
 				}
 			}
-			cmd, ok := args[0].(string)
-			if !ok {
-				l.Error(lua.LString("Unknown Redis command called from Lua script"), 1)
+			if len(args) == 0 {
+				l.Error(lua.LString(msgNotFromScripts), 1)
 				return 0
 			}
-			switch strings.ToUpper(cmd) {
-			case "MULTI", "EXEC":
-				if failFast {
-					l.Error(lua.LString("This Redis command is not allowed from scripts"), 1)
-					return 0
-				}
-				l.Push(lua.LNil)
-				return 1
-			}
 
-			res, err := conn.Do(cmd, args[1:]...)
+			buf := &bytes.Buffer{}
+			wr := bufio.NewWriter(buf)
+			peer := server.NewPeer(wr)
+			peer.Ctx = pCtx
+			srv.Dispatch(peer, args)
+			wr.Flush()
+
+			res, err := server.ParseReply(bufio.NewReader(buf))
 			if err != nil {
 				if failFast {
 					// call() mode
@@ -66,14 +72,19 @@ func mkLuaFuncs(conn redigo.Conn) map[string]lua.LGFunction {
 				switch r := res.(type) {
 				case int64:
 					l.Push(lua.LNumber(r))
+				case int:
+					l.Push(lua.LNumber(r))
 				case []uint8:
 					l.Push(lua.LString(string(r)))
 				case []interface{}:
 					l.Push(redisToLua(l, r))
 				case string:
 					l.Push(lua.LString(r))
+				case error:
+					l.Error(lua.LString(r.Error()), 1)
+					return 0
 				default:
-					panic("type not handled")
+					panic(fmt.Sprintf("type not handled (%T)", r))
 				}
 			}
 			return 1

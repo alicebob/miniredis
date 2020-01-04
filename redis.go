@@ -36,6 +36,7 @@ const (
 	msgStreamIDTooSmall   = "ERR The ID specified in XADD is equal or smaller than the target stream top item"
 	msgNoScriptFound      = "NOSCRIPT No matching script. Please use EVAL."
 	msgUnsupportedUnit    = "ERR unsupported unit provided. please use m, km, ft, mi"
+	msgNotFromScripts     = "This Redis command is not allowed from scripts"
 )
 
 func errWrongNumber(cmd string) string {
@@ -54,6 +55,14 @@ func withTx(
 	cb txCmd,
 ) {
 	ctx := getCtx(c)
+
+	if ctx.nested {
+		// this is a call via Lua's .call(). It's already locked.
+		cb(c, ctx)
+		m.signal.Broadcast()
+		return
+	}
+
 	if inTx(ctx) {
 		addTxCmd(ctx, cb)
 		c.WriteInline("QUEUED")

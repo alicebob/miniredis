@@ -20,6 +20,8 @@ func TestEval(t *testing.T) {
 		succ("EVAL", "return redis.call('GET', 'nosuch')==nil", 0),
 		succ("EVAL", "local a = redis.call('MGET', 'bar'); return a[1] == false", 0),
 		succ("EVAL", "local a = redis.call('MGET', 'bar'); return a[1] == nil", 0),
+		succ("EVAL", "return redis.call('ZRANGE', 'q', 0, -1)", 0),
+		succ("EVAL", "return redis.call('LPOP', 'foo')", 0),
 
 		// failure cases
 		fail("EVAL"),
@@ -98,6 +100,7 @@ func TestLua(t *testing.T) {
 		succ("EVAL", "return 3.9999+0.201", 0),
 		succ("EVAL", "return {{1}}", 0),
 		succ("EVAL", "return {1,{1,{1,'bar'}}}", 0),
+		succ("EVAL", "return nil", 0),
 	)
 
 	// special returns
@@ -277,7 +280,7 @@ func TestLuaCall(t *testing.T) {
 		succ("GET", "res"),
 	)
 
-	// call() with transaction commands
+	// call() with non-allowed commands
 	testCommands(t,
 		succ("SET", "foo", 1),
 
@@ -288,6 +291,42 @@ func TestLuaCall(t *testing.T) {
 		failWith(
 			"This Redis command is not allowed from scripts",
 			"EVAL", `redis.call("EXEC")`, 0,
+		),
+		failWith(
+			"This Redis command is not allowed from scripts",
+			"EVAL", `redis.call("EVAL", "redis.call(\"GET\", \"foo\")", 0)`, 0,
+		),
+		failWith(
+			"This Redis command is not allowed from scripts",
+			"EVAL", `redis.call("SCRIPT", "LOAD", "return 42")`, 0,
+		),
+		failWith(
+			"This Redis command is not allowed from scripts",
+			"EVAL", `redis.call("EVALSHA", "123", "0")`, 0,
+		),
+		failWith(
+			"This Redis command is not allowed from scripts",
+			"EVAL", `redis.call("AUTH", "foobar")`, 0,
+		),
+		failWith(
+			"This Redis command is not allowed from scripts",
+			"EVAL", `redis.call("WATCH", "foobar")`, 0,
+		),
+		failWith(
+			"This Redis command is not allowed from scripts",
+			"EVAL", `redis.call("SUBSCRIBE", "foo")`, 0,
+		),
+		failWith(
+			"This Redis command is not allowed from scripts",
+			"EVAL", `redis.call("UNSUBSCRIBE", "foo")`, 0,
+		),
+		failWith(
+			"This Redis command is not allowed from scripts",
+			"EVAL", `redis.call("PSUBSCRIBE", "foo")`, 0,
+		),
+		failWith(
+			"This Redis command is not allowed from scripts",
+			"EVAL", `redis.call("PUNSUBSCRIBE", "foo")`, 0,
 		),
 		succ("EVAL", `redis.pcall("EXEC")`, 0),
 		succ("GET", "foo"),

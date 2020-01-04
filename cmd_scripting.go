@@ -51,11 +51,6 @@ func (m *Miniredis) runLuaScript(c *server.Peer, script string, args []string) {
 	luajson.Preload(l)
 	requireGlobal(l, "cjson", "json")
 
-	m.Unlock()
-	conn := m.redigo()
-	m.Lock()
-	defer conn.Close()
-
 	// set global variable KEYS
 	keysTable := l.NewTable()
 	keysS, args := args[0], args[1:]
@@ -84,7 +79,7 @@ func (m *Miniredis) runLuaScript(c *server.Peer, script string, args []string) {
 	}
 	l.SetGlobal("ARGV", argvTable)
 
-	redisFuncs := mkLuaFuncs(conn)
+	redisFuncs := mkLuaFuncs(m.srv, c)
 	// Register command handlers
 	l.Push(l.NewFunction(func(l *lua.LState) int {
 		mod := l.RegisterModule("redis", redisFuncs).(*lua.LTable)
@@ -97,8 +92,6 @@ func (m *Miniredis) runLuaScript(c *server.Peer, script string, args []string) {
 	l.Push(lua.LString("redis"))
 	l.Call(1, 0)
 
-	m.Unlock() // This runs in a transaction, but can access our db recursively
-	defer m.Lock()
 	if err := l.DoString(script); err != nil {
 		c.WriteError(errLuaParseError(err))
 		return
@@ -120,6 +113,11 @@ func (m *Miniredis) cmdEval(c *server.Peer, cmd string, args []string) {
 		return
 	}
 
+	if getCtx(c).nested {
+		c.WriteError(msgNotFromScripts)
+		return
+	}
+
 	script, args := args[0], args[1:]
 
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
@@ -137,6 +135,10 @@ func (m *Miniredis) cmdEvalsha(c *server.Peer, cmd string, args []string) {
 		return
 	}
 	if m.checkPubsub(c) {
+		return
+	}
+	if getCtx(c).nested {
+		c.WriteError(msgNotFromScripts)
 		return
 	}
 
@@ -163,6 +165,11 @@ func (m *Miniredis) cmdScript(c *server.Peer, cmd string, args []string) {
 		return
 	}
 	if m.checkPubsub(c) {
+		return
+	}
+
+	if getCtx(c).nested {
+		c.WriteError(msgNotFromScripts)
 		return
 	}
 

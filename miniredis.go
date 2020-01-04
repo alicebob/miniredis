@@ -18,12 +18,9 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
-	"net"
 	"strconv"
 	"sync"
 	"time"
-
-	redigo "github.com/gomodule/redigo/redis"
 
 	"github.com/alicebob/miniredis/v2/server"
 )
@@ -80,6 +77,7 @@ type connCtx struct {
 	dirtyTransaction bool           // any error during QUEUEing
 	watch            map[dbKey]uint // WATCHed keys
 	subscriber       *Subscriber    // client is in PUBSUB mode if not nil
+	nested           bool           // this is called via Lua
 }
 
 // NewMiniRedis makes a new, non-started, Miniredis object.
@@ -287,19 +285,6 @@ func (m *Miniredis) Server() *server.Server {
 	return m.srv
 }
 
-// redigo returns a redigo.Conn, connected using net.Pipe
-func (m *Miniredis) redigo() redigo.Conn {
-	c1, c2 := net.Pipe()
-	m.srv.ServeConn(c1)
-	c := redigo.NewConn(c2, 0, 0)
-	if m.password != "" {
-		if _, err := c.Do("AUTH", m.password); err != nil {
-			// ?
-		}
-	}
-	return c
-}
-
 // Dump returns a text version of the selected DB, usable for debugging.
 func (m *Miniredis) Dump() string {
 	m.Lock()
@@ -366,6 +351,10 @@ func (m *Miniredis) SetTime(t time.Time) {
 
 // handleAuth returns false if connection has no access. It sends the reply.
 func (m *Miniredis) handleAuth(c *server.Peer) bool {
+	if getCtx(c).nested {
+		return true
+	}
+
 	m.Lock()
 	defer m.Unlock()
 	if m.password == "" {
@@ -381,6 +370,10 @@ func (m *Miniredis) handleAuth(c *server.Peer) bool {
 // handlePubsub sends an error to the user if the connection is in PUBSUB mode.
 // It'll return true if it did.
 func (m *Miniredis) checkPubsub(c *server.Peer) bool {
+	if getCtx(c).nested {
+		return false
+	}
+
 	m.Lock()
 	defer m.Unlock()
 

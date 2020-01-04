@@ -3,6 +3,7 @@ package server
 import (
 	"bufio"
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"reflect"
@@ -112,6 +113,75 @@ func TestReadString(t *testing.T) {
 		res, err := readString(bufio.NewReader(bytes.NewBufferString(c.payload)))
 		if have, want := err, c.err; have != want {
 			t.Errorf("err %d: have %v, want %v", i, have, want)
+			continue
+		}
+		if have, want := res, c.res; !reflect.DeepEqual(have, want) {
+			t.Errorf("case %d: have %#v, want %#v", i, have, want)
+		}
+	}
+}
+
+func TestParseReply(t *testing.T) {
+	type cas struct {
+		payload string
+		err     error
+		res     interface{}
+	}
+	bigPayload := strings.Repeat("X", 1<<24)
+	for i, c := range []cas{
+		{
+			payload: "+hello world\r\n",
+			res:     "hello world",
+		},
+		{
+			payload: "-some error\r\n",
+			err:     errors.New("some error"),
+		},
+		{
+			payload: ":42\r\n",
+			res:     42,
+		},
+		{
+			payload: ":\r\n",
+			res:     0,
+		},
+		{
+			payload: "$4\r\nabcd\r\n",
+			res:     "abcd",
+		},
+		{
+			payload: fmt.Sprintf("$%d\r\n%s\r\n", len(bigPayload), bigPayload),
+			res:     bigPayload,
+		},
+
+		{
+			payload: "",
+			err:     io.EOF,
+		},
+		{
+			payload: ":42",
+			err:     io.EOF,
+		},
+		{
+			payload: "XXX",
+			err:     io.EOF,
+		},
+		{
+			payload: "XXXXXX",
+			err:     io.EOF,
+		},
+		{
+			payload: "\r\n",
+			err:     ErrProtocol,
+		},
+		{
+			payload: "XXXX\r\n",
+			err:     ErrProtocol,
+		},
+	} {
+		res, err := ParseReply(bufio.NewReader(bytes.NewBufferString(c.payload)))
+		if have, want := err, c.err; !reflect.DeepEqual(have, want) {
+			t.Errorf("err %d: have %#v, want %#v", i, have, want)
 			continue
 		}
 		if have, want := res, c.res; !reflect.DeepEqual(have, want) {
