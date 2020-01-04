@@ -44,11 +44,13 @@ func (m *Miniredis) cmdPing(c *server.Peer, cmd string, args []string) {
 		return
 	}
 
-	if payload == "" {
-		c.WriteInline("PONG")
-		return
-	}
-	c.WriteBulk(payload)
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
+		if payload == "" {
+			c.WriteInline("PONG")
+			return
+		}
+		c.WriteBulk(payload)
+	})
 }
 
 // AUTH
@@ -93,8 +95,10 @@ func (m *Miniredis) cmdEcho(c *server.Peer, cmd string, args []string) {
 		return
 	}
 
-	msg := args[0]
-	c.WriteBulk(msg)
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
+		msg := args[0]
+		c.WriteBulk(msg)
+	})
 }
 
 // SELECT
