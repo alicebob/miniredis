@@ -438,10 +438,6 @@ func setDirty(c *server.Peer) {
 	getCtx(c).dirtyTransaction = true
 }
 
-func setAuthenticated(c *server.Peer) {
-	getCtx(c).authenticated = true
-}
-
 func (m *Miniredis) addSubscriber(s *Subscriber) {
 	m.subscribers[s] = struct{}{}
 }
