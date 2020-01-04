@@ -44,11 +44,13 @@ func (m *Miniredis) cmdPing(c *server.Peer, cmd string, args []string) {
 		return
 	}
 
-	if payload == "" {
-		c.WriteInline("PONG")
-		return
-	}
-	c.WriteBulk(payload)
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
+		if payload == "" {
+			c.WriteInline("PONG")
+			return
+		}
+		c.WriteBulk(payload)
+	})
 }
 
 // AUTH
@@ -68,19 +70,19 @@ func (m *Miniredis) cmdAuth(c *server.Peer, cmd string, args []string) {
 
 	pw := args[0]
 
-	m.Lock()
-	defer m.Unlock()
-	if m.password == "" {
-		c.WriteError("ERR Client sent AUTH, but no password is set")
-		return
-	}
-	if m.password != pw {
-		c.WriteError("ERR invalid password")
-		return
-	}
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
+		if m.password == "" {
+			c.WriteError("ERR Client sent AUTH, but no password is set")
+			return
+		}
+		if m.password != pw {
+			c.WriteError("ERR invalid password")
+			return
+		}
 
-	setAuthenticated(c)
-	c.WriteOK()
+		ctx.authenticated = true
+		c.WriteOK()
+	})
 }
 
 // ECHO
@@ -97,8 +99,10 @@ func (m *Miniredis) cmdEcho(c *server.Peer, cmd string, args []string) {
 		return
 	}
 
-	msg := args[0]
-	c.WriteBulk(msg)
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
+		msg := args[0]
+		c.WriteBulk(msg)
+	})
 }
 
 // SELECT
@@ -115,20 +119,22 @@ func (m *Miniredis) cmdSelect(c *server.Peer, cmd string, args []string) {
 		return
 	}
 
-	id, err := strconv.Atoi(args[0])
-	if err != nil {
-		id = 0
-	}
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
+		id, err := strconv.Atoi(args[0])
+		if err != nil {
+			c.WriteError("ERR invalid DB index")
+			setDirty(c)
+			return
+		}
+		if id < 0 {
+			c.WriteError("ERR DB index is out of range")
+			setDirty(c)
+			return
+		}
 
-	if !getCtx(c).nested {
-		m.Lock()
-		defer m.Unlock()
-	}
-
-	ctx := getCtx(c)
-	ctx.selectedDB = id
-
-	c.WriteOK()
+		ctx.selectedDB = id
+		c.WriteOK()
+	})
 }
 
 // SWAPDB
