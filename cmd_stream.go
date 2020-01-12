@@ -273,9 +273,7 @@ func (m *Miniredis) cmdXgroup(c *server.Peer, cmd string, args []string) {
 
 // XGROUP CREATE
 func (m *Miniredis) cmdXgroupCreate(c *server.Peer, cmd string, args []string) {
-	stream := args[1]
-	group := args[2]
-	id := args[3]
+	stream, group, id := args[1], args[2], args[3]
 
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
