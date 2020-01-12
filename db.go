@@ -2,6 +2,7 @@ package miniredis
 
 import (
 	"errors"
+	"fmt"
 	"math/big"
 	"sort"
 	"strconv"
@@ -562,6 +563,16 @@ func (db *RedisDB) stream(key string) []StreamEntry {
 	return db.streamKeys[key]
 }
 
+func (db *RedisDB) streamCreate(key string) {
+	_, ok := db.streamKeys[key]
+	if !ok {
+		db.keys[key] = "stream"
+	}
+
+	db.streamKeys[key] = make(streamKey, 0)
+	db.keyVersion[key]++
+}
+
 // streamAdd adds an entry to a stream. Returns the new entry ID.
 // If id is empty or "*" the ID will be generated automatically.
 // `values` should have an even length.
@@ -597,6 +608,181 @@ func (db *RedisDB) streamMaxlen(key string, n int) {
 	if len(stream) > n {
 		db.streamKeys[key] = stream[len(stream)-n:]
 	}
+}
+
+func (db *RedisDB) streamLen(key string) (int, error) {
+	stream, ok := db.streamKeys[key]
+	if !ok {
+		return 0, fmt.Errorf("stream %s not exists", key)
+	}
+	return len(stream), nil
+}
+
+func (db *RedisDB) streamGroupCreate(stream, group, id string) error {
+	streamData, ok := db.streamKeys[stream]
+	if !ok {
+		return fmt.Errorf("stream %s not exists", stream)
+	}
+
+	if _, ok := db.streamGroupKeys[stream]; !ok {
+		db.streamGroupKeys[stream] = streamGroupKey{}
+	}
+
+	if _, ok := db.streamGroupKeys[stream][group]; ok {
+		return errors.New("BUSYGROUP")
+	}
+
+	entry := streamGroupEntry{
+		pending: make([]pendingEntry, 0),
+	}
+
+	if id == "$" {
+		entry.lastID = streamData.lastID()
+	} else {
+		entry.lastID = id
+	}
+
+	db.streamGroupKeys[stream][group] = entry
+
+	return nil
+}
+
+func (db *RedisDB) streamRead(stream, group, consumer, id string, count int) ([]StreamEntry, error) {
+	streamData, ok := db.streamKeys[stream]
+	if !ok {
+		return nil, fmt.Errorf("stream %s not exists", stream)
+	}
+
+	if _, ok := db.streamGroupKeys[stream]; !ok {
+		// Error for group because this is key for group
+		return nil, fmt.Errorf("group %s not exists", group)
+	}
+
+	groupData, ok := db.streamGroupKeys[stream][group]
+	if !ok {
+		return nil, fmt.Errorf("group %s not exists", group)
+	}
+
+	res := make([]StreamEntry, 0)
+
+	if id == ">" {
+		next := sort.Search(len(streamData), func(i int) bool {
+			return streamCmp(groupData.lastID, streamData[i].ID) < 0
+		})
+
+		if len(streamData[next:]) == 0 {
+			return nil, nil
+		}
+
+		if count == 0 || count > len(streamData[next:]) {
+			count = len(streamData[next:])
+		}
+
+		res = append(res, streamData[next:count]...)
+
+		for _, en := range res {
+			pending := pendingEntry{
+				consumer: consumer,
+				ID:       en.ID,
+			}
+			groupData.pending = append(groupData.pending, pending)
+		}
+
+		groupData.lastID = res[len(res)-1].ID
+		db.streamGroupKeys[stream][group] = groupData
+	} else {
+		next := sort.Search(len(groupData.pending), func(i int) bool {
+			return streamCmp(id, groupData.pending[i].ID) < 0
+		})
+
+		if len(groupData.pending[next:]) == 0 {
+			return nil, nil
+		}
+
+		for _, e := range groupData.pending[next:] {
+			if e.consumer != consumer {
+				continue
+			}
+
+			pos := sort.Search(len(streamData), func(i int) bool {
+				return streamCmp(e.ID, streamData[i].ID) == 0
+			})
+
+			// Not found
+			if pos == len(streamData) {
+				continue
+			}
+
+			res = append(res, streamData[pos])
+
+			// Truncate to allow faster next search, because next element in pending
+			// is greater, then current, so on for stream
+			streamData = streamData[pos:]
+		}
+	}
+
+	return res, nil
+}
+
+func (db *RedisDB) streamDelete(stream string, ids []string) (int, error) {
+	streamData, ok := db.streamKeys[stream]
+	if !ok {
+		return 0, fmt.Errorf("stream %s not exists", stream)
+	}
+
+	count := 0
+
+	for _, id := range ids {
+		pos := sort.Search(len(streamData), func(i int) bool {
+			return streamCmp(id, streamData[i].ID) == 0
+		})
+
+		if pos == len(streamData) {
+			continue
+		}
+
+		streamData = append(streamData[:pos], streamData[pos+1:]...)
+		count++
+	}
+
+	if count > 0 {
+		db.streamKeys[stream] = streamData
+	}
+
+	return count, nil
+}
+
+func (db *RedisDB) streamAck(stream, group string, ids []string) (int, error) {
+	if _, ok := db.streamGroupKeys[stream]; !ok {
+		// Error for group because this is key for group
+		return 0, fmt.Errorf("group %s not exists", group)
+	}
+
+	groupData, ok := db.streamGroupKeys[stream][group]
+	if !ok {
+		return 0, fmt.Errorf("group %s not exists", group)
+	}
+
+	count := 0
+
+	for _, id := range ids {
+		pos := sort.Search(len(groupData.pending), func(i int) bool {
+			return streamCmp(id, groupData.pending[i].ID) == 0
+		})
+
+		if pos == len(groupData.pending) {
+			continue
+		}
+
+		groupData.pending = append(groupData.pending[:pos], groupData.pending[pos+1:]...)
+		count++
+	}
+
+	if count > 0 {
+		db.streamGroupKeys[stream][group] = groupData
+	}
+
+	return count, nil
 }
 
 // fastForward proceeds the current timestamp with duration, works as a time machine

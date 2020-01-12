@@ -33,6 +33,12 @@ func RedisAuth(passwd string) (*ephemeral, string) {
 	return runRedis(fmt.Sprintf("requirepass %s", passwd))
 }
 
+// RedisCluster starts a memory-only redis on a random port. The redis has
+// cluster mode enabled. See Redis()
+func RedisCluster() (*ephemeral, string) {
+	return runRedis("cluster-enabled yes\ncluster-config-file nodes.conf")
+}
+
 func runRedis(extraConfig string) (*ephemeral, string) {
 	port := arbitraryPort()
 

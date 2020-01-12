@@ -33,6 +33,11 @@ func TestStream(t *testing.T) {
 		equals(t, "stream", s)
 	})
 
+	info, err := redis.Int64Map(c.Do("XINFO", "STREAM", "s"))
+	ok(t, err)
+
+	equals(t, map[string]int64{"length": 1}, info)
+
 	now := time.Date(2001, 1, 1, 4, 4, 5, 4000000, time.UTC)
 	s.SetTime(now)
 
@@ -279,4 +284,137 @@ func TestStreamRange(t *testing.T) {
 		_, err = c.Do("XRANGE", "foo", "-", "noint")
 		mustFail(t, err, msgInvalidStreamID)
 	})
+}
+
+// Test XINFO
+func TestStreamInfo(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+	defer c.Close()
+
+	_, err = redis.Strings(c.Do("XINFO", "STREAM", "planets"))
+	mustFail(t, err, "ERR stream planets not exists")
+
+	_, err = redis.String(c.Do("XADD", "planets", "0-1", "name", "Mercury", "greek-god", "Hermes", "idx", "1"))
+	ok(t, err)
+
+	info, err := redis.Int64Map(c.Do("XINFO", "STREAM", "planets"))
+	ok(t, err)
+
+	equals(t, map[string]int64{"length": 1}, info)
+}
+
+// Test XGROUP
+func TestStreamGroup(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+	defer c.Close()
+
+	_, err = redis.String(c.Do("XGROUP", "CREATE", "s", "processing", "$"))
+	mustFail(t, err, "ERR stream s not exists")
+
+	_, err = redis.String(c.Do("XGROUP", "CREATE", "s", "processing", "$", "MKSTREAM"))
+	ok(t, err)
+
+	count, err := redis.Int(c.Do("XLEN", "s"))
+	ok(t, err)
+	equals(t, 0, count)
+}
+
+// Test XREADGROUP
+func TestStreamReadGroup(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+	defer c.Close()
+
+	_, err = redis.Values(c.Do("XREADGROUP", "GROUP", "processing", "alice", "STREAMS", "planets", ">"))
+	mustFail(t, err, "stream planets not exists")
+
+	_, err = redis.String(c.Do("XGROUP", "CREATE", "planets", "processing", "$", "MKSTREAM"))
+	ok(t, err)
+
+	_, err = redis.Values(c.Do("XREADGROUP", "GROUP", "processing", "alice", "STREAMS", "planets", ">"))
+	mustFail(t, err, redis.ErrNil.Error())
+
+	_, err = redis.String(c.Do("XADD", "planets", "0-1", "name", "Mercury"))
+	ok(t, err)
+
+	count, err := redis.Int(c.Do("XLEN", "planets"))
+	ok(t, err)
+	equals(t, 1, count)
+
+	msgs, err := redis.Values(c.Do("XREADGROUP", "GROUP", "processing", "alice", "STREAMS", "planets", ">"))
+	ok(t, err)
+	equals(t, []interface{}{[]interface{}{[]byte("planets"), []interface{}{[]interface{}{[]byte("0-1"), []interface{}{[]byte("name"), []byte("Mercury")}}}}}, msgs)
+
+	msgs, err = redis.Values(c.Do("XREADGROUP", "GROUP", "processing", "alice", "STREAMS", "planets", ">"))
+	mustFail(t, err, redis.ErrNil.Error())
+
+	// Read from PEL
+	msgs, err = redis.Values(c.Do("XREADGROUP", "GROUP", "processing", "alice", "STREAMS", "planets", "0-0"))
+	ok(t, err)
+	equals(t, []interface{}{[]interface{}{[]byte("planets"), []interface{}{[]interface{}{[]byte("0-1"), []interface{}{[]byte("name"), []byte("Mercury")}}}}}, msgs)
+}
+
+// Test XDEL
+func TestStreamDelete(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+	defer c.Close()
+
+	_, err = redis.String(c.Do("XGROUP", "CREATE", "planets", "processing", "$", "MKSTREAM"))
+	ok(t, err)
+
+	_, err = redis.String(c.Do("XADD", "planets", "0-1", "name", "Mercury"))
+	ok(t, err)
+
+	msgs, err := redis.Values(c.Do("XREADGROUP", "GROUP", "processing", "alice", "STREAMS", "planets", ">"))
+	ok(t, err)
+	equals(t, []interface{}{[]interface{}{[]byte("planets"), []interface{}{[]interface{}{[]byte("0-1"), []interface{}{[]byte("name"), []byte("Mercury")}}}}}, msgs)
+
+	count, err := redis.Int(c.Do("XDEL", "planets", "0-1"))
+	ok(t, err)
+	equals(t, 1, count)
+
+	_, err = redis.Values(c.Do("XREADGROUP", "GROUP", "processing", "alice", "STREAMS", "planets", "0-0"))
+	mustFail(t, err, redis.ErrNil.Error())
+}
+
+// Test XACK
+func TestStreamAck(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+	defer c.Close()
+
+	_, err = redis.String(c.Do("XGROUP", "CREATE", "planets", "processing", "$", "MKSTREAM"))
+	ok(t, err)
+
+	_, err = redis.String(c.Do("XADD", "planets", "0-1", "name", "Mercury"))
+	ok(t, err)
+
+	msgs, err := redis.Values(c.Do("XREADGROUP", "GROUP", "processing", "alice", "STREAMS", "planets", ">"))
+	ok(t, err)
+	equals(t, []interface{}{[]interface{}{[]byte("planets"), []interface{}{[]interface{}{[]byte("0-1"), []interface{}{[]byte("name"), []byte("Mercury")}}}}}, msgs)
+
+	count, err := redis.Int(c.Do("XACK", "planets", "processing", "0-1"))
+	ok(t, err)
+	equals(t, 1, count)
+
+	_, err = redis.Values(c.Do("XREADGROUP", "GROUP", "processing", "alice", "STREAMS", "planets", "0-0"))
+	mustFail(t, err, redis.ErrNil.Error())
 }

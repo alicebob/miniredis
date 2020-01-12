@@ -24,6 +24,18 @@ type StreamEntry struct {
 	Values []string
 }
 
+type streamGroupKey map[string]streamGroupEntry
+
+type streamGroupEntry struct {
+	lastID  string
+	pending []pendingEntry
+}
+
+type pendingEntry struct {
+	consumer string
+	ID       string
+}
+
 func (ss *streamKey) generateID(now time.Time) string {
 	ts := uint64(now.UnixNano()) / 1000000
 
