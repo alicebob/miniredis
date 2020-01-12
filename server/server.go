@@ -279,6 +279,13 @@ func (c *Peer) WriteInt(i int) {
 	})
 }
 
+// WriteRaw writes a raw redis response
+func (c *Peer) WriteRaw(s string) {
+	c.Block(func(w *Writer) {
+		w.WriteRaw(s)
+	})
+}
+
 func toInline(s string) string {
 	return strings.Map(func(r rune) rune {
 		if unicode.IsSpace(r) {
@@ -320,6 +327,11 @@ func (w *Writer) WriteNull() {
 // WriteInline writes a redis inline string
 func (w *Writer) WriteInline(s string) {
 	fmt.Fprintf(w.w, "+%s\r\n", toInline(s))
+}
+
+// WriteRaw writes a raw redis response
+func (w *Writer) WriteRaw(s string) {
+	fmt.Fprint(w.w, s)
 }
 
 func (w *Writer) Flush() {

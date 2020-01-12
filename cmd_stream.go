@@ -3,6 +3,8 @@
 package miniredis
 
 import (
+	"errors"
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -15,6 +17,11 @@ func commandsStream(m *Miniredis) {
 	m.srv.Register("XLEN", m.cmdXlen)
 	m.srv.Register("XRANGE", m.makeCmdXrange(false))
 	m.srv.Register("XREVRANGE", m.makeCmdXrange(true))
+	m.srv.Register("XGROUP", m.cmdXgroup)
+	m.srv.Register("XINFO", m.cmdXinfo)
+	m.srv.Register("XREADGROUP", m.cmdXreadgroup)
+	m.srv.Register("XACK", m.cmdXack)
+	m.srv.Register("XDEL", m.cmdXdel)
 }
 
 // XADD
@@ -250,4 +257,229 @@ func (m *Miniredis) makeCmdXrange(reverse bool) server.Cmd {
 			}
 		})
 	}
+}
+
+// XGROUP
+func (m *Miniredis) cmdXgroup(c *server.Peer, cmd string, args []string) {
+	if (len(args) == 4 || len(args) == 5) && strings.ToUpper(args[0]) == "CREATE" {
+		m.cmdXgroupCreate(c, cmd, args)
+	} else {
+		j := strings.Join(args, " ")
+		err := fmt.Sprintf("ERR 'XGROUP %s' not supported", j)
+		setDirty(c)
+		c.WriteError(err)
+	}
+}
+
+// XGROUP CREATE
+func (m *Miniredis) cmdXgroupCreate(c *server.Peer, cmd string, args []string) {
+	stream := args[1]
+	group := args[2]
+	id := args[3]
+
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
+		db := m.db(ctx.selectedDB)
+
+		if len(args) == 5 && strings.ToUpper(args[4]) == "MKSTREAM" {
+			db.streamCreate(stream)
+		}
+
+		if err := db.streamGroupCreate(stream, group, id); err != nil {
+			c.WriteError(fmt.Sprintf("ERR %s", err.Error()))
+			return
+		}
+
+		c.WriteOK()
+	})
+}
+
+// XINFO
+func (m *Miniredis) cmdXinfo(c *server.Peer, cmd string, args []string) {
+	if len(args) == 2 && strings.ToUpper(args[0]) == "STREAM" {
+		m.cmdXinfoStream(c, cmd, args)
+	} else {
+		j := strings.Join(args, " ")
+		err := fmt.Sprintf("'XINFO %s' not supported", j)
+		setDirty(c)
+		c.WriteError(err)
+	}
+}
+
+// XINFO STREAM
+// Produces only part of full command output
+func (m *Miniredis) cmdXinfoStream(c *server.Peer, cmd string, args []string) {
+	stream := args[1]
+
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
+		db := m.db(ctx.selectedDB)
+
+		streamLen, err := db.streamLen(stream)
+		if err != nil {
+			c.WriteError(fmt.Sprintf("ERR %s", err.Error()))
+			return
+		}
+
+		c.WriteLen(2)
+		c.WriteBulk("length")
+		c.WriteInt(streamLen)
+	})
+}
+
+// XREADGROUP
+// NOACK is not supported, BLOCK is not supported
+func (m *Miniredis) cmdXreadgroup(c *server.Peer, cmd string, args []string) {
+	// XREADGROUP GROUP group consumer STREAMS key ID
+	if len(args) < 6 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
+	}
+
+	if strings.ToUpper(args[0]) != "GROUP" {
+		setDirty(c)
+		c.WriteError("ERR incorrect command")
+		return
+	}
+
+	group, consumer, args := args[1], args[2], args[3:]
+
+	var count int
+	var err error
+	streams := make([]string, 0)
+	ids := make([]string, 0)
+
+parsing:
+	for len(args) > 0 {
+		switch strings.ToUpper(args[0]) {
+		case "COUNT":
+			if len(args) < 2 {
+				err = errors.New(errWrongNumber(cmd))
+				break parsing
+			}
+
+			count, err = strconv.Atoi(args[1])
+			if err != nil {
+				break parsing
+			}
+
+			args = args[2:]
+		case "BLOCK":
+			if len(args) < 2 {
+				err = errors.New(errWrongNumber(cmd))
+				break parsing
+			}
+			args = args[2:]
+		case "NOACK":
+			args = args[1:]
+		case "STREAMS":
+			args = args[1:]
+
+			if len(args)%2 != 0 {
+				err = errors.New(errWrongNumber(cmd))
+				break parsing
+			}
+
+			streams, ids = args[0:len(args)/2], args[len(args)/2:]
+			break parsing
+		default:
+			err = fmt.Errorf("ERR incorrect argument %s", args[0])
+			break parsing
+		}
+	}
+
+	if err != nil {
+		setDirty(c)
+		c.WriteError(err.Error())
+		return
+	}
+
+	if len(streams) == 0 || len(ids) == 0 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
+	}
+
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
+		res := make(map[string][]StreamEntry)
+
+		db := m.db(ctx.selectedDB)
+
+		for i := range streams {
+			stream := streams[i]
+			id := ids[i]
+
+			entries, err := db.streamRead(stream, group, consumer, id, count)
+			if err != nil {
+				c.WriteError(err.Error())
+				return
+			}
+
+			res[stream] = entries
+		}
+
+		c.WriteLen(len(streams))
+
+		for _, stream := range streams {
+			c.WriteLen(2)
+			c.WriteInline(stream)
+
+			entries := res[stream]
+
+			c.WriteLen(len(entries))
+
+			for _, entry := range entries {
+				c.WriteLen(2)
+				c.WriteInline(entry.ID)
+				c.WriteLen(len(entry.Values))
+
+				for _, v := range entry.Values {
+					c.WriteInline(v)
+				}
+			}
+		}
+	})
+}
+
+// XACK
+func (m *Miniredis) cmdXack(c *server.Peer, cmd string, args []string) {
+	if len(args) < 3 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
+	}
+
+	stream, group, args := args[0], args[1], args[2:]
+
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
+		db := m.db(ctx.selectedDB)
+		cnt, err := db.streamAck(stream, group, args)
+		if err != nil {
+			c.WriteError(fmt.Sprintf("ERR %s", err.Error()))
+			return
+		}
+
+		c.WriteInt(cnt)
+	})
+}
+
+// XDEL
+func (m *Miniredis) cmdXdel(c *server.Peer, cmd string, args []string) {
+	if len(args) < 2 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
+	}
+
+	stream, args := args[0], args[1:]
+
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
+		db := m.db(ctx.selectedDB)
+		cnt, err := db.streamDelete(stream, args)
+		if err != nil {
+			c.WriteError(fmt.Sprintf("ERR %s", err.Error()))
+			return
+		}
+
+		c.WriteInt(cnt)
+	})
 }
