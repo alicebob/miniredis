@@ -17,15 +17,16 @@ import (
 )
 
 type command struct {
-	cmd         string // 'GET', 'SET', &c.
-	args        []interface{}
-	error       bool   // Whether the command should return an error or not.
-	sort        bool   // Sort real redis's result. Used for 'keys'.
-	loosely     bool   // Don't compare values, only structure. (for random things)
-	errorSub    string // Both errors need this substring
-	receiveOnly bool   // no command, only receive. For pubsub messages.
-	roundFloats int    // if > 0 round floats to this many places before DeepEqual
-	closeChan   bool   // helper for testClients2()
+	cmd           string // 'GET', 'SET', &c.
+	args          []interface{}
+	error         bool   // Whether the command should return an error or not.
+	sort          bool   // Sort real redis's result. Used for 'keys'.
+	loosely       bool   // Don't compare values, only structure. (for random things)
+	errorSub      string // Both errors need this substring
+	receiveOnly   bool   // no command, only receive. For pubsub messages.
+	roundFloats   int    // if > 0 round floats to this many places before DeepEqual
+	closeChan     bool   // helper for testClients2()
+	noResultCheck bool   // don't check result
 }
 
 func succ(cmd string, args ...interface{}) command {
@@ -71,6 +72,16 @@ func succRound3(cmd string, args ...interface{}) command {
 		args:        args,
 		error:       false,
 		roundFloats: 3,
+	}
+}
+
+// only check success status from command
+func succNoResultCheck(cmd string, args ...interface{}) command {
+	return command{
+		cmd:           cmd,
+		args:          args,
+		error:         false,
+		noResultCheck: true,
 	}
 }
 
@@ -231,6 +242,16 @@ func testAuthCommands(t *testing.T, passwd string, commands ...command) {
 	runCommands(t, sRealAddr, sMini.Addr(), commands)
 }
 
+func testClusterCommands(t *testing.T, commands ...command) {
+	sMini, err := miniredis.Run()
+	ok(t, err)
+	defer sMini.Close()
+
+	sReal, sRealAddr := RedisCluster()
+	defer sReal.Close()
+	runCommands(t, sRealAddr, sMini.Addr(), commands)
+}
+
 func runCommands(t *testing.T, realAddr, miniAddr string, commands []command) {
 	t.Helper()
 	cMini, err := redis.Dial("tcp", miniAddr)
@@ -286,6 +307,10 @@ func runCommand(t *testing.T, cMini, cReal redis.Conn, p command) {
 		if have, want := errMini.Error(), p.errorSub; !strings.Contains(have, want) {
 			t.Errorf("miniredis error error. expected: %q in %q case: %#v", want, have, p)
 		}
+		return
+	}
+
+	if p.noResultCheck {
 		return
 	}
 

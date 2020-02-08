@@ -198,3 +198,20 @@ func TestStreamRange(t *testing.T) {
 		succ("XLEN", "ordplanets"),
 	)
 }
+
+func TestStreamGroup(t *testing.T) {
+	testCommands(t,
+		failLoosely("XGROUP", "CREATE", "planets", "processing", "$"),
+		succ("XGROUP", "CREATE", "planets", "processing", "$", "MKSTREAM"),
+		succNoResultCheck("XINFO", "STREAM", "planets"),
+		failLoosely("XINFO", "STREAMMM"),
+		failLoosely("XINFO", "STREAM", "foo"),
+		failLoosely("XINFO"),
+		succ("XADD", "planets", "0-1", "name", "Mercury"),
+		succ("XLEN", "planets"),
+		succ("XREADGROUP", "GROUP", "processing", "alice", "STREAMS", "planets", ">"),
+		succ("XREADGROUP", "GROUP", "processing", "alice", "STREAMS", "planets", ">"),
+		succ("XACK", "planets", "processing", "0-1"),
+		succ("XDEL", "planets", "0-1"),
+	)
+}
