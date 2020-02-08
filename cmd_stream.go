@@ -412,26 +412,39 @@ parsing:
 				return
 			}
 
+			if len(entries) == 0 {
+				continue
+			}
+
 			res[stream] = entries
 		}
 
-		c.WriteLen(len(streams))
+		// Real Redis returns Nil
+		if len(res) == 0 {
+			c.WriteNull()
+			return
+		}
+
+		c.WriteLen(len(res))
 
 		for _, stream := range streams {
-			c.WriteLen(2)
-			c.WriteInline(stream)
+			entries, ok := res[stream]
+			if !ok {
+				continue
+			}
 
-			entries := res[stream]
+			c.WriteLen(2)
+			c.WriteBulk(stream)
 
 			c.WriteLen(len(entries))
 
 			for _, entry := range entries {
 				c.WriteLen(2)
-				c.WriteInline(entry.ID)
+				c.WriteBulk(entry.ID)
 				c.WriteLen(len(entry.Values))
 
 				for _, v := range entry.Values {
-					c.WriteInline(v)
+					c.WriteBulk(v)
 				}
 			}
 		}

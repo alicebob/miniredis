@@ -342,9 +342,8 @@ func TestStreamReadGroup(t *testing.T) {
 	_, err = redis.String(c.Do("XGROUP", "CREATE", "planets", "processing", "$", "MKSTREAM"))
 	ok(t, err)
 
-	msgs, err := redis.Values(c.Do("XREADGROUP", "GROUP", "processing", "alice", "STREAMS", "planets", ">"))
-	ok(t, err)
-	equals(t, []interface{}{[]interface{}{"planets", []interface{}{}}}, msgs)
+	_, err = redis.Values(c.Do("XREADGROUP", "GROUP", "processing", "alice", "STREAMS", "planets", ">"))
+	mustFail(t, err, redis.ErrNil.Error())
 
 	_, err = redis.String(c.Do("XADD", "planets", "0-1", "name", "Mercury"))
 	ok(t, err)
@@ -353,18 +352,17 @@ func TestStreamReadGroup(t *testing.T) {
 	ok(t, err)
 	equals(t, 1, count)
 
-	msgs, err = redis.Values(c.Do("XREADGROUP", "GROUP", "processing", "alice", "STREAMS", "planets", ">"))
+	msgs, err := redis.Values(c.Do("XREADGROUP", "GROUP", "processing", "alice", "STREAMS", "planets", ">"))
 	ok(t, err)
-	equals(t, []interface{}{[]interface{}{"planets", []interface{}{[]interface{}{"0-1", []interface{}{"name", "Mercury"}}}}}, msgs)
+	equals(t, []interface{}{[]interface{}{[]byte("planets"), []interface{}{[]interface{}{[]byte("0-1"), []interface{}{[]byte("name"), []byte("Mercury")}}}}}, msgs)
 
 	msgs, err = redis.Values(c.Do("XREADGROUP", "GROUP", "processing", "alice", "STREAMS", "planets", ">"))
-	ok(t, err)
-	equals(t, []interface{}{[]interface{}{"planets", []interface{}{}}}, msgs)
+	mustFail(t, err, redis.ErrNil.Error())
 
 	// Read from PEL
 	msgs, err = redis.Values(c.Do("XREADGROUP", "GROUP", "processing", "alice", "STREAMS", "planets", "0-0"))
 	ok(t, err)
-	equals(t, []interface{}{[]interface{}{"planets", []interface{}{[]interface{}{"0-1", []interface{}{"name", "Mercury"}}}}}, msgs)
+	equals(t, []interface{}{[]interface{}{[]byte("planets"), []interface{}{[]interface{}{[]byte("0-1"), []interface{}{[]byte("name"), []byte("Mercury")}}}}}, msgs)
 }
 
 // Test XDEL
@@ -384,15 +382,14 @@ func TestStreamDelete(t *testing.T) {
 
 	msgs, err := redis.Values(c.Do("XREADGROUP", "GROUP", "processing", "alice", "STREAMS", "planets", ">"))
 	ok(t, err)
-	equals(t, []interface{}{[]interface{}{"planets", []interface{}{[]interface{}{"0-1", []interface{}{"name", "Mercury"}}}}}, msgs)
+	equals(t, []interface{}{[]interface{}{[]byte("planets"), []interface{}{[]interface{}{[]byte("0-1"), []interface{}{[]byte("name"), []byte("Mercury")}}}}}, msgs)
 
 	count, err := redis.Int(c.Do("XDEL", "planets", "0-1"))
 	ok(t, err)
 	equals(t, 1, count)
 
-	msgs, err = redis.Values(c.Do("XREADGROUP", "GROUP", "processing", "alice", "STREAMS", "planets", "0-0"))
-	ok(t, err)
-	equals(t, []interface{}{[]interface{}{"planets", []interface{}{}}}, msgs)
+	_, err = redis.Values(c.Do("XREADGROUP", "GROUP", "processing", "alice", "STREAMS", "planets", "0-0"))
+	mustFail(t, err, redis.ErrNil.Error())
 }
 
 // Test XACK
@@ -412,13 +409,12 @@ func TestStreamAck(t *testing.T) {
 
 	msgs, err := redis.Values(c.Do("XREADGROUP", "GROUP", "processing", "alice", "STREAMS", "planets", ">"))
 	ok(t, err)
-	equals(t, []interface{}{[]interface{}{"planets", []interface{}{[]interface{}{"0-1", []interface{}{"name", "Mercury"}}}}}, msgs)
+	equals(t, []interface{}{[]interface{}{[]byte("planets"), []interface{}{[]interface{}{[]byte("0-1"), []interface{}{[]byte("name"), []byte("Mercury")}}}}}, msgs)
 
 	count, err := redis.Int(c.Do("XACK", "planets", "processing", "0-1"))
 	ok(t, err)
 	equals(t, 1, count)
 
-	msgs, err = redis.Values(c.Do("XREADGROUP", "GROUP", "processing", "alice", "STREAMS", "planets", "0-0"))
-	ok(t, err)
-	equals(t, []interface{}{[]interface{}{"planets", []interface{}{}}}, msgs)
+	_, err = redis.Values(c.Do("XREADGROUP", "GROUP", "processing", "alice", "STREAMS", "planets", "0-0"))
+	mustFail(t, err, redis.ErrNil.Error())
 }
