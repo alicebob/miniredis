@@ -1,5 +1,10 @@
 ## Changelog
 
+### v2.11.2
+
+- make sure Lua code is executed concurrently
+- add command GEORADIUSBYMEMBER (thanks @kyeett)
+
 ### v2.11.1
 
 - globals protection for LUA code (thanks @vk-outreach)
