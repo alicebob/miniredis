@@ -161,9 +161,14 @@ Implemented commands:
    - ZUNIONSTORE
    - ZSCAN
  - Stream keys
+   - XACK
    - XADD
+   - XDEL
+   - XGROUP CREATE
+   - XINFO STREAM -- partly
    - XLEN
    - XRANGE
+   - XREADGROUP -- partly
    - XREVRANGE
  - Scripting
    - EVAL
@@ -178,8 +183,13 @@ Implemented commands:
    - GEOPOS
    - GEORADIUS
    - GEORADIUS_RO
-   - ~~GEORADIUSBYMEMBER~~
-   - ~~GEORADIUSBYMEMBER_RO~~
+   - GEORADIUSBYMEMBER
+   - GEORADIUSBYMEMBER_RO
+ - Server
+   - COMMAND -- partly
+ - Cluster
+   - CLUSTER SLOTS
+
 
 ## TTLs, key expiration, and time
 
@@ -274,7 +284,6 @@ Commands which will probably not be implemented:
     - ~~BGSAVE~~
     - ~~BGWRITEAOF~~
     - ~~CLIENT *~~
-    - ~~COMMAND *~~
     - ~~CONFIG *~~
     - ~~DEBUG *~~
     - ~~INFO~~
