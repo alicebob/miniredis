@@ -31,6 +31,7 @@ func commandsGeneric(m *Miniredis) {
 	m.srv.Register("RENAMENX", m.cmdRenamenx)
 	// RESTORE
 	// SORT
+	m.srv.Register("TOUCH", m.cmdTouch)
 	m.srv.Register("TTL", m.cmdTTL)
 	m.srv.Register("TYPE", m.cmdType)
 	m.srv.Register("SCAN", m.cmdScan)
@@ -85,11 +86,41 @@ func makeCmdExpire(m *Miniredis, unix bool, d time.Duration) func(*server.Peer, 
 			} else {
 				db.ttl[key] = time.Duration(i) * d
 			}
+			db.origTtl[key] = db.ttl[key]
 			db.keyVersion[key]++
 			db.checkTTL(key)
 			c.WriteInt(1)
 		})
 	}
+}
+
+// TOUCH
+func (m *Miniredis) cmdTouch(c *server.Peer, cmd string, args []string) {
+	if !m.handleAuth(c) {
+		return
+	}
+	if m.checkPubsub(c) {
+		return
+	}
+
+	if len(args) == 0 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
+	}
+
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
+		db := m.db(ctx.selectedDB)
+
+		count := 0
+		for _, key := range args {
+			if db.exists(key) {
+				count++
+				db.touch(key)
+			}
+		}
+		c.WriteInt(count)
+	})
 }
 
 // TTL
@@ -192,6 +223,7 @@ func (m *Miniredis) cmdPersist(c *server.Peer, cmd string, args []string) {
 			c.WriteInt(0)
 			return
 		}
+		delete(db.origTtl, key)
 		delete(db.ttl, key)
 		db.keyVersion[key]++
 		c.WriteInt(1)

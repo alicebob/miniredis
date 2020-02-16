@@ -41,6 +41,7 @@ func (db *RedisDB) flush() {
 	db.listKeys = map[string]listKey{}
 	db.setKeys = map[string]setKey{}
 	db.sortedsetKeys = map[string]sortedSet{}
+	db.origTtl = map[string]time.Duration{}
 	db.ttl = map[string]time.Duration{}
 }
 
@@ -102,6 +103,10 @@ func (db *RedisDB) rename(from, to string) {
 	if v, ok := db.ttl[from]; ok {
 		db.ttl[to] = v
 	}
+	if v, ok := db.origTtl[from]; ok {
+		delete(db.origTtl, from)
+		db.origTtl[to] = v
+	}
 
 	db.del(from, true)
 }
@@ -114,6 +119,7 @@ func (db *RedisDB) del(k string, delTTL bool) {
 	delete(db.keys, k)
 	db.keyVersion[k]++
 	if delTTL {
+		delete(db.origTtl, k)
 		delete(db.ttl, k)
 	}
 	switch t {
@@ -802,4 +808,9 @@ func (db *RedisDB) checkTTL(key string) {
 	if v, ok := db.ttl[key]; ok && v <= 0 {
 		db.del(key, true)
 	}
+}
+
+// Touch resets a key's TTL to its original unmodified value.
+func (db *RedisDB) touch(k string) {
+	db.ttl[k] = db.origTtl[k]
 }

@@ -121,6 +121,7 @@ func (m *Miniredis) cmdSet(c *server.Peer, cmd string, args []string) {
 		// a vanilla SET clears the expire
 		db.stringSet(key, value)
 		if ttl != 0 {
+			db.origTtl[key] = ttl
 			db.ttl[key] = ttl
 		}
 		c.WriteOK()
@@ -161,6 +162,7 @@ func (m *Miniredis) cmdSetex(c *server.Peer, cmd string, args []string) {
 		db.del(key, true) // Clear any existing keys.
 		db.stringSet(key, value)
 		db.ttl[key] = time.Duration(ttl) * time.Second
+		db.origTtl[key] = db.ttl[key]
 		c.WriteOK()
 	})
 }
@@ -199,6 +201,7 @@ func (m *Miniredis) cmdPsetex(c *server.Peer, cmd string, args []string) {
 		db.del(key, true) // Clear any existing keys.
 		db.stringSet(key, value)
 		db.ttl[key] = time.Duration(ttl) * time.Millisecond
+		db.origTtl[key] = db.ttl[key]
 		c.WriteOK()
 	})
 }
@@ -374,6 +377,7 @@ func (m *Miniredis) cmdGetset(c *server.Peer, cmd string, args []string) {
 		old, ok := db.stringKeys[key]
 		db.stringSet(key, value)
 		// a GETSET clears the ttl
+		delete(db.origTtl, key)
 		delete(db.ttl, key)
 
 		if !ok {

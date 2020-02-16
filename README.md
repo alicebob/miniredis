@@ -42,6 +42,7 @@ Implemented commands:
    - RENAMENX
    - RANDOMKEY -- see m.Seed(...)
    - SCAN
+   - TOUCH
    - TTL
    - TYPE
    - UNLINK
