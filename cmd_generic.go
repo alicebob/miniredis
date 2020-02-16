@@ -116,8 +116,8 @@ func (m *Miniredis) cmdTouch(c *server.Peer, cmd string, args []string) {
 		for _, key := range args {
 			if db.exists(key) {
 				count++
+				db.touch(key)
 			}
-			db.touch(key)
 		}
 		c.WriteInt(count)
 	})
