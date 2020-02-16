@@ -143,6 +143,46 @@ func TestExpireat(t *testing.T) {
 	}
 }
 
+func TestTouch(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	// Set something
+	{
+		s.SetTime(time.Unix(1234567890, 0))
+		_, err := c.Do("SET", "foo", "bar", "EX", 100)
+		ok(t, err)
+		_, err = c.Do("SET", "baz", "qux", "EX", 100)
+		ok(t, err)
+
+		// Advance time, keys still exist with 1 second TTL
+		s.FastForward(time.Second * 99)
+		equals(t, time.Second, s.TTL("foo"))
+		equals(t, time.Second, s.TTL("baz"))
+
+		// Change TTL on a key to test that TOUCH will use the new value
+		_, err = c.Do("EXPIRE", "foo", "200")
+		ok(t, err)
+
+		// Touch one key
+		_, err = c.Do("TOUCH", "baz")
+		ok(t, err)
+
+		s.FastForward(time.Second * 99)
+		equals(t, time.Second*101, s.TTL("foo"))
+		equals(t, time.Second, s.TTL("baz"))
+
+		// Reset TTL on multiple keys
+		_, err = c.Do("TOUCH", "foo", "baz")
+		ok(t, err)
+		equals(t, time.Second*200, s.TTL("foo"))
+		equals(t, time.Second*100, s.TTL("baz"))
+	}
+}
+
 func TestPexpireat(t *testing.T) {
 	s, err := Run()
 	ok(t, err)

@@ -416,6 +416,7 @@ func (db *RedisDB) SetTTL(k string, ttl time.Duration) {
 	defer db.master.Unlock()
 	defer db.master.signal.Broadcast()
 
+	db.origTtl[k] = ttl
 	db.ttl[k] = ttl
 	db.keyVersion[k]++
 }
