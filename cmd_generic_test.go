@@ -168,16 +168,19 @@ func TestTouch(t *testing.T) {
 		ok(t, err)
 
 		// Touch one key
-		_, err = c.Do("TOUCH", "baz")
+		n, err := redis.Int(c.Do("TOUCH", "baz"))
 		ok(t, err)
+		equals(t, 1, n)
 
 		s.FastForward(time.Second * 99)
 		equals(t, time.Second*101, s.TTL("foo"))
 		equals(t, time.Second, s.TTL("baz"))
 
-		// Reset TTL on multiple keys
-		_, err = c.Do("TOUCH", "foo", "baz")
+		// Reset TTL on multiple keys, "nay" doesn't exist
+		n, err = redis.Int(c.Do("TOUCH", "foo", "baz", "nay"))
 		ok(t, err)
+		equals(t, 2, n)
+
 		equals(t, time.Second*200, s.TTL("foo"))
 		equals(t, time.Second*100, s.TTL("baz"))
 	}
