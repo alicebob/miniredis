@@ -589,7 +589,10 @@ func (db *RedisDB) streamAdd(key, entryID string, values []string) (string, erro
 	if err != nil {
 		return "", err
 	}
-	if entryID == "0-0" || streamCmp(stream.lastID(), entryID) != -1 {
+	if entryID == "0-0" {
+		return "", errZeroStreamValue
+	}
+	if streamCmp(stream.lastID(), entryID) != -1 {
 		return "", errInvalidStreamValue
 	}
 	db.streamKeys[key] = append(stream, StreamEntry{
