@@ -13,6 +13,7 @@ import (
 
 var (
 	errInvalidStreamValue = errors.New("stream id is not bigger than the top item")
+	errZeroStreamValue    = errors.New("stream id is 0-0")
 )
 
 type streamKey []StreamEntry
