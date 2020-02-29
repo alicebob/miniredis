@@ -421,6 +421,18 @@ func (db *RedisDB) SetTTL(k string, ttl time.Duration) {
 	db.keyVersion[k]++
 }
 
+// Touch resets the TTL of the key
+func (m *Miniredis) Touch(k string) {
+	m.DB(m.selectedDB).Touch(k)
+}
+
+func (db *RedisDB) Touch(k string) {
+	db.master.Lock()
+	defer db.master.Unlock()
+
+	db.touch(k)
+}
+
 // Type gives the type of a key, or ""
 func (m *Miniredis) Type(k string) string {
 	return m.DB(m.selectedDB).Type(k)

@@ -208,6 +208,18 @@ func TestTouch(t *testing.T) {
 		_, err := c.Do("TOUCH")
 		mustFail(t, err, "ERR wrong number of arguments for 'touch' command")
 	})
+
+	t.Run("direct", func(t *testing.T) {
+		s.Set("dir", "bar")
+		s.SetTTL("dir", 30*time.Second)
+		equals(t, 30*time.Second, s.TTL("dir"))
+
+		s.FastForward(10 * time.Second)
+		equals(t, 20*time.Second, s.TTL("dir"))
+
+		s.Touch("dir")
+		equals(t, 30*time.Second, s.TTL("dir"))
+	})
 }
 
 func TestPexpireat(t *testing.T) {
