@@ -151,7 +151,7 @@ func TestTouch(t *testing.T) {
 	ok(t, err)
 
 	// Set something
-	{
+	t.Run("basic", func(t *testing.T) {
 		s.SetTime(time.Unix(1234567890, 0))
 		_, err := c.Do("SET", "foo", "bar", "EX", 100)
 		ok(t, err)
@@ -183,7 +183,31 @@ func TestTouch(t *testing.T) {
 
 		equals(t, time.Second*200, s.TTL("foo"))
 		equals(t, time.Second*100, s.TTL("baz"))
-	}
+	})
+
+	t.Run("rename", func(t *testing.T) {
+		s.SetTime(time.Unix(1234567890, 0))
+		_, err := c.Do("SET", "foo", "bar", "EX", 100)
+		ok(t, err)
+		n, err := redis.Int(c.Do("TOUCH", "foo"))
+		ok(t, err)
+		equals(t, 1, n)
+
+		s.FastForward(time.Second * 60)
+		equals(t, 40*time.Second, s.TTL("foo"))
+
+		_, err = redis.String(c.Do("RENAME", "foo", "foo2"))
+		ok(t, err)
+		n, err = redis.Int(c.Do("TOUCH", "foo2"))
+		ok(t, err)
+		equals(t, 1, n)
+		equals(t, 100*time.Second, s.TTL("foo2"))
+	})
+
+	t.Run("failure cases", func(t *testing.T) {
+		_, err := c.Do("TOUCH")
+		mustFail(t, err, "ERR wrong number of arguments for 'touch' command")
+	})
 }
 
 func TestPexpireat(t *testing.T) {

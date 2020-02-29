@@ -103,6 +103,10 @@ func (db *RedisDB) rename(from, to string) {
 	if v, ok := db.ttl[from]; ok {
 		db.ttl[to] = v
 	}
+	if v, ok := db.origTtl[from]; ok {
+		delete(db.origTtl, from)
+		db.origTtl[to] = v
+	}
 
 	db.del(from, true)
 }
