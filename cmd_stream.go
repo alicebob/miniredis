@@ -90,6 +90,8 @@ func (m *Miniredis) cmdXadd(c *server.Peer, cmd string, args []string) {
 			switch err {
 			case errInvalidEntryID:
 				c.WriteError(msgInvalidStreamID)
+			case errZeroStreamValue:
+				c.WriteError(msgStreamIDZero)
 			case errInvalidStreamValue:
 				c.WriteError(msgStreamIDTooSmall)
 			default:

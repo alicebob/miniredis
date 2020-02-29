@@ -34,6 +34,7 @@ const (
 	msgSingleElementPair  = "ERR INCR option supports a single increment-element pair"
 	msgInvalidStreamID    = "ERR Invalid stream ID specified as stream command argument"
 	msgStreamIDTooSmall   = "ERR The ID specified in XADD is equal or smaller than the target stream top item"
+	msgStreamIDZero       = "ERR The ID specified in XADD must be greater than 0-0"
 	msgNoScriptFound      = "NOSCRIPT No matching script. Please use EVAL."
 	msgUnsupportedUnit    = "ERR unsupported unit provided. please use m, km, ft, mi"
 	msgNotFromScripts     = "This Redis command is not allowed from scripts"

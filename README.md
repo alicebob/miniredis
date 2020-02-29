@@ -300,7 +300,7 @@ Commands which will probably not be implemented:
 
 ## &c.
 
-Tests are run against Redis 5.0.3. The [./integration](./integration/) subdir
+Tests are run against Redis 5.0.7. The [./integration](./integration/) subdir
 compares miniredis against a real redis instance.
 
 If you want to test Redis Sentinel have a look at [minisentinel](https://github.com/Bose/minisentinel).

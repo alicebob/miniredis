@@ -43,7 +43,7 @@ func TestStream(t *testing.T) {
 
 	t.Run("direct usage", func(t *testing.T) {
 		_, err := s.XAdd("s1", "0-0", []string{"name", "foo"})
-		mustFail(t, err, errInvalidStreamValue.Error())
+		mustFail(t, err, errZeroStreamValue.Error())
 
 		id, err := s.XAdd("s1", "12345-67", []string{"name", "bar"})
 		ok(t, err)
