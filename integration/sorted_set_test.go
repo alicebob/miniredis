@@ -624,6 +624,13 @@ func TestZunionstore(t *testing.T) {
 		succ("TYPE", "h1"),
 		succ("TYPE", "h2"),
 	)
+	// not a sorted set, still fine
+	testCommands(t,
+		succ("SADD", "super", "1", "2", "3"),
+		succ("SADD", "exclude", "3"),
+		succ("ZUNIONSTORE", "tmp", "2", "super", "exclude", "weights", "1", "0", "aggregate", "min"),
+		succ("ZRANGE", "tmp", "0", "-1", "withscores"),
+	)
 }
 
 func TestZinterstore(t *testing.T) {

@@ -1265,32 +1265,42 @@ func (m *Miniredis) cmdZunionstore(c *server.Peer, cmd string, args []string) {
 			if !db.exists(key) {
 				continue
 			}
-			if db.t(key) != "zset" {
+
+			var set map[string]float64
+			switch db.t(key) {
+			case "set":
+				set = map[string]float64{}
+				for elem := range db.setKeys[key] {
+					set[elem] = 1.0
+				}
+			case "zset":
+				set = db.sortedSet(key)
+			default:
 				c.WriteError(msgWrongType)
 				return
 			}
-			for _, el := range db.ssetElements(key) {
-				score := el.score
+
+			for member, score := range set {
 				if withWeights {
 					score *= weights[i]
 				}
-				old, ok := sset[el.member]
+				old, ok := sset[member]
 				if !ok {
-					sset[el.member] = score
+					sset[member] = score
 					continue
 				}
 				switch aggregate {
 				default:
 					panic("Invalid aggregate")
 				case "sum":
-					sset[el.member] += score
+					sset[member] += score
 				case "min":
 					if score < old {
-						sset[el.member] = score
+						sset[member] = score
 					}
 				case "max":
 					if score > old {
-						sset[el.member] = score
+						sset[member] = score
 					}
 				}
 			}
