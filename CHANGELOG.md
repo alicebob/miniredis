@@ -1,5 +1,10 @@
 ## Changelog
 
+### v2.11.3
+
+- support for TOUCH (thanks @cleroux)
+- support for cluster and stream commands (thanks @kak-tus)
+
 ### v2.11.2
 
 - make sure Lua code is executed concurrently
