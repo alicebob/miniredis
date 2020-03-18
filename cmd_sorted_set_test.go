@@ -1174,8 +1174,7 @@ func TestZunionstore(t *testing.T) {
 	s.ZAdd("h2", 1.0, "field1")
 	s.ZAdd("h2", 2.0, "field2")
 
-	// Simple case
-	{
+	t.Run("simple case", func(t *testing.T) {
 		res, err := redis.Int(c.Do("ZUNIONSTORE", "new", 2, "h1", "h2"))
 		ok(t, err)
 		equals(t, 2, res)
@@ -1183,10 +1182,9 @@ func TestZunionstore(t *testing.T) {
 		ss, err := s.SortedSet("new")
 		ok(t, err)
 		equals(t, map[string]float64{"field1": 2, "field2": 4}, ss)
-	}
+	})
 
-	// Merge destination with itself.
-	{
+	t.Run("merge destination with itself", func(t *testing.T) {
 		s.ZAdd("h3", 1.0, "field1")
 		s.ZAdd("h3", 3.0, "field3")
 
@@ -1197,10 +1195,9 @@ func TestZunionstore(t *testing.T) {
 		ss, err := s.SortedSet("h3")
 		ok(t, err)
 		equals(t, map[string]float64{"field1": 2, "field2": 2, "field3": 3}, ss)
-	}
+	})
 
-	// WEIGHTS
-	{
+	t.Run("WEIGHTS", func(t *testing.T) {
 		res, err := redis.Int(c.Do("ZUNIONSTORE", "weighted", 2, "h1", "h2", "WeIgHtS", "4.5", "12"))
 		ok(t, err)
 		equals(t, 2, res)
@@ -1208,10 +1205,9 @@ func TestZunionstore(t *testing.T) {
 		ss, err := s.SortedSet("weighted")
 		ok(t, err)
 		equals(t, map[string]float64{"field1": 16.5, "field2": 33}, ss)
-	}
+	})
 
-	// AGGREGATE
-	{
+	t.Run("AGGREGATE", func(t *testing.T) {
 		res, err := redis.Int(c.Do("ZUNIONSTORE", "aggr", 2, "h1", "h2", "AgGrEgAtE", "min"))
 		ok(t, err)
 		equals(t, 2, res)
@@ -1219,10 +1215,17 @@ func TestZunionstore(t *testing.T) {
 		ss, err := s.SortedSet("aggr")
 		ok(t, err)
 		equals(t, map[string]float64{"field1": 1.0, "field2": 2.0}, ss)
-	}
+	})
 
-	// Wrong usage
-	{
+	t.Run("normal set", func(t *testing.T) {
+		_, err := c.Do("SADD", "set", "aap", "noot", "mies")
+		ok(t, err)
+		res, err := redis.Int(c.Do("ZUNIONSTORE", "aggr", 1, "set"))
+		ok(t, err)
+		equals(t, 3, res)
+	})
+
+	t.Run("wrong usage", func(t *testing.T) {
 		_, err := redis.Int(c.Do("ZUNIONSTORE"))
 		assert(t, err != nil, "do ZUNIONSTORE error")
 		_, err = redis.Int(c.Do("ZUNIONSTORE", "set"))
@@ -1255,7 +1258,7 @@ func TestZunionstore(t *testing.T) {
 		s.Set("str", "value")
 		_, err = redis.Int(c.Do("ZUNIONSTORE", "set", 1, "str"))
 		assert(t, err != nil, "do ZUNIONSTORE error")
-	}
+	})
 }
 
 func TestZinterstore(t *testing.T) {
