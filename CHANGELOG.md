@@ -1,5 +1,10 @@
 ## Changelog
 
+### v2.11.4
+
+- ZUNIONSTORE now supports standard set types (thanks @wshirey)
+
+
 ### v2.11.3
 
 - support for TOUCH (thanks @cleroux)
