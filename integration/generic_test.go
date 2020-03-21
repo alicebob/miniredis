@@ -283,17 +283,11 @@ func TestUnlink(t *testing.T) {
 func TestTouch(t *testing.T) {
 	testCommands(t,
 		succ("SET", "a", "some value"),
-		succ("TTL", "a"),
-		succ("EXPIRE", "a", 400),
+		succ("TOUCH", "a"),
+		succ("GET", "a"),
 		succ("TTL", "a"),
 
-		succ("TOUCH", "a"),
-		succ("TTL", "a"),
 		succ("TOUCH", "a", "foobar", "a"),
-
-		succ("RENAME", "a", "a2"),
-		succ("TOUCH", "a"),
-		succ("TTL", "a"), // hard to test
 
 		fail("TOUCH"),
 	)

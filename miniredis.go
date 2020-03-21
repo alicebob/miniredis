@@ -41,7 +41,6 @@ type RedisDB struct {
 	sortedsetKeys   map[string]sortedSet      // ZADD &c. keys
 	streamKeys      map[string]streamKey      // XADD &c. keys
 	streamGroupKeys map[string]streamGroupKey // XREADGROUP &c. keys
-	origTtl         map[string]time.Duration  // unmodified TTL values
 	ttl             map[string]time.Duration  // effective TTL values
 	keyVersion      map[string]uint           // used to watch values
 }
@@ -106,7 +105,6 @@ func newRedisDB(id int, m *Miniredis) RedisDB {
 		sortedsetKeys:   map[string]sortedSet{},
 		streamKeys:      map[string]streamKey{},
 		streamGroupKeys: map[string]streamGroupKey{},
-		origTtl:         map[string]time.Duration{},
 		ttl:             map[string]time.Duration{},
 		keyVersion:      map[string]uint{},
 	}
