@@ -158,50 +158,15 @@ func TestTouch(t *testing.T) {
 		_, err = c.Do("SET", "baz", "qux", "EX", 100)
 		ok(t, err)
 
-		// Advance time, keys still exist with 1 second TTL
-		s.FastForward(time.Second * 99)
-		equals(t, time.Second, s.TTL("foo"))
-		equals(t, time.Second, s.TTL("baz"))
-
-		// Change TTL on a key to test that TOUCH will use the new value
-		_, err = c.Do("EXPIRE", "foo", "200")
-		ok(t, err)
-
 		// Touch one key
 		n, err := redis.Int(c.Do("TOUCH", "baz"))
 		ok(t, err)
 		equals(t, 1, n)
 
-		s.FastForward(time.Second * 99)
-		equals(t, time.Second*101, s.TTL("foo"))
-		equals(t, time.Second, s.TTL("baz"))
-
-		// Reset TTL on multiple keys, "nay" doesn't exist
+		// Touch multiple keys, "nay" doesn't exist
 		n, err = redis.Int(c.Do("TOUCH", "foo", "baz", "nay"))
 		ok(t, err)
 		equals(t, 2, n)
-
-		equals(t, time.Second*200, s.TTL("foo"))
-		equals(t, time.Second*100, s.TTL("baz"))
-	})
-
-	t.Run("rename", func(t *testing.T) {
-		s.SetTime(time.Unix(1234567890, 0))
-		_, err := c.Do("SET", "foo", "bar", "EX", 100)
-		ok(t, err)
-		n, err := redis.Int(c.Do("TOUCH", "foo"))
-		ok(t, err)
-		equals(t, 1, n)
-
-		s.FastForward(time.Second * 60)
-		equals(t, 40*time.Second, s.TTL("foo"))
-
-		_, err = redis.String(c.Do("RENAME", "foo", "foo2"))
-		ok(t, err)
-		n, err = redis.Int(c.Do("TOUCH", "foo2"))
-		ok(t, err)
-		equals(t, 1, n)
-		equals(t, 100*time.Second, s.TTL("foo2"))
 	})
 
 	t.Run("failure cases", func(t *testing.T) {
@@ -209,16 +174,17 @@ func TestTouch(t *testing.T) {
 		mustFail(t, err, "ERR wrong number of arguments for 'touch' command")
 	})
 
-	t.Run("direct", func(t *testing.T) {
-		s.Set("dir", "bar")
-		s.SetTTL("dir", 30*time.Second)
-		equals(t, 30*time.Second, s.TTL("dir"))
+	t.Run("TTL unchanged", func(t *testing.T) {
+		_, err := c.Do("SET", "foo", "bar", "EX", 100)
+		ok(t, err)
 
-		s.FastForward(10 * time.Second)
-		equals(t, 20*time.Second, s.TTL("dir"))
+		s.FastForward(time.Second * 99)
+		equals(t, time.Second, s.TTL("foo"))
 
-		s.Touch("dir")
-		equals(t, 30*time.Second, s.TTL("dir"))
+		n, err := redis.Int(c.Do("TOUCH", "baz"))
+		ok(t, err)
+		equals(t, 1, n)
+		equals(t, time.Second, s.TTL("foo"))
 	})
 }
 

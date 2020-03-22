@@ -86,7 +86,6 @@ func makeCmdExpire(m *Miniredis, unix bool, d time.Duration) func(*server.Peer, 
 			} else {
 				db.ttl[key] = time.Duration(i) * d
 			}
-			db.origTtl[key] = db.ttl[key]
 			db.keyVersion[key]++
 			db.checkTTL(key)
 			c.WriteInt(1)
@@ -116,7 +115,6 @@ func (m *Miniredis) cmdTouch(c *server.Peer, cmd string, args []string) {
 		for _, key := range args {
 			if db.exists(key) {
 				count++
-				db.touch(key)
 			}
 		}
 		c.WriteInt(count)
@@ -223,7 +221,6 @@ func (m *Miniredis) cmdPersist(c *server.Peer, cmd string, args []string) {
 			c.WriteInt(0)
 			return
 		}
-		delete(db.origTtl, key)
 		delete(db.ttl, key)
 		db.keyVersion[key]++
 		c.WriteInt(1)
