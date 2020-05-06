@@ -10,4 +10,4 @@ script: make test testrace int
 sudo: false
 
 go:
-    - 1.12
+    - 1.13
