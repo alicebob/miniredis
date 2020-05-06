@@ -292,3 +292,13 @@ func TestTouch(t *testing.T) {
 		fail("TOUCH"),
 	)
 }
+
+func TestPersist(t *testing.T) {
+	testCommands(t,
+		succ("SET", "foo", "bar"),
+		succ("EXPIRE", "foo", 12),
+		succ("TTL", "foo"),
+		succ("PERSIST", "foo"),
+		succ("TTL", "foo"),
+	)
+}
