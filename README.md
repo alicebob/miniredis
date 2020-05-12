@@ -190,6 +190,8 @@ Implemented commands:
    - COMMAND -- partly
  - Cluster
    - CLUSTER SLOTS
+   - CLUSTER KEYSLOT
+   - CLUSTER NODES
 
 
 ## TTLs, key expiration, and time
