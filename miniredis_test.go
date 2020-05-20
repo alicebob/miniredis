@@ -238,3 +238,19 @@ func TestExpireWithFastForward(t *testing.T) {
 	s.FastForward(5 * time.Second)
 	equals(t, 1, len(s.Keys()))
 }
+
+func TestPool(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+
+	pool := &redis.Pool{
+		MaxIdle:     1,
+		IdleTimeout: 5 * time.Second,
+		Dial: func() (redis.Conn, error) {
+			return redis.Dial("tcp", s.Addr())
+		},
+	}
+	c := pool.Get()
+	c.Close()
+}
