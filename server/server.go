@@ -53,6 +53,12 @@ func NewServer(addr string) (*Server, error) {
 	go func() {
 		defer s.wg.Done()
 		s.serve(l)
+
+		s.mu.Lock()
+		for c := range s.peers {
+			c.Close()
+		}
+		s.mu.Unlock()
 	}()
 	return &s, nil
 }
@@ -70,13 +76,14 @@ func (s *Server) serve(l net.Listener) {
 // ServeConn handles a net.Conn. Nice with net.Pipe()
 func (s *Server) ServeConn(conn net.Conn) {
 	s.wg.Add(1)
+	s.mu.Lock()
+	s.peers[conn] = struct{}{}
+	s.infoConns++
+	s.mu.Unlock()
+
 	go func() {
 		defer s.wg.Done()
 		defer conn.Close()
-		s.mu.Lock()
-		s.peers[conn] = struct{}{}
-		s.infoConns++
-		s.mu.Unlock()
 
 		s.servePeer(conn)
 
@@ -104,10 +111,8 @@ func (s *Server) Close() {
 		s.l.Close()
 	}
 	s.l = nil
-	for c := range s.peers {
-		c.Close()
-	}
 	s.mu.Unlock()
+
 	s.wg.Wait()
 }
 
@@ -142,6 +147,7 @@ func (s *Server) servePeer(c net.Conn) {
 		}
 		s.Dispatch(peer, args)
 		peer.Flush()
+
 		s.mu.Lock()
 		closed := peer.closed
 		s.mu.Unlock()
