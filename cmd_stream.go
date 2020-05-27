@@ -34,7 +34,7 @@ func (m *Miniredis) cmdXadd(c *server.Peer, cmd string, args []string) {
 	if !m.handleAuth(c) {
 		return
 	}
-	if m.checkPubsub(c) {
+	if m.checkPubsub(c, cmd) {
 		return
 	}
 
@@ -118,7 +118,7 @@ func (m *Miniredis) cmdXlen(c *server.Peer, cmd string, args []string) {
 	if !m.handleAuth(c) {
 		return
 	}
-	if m.checkPubsub(c) {
+	if m.checkPubsub(c, cmd) {
 		return
 	}
 
@@ -158,7 +158,7 @@ func (m *Miniredis) makeCmdXrange(reverse bool) server.Cmd {
 		if !m.handleAuth(c) {
 			return
 		}
-		if m.checkPubsub(c) {
+		if m.checkPubsub(c, cmd) {
 			return
 		}
 

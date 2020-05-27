@@ -38,7 +38,7 @@ func (m *Miniredis) cmdSadd(c *server.Peer, cmd string, args []string) {
 	if !m.handleAuth(c) {
 		return
 	}
-	if m.checkPubsub(c) {
+	if m.checkPubsub(c, cmd) {
 		return
 	}
 
@@ -67,7 +67,7 @@ func (m *Miniredis) cmdScard(c *server.Peer, cmd string, args []string) {
 	if !m.handleAuth(c) {
 		return
 	}
-	if m.checkPubsub(c) {
+	if m.checkPubsub(c, cmd) {
 		return
 	}
 
@@ -101,7 +101,7 @@ func (m *Miniredis) cmdSdiff(c *server.Peer, cmd string, args []string) {
 	if !m.handleAuth(c) {
 		return
 	}
-	if m.checkPubsub(c) {
+	if m.checkPubsub(c, cmd) {
 		return
 	}
 
@@ -133,7 +133,7 @@ func (m *Miniredis) cmdSdiffstore(c *server.Peer, cmd string, args []string) {
 	if !m.handleAuth(c) {
 		return
 	}
-	if m.checkPubsub(c) {
+	if m.checkPubsub(c, cmd) {
 		return
 	}
 
@@ -164,7 +164,7 @@ func (m *Miniredis) cmdSinter(c *server.Peer, cmd string, args []string) {
 	if !m.handleAuth(c) {
 		return
 	}
-	if m.checkPubsub(c) {
+	if m.checkPubsub(c, cmd) {
 		return
 	}
 
@@ -196,7 +196,7 @@ func (m *Miniredis) cmdSinterstore(c *server.Peer, cmd string, args []string) {
 	if !m.handleAuth(c) {
 		return
 	}
-	if m.checkPubsub(c) {
+	if m.checkPubsub(c, cmd) {
 		return
 	}
 
@@ -227,7 +227,7 @@ func (m *Miniredis) cmdSismember(c *server.Peer, cmd string, args []string) {
 	if !m.handleAuth(c) {
 		return
 	}
-	if m.checkPubsub(c) {
+	if m.checkPubsub(c, cmd) {
 		return
 	}
 
@@ -264,7 +264,7 @@ func (m *Miniredis) cmdSmembers(c *server.Peer, cmd string, args []string) {
 	if !m.handleAuth(c) {
 		return
 	}
-	if m.checkPubsub(c) {
+	if m.checkPubsub(c, cmd) {
 		return
 	}
 
@@ -302,7 +302,7 @@ func (m *Miniredis) cmdSmove(c *server.Peer, cmd string, args []string) {
 	if !m.handleAuth(c) {
 		return
 	}
-	if m.checkPubsub(c) {
+	if m.checkPubsub(c, cmd) {
 		return
 	}
 
@@ -346,7 +346,7 @@ func (m *Miniredis) cmdSpop(c *server.Peer, cmd string, args []string) {
 	if !m.handleAuth(c) {
 		return
 	}
-	if m.checkPubsub(c) {
+	if m.checkPubsub(c, cmd) {
 		return
 	}
 
@@ -430,7 +430,7 @@ func (m *Miniredis) cmdSrandmember(c *server.Peer, cmd string, args []string) {
 	if !m.handleAuth(c) {
 		return
 	}
-	if m.checkPubsub(c) {
+	if m.checkPubsub(c, cmd) {
 		return
 	}
 
@@ -499,7 +499,7 @@ func (m *Miniredis) cmdSrem(c *server.Peer, cmd string, args []string) {
 	if !m.handleAuth(c) {
 		return
 	}
-	if m.checkPubsub(c) {
+	if m.checkPubsub(c, cmd) {
 		return
 	}
 
@@ -532,7 +532,7 @@ func (m *Miniredis) cmdSunion(c *server.Peer, cmd string, args []string) {
 	if !m.handleAuth(c) {
 		return
 	}
-	if m.checkPubsub(c) {
+	if m.checkPubsub(c, cmd) {
 		return
 	}
 
@@ -564,7 +564,7 @@ func (m *Miniredis) cmdSunionstore(c *server.Peer, cmd string, args []string) {
 	if !m.handleAuth(c) {
 		return
 	}
-	if m.checkPubsub(c) {
+	if m.checkPubsub(c, cmd) {
 		return
 	}
 
@@ -595,7 +595,7 @@ func (m *Miniredis) cmdSscan(c *server.Peer, cmd string, args []string) {
 	if !m.handleAuth(c) {
 		return
 	}
-	if m.checkPubsub(c) {
+	if m.checkPubsub(c, cmd) {
 		return
 	}
 

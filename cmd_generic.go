@@ -50,7 +50,7 @@ func makeCmdExpire(m *Miniredis, unix bool, d time.Duration) func(*server.Peer, 
 		if !m.handleAuth(c) {
 			return
 		}
-		if m.checkPubsub(c) {
+		if m.checkPubsub(c, cmd) {
 			return
 		}
 
@@ -98,7 +98,7 @@ func (m *Miniredis) cmdTouch(c *server.Peer, cmd string, args []string) {
 	if !m.handleAuth(c) {
 		return
 	}
-	if m.checkPubsub(c) {
+	if m.checkPubsub(c, cmd) {
 		return
 	}
 
@@ -131,7 +131,7 @@ func (m *Miniredis) cmdTTL(c *server.Peer, cmd string, args []string) {
 	if !m.handleAuth(c) {
 		return
 	}
-	if m.checkPubsub(c) {
+	if m.checkPubsub(c, cmd) {
 		return
 	}
 
@@ -166,7 +166,7 @@ func (m *Miniredis) cmdPTTL(c *server.Peer, cmd string, args []string) {
 	if !m.handleAuth(c) {
 		return
 	}
-	if m.checkPubsub(c) {
+	if m.checkPubsub(c, cmd) {
 		return
 	}
 
@@ -201,7 +201,7 @@ func (m *Miniredis) cmdPersist(c *server.Peer, cmd string, args []string) {
 	if !m.handleAuth(c) {
 		return
 	}
-	if m.checkPubsub(c) {
+	if m.checkPubsub(c, cmd) {
 		return
 	}
 
@@ -232,7 +232,7 @@ func (m *Miniredis) cmdDel(c *server.Peer, cmd string, args []string) {
 	if !m.handleAuth(c) {
 		return
 	}
-	if m.checkPubsub(c) {
+	if m.checkPubsub(c, cmd) {
 		return
 	}
 
@@ -266,7 +266,7 @@ func (m *Miniredis) cmdType(c *server.Peer, cmd string, args []string) {
 	if !m.handleAuth(c) {
 		return
 	}
-	if m.checkPubsub(c) {
+	if m.checkPubsub(c, cmd) {
 		return
 	}
 
@@ -295,7 +295,7 @@ func (m *Miniredis) cmdExists(c *server.Peer, cmd string, args []string) {
 	if !m.handleAuth(c) {
 		return
 	}
-	if m.checkPubsub(c) {
+	if m.checkPubsub(c, cmd) {
 		return
 	}
 
@@ -322,7 +322,7 @@ func (m *Miniredis) cmdMove(c *server.Peer, cmd string, args []string) {
 	if !m.handleAuth(c) {
 		return
 	}
-	if m.checkPubsub(c) {
+	if m.checkPubsub(c, cmd) {
 		return
 	}
 
@@ -358,7 +358,7 @@ func (m *Miniredis) cmdKeys(c *server.Peer, cmd string, args []string) {
 	if !m.handleAuth(c) {
 		return
 	}
-	if m.checkPubsub(c) {
+	if m.checkPubsub(c, cmd) {
 		return
 	}
 
@@ -385,7 +385,7 @@ func (m *Miniredis) cmdRandomkey(c *server.Peer, cmd string, args []string) {
 	if !m.handleAuth(c) {
 		return
 	}
-	if m.checkPubsub(c) {
+	if m.checkPubsub(c, cmd) {
 		return
 	}
 
@@ -417,7 +417,7 @@ func (m *Miniredis) cmdRename(c *server.Peer, cmd string, args []string) {
 	if !m.handleAuth(c) {
 		return
 	}
-	if m.checkPubsub(c) {
+	if m.checkPubsub(c, cmd) {
 		return
 	}
 
@@ -446,7 +446,7 @@ func (m *Miniredis) cmdRenamenx(c *server.Peer, cmd string, args []string) {
 	if !m.handleAuth(c) {
 		return
 	}
-	if m.checkPubsub(c) {
+	if m.checkPubsub(c, cmd) {
 		return
 	}
 
@@ -480,7 +480,7 @@ func (m *Miniredis) cmdScan(c *server.Peer, cmd string, args []string) {
 	if !m.handleAuth(c) {
 		return
 	}
-	if m.checkPubsub(c) {
+	if m.checkPubsub(c, cmd) {
 		return
 	}
 

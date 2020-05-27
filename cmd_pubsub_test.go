@@ -218,7 +218,7 @@ func TestPublishMode(t *testing.T) {
 	ok(t, err)
 
 	_, err = c.Do("SET", "foo", "bar")
-	mustFail(t, err, "ERR only (P)SUBSCRIBE / (P)UNSUBSCRIBE / PING / QUIT allowed in this context")
+	mustFail(t, err, "ERR Can't execute 'set': only (P)SUBSCRIBE / (P)UNSUBSCRIBE / PING / QUIT are allowed in this context")
 
 	_, err = c.Do("UNSUBSCRIBE", "birds")
 	ok(t, err)
@@ -258,7 +258,7 @@ func TestPublish(t *testing.T) {
 	// Wrong usage
 	{
 		_, err := c2.Do("PUBLISH", "foo", "bar")
-		mustFail(t, err, "ERR only (P)SUBSCRIBE / (P)UNSUBSCRIBE / PING / QUIT allowed in this context")
+		mustFail(t, err, "ERR Can't execute 'publish': only (P)SUBSCRIBE / (P)UNSUBSCRIBE / PING / QUIT are allowed in this context")
 	}
 }
 

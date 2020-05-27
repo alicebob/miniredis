@@ -21,7 +21,7 @@ func TestAuth(t *testing.T) {
 	mustFail(t, err, "NOAUTH Authentication required.")
 
 	_, err = c.Do("AUTH", "wrongpasswd")
-	mustFail(t, err, "ERR invalid password")
+	mustFail(t, err, "WRONGPASS invalid username-password pair")
 
 	_, err = c.Do("AUTH", "nocomment")
 	ok(t, err)
