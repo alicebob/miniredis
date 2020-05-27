@@ -390,7 +390,8 @@ func (db *RedisDB) Unlink(k string) bool {
 
 // TTL is the left over time to live. As set via EXPIRE, PEXPIRE, EXPIREAT,
 // PEXPIREAT.
-// 0 if not set.
+// Note: this direct function returns 0 if there is no TTL set, unlike redis,
+// which returns -1.
 func (m *Miniredis) TTL(k string) time.Duration {
 	return m.DB(m.selectedDB).TTL(k)
 }
