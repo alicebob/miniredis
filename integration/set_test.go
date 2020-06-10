@@ -154,6 +154,7 @@ func TestSetSpop(t *testing.T) {
 
 		// failure cases
 		fail("SPOP", "foo", "one"),
+		fail("SPOP", "foo", -4),
 	)
 }
 

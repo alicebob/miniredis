@@ -364,6 +364,11 @@ func (m *Miniredis) cmdSpop(c *server.Peer, cmd string, args []string) {
 				c.WriteError(msgInvalidInt)
 				return
 			}
+			if v < 0 {
+				setDirty(c)
+				c.WriteError(msgOutOfRange)
+				return
+			}
 			count = v
 			withCount = true
 			args = args[1:]

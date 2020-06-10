@@ -305,6 +305,9 @@ func TestSpop(t *testing.T) {
 		members, err := s.Members("s")
 		ok(t, err)
 		assert(t, len(members) == 2, "SPOP s 2")
+
+		_, err = c.Do("SPOP", "str", -12)
+		mustFail(t, err, msgOutOfRange)
 	})
 }
 
