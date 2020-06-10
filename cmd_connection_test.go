@@ -170,3 +170,24 @@ func TestQuit(t *testing.T) {
 	assert(t, err != nil, "QUIT closed the client")
 	equals(t, "", v)
 }
+
+func TestSetError(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	r, err := redis.String(c.Do("PING"))
+	ok(t, err)
+	equals(t, "PONG", r)
+
+	s.SetError("LOADING Redis is loading the dataset in memory")
+	_, err = c.Do("PING", "hi")
+	mustFail(t, err, "LOADING Redis is loading the dataset in memory")
+
+	s.SetError("")
+	r, err = redis.String(c.Do("PING"))
+	ok(t, err)
+	equals(t, "PONG", r)
+}
