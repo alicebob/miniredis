@@ -159,7 +159,7 @@ func (m *Miniredis) cmdPublish(c *server.Peer, cmd string, args []string) {
 	if !m.handleAuth(c) {
 		return
 	}
-	if m.checkPubsub(c) {
+	if m.checkPubsub(c, cmd) {
 		return
 	}
 
@@ -178,7 +178,7 @@ func (m *Miniredis) cmdPubSub(c *server.Peer, cmd string, args []string) {
 		return
 	}
 
-	if m.checkPubsub(c) {
+	if m.checkPubsub(c, cmd) {
 		return
 	}
 

@@ -60,7 +60,7 @@ func (m *Miniredis) cmdAuth(c *server.Peer, cmd string, args []string) {
 		c.WriteError(errWrongNumber(cmd))
 		return
 	}
-	if m.checkPubsub(c) {
+	if m.checkPubsub(c, cmd) {
 		return
 	}
 	if getCtx(c).nested {
@@ -72,11 +72,11 @@ func (m *Miniredis) cmdAuth(c *server.Peer, cmd string, args []string) {
 
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		if m.password == "" {
-			c.WriteError("ERR Client sent AUTH, but no password is set")
+			c.WriteError("ERR AUTH <password> called without any password configured for the default user. Are you sure your configuration is correct?")
 			return
 		}
 		if m.password != pw {
-			c.WriteError("ERR invalid password")
+			c.WriteError("WRONGPASS invalid username-password pair")
 			return
 		}
 
@@ -95,7 +95,7 @@ func (m *Miniredis) cmdEcho(c *server.Peer, cmd string, args []string) {
 	if !m.handleAuth(c) {
 		return
 	}
-	if m.checkPubsub(c) {
+	if m.checkPubsub(c, cmd) {
 		return
 	}
 
@@ -115,7 +115,7 @@ func (m *Miniredis) cmdSelect(c *server.Peer, cmd string, args []string) {
 	if !m.handleAuth(c) {
 		return
 	}
-	if m.checkPubsub(c) {
+	if m.checkPubsub(c, cmd) {
 		return
 	}
 

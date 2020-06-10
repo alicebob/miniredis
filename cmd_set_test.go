@@ -52,8 +52,7 @@ func TestSadd(t *testing.T) {
 		equals(t, []string{"aap", "mies", "new", "noot"}, members)
 	}
 
-	// Direct usage
-	{
+	t.Run("direct usage", func(t *testing.T) {
 		added, err := s.SetAdd("s1", "aap")
 		ok(t, err)
 		equals(t, 1, added)
@@ -61,27 +60,25 @@ func TestSadd(t *testing.T) {
 		members, err := s.Members("s1")
 		ok(t, err)
 		equals(t, []string{"aap"}, members)
-	}
+	})
 
-	// Wrong type of key
-	{
+	t.Run("errors", func(t *testing.T) {
 		_, err := redis.String(c.Do("SET", "str", "value"))
 		ok(t, err)
 		_, err = redis.Int(c.Do("SADD", "str", "hi"))
-		assert(t, err != nil, "SADD error")
+		mustFail(t, err, msgWrongType)
 		_, err = redis.Int(c.Do("SMEMBERS", "str"))
-		assert(t, err != nil, "MEMBERS error")
+		mustFail(t, err, msgWrongType)
 		// Wrong argument counts
 		_, err = redis.String(c.Do("SADD"))
-		assert(t, err != nil, "SADD error")
+		mustFail(t, err, "ERR wrong number of arguments for 'sadd' command")
 		_, err = redis.String(c.Do("SADD", "set"))
-		assert(t, err != nil, "SADD error")
+		mustFail(t, err, "ERR wrong number of arguments for 'sadd' command")
 		_, err = redis.String(c.Do("SMEMBERS"))
-		assert(t, err != nil, "SMEMBERS error")
+		mustFail(t, err, "ERR wrong number of arguments for 'smembers' command")
 		_, err = redis.String(c.Do("SMEMBERS", "set", "spurious"))
-		assert(t, err != nil, "SMEMBERS error")
-	}
-
+		mustFail(t, err, "ERR wrong number of arguments for 'smembers' command")
+	})
 }
 
 // Test SISMEMBER
@@ -111,28 +108,25 @@ func TestSismember(t *testing.T) {
 		equals(t, 0, b)
 	}
 
-	// Direct usage
-	{
+	t.Run("direct usage", func(t *testing.T) {
 		isMember, err := s.IsMember("s", "noot")
 		ok(t, err)
 		equals(t, true, isMember)
-	}
+	})
 
-	// Wrong type of key
-	{
+	t.Run("errors", func(t *testing.T) {
 		_, err := redis.String(c.Do("SET", "str", "value"))
 		ok(t, err)
 		_, err = redis.Int(c.Do("SISMEMBER", "str"))
-		assert(t, err != nil, "SISMEMBER error")
+		mustFail(t, err, "ERR wrong number of arguments for 'sismember' command")
 		// Wrong argument counts
 		_, err = redis.String(c.Do("SISMEMBER"))
-		assert(t, err != nil, "SISMEMBER error")
+		mustFail(t, err, "ERR wrong number of arguments for 'sismember' command")
 		_, err = redis.String(c.Do("SISMEMBER", "set"))
-		assert(t, err != nil, "SISMEMBER error")
+		mustFail(t, err, "ERR wrong number of arguments for 'sismember' command")
 		_, err = redis.String(c.Do("SISMEMBER", "set", "spurious", "args"))
-		assert(t, err != nil, "SISMEMBER error")
-	}
-
+		mustFail(t, err, "ERR wrong number of arguments for 'sismember' command")
+	})
 }
 
 // Test SREM
@@ -169,8 +163,7 @@ func TestSrem(t *testing.T) {
 		equals(t, 0, b)
 	}
 
-	// Direct usage
-	{
+	t.Run("direct usage", func(t *testing.T) {
 		b, err := s.SRem("s", "mies")
 		ok(t, err)
 		equals(t, 1, b)
@@ -178,22 +171,21 @@ func TestSrem(t *testing.T) {
 		members, err := s.Members("s")
 		ok(t, err)
 		equals(t, []string{"vuur"}, members)
-	}
+	})
 
-	// Wrong type of key
-	{
+	t.Run("errors", func(t *testing.T) {
 		_, err := redis.String(c.Do("SET", "str", "value"))
 		ok(t, err)
 		_, err = redis.Int(c.Do("SREM", "str", "value"))
-		assert(t, err != nil, "SREM error")
+		mustFail(t, err, msgWrongType)
 		// Wrong argument counts
 		_, err = redis.String(c.Do("SREM"))
-		assert(t, err != nil, "SREM error")
+		mustFail(t, err, "ERR wrong number of arguments for 'srem' command")
 		_, err = redis.String(c.Do("SREM", "set"))
-		assert(t, err != nil, "SREM error")
+		mustFail(t, err, "ERR wrong number of arguments for 'srem' command")
 		_, err = redis.String(c.Do("SREM", "set", "spurious", "args"))
 		assert(t, err != nil, "SREM error")
-	}
+	})
 }
 
 // Test SMOVE
@@ -246,24 +238,23 @@ func TestSmove(t *testing.T) {
 		equals(t, 0, b)
 	}
 
-	// Wrong type of key
-	{
+	t.Run("errors", func(t *testing.T) {
 		_, err := redis.String(c.Do("SET", "str", "value"))
 		ok(t, err)
 		_, err = redis.Int(c.Do("SMOVE", "str", "dst", "value"))
-		assert(t, err != nil, "SMOVE error")
+		mustFail(t, err, msgWrongType)
 		_, err = redis.Int(c.Do("SMOVE", "s2", "str", "value"))
-		assert(t, err != nil, "SMOVE error")
+		mustFail(t, err, msgWrongType)
 		// Wrong argument counts
 		_, err = redis.String(c.Do("SMOVE"))
-		assert(t, err != nil, "SMOVE error")
+		mustFail(t, err, "ERR wrong number of arguments for 'smove' command")
 		_, err = redis.String(c.Do("SMOVE", "set"))
-		assert(t, err != nil, "SMOVE error")
+		mustFail(t, err, "ERR wrong number of arguments for 'smove' command")
 		_, err = redis.String(c.Do("SMOVE", "set", "set2"))
-		assert(t, err != nil, "SMOVE error")
+		mustFail(t, err, "ERR wrong number of arguments for 'smove' command")
 		_, err = redis.String(c.Do("SMOVE", "set", "set2", "spurious", "args"))
-		assert(t, err != nil, "SMOVE error")
-	}
+		mustFail(t, err, "ERR wrong number of arguments for 'smove' command")
+	})
 }
 
 // Test SPOP
@@ -274,9 +265,8 @@ func TestSpop(t *testing.T) {
 	c, err := redis.Dial("tcp", s.Addr())
 	ok(t, err)
 
-	s.SetAdd("s", "aap", "noot")
-
-	{
+	t.Run("basics", func(t *testing.T) {
+		s.SetAdd("s", "aap", "noot")
 		el, err := redis.String(c.Do("SPOP", "s"))
 		ok(t, err)
 		assert(t, el == "aap" || el == "noot", "spop got something")
@@ -286,31 +276,28 @@ func TestSpop(t *testing.T) {
 		assert(t, el == "aap" || el == "noot", "spop got something")
 
 		assert(t, !s.Exists("s"), "all spopped away")
-	}
+	})
 
-	// a nonexisting key
-	{
+	t.Run("nonexisting key", func(t *testing.T) {
 		b, err := c.Do("SPOP", "nosuch")
 		ok(t, err)
 		equals(t, nil, b)
-	}
+	})
 
-	// various errors
-	{
+	t.Run("various errors", func(t *testing.T) {
 		s.SetAdd("chk", "aap", "noot")
 		s.Set("str", "value")
 
 		_, err = redis.String(c.Do("SMOVE"))
-		assert(t, err != nil, "SMOVE error")
+		mustFail(t, err, "ERR wrong number of arguments for 'smove' command")
 		_, err = redis.String(c.Do("SMOVE", "chk", "set2"))
-		assert(t, err != nil, "SMOVE error")
+		mustFail(t, err, "ERR wrong number of arguments for 'smove' command")
 
 		_, err = c.Do("SPOP", "str")
-		assert(t, err != nil, "SPOP error")
-	}
+		mustFail(t, err, msgWrongType)
+	})
 
-	// count argument
-	{
+	t.Run("count argument", func(t *testing.T) {
 		s.SetAdd("s", "aap", "noot", "mies", "vuur")
 		el, err := redis.Strings(c.Do("SPOP", "s", 2))
 		ok(t, err)
@@ -318,7 +305,10 @@ func TestSpop(t *testing.T) {
 		members, err := s.Members("s")
 		ok(t, err)
 		assert(t, len(members) == 2, "SPOP s 2")
-	}
+
+		_, err = c.Do("SPOP", "str", -12)
+		mustFail(t, err, msgOutOfRange)
+	})
 }
 
 // Test SRANDMEMBER
@@ -364,21 +354,20 @@ func TestSrandmember(t *testing.T) {
 		equals(t, nil, b)
 	}
 
-	// Various errors
-	{
+	t.Run("errors", func(t *testing.T) {
 		s.SetAdd("chk", "aap", "noot")
 		s.Set("str", "value")
 
 		_, err = redis.String(c.Do("SRANDMEMBER"))
-		assert(t, err != nil, "SRANDMEMBER error")
+		mustFail(t, err, "ERR wrong number of arguments for 'srandmember' command")
 		_, err = redis.String(c.Do("SRANDMEMBER", "chk", "noint"))
-		assert(t, err != nil, "SRANDMEMBER error")
+		mustFail(t, err, "ERR value is not an integer or out of range")
 		_, err = redis.String(c.Do("SRANDMEMBER", "chk", 1, "toomanu"))
-		assert(t, err != nil, "SRANDMEMBER error")
+		mustFail(t, err, "ERR syntax error")
 
 		_, err = c.Do("SRANDMEMBER", "str")
-		assert(t, err != nil, "SRANDMEMBER error")
-	}
+		mustFail(t, err, msgWrongType)
+	})
 }
 
 // Test SDIFF
@@ -422,18 +411,17 @@ func TestSdiff(t *testing.T) {
 		equals(t, []string{}, els)
 	}
 
-	// Various errors
-	{
+	t.Run("errors", func(t *testing.T) {
 		s.SetAdd("chk", "aap", "noot")
 		s.Set("str", "value")
 
 		_, err = redis.String(c.Do("SDIFF"))
-		assert(t, err != nil, "SDIFF error")
+		mustFail(t, err, "ERR wrong number of arguments for 'sdiff' command")
 		_, err = redis.String(c.Do("SDIFF", "str"))
-		assert(t, err != nil, "SDIFF error")
+		mustFail(t, err, msgWrongType)
 		_, err = redis.String(c.Do("SDIFF", "chk", "str"))
-		assert(t, err != nil, "SDIFF error")
-	}
+		mustFail(t, err, msgWrongType)
+	})
 }
 
 // Test SDIFFSTORE
@@ -456,18 +444,17 @@ func TestSdiffstore(t *testing.T) {
 		s.CheckSet(t, "res", "noot")
 	}
 
-	// Various errors
-	{
+	t.Run("errors", func(t *testing.T) {
 		s.SetAdd("chk", "aap", "noot")
 		s.Set("str", "value")
 
 		_, err = redis.String(c.Do("SDIFFSTORE"))
-		assert(t, err != nil, "SDIFFSTORE error")
+		mustFail(t, err, "ERR wrong number of arguments for 'sdiffstore' command")
 		_, err = redis.String(c.Do("SDIFFSTORE", "t"))
-		assert(t, err != nil, "SDIFFSTORE error")
+		mustFail(t, err, "ERR wrong number of arguments for 'sdiffstore' command")
 		_, err = redis.String(c.Do("SDIFFSTORE", "t", "str"))
-		assert(t, err != nil, "SDIFFSTORE error")
-	}
+		mustFail(t, err, msgWrongType)
+	})
 }
 
 // Test SINTER
@@ -519,18 +506,17 @@ func TestSinter(t *testing.T) {
 		equals(t, []string{}, els)
 	}
 
-	// Various errors
-	{
+	t.Run("errors", func(t *testing.T) {
 		s.SetAdd("chk", "aap", "noot")
 		s.Set("str", "value")
 
 		_, err = redis.String(c.Do("SINTER"))
-		assert(t, err != nil, "SINTER error")
+		mustFail(t, err, "ERR wrong number of arguments for 'sinter' command")
 		_, err = redis.String(c.Do("SINTER", "str"))
-		assert(t, err != nil, "SINTER error")
+		mustFail(t, err, msgWrongType)
 		_, err = redis.String(c.Do("SINTER", "chk", "str"))
-		assert(t, err != nil, "SINTER error")
-	}
+		mustFail(t, err, msgWrongType)
+	})
 }
 
 // Test SINTERSTORE
@@ -561,18 +547,17 @@ func TestSinterstore(t *testing.T) {
 		s.CheckSet(t, "res", []string{}...)
 	}
 
-	// Various errors
-	{
+	t.Run("errors", func(t *testing.T) {
 		s.SetAdd("chk", "aap", "noot")
 		s.Set("str", "value")
 
 		_, err = redis.String(c.Do("SINTERSTORE"))
-		assert(t, err != nil, "SINTERSTORE error")
+		mustFail(t, err, "ERR wrong number of arguments for 'sinterstore' command")
 		_, err = redis.String(c.Do("SINTERSTORE", "t"))
-		assert(t, err != nil, "SINTERSTORE error")
+		mustFail(t, err, "ERR wrong number of arguments for 'sinterstore' command")
 		_, err = redis.String(c.Do("SINTERSTORE", "t", "str"))
-		assert(t, err != nil, "SINTERSTORE error")
-	}
+		mustFail(t, err, msgWrongType)
+	})
 }
 
 // Test SUNION
@@ -618,18 +603,17 @@ func TestSunion(t *testing.T) {
 		equals(t, []string{}, els)
 	}
 
-	// Various errors
-	{
+	t.Run("errors", func(t *testing.T) {
 		s.SetAdd("chk", "aap", "noot")
 		s.Set("str", "value")
 
 		_, err = redis.String(c.Do("SUNION"))
-		assert(t, err != nil, "SUNION error")
+		mustFail(t, err, "ERR wrong number of arguments for 'sunion' command")
 		_, err = redis.String(c.Do("SUNION", "str"))
-		assert(t, err != nil, "SUNION error")
+		mustFail(t, err, msgWrongType)
 		_, err = redis.String(c.Do("SUNION", "chk", "str"))
-		assert(t, err != nil, "SUNION error")
-	}
+		mustFail(t, err, msgWrongType)
+	})
 }
 
 // Test SUNIONSTORE
@@ -652,18 +636,17 @@ func TestSunionstore(t *testing.T) {
 		s.CheckSet(t, "res", "aap", "mies", "noot", "wim")
 	}
 
-	// Various errors
-	{
+	t.Run("errors", func(t *testing.T) {
 		s.SetAdd("chk", "aap", "noot")
 		s.Set("str", "value")
 
 		_, err = redis.String(c.Do("SUNIONSTORE"))
-		assert(t, err != nil, "SUNIONSTORE error")
+		mustFail(t, err, "ERR wrong number of arguments for 'sunionstore' command")
 		_, err = redis.String(c.Do("SUNIONSTORE", "t"))
-		assert(t, err != nil, "SUNIONSTORE error")
+		mustFail(t, err, "ERR wrong number of arguments for 'sunionstore' command")
 		_, err = redis.String(c.Do("SUNIONSTORE", "t", "str"))
-		assert(t, err != nil, "SUNIONSTORE error")
-	}
+		mustFail(t, err, msgWrongType)
+	})
 }
 
 func TestSscan(t *testing.T) {
@@ -734,22 +717,21 @@ func TestSscan(t *testing.T) {
 		equals(t, []string{"mies"}, keys)
 	}
 
-	// Wrong usage
-	{
+	t.Run("errors", func(t *testing.T) {
 		_, err := redis.Int(c.Do("SSCAN"))
-		assert(t, err != nil, "do SSCAN error")
+		mustFail(t, err, "ERR wrong number of arguments for 'sscan' command")
 		_, err = redis.Int(c.Do("SSCAN", "set"))
-		assert(t, err != nil, "do SSCAN error")
+		mustFail(t, err, "ERR wrong number of arguments for 'sscan' command")
 		_, err = redis.Int(c.Do("SSCAN", "set", "noint"))
-		assert(t, err != nil, "do SSCAN error")
+		mustFail(t, err, msgInvalidCursor)
 		_, err = redis.Int(c.Do("SSCAN", "set", 1, "MATCH"))
-		assert(t, err != nil, "do SSCAN error")
+		mustFail(t, err, msgSyntaxError)
 		_, err = redis.Int(c.Do("SSCAN", "set", 1, "COUNT"))
-		assert(t, err != nil, "do SSCAN error")
+		mustFail(t, err, msgSyntaxError)
 		_, err = redis.Int(c.Do("SSCAN", "set", 1, "COUNT", "noint"))
-		assert(t, err != nil, "do SSCAN error")
+		mustFail(t, err, msgInvalidInt)
 		s.Set("str", "value")
 		_, err = redis.Int(c.Do("SSCAN", "str", 1))
 		assert(t, err != nil, "do SSCAN error")
-	}
+	})
 }

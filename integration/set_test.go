@@ -149,8 +149,12 @@ func TestSetSpop(t *testing.T) {
 		succ("SPOP", "s", 1),
 		succ("SCARD", "s"),
 
+		succ("SPOP", "nosuch", 1),
+		succ("SPOP", "nosuch", 0),
+
 		// failure cases
 		fail("SPOP", "foo", "one"),
+		fail("SPOP", "foo", -4),
 	)
 }
 

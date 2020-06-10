@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"math/rand"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -373,7 +374,7 @@ func (m *Miniredis) handleAuth(c *server.Peer) bool {
 
 // handlePubsub sends an error to the user if the connection is in PUBSUB mode.
 // It'll return true if it did.
-func (m *Miniredis) checkPubsub(c *server.Peer) bool {
+func (m *Miniredis) checkPubsub(c *server.Peer, cmd string) bool {
 	if getCtx(c).nested {
 		return false
 	}
@@ -386,7 +387,10 @@ func (m *Miniredis) checkPubsub(c *server.Peer) bool {
 		return false
 	}
 
-	c.WriteError("ERR only (P)SUBSCRIBE / (P)UNSUBSCRIBE / PING / QUIT allowed in this context")
+	c.WriteError(fmt.Sprintf(
+		"ERR Can't execute '%s': only (P)SUBSCRIBE / (P)UNSUBSCRIBE / PING / QUIT are allowed in this context",
+		strings.ToLower(cmd),
+	))
 	return true
 }
 
