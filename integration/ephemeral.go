@@ -39,6 +39,20 @@ func RedisCluster() (*ephemeral, string) {
 	return runRedis("cluster-enabled yes\ncluster-config-file nodes.conf")
 }
 
+func RedisTLS() (*ephemeral, string) {
+	port := arbitraryPort()
+	e, _ := runRedis(fmt.Sprintf(
+		`
+			tls-port %d
+			tls-cert-file ../testdata/server.crt
+			tls-key-file ../testdata/server.key
+			tls-ca-cert-file ../testdata/client.crt
+		`,
+		port))
+	addr := fmt.Sprintf("127.0.0.1:%d", port)
+	return e, addr
+}
+
 func runRedis(extraConfig string) (*ephemeral, string) {
 	port := arbitraryPort()
 
@@ -67,7 +81,7 @@ func runRedis(extraConfig string) (*ephemeral, string) {
 			e := ephemeral(*c)
 			return &e, addr
 		}
-		time.Sleep(1 * time.Millisecond)
+		time.Sleep(3 * time.Millisecond)
 	}
 	panic(fmt.Sprintf("No connection on port %d", port))
 }

@@ -36,3 +36,12 @@ func TestServer(t *testing.T) {
 		fail("FLUSHALL", "ASYNC", "foo"),
 	)
 }
+
+func TestServerTLS(t *testing.T) {
+	testCommandsTLS(t,
+		succ("PING", "foo"),
+
+		succ("SET", "foo", "bar"),
+		succ("GET", "foo"),
+	)
+}

@@ -16,6 +16,7 @@ package miniredis
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"math/rand"
 	"strconv"
@@ -117,10 +118,25 @@ func Run() (*Miniredis, error) {
 	return m, m.Start()
 }
 
+// Run creates and Start()s a Miniredis, TLS version.
+func RunTLS(cfg *tls.Config) (*Miniredis, error) {
+	m := NewMiniRedis()
+	return m, m.StartTLS(cfg)
+}
+
 // Start starts a server. It listens on a random port on localhost. See also
 // Addr().
 func (m *Miniredis) Start() error {
 	s, err := server.NewServer(fmt.Sprintf("127.0.0.1:%d", m.port))
+	if err != nil {
+		return err
+	}
+	return m.start(s)
+}
+
+// Start starts a server, TLS version.
+func (m *Miniredis) StartTLS(cfg *tls.Config) error {
+	s, err := server.NewServerTLS(fmt.Sprintf("127.0.0.1:%d", m.port), cfg)
 	if err != nil {
 		return err
 	}
