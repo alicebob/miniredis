@@ -243,6 +243,7 @@ func testClients2(t *testing.T, f func(c1, c2 chan<- command)) {
 }
 
 func testAuthCommands(t *testing.T, passwd string, commands ...command) {
+	t.Helper()
 	sMini, err := miniredis.Run()
 	ok(t, err)
 	defer sMini.Close()
@@ -253,7 +254,22 @@ func testAuthCommands(t *testing.T, passwd string, commands ...command) {
 	runCommands(t, sRealAddr, sMini.Addr(), commands)
 }
 
+func testUserAuthCommands(t *testing.T, users map[string]string, commands ...command) {
+	t.Helper()
+	sMini, err := miniredis.Run()
+	ok(t, err)
+	defer sMini.Close()
+	for user, pass := range users {
+		sMini.RequireUserAuth(user, pass)
+	}
+
+	sReal, sRealAddr := RedisUserAuth(users)
+	defer sReal.Close()
+	runCommands(t, sRealAddr, sMini.Addr(), commands)
+}
+
 func testClusterCommands(t *testing.T, commands ...command) {
+	t.Helper()
 	sMini, err := miniredis.Run()
 	ok(t, err)
 	defer sMini.Close()

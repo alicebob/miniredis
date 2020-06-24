@@ -33,6 +33,16 @@ func RedisAuth(passwd string) (*ephemeral, string) {
 	return runRedis(fmt.Sprintf("requirepass %s", passwd))
 }
 
+// RedisUserAuth starts a memory-only redis on a random port. The redis has
+// ACL rules enabled. See Redis()
+func RedisUserAuth(users map[string]string) (*ephemeral, string) {
+	acls := "user default off\n"
+	for user, pass := range users {
+		acls += fmt.Sprintf("user %s on >%s ~* +@all\n", user, pass)
+	}
+	return runRedis(acls)
+}
+
 // RedisCluster starts a memory-only redis on a random port. The redis has
 // cluster mode enabled. See Redis()
 func RedisCluster() (*ephemeral, string) {
