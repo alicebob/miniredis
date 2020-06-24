@@ -1,7 +1,10 @@
 package server
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
+	"io/ioutil"
 	"reflect"
 	"strconv"
 	"strings"
@@ -153,6 +156,84 @@ func Test(t *testing.T) {
 			t.Fatal(err)
 		}
 		if have, want := echo, bigPayload; have != want {
+			t.Errorf("have: %s, want: %s", have, want)
+		}
+	}
+}
+
+func testServerTLS(t *testing.T) *tls.Config {
+	cert, err := tls.LoadX509KeyPair("../testdata/server.crt", "../testdata/server.key")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cp := x509.NewCertPool()
+	rootca, err := ioutil.ReadFile("../testdata/client.crt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cp.AppendCertsFromPEM(rootca) {
+		t.Fatal("client cert err")
+	}
+	return &tls.Config{
+		Certificates: []tls.Certificate{cert},
+		ClientAuth:   tls.RequireAndVerifyClientCert,
+		ServerName:   "Server",
+		ClientCAs:    cp,
+	}
+}
+
+func testClientTLS(t *testing.T) *tls.Config {
+	cert, err := tls.LoadX509KeyPair("../testdata/client.crt", "../testdata/client.key")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cp := x509.NewCertPool()
+	rootca, err := ioutil.ReadFile("../testdata/server.crt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cp.AppendCertsFromPEM(rootca) {
+		t.Fatal("server cert err")
+	}
+	return &tls.Config{
+		Certificates: []tls.Certificate{cert},
+		ServerName:   "Server",
+		RootCAs:      cp,
+	}
+}
+
+func TestTLS(t *testing.T) {
+	s, err := NewServerTLS("127.0.0.1:0", testServerTLS(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+
+	if have := s.Addr().Port; have <= 0 {
+		t.Fatalf("have %v, want > 0", have)
+	}
+
+	s.Register("PING", func(c *Peer, cmd string, args []string) {
+		c.WriteInline("PONG")
+	})
+
+	cfg := testClientTLS(t)
+	c, err := redis.Dial("tcp",
+		s.Addr().String(),
+		redis.DialTLSConfig(cfg),
+		redis.DialUseTLS(true),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	{
+		res, err := redis.String(c.Do("PING"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if have, want := res, "PONG"; have != want {
 			t.Errorf("have: %s, want: %s", have, want)
 		}
 	}

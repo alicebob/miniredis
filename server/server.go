@@ -2,6 +2,7 @@ package server
 
 import (
 	"bufio"
+	"crypto/tls"
 	"fmt"
 	"net"
 	"strings"
@@ -42,16 +43,27 @@ type Server struct {
 
 // NewServer makes a server listening on addr. Close with .Close().
 func NewServer(addr string) (*Server, error) {
-	s := Server{
-		cmds:  map[string]Cmd{},
-		peers: map[net.Conn]struct{}{},
-	}
-
 	l, err := net.Listen("tcp", addr)
 	if err != nil {
 		return nil, err
 	}
-	s.l = l
+	return newServer(l), nil
+}
+
+func NewServerTLS(addr string, cfg *tls.Config) (*Server, error) {
+	l, err := tls.Listen("tcp", addr, cfg)
+	if err != nil {
+		return nil, err
+	}
+	return newServer(l), nil
+}
+
+func newServer(l net.Listener) *Server {
+	s := Server{
+		cmds:  map[string]Cmd{},
+		peers: map[net.Conn]struct{}{},
+		l:     l,
+	}
 
 	s.wg.Add(1)
 	go func() {
@@ -64,7 +76,7 @@ func NewServer(addr string) (*Server, error) {
 		}
 		s.mu.Unlock()
 	}()
-	return &s, nil
+	return &s
 }
 
 // (un)set a hook which is ran before every call. It returns true if the command is done.

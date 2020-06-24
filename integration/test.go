@@ -139,6 +139,17 @@ func testCommands(t *testing.T, commands ...command) {
 	runCommands(t, sRealAddr, sMini.Addr(), commands)
 }
 
+func testCommandsTLS(t *testing.T, commands ...command) {
+	t.Helper()
+	sMini := miniredis.NewMiniRedis()
+	ok(t, sMini.StartTLS(testServerTLS(t)))
+	defer sMini.Close()
+
+	sReal, sRealAddr := RedisTLS()
+	defer sReal.Close()
+	runCommandsTLS(t, sRealAddr, sMini.Addr(), commands)
+}
+
 // like testCommands, but multiple connections
 func testMultiCommands(t *testing.T, cs ...func(chan<- command, *miniredis.Miniredis)) {
 	t.Helper()
@@ -258,6 +269,30 @@ func runCommands(t *testing.T, realAddr, miniAddr string, commands []command) {
 	ok(t, err)
 
 	cReal, err := redis.Dial("tcp", realAddr)
+	ok(t, err)
+
+	for _, c := range commands {
+		runCommand(t, cMini, cReal, c)
+	}
+}
+
+func runCommandsTLS(t *testing.T, realAddr, miniAddr string, commands []command) {
+	t.Helper()
+	cfg := testClientTLS(t)
+	cMini, err := redis.Dial(
+		"tcp",
+		miniAddr,
+		redis.DialTLSConfig(cfg),
+		redis.DialUseTLS(true),
+	)
+	ok(t, err)
+
+	cReal, err := redis.Dial(
+		"tcp",
+		realAddr,
+		redis.DialTLSConfig(cfg),
+		redis.DialUseTLS(true),
+	)
 	ok(t, err)
 
 	for _, c := range commands {
