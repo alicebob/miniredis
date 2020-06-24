@@ -354,6 +354,21 @@ func (m *Miniredis) SetTime(t time.Time) {
 	m.now = t
 }
 
+// make every command return this message. For example:
+//   LOADING Redis is loading the dataset in memory
+//   MASTERDOWN Link with MASTER is down and replica-serve-stale-data is set to 'no'.
+// Clear it with an empty string. Don't add newlines.
+func (m *Miniredis) SetError(msg string) {
+	cb := server.Hook(nil)
+	if msg != "" {
+		cb = func(c *server.Peer, cmd string, args ...string) bool {
+			c.WriteError(msg)
+			return true
+		}
+	}
+	m.srv.SetPreHook(cb)
+}
+
 // handleAuth returns false if connection has no access. It sends the reply.
 func (m *Miniredis) handleAuth(c *server.Peer) bool {
 	if getCtx(c).nested {

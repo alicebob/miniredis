@@ -25,10 +25,14 @@ type Cmd func(c *Peer, cmd string, args []string)
 
 type DisconnectHandler func(c *Peer)
 
+// Hook is can be added to run before every cmd. Return true if the command is done.
+type Hook func(*Peer, string, ...string) bool
+
 // Server is a simple redis server
 type Server struct {
 	l         net.Listener
 	cmds      map[string]Cmd
+	preHook   Hook
 	peers     map[net.Conn]struct{}
 	mu        sync.Mutex
 	wg        sync.WaitGroup
@@ -61,6 +65,13 @@ func NewServer(addr string) (*Server, error) {
 		s.mu.Unlock()
 	}()
 	return &s, nil
+}
+
+// (un)set a hook which is ran before every call. It returns true if the command is done.
+func (s *Server) SetPreHook(h Hook) {
+	s.mu.Lock()
+	s.preHook = h
+	s.mu.Unlock()
 }
 
 func (s *Server) serve(l net.Listener) {
@@ -160,6 +171,15 @@ func (s *Server) servePeer(c net.Conn) {
 func (s *Server) Dispatch(c *Peer, args []string) {
 	cmd, args := args[0], args[1:]
 	cmdUp := strings.ToUpper(cmd)
+	s.mu.Lock()
+	h := s.preHook
+	s.mu.Unlock()
+	if h != nil {
+		if h(c, cmdUp, args...) {
+			return
+		}
+	}
+
 	s.mu.Lock()
 	cb, ok := s.cmds[cmdUp]
 	s.mu.Unlock()
