@@ -7,27 +7,67 @@ import (
 )
 
 func TestAuth(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
-	ok(t, err)
+	t.Run("default user", func(t *testing.T) {
+		s, err := Run()
+		ok(t, err)
+		defer s.Close()
+		c, err := redis.Dial("tcp", s.Addr())
+		ok(t, err)
 
-	_, err = c.Do("AUTH", "foo", "bar")
-	mustFail(t, err, "ERR wrong number of arguments for 'auth' command")
+		_, err = c.Do("AUTH", "foo", "bar", "baz")
+		mustFail(t, err, "ERR syntax error")
 
-	s.RequireAuth("nocomment")
-	_, err = c.Do("PING", "foo", "bar")
-	mustFail(t, err, "NOAUTH Authentication required.")
+		s.RequireAuth("nocomment")
+		_, err = c.Do("PING", "foo", "bar")
+		mustFail(t, err, "NOAUTH Authentication required.")
 
-	_, err = c.Do("AUTH", "wrongpasswd")
-	mustFail(t, err, "WRONGPASS invalid username-password pair")
+		_, err = c.Do("AUTH", "wrongpasswd")
+		mustFail(t, err, "WRONGPASS invalid username-password pair")
 
-	_, err = c.Do("AUTH", "nocomment")
-	ok(t, err)
+		_, err = c.Do("AUTH", "nocomment")
+		ok(t, err)
 
-	_, err = c.Do("PING")
-	ok(t, err)
+		_, err = c.Do("PING")
+		ok(t, err)
+	})
+
+	t.Run("another user", func(t *testing.T) {
+		s, err := Run()
+		ok(t, err)
+		defer s.Close()
+		c, err := redis.Dial("tcp", s.Addr())
+		ok(t, err)
+
+		s.RequireUserAuth("hello", "world")
+		_, err = c.Do("PING", "foo", "bar")
+		mustFail(t, err, "NOAUTH Authentication required.")
+
+		_, err = c.Do("AUTH", "hello", "wrongpasswd")
+		mustFail(t, err, "WRONGPASS invalid username-password pair")
+
+		_, err = c.Do("AUTH", "goodbye", "world")
+		mustFail(t, err, "WRONGPASS invalid username-password pair")
+
+		_, err = c.Do("AUTH", "hello", "world")
+		ok(t, err)
+
+		_, err = c.Do("PING")
+		ok(t, err)
+	})
+
+	t.Run("error cases", func(t *testing.T) {
+		s, err := Run()
+		ok(t, err)
+		defer s.Close()
+		c, err := redis.Dial("tcp", s.Addr())
+		ok(t, err)
+
+		_, err = c.Do("AUTH")
+		mustFail(t, err, "ERR wrong number of arguments for 'auth' command")
+
+		_, err = c.Do("AUTH", "foo", "bar", "baz")
+		mustFail(t, err, "ERR syntax error")
+	})
 }
 
 func TestPing(t *testing.T) {

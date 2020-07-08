@@ -52,7 +52,7 @@ type Miniredis struct {
 	sync.Mutex
 	srv         *server.Server
 	port        int
-	password    string
+	passwords   map[string]string // username password
 	dbs         map[int]*RedisDB
 	selectedDB  int               // DB id used in the direct Get(), Set() &c.
 	scripts     map[string]string // sha1 -> lua src
@@ -202,12 +202,26 @@ func (m *Miniredis) Close() {
 
 }
 
-// RequireAuth makes every connection need to AUTH first. Disable again by
-// setting an empty string.
+// RequireAuth makes every connection need to AUTH first. This is the old 'AUTH [password] command.
+// Remove it by setting an empty string.
 func (m *Miniredis) RequireAuth(pw string) {
+	m.RequireUserAuth("default", pw)
+}
+
+// Add a username/password, for use with 'AUTH [username] [password]'.
+// There are currently no access controls for commands implemented.
+// Disable access for the user with an empty password.
+func (m *Miniredis) RequireUserAuth(username, pw string) {
 	m.Lock()
 	defer m.Unlock()
-	m.password = pw
+	if m.passwords == nil {
+		m.passwords = map[string]string{}
+	}
+	if pw == "" {
+		delete(m.passwords, username)
+		return
+	}
+	m.passwords[username] = pw
 }
 
 // DB returns a DB by ID.
@@ -393,7 +407,7 @@ func (m *Miniredis) handleAuth(c *server.Peer) bool {
 
 	m.Lock()
 	defer m.Unlock()
-	if m.password == "" {
+	if len(m.passwords) == 0 {
 		return true
 	}
 	if !getCtx(c).authenticated {

@@ -55,9 +55,14 @@ func (m *Miniredis) cmdPing(c *server.Peer, cmd string, args []string) {
 
 // AUTH
 func (m *Miniredis) cmdAuth(c *server.Peer, cmd string, args []string) {
-	if len(args) != 1 {
+	if len(args) < 1 {
 		setDirty(c)
 		c.WriteError(errWrongNumber(cmd))
+		return
+	}
+
+	if len(args) > 2 {
+		c.WriteError(msgSyntaxError)
 		return
 	}
 	if m.checkPubsub(c, cmd) {
@@ -67,15 +72,23 @@ func (m *Miniredis) cmdAuth(c *server.Peer, cmd string, args []string) {
 		c.WriteError(msgNotFromScripts)
 		return
 	}
-
+	username := "default"
 	pw := args[0]
+	if len(args) == 2 {
+		username, pw = args[0], args[1]
+	}
 
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
-		if m.password == "" {
+		if len(m.passwords) == 0 && username == "default" {
 			c.WriteError("ERR AUTH <password> called without any password configured for the default user. Are you sure your configuration is correct?")
 			return
 		}
-		if m.password != pw {
+		setPW, ok := m.passwords[username]
+		if !ok {
+			c.WriteError("WRONGPASS invalid username-password pair")
+			return
+		}
+		if setPW != pw {
 			c.WriteError("WRONGPASS invalid username-password pair")
 			return
 		}
