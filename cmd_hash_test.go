@@ -8,7 +8,6 @@ import (
 	"github.com/gomodule/redigo/redis"
 )
 
-// Test Hash.
 func TestHash(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
@@ -57,13 +56,13 @@ func TestHash(t *testing.T) {
 		_, err := redis.String(c.Do("SET", "foo", "bar"))
 		ok(t, err)
 		_, err = redis.Int(c.Do("HSET", "foo", "noot", "mies"))
-		assert(t, err != nil, "HSET error")
+		mustFail(t, err, "WRONGTYPE Operation against a key holding the wrong kind of value")
 	}
 
 	// HSET with unmatched pairs
 	{
 		_, err := redis.Int(c.Do("HSET", "a", "b", "c", "d"))
-		assert(t, err != nil, "HSET unmatched error")
+		mustFail(t, err, "ERR wrong number of arguments for HMSET")
 	}
 
 	// hash exists, key doesn't.
@@ -84,7 +83,7 @@ func TestHash(t *testing.T) {
 	// HGET on wrong type
 	{
 		_, err := redis.Int(c.Do("HGET", "aap"))
-		assert(t, err != nil, "HGET error")
+		mustFail(t, err, "ERR wrong number of arguments for 'hget' command")
 	}
 
 	// Direct HSet()
@@ -595,22 +594,74 @@ func TestHscan(t *testing.T) {
 		equals(t, []string{"mies", "m"}, keys)
 	}
 
-	// Wrong usage
-	{
+	t.Run("errors", func(t *testing.T) {
 		_, err := redis.Int(c.Do("HSCAN"))
-		assert(t, err != nil, "do HSCAN error")
+		mustFail(t, err, "ERR wrong number of arguments for 'hscan' command")
+
 		_, err = redis.Int(c.Do("HSCAN", "set"))
-		assert(t, err != nil, "do HSCAN error")
+		mustFail(t, err, "ERR wrong number of arguments for 'hscan' command")
+
 		_, err = redis.Int(c.Do("HSCAN", "set", "noint"))
-		assert(t, err != nil, "do HSCAN error")
+		mustFail(t, err, "ERR invalid cursor")
+
 		_, err = redis.Int(c.Do("HSCAN", "set", 1, "MATCH"))
-		assert(t, err != nil, "do HSCAN error")
+		mustFail(t, err, "ERR syntax error")
+
 		_, err = redis.Int(c.Do("HSCAN", "set", 1, "COUNT"))
-		assert(t, err != nil, "do HSCAN error")
+		mustFail(t, err, "ERR syntax error")
+
 		_, err = redis.Int(c.Do("HSCAN", "set", 1, "COUNT", "noint"))
-		assert(t, err != nil, "do HSCAN error")
-		s.Set("str", "value")
-		_, err = redis.Int(c.Do("HSCAN", "str", 1))
-		assert(t, err != nil, "do HSCAN error")
-	}
+		mustFail(t, err, "ERR value is not an integer or out of range")
+	})
+}
+
+func TestHstrlen(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+
+	t.Run("basic", func(t *testing.T) {
+		s.HSet("myhash", "foo", "bar")
+		n, err := redis.Int(c.Do("HSTRLEN", "myhash", "foo"))
+		ok(t, err)
+		equals(t, 3, n)
+	})
+
+	t.Run("no such key", func(t *testing.T) {
+		s.HSet("myhash", "foo", "bar")
+		n, err := redis.Int(c.Do("HSTRLEN", "myhash", "nosuch"))
+		ok(t, err)
+		equals(t, 0, n)
+	})
+
+	t.Run("no such hash", func(t *testing.T) {
+		s.HSet("myhash", "foo", "bar")
+		n, err := redis.Int(c.Do("HSTRLEN", "yourhash", "foo"))
+		ok(t, err)
+		equals(t, 0, n)
+	})
+
+	t.Run("utf8", func(t *testing.T) {
+		s.HSet("myhash", "snow", "☃☃☃")
+		n, err := redis.Int(c.Do("HSTRLEN", "myhash", "snow"))
+		ok(t, err)
+		equals(t, 9, n)
+	})
+
+	t.Run("errors", func(t *testing.T) {
+		_, err := redis.Int(c.Do("HSTRLEN"))
+		mustFail(t, err, "ERR wrong number of arguments for 'hstrlen' command")
+
+		_, err = redis.Int(c.Do("HSTRLEN", "bar"))
+		mustFail(t, err, "ERR wrong number of arguments for 'hstrlen' command")
+
+		_, err = redis.Int(c.Do("HSTRLEN", "bar", "baz", "bak"))
+		mustFail(t, err, "ERR wrong number of arguments for 'hstrlen' command")
+
+		s.Set("notahash", "bar")
+		_, err = redis.Int(c.Do("HSTRLEN", "notahash", "bar"))
+		mustFail(t, err, "WRONGTYPE Operation against a key holding the wrong kind of value")
+	})
 }

@@ -94,6 +94,7 @@ Implemented commands:
    - HMSET
    - HSET
    - HSETNX
+   - HSTRLEN
    - HVALS
    - HSCAN
  - List keys (complete)

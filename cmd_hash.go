@@ -24,6 +24,7 @@ func commandsHash(m *Miniredis) {
 	m.srv.Register("HMSET", m.cmdHmset)
 	m.srv.Register("HSET", m.cmdHset)
 	m.srv.Register("HSETNX", m.cmdHsetnx)
+	m.srv.Register("HSTRLEN", m.cmdHstrlen)
 	m.srv.Register("HVALS", m.cmdHvals)
 	m.srv.Register("HSCAN", m.cmdHscan)
 }
@@ -332,6 +333,40 @@ func (m *Miniredis) cmdHkeys(c *server.Peer, cmd string, args []string) {
 		for _, f := range fields {
 			c.WriteBulk(f)
 		}
+	})
+}
+
+// HSTRLEN
+func (m *Miniredis) cmdHstrlen(c *server.Peer, cmd string, args []string) {
+	if len(args) != 2 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
+	}
+	if !m.handleAuth(c) {
+		return
+	}
+	if m.checkPubsub(c, cmd) {
+		return
+	}
+
+	hash, key := args[0], args[1]
+
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
+		db := m.db(ctx.selectedDB)
+
+		t, ok := db.keys[hash]
+		if !ok {
+			c.WriteInt(0)
+			return
+		}
+		if t != "hash" {
+			c.WriteError(msgWrongType)
+			return
+		}
+
+		keys := db.hashKeys[hash]
+		c.WriteInt(len(keys[key]))
 	})
 }
 
