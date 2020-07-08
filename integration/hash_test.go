@@ -196,3 +196,19 @@ func TestHscan(t *testing.T) {
 		fail("HSCAN", "str", 0),
 	)
 }
+
+func TestHstrlen(t *testing.T) {
+	testCommands(t,
+		succ("HSTRLEN", "hash", "foo"),
+		succ("HSET", "hash", "foo", "bar"),
+		succ("HSTRLEN", "hash", "foo"),
+		succ("HSTRLEN", "hash", "nosuch"),
+		succ("HSTRLEN", "nosuch", "nosuch"),
+
+		fail("HSTRLEN"),
+		fail("HSTRLEN", "foo"),
+		fail("HSTRLEN", "foo", "baz", "bar"),
+		succ("SET", "str", "1"),
+		fail("HSTRLEN", "str", "bar"),
+	)
+}
