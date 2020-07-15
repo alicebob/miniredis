@@ -4,6 +4,8 @@ import (
 	"testing"
 
 	"github.com/gomodule/redigo/redis"
+
+	"github.com/alicebob/miniredis/v2/client"
 )
 
 func TestAuth(t *testing.T) {
@@ -74,20 +76,27 @@ func TestPing(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := client.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
-	r, err := redis.String(c.Do("PING"))
-	ok(t, err)
-	equals(t, "PONG", r)
+	t.Run("no args", func(t *testing.T) {
+		res, err := c.Do("PING")
+		ok(t, err)
+		equals(t, "+PONG\r\n", res)
+	})
 
-	r, err = redis.String(c.Do("PING", "hi"))
-	ok(t, err)
-	equals(t, "hi", r)
+	t.Run("args", func(t *testing.T) {
+		res, err := c.Do("PING", "hi")
+		ok(t, err)
+		equals(t, "$2\r\nhi\r\n", res)
+	})
 
-	_, err = c.Do("PING", "foo", "bar")
-	mustFail(t, err, errWrongNumber("ping"))
-
+	t.Run("error", func(t *testing.T) {
+		res, err := c.Do("PING", "foo", "bar")
+		ok(t, err)
+		equals(t, "-ERR wrong number of arguments for 'ping' command\r\n", res)
+	})
 }
 
 func TestEcho(t *testing.T) {
