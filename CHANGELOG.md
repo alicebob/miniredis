@@ -1,9 +1,26 @@
 ## Changelog
 
+### v2.13.1
+
+- added HSTRLEN
+- minimal support for ACL users in AUTH
+
+### v2.13.0
+
+- added RunTLS(...)
+- added SetError(...)
+
+### v2.12.0
+
+- redis 6
+- Lua json update (thanks @gsmith85)
+- CLUSTER commands (thanks @kratisto)
+- fix TOUCH
+- fix a shutdown race conditionv
+
 ### v2.11.4
 
 - ZUNIONSTORE now supports standard set types (thanks @wshirey)
-
 
 ### v2.11.3
 
