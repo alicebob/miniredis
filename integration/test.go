@@ -39,13 +39,6 @@ func succ(cmd string, args ...interface{}) command {
 	}
 }
 
-func cmd(cmd string, args ...interface{}) command {
-	return command{
-		cmd:  cmd,
-		args: args,
-	}
-}
-
 func succSorted(cmd string, args ...interface{}) command {
 	return command{
 		cmd:   cmd,
@@ -509,6 +502,7 @@ func roundFloats(r interface{}, pos int) interface{} {
 	}
 }
 
+// client which compares two redises
 type client struct {
 	t          *testing.T
 	real, mini *proto.Client
@@ -530,6 +524,7 @@ func newClient(t *testing.T, realAddr, miniAddr string) *client {
 	}
 }
 
+// result must match exactly
 func (c *client) Do(cmd string, args ...string) {
 	c.t.Helper()
 
