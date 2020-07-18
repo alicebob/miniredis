@@ -1,4 +1,4 @@
-package client
+package proto
 
 import (
 	"bufio"
@@ -10,7 +10,7 @@ import (
 
 var ErrProtocol = errors.New("invalid request")
 
-// Read a single command, as-is. Used to parse replies from redis.
+// Read a single command, returning it raw. Used to read replies from redis.
 // Understands RESP3 proto.
 func Read(r *bufio.Reader) (string, error) {
 	line, err := r.ReadString('\n')

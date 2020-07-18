@@ -5,7 +5,7 @@ import (
 
 	"github.com/gomodule/redigo/redis"
 
-	"github.com/alicebob/miniredis/v2/client"
+	"github.com/alicebob/miniredis/v2/proto"
 )
 
 func TestAuth(t *testing.T) {
@@ -76,26 +76,26 @@ func TestPing(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := client.Dial(s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
 
 	t.Run("no args", func(t *testing.T) {
 		res, err := c.Do("PING")
 		ok(t, err)
-		equals(t, "+PONG\r\n", res)
+		equals(t, proto.Inline("PONG"), res)
 	})
 
 	t.Run("args", func(t *testing.T) {
 		res, err := c.Do("PING", "hi")
 		ok(t, err)
-		equals(t, "$2\r\nhi\r\n", res)
+		equals(t, proto.String("hi"), res)
 	})
 
 	t.Run("error", func(t *testing.T) {
 		res, err := c.Do("PING", "foo", "bar")
 		ok(t, err)
-		equals(t, "-ERR wrong number of arguments for 'ping' command\r\n", res)
+		equals(t, proto.Error(errWrongNumber("ping")), res)
 	})
 }
 
