@@ -18,4 +18,6 @@ func TestTypes(t *testing.T) {
 	test(Inline("Hi"), "+Hi\r\n")
 
 	test(Error("ERR wrong"), "-ERR wrong\r\n")
+
+	test(Array(Inline("hi"), Inline("ho")), "*2\r\n+hi\r\n+ho\r\n")
 }

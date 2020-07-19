@@ -1,63 +1,51 @@
 package miniredis
 
 import (
-	"fmt"
+	"strconv"
 	"testing"
 
-	"github.com/gomodule/redigo/redis"
+	"github.com/alicebob/miniredis/v2/proto"
 )
 
-// Test CLUSTER SLOTS.
-func TestClusterSlots(t *testing.T) {
+// Test CLUSTER *.
+func TestCluster(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
-	{
-		v, err := redis.Values(c.Do("CLUSTER", "SLOTS"))
+	t.Run("slots", func(t *testing.T) {
+		port, err := strconv.Atoi(s.Port())
 		ok(t, err)
-		equals(t, 1, len(v))
+		mustDo(t, c,
+			"CLUSTER", "SLOTS",
+			proto.Array(
+				proto.Array(
+					proto.Int(0),
+					proto.Int(16383),
+					proto.Array(
+						proto.String(s.Host()),
+						proto.Int(port),
+						proto.String("09dbe9720cda62f7865eabc5fd8857c5d2678366"),
+					),
+				),
+			),
+		)
+	})
 
-		v2 := v[0].([]interface{})
-		equals(t, 3, len(v2))
+	t.Run("nodes", func(t *testing.T) {
+		mustDo(t, c,
+			"CLUSTER", "NODES",
+			proto.String("e7d1eecce10fd6bb5eb35b9f99a514335d9ba9ca 127.0.0.1:7000@7000 myself,master - 0 0 1 connected 0-16383"),
+		)
+	})
 
-		v3 := v2[2].([]interface{})
-		equals(t, 3, len(v3))
-
-		addr := fmt.Sprintf("%s:%d", string(v3[0].([]uint8)), v3[1].(int64))
-		equals(t, s.Addr(), addr)
-	}
+	t.Run("keyslot", func(t *testing.T) {
+		mustDo(t, c,
+			"CLUSTER", "keyslot", "{test_key}",
+			proto.Int(163),
+		)
+	})
 }
-
-// Test CLUSTER NODES.
-func TestClusterNodes(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
-	ok(t, err)
-
-	{
-		v, err := redis.String(c.Do("CLUSTER", "NODES"))
-		ok(t, err)
-		equals(t, "e7d1eecce10fd6bb5eb35b9f99a514335d9ba9ca 127.0.0.1:7000@7000 myself,master - 0 0 1 connected 0-16383", v)
-	}
-}
-
-// Test CLUSTER SLOTS.
-func TestClusterKeyslot(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
-	ok(t, err)
-
-	{
-		v, err := redis.Int(c.Do("CLUSTER", "keyslot", "{test_key}"))
-		ok(t, err)
-		equals(t, 163, v)
-	}
-}
-

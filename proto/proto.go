@@ -53,6 +53,19 @@ func Read(r *bufio.Reader) (string, error) {
 			pos += n
 		}
 		return line + string(buf), nil
+	case '*':
+		length, err := strconv.Atoi(line[1 : len(line)-2])
+		if err != nil {
+			return "", err
+		}
+		for i := 0; i < length; i++ {
+			next, err := Read(r)
+			if err != nil {
+				return "", err
+			}
+			line += next
+		}
+		return line, nil
 	}
 }
 

@@ -2,6 +2,7 @@ package proto
 
 import (
 	"fmt"
+	"strings"
 )
 
 // Byte-safe string
@@ -21,4 +22,15 @@ func Error(s string) string {
 
 func inline(r rune, s string) string {
 	return fmt.Sprintf("%s%s\r\n", string(r), s)
+}
+
+// Int
+func Int(n int) string {
+	return fmt.Sprintf(":%d\r\n", n)
+}
+
+// Array assembles the args in a list. Args should be raw redis commands.
+// Example: Array(String("foo"), String("bar"))
+func Array(args ...string) string {
+	return fmt.Sprintf("*%d\r\n", len(args)) + strings.Join(args, "")
 }
