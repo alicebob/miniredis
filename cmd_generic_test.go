@@ -1,10 +1,13 @@
 package miniredis
 
 import (
+	"strconv"
 	"testing"
 	"time"
 
 	"github.com/gomodule/redigo/redis"
+
+	"github.com/alicebob/miniredis/v2/proto"
 )
 
 // Test EXPIRE. Keys with an expiration are called volatile in Redis parlance.
@@ -12,96 +15,84 @@ func TestTTL(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	// Not volatile yet
 	{
 		equals(t, time.Duration(0), s.TTL("foo"))
-		b, err := redis.Int(c.Do("TTL", "foo"))
-		ok(t, err)
-		equals(t, -2, b)
+		mustDo(t, c,
+			"TTL", "foo",
+			proto.Int(-2),
+		)
 	}
 
 	// Set something
 	{
-		_, err := c.Do("SET", "foo", "bar")
-		ok(t, err)
+		mustOK(t, c, "SET", "foo", "bar")
 		// key exists, but no Expire set yet
-		b, err := redis.Int(c.Do("TTL", "foo"))
-		ok(t, err)
-		equals(t, -1, b)
-
-		n, err := redis.Int(c.Do("EXPIRE", "foo", "1200"))
-		ok(t, err)
-		equals(t, 1, n) // EXPIRE returns 1 on success
-
-		equals(t, 1200*time.Second, s.TTL("foo"))
-		b, err = redis.Int(c.Do("TTL", "foo"))
-		ok(t, err)
-		equals(t, 1200, b)
+		mustDo(t, c,
+			"TTL", "foo",
+			proto.Int(-1),
+		)
+		must1(t, c, "EXPIRE", "foo", "1200") // EXPIRE returns 1 on success
+		mustDo(t, c,
+			"TTL", "foo",
+			proto.Int(1200),
+		)
 	}
 
 	// A SET resets the expire.
 	{
-		_, err := c.Do("SET", "foo", "bar")
-		ok(t, err)
-		b, err := redis.Int(c.Do("TTL", "foo"))
-		ok(t, err)
-		equals(t, -1, b)
+		mustOK(t, c, "SET", "foo", "bar")
+		mustDo(t, c,
+			"TTL", "foo",
+			proto.Int(-1),
+		)
 	}
 
 	// Set a non-existing key
 	{
-		n, err := redis.Int(c.Do("EXPIRE", "nokey", "1200"))
-		ok(t, err)
-		equals(t, 0, n) // EXPIRE returns 0 on failure.
+		must0(t, c, "EXPIRE", "nokey", "1200") // EXPIRE returns 0 on failure
 	}
 
 	// Remove an expire
 	{
 
 		// No key yet
-		n, err := redis.Int(c.Do("PERSIST", "exkey"))
-		ok(t, err)
-		equals(t, 0, n)
+		must0(t, c, "PERSIST", "exkey")
 
-		_, err = c.Do("SET", "exkey", "bar")
-		ok(t, err)
+		mustOK(t, c, "SET", "exkey", "bar")
 
 		// No timeout yet
-		n, err = redis.Int(c.Do("PERSIST", "exkey"))
-		ok(t, err)
-		equals(t, 0, n)
+		must0(t, c, "PERSIST", "exkey")
 
-		_, err = redis.Int(c.Do("EXPIRE", "exkey", "1200"))
-		ok(t, err)
+		must1(t, c, "EXPIRE", "exkey", "1200")
 
 		// All fine now
-		n, err = redis.Int(c.Do("PERSIST", "exkey"))
-		ok(t, err)
-		equals(t, 1, n)
+		must1(t, c, "PERSIST", "exkey")
 
 		// No TTL left
-		b, err := redis.Int(c.Do("TTL", "exkey"))
-		ok(t, err)
-		equals(t, -1, b)
+		mustDo(t, c,
+			"TTL", "exkey",
+			proto.Int(-1),
+		)
 	}
 
 	// Hash key works fine, too
 	{
-		_, err := c.Do("HSET", "wim", "zus", "jet")
-		ok(t, err)
-		b, err := redis.Int(c.Do("EXPIRE", "wim", "1234"))
-		ok(t, err)
-		equals(t, 1, b)
+		must1(t, c, "HSET", "wim", "zus", "jet")
+		must1(t, c, "EXPIRE", "wim", "1234")
+		mustDo(t, c,
+			"EXPIRE", "wim", "1234",
+			proto.Int(1),
+		)
 	}
 
 	{
-		_, err = c.Do("SET", "wim", "zus")
-		ok(t, err)
-		_, err = redis.Int(c.Do("EXPIRE", "wim", -1200))
-		ok(t, err)
+		mustOK(t, c, "SET", "wim", "zus")
+		must1(t, c, "EXPIRE", "wim", "-1200")
 		equals(t, false, s.Exists("wim"))
 	}
 }
@@ -110,36 +101,35 @@ func TestExpireat(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	// Not volatile yet
 	{
 		equals(t, time.Duration(0), s.TTL("foo"))
-		b, err := redis.Int(c.Do("TTL", "foo"))
-		ok(t, err)
-		equals(t, -2, b)
+		mustDo(t, c,
+			"TTL", "foo",
+			proto.Int(-2),
+		)
 	}
 
 	// Set something
 	{
-		_, err := c.Do("SET", "foo", "bar")
-		ok(t, err)
+		mustOK(t, c, "SET", "foo", "bar")
 		// Key exists, but no ttl set.
-		b, err := redis.Int(c.Do("TTL", "foo"))
-		ok(t, err)
-		equals(t, -1, b)
+		mustDo(t, c,
+			"TTL", "foo",
+			proto.Int(-1),
+		)
 
-		s.SetTime(time.Unix(1234567890, 0))
-		n, err := redis.Int(c.Do("EXPIREAT", "foo", 1234567890+100))
-		ok(t, err)
-		equals(t, 1, n) // EXPIREAT returns 1 on success.
+		now := 1234567890
+		s.SetTime(time.Unix(int64(now), 0))
+		must1(t, c, "EXPIREAT", "foo", strconv.Itoa(now+100)) // EXPIREAT returns 1 on success.
 
 		equals(t, 100*time.Second, s.TTL("foo"))
-		b, err = redis.Int(c.Do("TTL", "foo"))
-		ok(t, err)
-		equals(t, 100, b)
 		equals(t, 100*time.Second, s.TTL("foo"))
+		mustDo(t, c, "TTL", "foo", proto.Int(100))
 	}
 }
 
@@ -147,43 +137,40 @@ func TestTouch(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	// Set something
 	t.Run("basic", func(t *testing.T) {
 		s.SetTime(time.Unix(1234567890, 0))
-		_, err := c.Do("SET", "foo", "bar", "EX", 100)
-		ok(t, err)
-		_, err = c.Do("SET", "baz", "qux", "EX", 100)
-		ok(t, err)
+		mustOK(t, c, "SET", "foo", "bar", "EX", "100")
+		mustOK(t, c, "SET", "baz", "qux", "EX", "100")
 
 		// Touch one key
-		n, err := redis.Int(c.Do("TOUCH", "baz"))
-		ok(t, err)
-		equals(t, 1, n)
+		must1(t, c, "TOUCH", "baz")
 
 		// Touch multiple keys, "nay" doesn't exist
-		n, err = redis.Int(c.Do("TOUCH", "foo", "baz", "nay"))
-		ok(t, err)
-		equals(t, 2, n)
+		mustDo(t, c,
+			"TOUCH", "foo", "baz", "nay",
+			proto.Int(2),
+		)
 	})
 
 	t.Run("failure cases", func(t *testing.T) {
-		_, err := c.Do("TOUCH")
-		mustFail(t, err, "ERR wrong number of arguments for 'touch' command")
+		mustDo(t, c,
+			"TOUCH",
+			proto.Error("ERR wrong number of arguments for 'touch' command"),
+		)
 	})
 
 	t.Run("TTL unchanged", func(t *testing.T) {
-		_, err := c.Do("SET", "foo", "bar", "EX", 100)
-		ok(t, err)
+		mustOK(t, c, "SET", "foo", "bar", "EX", "100")
 
 		s.FastForward(time.Second * 99)
 		equals(t, time.Second, s.TTL("foo"))
 
-		n, err := redis.Int(c.Do("TOUCH", "baz"))
-		ok(t, err)
-		equals(t, 1, n)
+		must1(t, c, "TOUCH", "baz")
 		equals(t, time.Second, s.TTL("foo"))
 	})
 }
@@ -192,36 +179,37 @@ func TestPexpireat(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	// Not volatile yet
 	{
 		equals(t, time.Duration(0), s.TTL("foo"))
-		b, err := redis.Int(c.Do("TTL", "foo"))
-		ok(t, err)
-		equals(t, -2, b)
+		mustDo(t, c,
+			"TTL", "foo",
+			proto.Int(-2),
+		)
 	}
 
 	// Set something
 	{
-		_, err := c.Do("SET", "foo", "bar")
-		ok(t, err)
+		mustOK(t, c, "SET", "foo", "bar")
 		// Key exists, but no ttl set.
-		b, err := redis.Int(c.Do("PTTL", "foo"))
-		ok(t, err)
-		equals(t, -1, b)
+		mustDo(t, c,
+			"PTTL", "foo",
+			proto.Int(-1),
+		)
 
-		s.SetTime(time.Unix(1234567890, 0))
-		n, err := redis.Int(c.Do("PEXPIREAT", "foo", 1234567890*1000+100))
-		ok(t, err)
-		equals(t, 1, n) // EXPIREAT returns 1 on success.
+		now := 1234567890
+		s.SetTime(time.Unix(int64(now), 0))
+		must1(t, c, "PEXPIREAT", "foo", strconv.Itoa(now*1000+100)) // PEXPIREAT returns 1 on success.
 
 		equals(t, 100*time.Millisecond, s.TTL("foo"))
-		b, err = redis.Int(c.Do("PTTL", "foo"))
-		ok(t, err)
-		equals(t, 100, b)
-		equals(t, 100*time.Millisecond, s.TTL("foo"))
+		mustDo(t, c,
+			"PTTL", "foo",
+			proto.Int(100),
+		)
 	}
 }
 
@@ -229,48 +217,45 @@ func TestPexpire(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
-	// Key exists
-	{
+	t.Run("key exists", func(t *testing.T) {
 		ok(t, s.Set("foo", "bar"))
-		b, err := redis.Int(c.Do("PEXPIRE", "foo", 12))
-		ok(t, err)
-		equals(t, 1, b)
+		must1(t, c, "PEXPIRE", "foo", "12")
 
-		e, err := redis.Int(c.Do("PTTL", "foo"))
-		ok(t, err)
-		equals(t, 12, e)
-
+		mustDo(t, c,
+			"PTTL", "foo",
+			proto.Int(12),
+		)
 		equals(t, 12*time.Millisecond, s.TTL("foo"))
-	}
-	// Key doesn't exist
-	{
-		b, err := redis.Int(c.Do("PEXPIRE", "nosuch", 12))
-		ok(t, err)
-		equals(t, 0, b)
+	})
 
-		e, err := redis.Int(c.Do("PTTL", "nosuch"))
-		ok(t, err)
-		equals(t, -2, e)
-	}
+	t.Run("no such key", func(t *testing.T) {
+		must0(t, c, "PEXPIRE", "nosuch", "12")
+		mustDo(t, c,
+			"PTTL", "nosuch",
+			proto.Int(-2),
+		)
+	})
 
-	// No expire
-	{
+	t.Run("no expire", func(t *testing.T) {
 		s.Set("aap", "noot")
-		e, err := redis.Int(c.Do("PTTL", "aap"))
-		ok(t, err)
-		equals(t, -1, e)
-	}
+		mustDo(t, c,
+			"PTTL", "aap",
+			proto.Int(-1),
+		)
+	})
 }
 
 func TestDel(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	t.Run("simple", func(t *testing.T) {
 		s.Set("foo", "bar")
@@ -278,15 +263,18 @@ func TestDel(t *testing.T) {
 		s.Set("one", "two")
 		s.SetTTL("one", time.Second*1234)
 		s.Set("three", "four")
-		r, err := redis.Int(c.Do("DEL", "one", "aap", "nosuch"))
-		ok(t, err)
-		equals(t, 2, r)
+		mustDo(t, c,
+			"DEL", "one", "aap", "nosuch",
+			proto.Int(2),
+		)
 		equals(t, time.Duration(0), s.TTL("one"))
 	})
 
 	t.Run("failure cases", func(t *testing.T) {
-		_, err := c.Do("DEL")
-		mustFail(t, err, "ERR wrong number of arguments for 'del' command")
+		mustDo(t, c,
+			"DEL",
+			proto.Error("ERR wrong number of arguments for 'del' command"),
+		)
 	})
 
 	t.Run("direct", func(t *testing.T) {
@@ -302,8 +290,9 @@ func TestUnlink(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	t.Run("simple", func(t *testing.T) {
 		s.Set("foo", "bar")
@@ -311,9 +300,10 @@ func TestUnlink(t *testing.T) {
 		s.Set("one", "two")
 		s.SetTTL("one", time.Second*1234)
 		s.Set("three", "four")
-		r, err := redis.Int(c.Do("UNLINK", "one", "aap", "nosuch"))
-		ok(t, err)
-		equals(t, 2, r)
+		mustDo(t, c,
+			"UNLINK", "one", "aap", "nosuch",
+			proto.Int(2),
+		)
 		equals(t, time.Duration(0), s.TTL("one"))
 	})
 
@@ -330,99 +320,95 @@ func TestType(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
-	// String key
-	{
-		s.Set("foo", "bar!")
-		v, err := redis.String(c.Do("TYPE", "foo"))
-		ok(t, err)
-		equals(t, "string", v)
-	}
+	s.Set("foo", "bar!")
+	t.Run("string", func(t *testing.T) {
+		mustDo(t, c,
+			"TYPE", "foo",
+			proto.Inline("string"),
+		)
+	})
 
-	// Hash key
-	{
-		s.HSet("aap", "noot", "mies")
-		v, err := redis.String(c.Do("TYPE", "aap"))
-		ok(t, err)
-		equals(t, "hash", v)
-	}
+	s.HSet("aap", "noot", "mies")
+	t.Run("hash", func(t *testing.T) {
+		mustDo(t, c,
+			"TYPE", "aap",
+			proto.Inline("hash"),
+		)
+	})
 
-	// New key
-	{
-		v, err := redis.String(c.Do("TYPE", "nosuch"))
-		ok(t, err)
-		equals(t, "none", v)
-	}
+	t.Run("no such key", func(t *testing.T) {
+		mustDo(t, c,
+			"TYPE", "nosuch",
+			proto.Inline("none"),
+		)
+	})
 
-	// Wrong usage
-	{
-		_, err := redis.Int(c.Do("TYPE"))
-		assert(t, err != nil, "do TYPE error")
-		_, err = redis.Int(c.Do("TYPE", "spurious", "arguments"))
-		assert(t, err != nil, "do TYPE error")
-	}
+	t.Run("errors", func(t *testing.T) {
+		mustDo(t, c,
+			"TYPE",
+			proto.Error("usage error"),
+		)
+		mustDo(t, c,
+			"TYPE", "spurious", "arguments",
+			proto.Error("usage error"),
+		)
+	})
 
-	// Direct usage:
-	{
+	t.Run("direct", func(t *testing.T) {
 		equals(t, "hash", s.Type("aap"))
 		equals(t, "", s.Type("nokey"))
-	}
+	})
 }
 
 func TestExists(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
-	// String key
-	{
+	t.Run("string", func(t *testing.T) {
 		s.Set("foo", "bar!")
-		v, err := redis.Int(c.Do("EXISTS", "foo"))
-		ok(t, err)
-		equals(t, 1, v)
-	}
+		must1(t, c, "EXISTS", "foo")
+	})
 
-	// Hash key
-	{
+	t.Run("hash", func(t *testing.T) {
 		s.HSet("aap", "noot", "mies")
-		v, err := redis.Int(c.Do("EXISTS", "aap"))
-		ok(t, err)
-		equals(t, 1, v)
-	}
+		must1(t, c, "EXISTS", "aap")
+	})
 
-	// Multiple keys
-	{
-		v, err := redis.Int(c.Do("EXISTS", "foo", "aap"))
-		ok(t, err)
-		equals(t, 2, v)
+	t.Run("multiple keys", func(t *testing.T) {
+		mustDo(t, c,
+			"EXISTS", "foo", "aap",
+			proto.Int(2),
+		)
 
-		v, err = redis.Int(c.Do("EXISTS", "foo", "noot", "aap"))
-		ok(t, err)
-		equals(t, 2, v)
-	}
+		mustDo(t, c,
+			"EXISTS", "foo", "noot", "aap",
+			proto.Int(2),
+		)
+	})
 
-	// New key
-	{
-		v, err := redis.Int(c.Do("EXISTS", "nosuch"))
-		ok(t, err)
-		equals(t, 0, v)
-	}
+	t.Run("nosuch keys", func(t *testing.T) {
+		must0(t, c, "EXISTS", "nosuch")
+	})
 
-	// Wrong usage
-	{
-		_, err := redis.Int(c.Do("EXISTS"))
-		assert(t, err != nil, "do EXISTS error")
-	}
+	t.Run("errors", func(t *testing.T) {
+		mustDo(t, c,
+			"EXISTS",
+			proto.Error(errWrongNumber("exists")),
+		)
+	})
 
-	// Direct usage:
-	{
+	t.Run("direct", func(t *testing.T) {
 		equals(t, true, s.Exists("aap"))
 		equals(t, false, s.Exists("nokey"))
-	}
+	})
 }
 
 func TestMove(t *testing.T) {

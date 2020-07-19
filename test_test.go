@@ -59,3 +59,15 @@ func mustOK(tb testing.TB, c *proto.Client, args ...string) {
 	tb.Helper()
 	mustDo(tb, c, append(args, proto.Inline("OK"))...)
 }
+
+// must0 is a mustDo() which expects a `0` response
+func must0(tb testing.TB, c *proto.Client, args ...string) {
+	tb.Helper()
+	mustDo(tb, c, append(args, proto.Int(0))...)
+}
+
+// must1 is a mustDo() which expects a `1` response
+func must1(tb testing.TB, c *proto.Client, args ...string) {
+	tb.Helper()
+	mustDo(tb, c, append(args, proto.Int(1))...)
+}
