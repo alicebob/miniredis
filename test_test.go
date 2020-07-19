@@ -60,6 +60,12 @@ func mustOK(tb testing.TB, c *proto.Client, args ...string) {
 	mustDo(tb, c, append(args, proto.Inline("OK"))...)
 }
 
+// mustNil is a mustDo() which expects a nil response
+func mustNil(tb testing.TB, c *proto.Client, args ...string) {
+	tb.Helper()
+	mustDo(tb, c, append(args, proto.Nil)...)
+}
+
 // must0 is a mustDo() which expects a `0` response
 func must0(tb testing.TB, c *proto.Client, args ...string) {
 	tb.Helper()

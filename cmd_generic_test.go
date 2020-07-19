@@ -5,8 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gomodule/redigo/redis"
-
 	"github.com/alicebob/miniredis/v2/proto"
 )
 
@@ -518,15 +516,12 @@ func TestRandom(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	// Empty db.
-	{
-		v, err := c.Do("RANDOMKEY")
-		ok(t, err)
-		equals(t, nil, v)
-	}
+	mustNil(t, c, "RANDOMKEY")
 
 	s.Set("one", "bar!")
 	s.Set("two", "bar!")
@@ -534,239 +529,236 @@ func TestRandom(t *testing.T) {
 
 	// No idea which key will be returned.
 	{
-		v, err := redis.String(c.Do("RANDOMKEY"))
+		v, err := c.Do("RANDOMKEY")
 		ok(t, err)
-		assert(t, v == "one" || v == "two" || v == "three", "RANDOMKEY looks sane")
+		assert(t, v == proto.String("one") || v == proto.String("two") || v == proto.String("three"), "RANDOMKEY looks sane")
 	}
 
-	// Wrong usage
-	{
-		_, err = redis.Int(c.Do("RANDOMKEY", "spurious"))
-		assert(t, err != nil, "do RANDOMKEY error")
-	}
+	t.Run("errors", func(t *testing.T) {
+		mustDo(t, c,
+			"RANDOMKEY", "spurious",
+			proto.Error(errWrongNumber("randomkey")),
+		)
+	})
 }
 
 func TestRename(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	// Non-existing key
-	{
-		_, err := redis.Int(c.Do("RENAME", "nosuch", "to"))
-		assert(t, err != nil, "do RENAME error")
-	}
+	mustDo(t, c,
+		"RENAME", "nosuch", "to",
+		proto.Error("ERR no such key"),
+	)
 
 	// Same key
-	{
-		_, err := redis.Int(c.Do("RENAME", "from", "from"))
-		assert(t, err != nil, "do RENAME error")
-	}
+	mustDo(t, c,
+		"RENAME", "from", "from",
+		proto.Error("ERR no such key"),
+	)
 
-	// Move a string key
-	{
+	t.Run("string key", func(t *testing.T) {
 		s.Set("from", "value")
-		str, err := redis.String(c.Do("RENAME", "from", "to"))
-		ok(t, err)
-		equals(t, "OK", str)
+		mustOK(t, c, "RENAME", "from", "to")
 		equals(t, false, s.Exists("from"))
 		equals(t, true, s.Exists("to"))
 		s.CheckGet(t, "to", "value")
 		_, ok := s.dbs[0].ttl["to"]
 		equals(t, ok, false)
-	}
+	})
 
-	// Move a hash key
-	{
+	t.Run("hash key", func(t *testing.T) {
 		s.HSet("from", "key", "value")
-		str, err := redis.String(c.Do("RENAME", "from", "to"))
-		ok(t, err)
-		equals(t, "OK", str)
+		mustOK(t, c, "RENAME", "from", "to")
 		equals(t, false, s.Exists("from"))
 		equals(t, true, s.Exists("to"))
 		equals(t, "value", s.HGet("to", "key"))
 		_, ok := s.dbs[0].ttl["to"]
 		equals(t, ok, false)
-	}
+	})
 
-	// Ensure dest ttl nil if source does not have a ttl
-
-	{
+	t.Run("ttl", func(t *testing.T) {
 		s.Set("TTLfrom", "value")
 		s.Set("TTLto", "value")
 		s.SetTTL("TTLto", time.Second*99999)
 		equals(t, time.Second*99999, s.TTL("TTLto"))
-		str, err := redis.String(c.Do("RENAME", "TTLfrom", "TTLto"))
-		ok(t, err)
-		equals(t, "OK", str)
+		mustOK(t, c, "RENAME", "TTLfrom", "TTLto")
 		_, ok := s.dbs[0].ttl["TTLto"]
 		equals(t, ok, false)
-	}
+	})
 
-	// Move over something which exists
-	{
+	t.Run("overwrite", func(t *testing.T) {
 		s.Set("from", "string value")
 		s.HSet("to", "key", "value")
 		s.SetTTL("from", time.Second*999999)
 
-		str, err := redis.String(c.Do("RENAME", "from", "to"))
-		ok(t, err)
-		equals(t, "OK", str)
+		mustOK(t, c, "RENAME", "from", "to")
 		equals(t, false, s.Exists("from"))
 		equals(t, true, s.Exists("to"))
 		s.CheckGet(t, "to", "string value")
 		equals(t, time.Duration(0), s.TTL("from"))
 		equals(t, time.Second*999999, s.TTL("to"))
-	}
+	})
 
-	// Wrong usage
-	{
-		_, err := redis.Int(c.Do("RENAME"))
-		assert(t, err != nil, "do RENAME error")
-		_, err = redis.Int(c.Do("RENAME", "too few"))
-		assert(t, err != nil, "do RENAME error")
-		_, err = redis.Int(c.Do("RENAME", "some", "spurious", "arguments"))
-		assert(t, err != nil, "do RENAME error")
-	}
+	t.Run("errors", func(t *testing.T) {
+		mustDo(t, c,
+			"RENAME",
+			proto.Error(errWrongNumber("rename")),
+		)
+		mustDo(t, c,
+			"RENAME", "too few",
+			proto.Error(errWrongNumber("rename")),
+		)
+		mustDo(t, c,
+			"RENAME", "some", "spurious", "arguments",
+			proto.Error(errWrongNumber("rename")),
+		)
+	})
 }
 
 func TestScan(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	// We cheat with scan. It always returns everything.
 
 	s.Set("key", "value")
 
-	// No problem
-	{
-		res, err := redis.Values(c.Do("SCAN", 0))
-		ok(t, err)
-		equals(t, 2, len(res))
+	t.Run("no problem", func(t *testing.T) {
+		mustDo(t, c,
+			"SCAN", "0",
+			proto.Array(
+				proto.String("0"),
+				proto.Array(
+					proto.String("key"),
+				),
+			),
+		)
+	})
 
-		var c int
-		var keys []string
-		_, err = redis.Scan(res, &c, &keys)
-		ok(t, err)
-		equals(t, 0, c)
-		equals(t, []string{"key"}, keys)
-	}
+	t.Run("invalid cursor", func(t *testing.T) {
+		mustDo(t, c,
+			"SCAN", "42",
+			proto.Array(
+				proto.String("0"),
+				proto.Array(),
+			),
+		)
+	})
 
-	// Invalid cursor
-	{
-		res, err := redis.Values(c.Do("SCAN", 42))
-		ok(t, err)
-		equals(t, 2, len(res))
+	t.Run("count (ignored)", func(t *testing.T) {
+		mustDo(t, c,
+			"SCAN", "0", "COUNT", "200",
+			proto.Array(
+				proto.String("0"),
+				proto.Array(
+					proto.String("key"),
+				),
+			),
+		)
+	})
 
-		var c int
-		var keys []string
-		_, err = redis.Scan(res, &c, &keys)
-		ok(t, err)
-		equals(t, 0, c)
-		equals(t, []string(nil), keys)
-	}
-
-	// COUNT (ignored)
-	{
-		res, err := redis.Values(c.Do("SCAN", 0, "COUNT", 200))
-		ok(t, err)
-		equals(t, 2, len(res))
-
-		var c int
-		var keys []string
-		_, err = redis.Scan(res, &c, &keys)
-		ok(t, err)
-		equals(t, 0, c)
-		equals(t, []string{"key"}, keys)
-	}
-
-	// MATCH
-	{
+	t.Run("match", func(t *testing.T) {
 		s.Set("aap", "noot")
 		s.Set("mies", "wim")
-		res, err := redis.Values(c.Do("SCAN", 0, "MATCH", "mi*"))
-		ok(t, err)
-		equals(t, 2, len(res))
 
-		var c int
-		var keys []string
-		_, err = redis.Scan(res, &c, &keys)
-		ok(t, err)
-		equals(t, 0, c)
-		equals(t, []string{"mies"}, keys)
-	}
+		mustDo(t, c,
+			"SCAN", "0", "MATCH", "mi*",
+			proto.Array(
+				proto.String("0"),
+				proto.Array(
+					proto.String("mies"),
+				),
+			),
+		)
+	})
 
-	// Wrong usage
-	{
-		_, err := redis.Int(c.Do("SCAN"))
-		assert(t, err != nil, "do SCAN error")
-		_, err = redis.Int(c.Do("SCAN", "noint"))
-		assert(t, err != nil, "do SCAN error")
-		_, err = redis.Int(c.Do("SCAN", 1, "MATCH"))
-		assert(t, err != nil, "do SCAN error")
-		_, err = redis.Int(c.Do("SCAN", 1, "COUNT"))
-		assert(t, err != nil, "do SCAN error")
-		_, err = redis.Int(c.Do("SCAN", 1, "COUNT", "noint"))
-		assert(t, err != nil, "do SCAN error")
-	}
+	t.Run("errors", func(t *testing.T) {
+		mustDo(t, c,
+			"SCAN",
+			proto.Error(errWrongNumber("scan")),
+		)
+		mustDo(t, c,
+			"SCAN", "noint",
+			proto.Error("ERR invalid cursor"),
+		)
+		mustDo(t, c,
+			"SCAN", "1", "MATCH",
+			proto.Error("ERR syntax error"),
+		)
+		mustDo(t, c,
+			"SCAN", "1", "COUNT",
+			proto.Error("ERR syntax error"),
+		)
+		mustDo(t, c,
+			"SCAN", "1", "COUNT", "noint",
+			proto.Error("ERR value is not an integer or out of range"),
+		)
+	})
 }
 
 func TestRenamenx(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	// Non-existing key
-	{
-		_, err := redis.Int(c.Do("RENAMENX", "nosuch", "to"))
-		assert(t, err != nil, "do RENAMENX error")
-	}
+	mustDo(t, c,
+		"RENAMENX", "nosuch", "to",
+		proto.Error("ERR no such key"),
+	)
 
-	// Same key
-	{
-		_, err := redis.Int(c.Do("RENAMENX", "from", "from"))
-		assert(t, err != nil, "do RENAMENX error")
-	}
+	t.Run("same key", func(t *testing.T) {
+		s.Set("akey", "value")
+		must0(t, c,
+			"RENAMENX", "akey", "akey",
+		)
+	})
 
 	// Move a string key
-	{
+	t.Run("string key", func(t *testing.T) {
 		s.Set("from", "value")
-		n, err := redis.Int(c.Do("RENAMENX", "from", "to"))
-		ok(t, err)
-		equals(t, 1, n)
+		must1(t, c, "RENAMENX", "from", "to")
 		equals(t, false, s.Exists("from"))
 		equals(t, true, s.Exists("to"))
 		s.CheckGet(t, "to", "value")
-	}
+	})
 
-	// Move over something which exists
-	{
+	t.Run("existing key", func(t *testing.T) {
 		s.Set("from", "string value")
 		s.Set("to", "value")
 
-		n, err := redis.Int(c.Do("RENAMENX", "from", "to"))
-		ok(t, err)
-		equals(t, 0, n)
+		must0(t, c, "RENAMENX", "from", "to")
 		equals(t, true, s.Exists("from"))
 		equals(t, true, s.Exists("to"))
 		s.CheckGet(t, "from", "string value")
 		s.CheckGet(t, "to", "value")
-	}
+	})
 
-	// Wrong usage
-	{
-		_, err := redis.Int(c.Do("RENAMENX"))
-		assert(t, err != nil, "do RENAMENX error")
-		_, err = redis.Int(c.Do("RENAMENX", "too few"))
-		assert(t, err != nil, "do RENAMENX error")
-		_, err = redis.Int(c.Do("RENAMENX", "some", "spurious", "arguments"))
-		assert(t, err != nil, "do RENAMENX error")
-	}
+	t.Run("errors", func(t *testing.T) {
+		mustDo(t, c,
+			"RENAME",
+			proto.Error(errWrongNumber("rename")),
+		)
+		mustDo(t, c,
+			"RENAME", "too few",
+			proto.Error(errWrongNumber("rename")),
+		)
+		mustDo(t, c,
+			"RENAME", "some", "spurious", "arguments",
+			proto.Error(errWrongNumber("rename")),
+		)
+	})
 }
