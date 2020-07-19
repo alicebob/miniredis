@@ -34,3 +34,12 @@ func Int(n int) string {
 func Array(args ...string) string {
 	return fmt.Sprintf("*%d\r\n", len(args)) + strings.Join(args, "")
 }
+
+// Strings is a helper to build 1 dimensional string arrays.
+func Strings(args ...string) string {
+	var strings []string
+	for _, a := range args {
+		strings = append(strings, String(a))
+	}
+	return Array(strings...)
+}

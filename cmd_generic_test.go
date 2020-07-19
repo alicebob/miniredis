@@ -415,31 +415,26 @@ func TestMove(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	// No problem.
 	{
 		s.Set("foo", "bar!")
-		v, err := redis.Int(c.Do("MOVE", "foo", 1))
-		ok(t, err)
-		equals(t, 1, v)
+		must1(t, c, "MOVE", "foo", "1")
 	}
 
 	// Src key doesn't exists.
 	{
-		v, err := redis.Int(c.Do("MOVE", "nosuch", 1))
-		ok(t, err)
-		equals(t, 0, v)
+		must0(t, c, "MOVE", "nosuch", "1")
 	}
 
 	// Target key already exists.
 	{
 		s.DB(0).Set("two", "orig")
 		s.DB(1).Set("two", "taken")
-		v, err := redis.Int(c.Do("MOVE", "two", 1))
-		ok(t, err)
-		equals(t, 0, v)
+		must0(t, c, "MOVE", "two", "1")
 		s.CheckGet(t, "two", "orig")
 	}
 
@@ -447,70 +442,76 @@ func TestMove(t *testing.T) {
 	{
 		s.DB(0).Set("one", "two")
 		s.DB(0).SetTTL("one", time.Second*4242)
-		v, err := redis.Int(c.Do("MOVE", "one", 1))
-		ok(t, err)
-		equals(t, 1, v)
+		must1(t, c, "MOVE", "one", "1")
 		equals(t, s.DB(1).TTL("one"), time.Second*4242)
 	}
 
-	// Wrong usage
-	{
-		_, err := redis.Int(c.Do("MOVE"))
-		assert(t, err != nil, "do MOVE error")
-		_, err = redis.Int(c.Do("MOVE", "foo"))
-		assert(t, err != nil, "do MOVE error")
-		_, err = redis.Int(c.Do("MOVE", "foo", "noint"))
-		assert(t, err != nil, "do MOVE error")
-		_, err = redis.Int(c.Do("MOVE", "foo", 2, "toomany"))
-		assert(t, err != nil, "do MOVE error")
-	}
+	t.Run("errors", func(t *testing.T) {
+		mustDo(t, c,
+			"MOVE",
+			proto.Error(errWrongNumber("move")),
+		)
+		mustDo(t, c,
+			"MOVE", "foo",
+			proto.Error(errWrongNumber("move")),
+		)
+		mustDo(t, c,
+			"MOVE", "foo", "noint",
+			proto.Error("ERR source and destination objects are the same"),
+		)
+		mustDo(t, c,
+			"MOVE", "foo", "2", "toomany",
+			proto.Error(errWrongNumber("move")),
+		)
+	})
 }
 
 func TestKeys(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	s.Set("foo", "bar!")
 	s.Set("foobar", "bar!")
 	s.Set("barfoo", "bar!")
 	s.Set("fooooo", "bar!")
 
-	{
-		v, err := redis.Strings(c.Do("KEYS", "foo"))
-		ok(t, err)
-		equals(t, []string{"foo"}, v)
-	}
+	mustDo(t, c,
+		"KEYS", "foo",
+		proto.Strings("foo"),
+	)
 
 	// simple '*'
-	{
-		v, err := redis.Strings(c.Do("KEYS", "foo*"))
-		ok(t, err)
-		equals(t, []string{"foo", "foobar", "fooooo"}, v)
-	}
+	mustDo(t, c,
+		"KEYS", "foo*",
+		proto.Strings("foo", "foobar", "fooooo"),
+	)
+
 	// simple '?'
-	{
-		v, err := redis.Strings(c.Do("KEYS", "fo?"))
-		ok(t, err)
-		equals(t, []string{"foo"}, v)
-	}
+	mustDo(t, c,
+		"KEYS", "fo?",
+		proto.Strings("foo"),
+	)
 
 	// Don't die on never-matching pattern.
-	{
-		v, err := redis.Strings(c.Do("KEYS", `f\`))
-		ok(t, err)
-		equals(t, []string{}, v)
-	}
+	mustDo(t, c,
+		"KEYS", `f\`,
+		proto.Strings(),
+	)
 
-	// Wrong usage
-	{
-		_, err := redis.Int(c.Do("KEYS"))
-		assert(t, err != nil, "do KEYS error")
-		_, err = redis.Int(c.Do("KEYS", "foo", "noint"))
-		assert(t, err != nil, "do KEYS error")
-	}
+	t.Run("error", func(t *testing.T) {
+		mustDo(t, c,
+			"KEYS",
+			proto.Error(errWrongNumber("keys")),
+		)
+		mustDo(t, c,
+			"KEYS", "foo", "noint",
+			proto.Error(errWrongNumber("keys")),
+		)
+	})
 }
 
 func TestRandom(t *testing.T) {
