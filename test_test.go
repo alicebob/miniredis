@@ -3,6 +3,8 @@ package miniredis
 import (
 	"reflect"
 	"testing"
+
+	"github.com/alicebob/miniredis/v2/proto"
 )
 
 // assert fails the test if the condition is false.
@@ -40,4 +42,20 @@ func mustFail(tb testing.TB, err error, want string) {
 	if have := err.Error(); have != want {
 		tb.Errorf("have %q, want %q", have, want)
 	}
+}
+
+// execute a Do(args[,-1]...), which needs to be the same as the last arg.
+func mustDo(tb testing.TB, c *proto.Client, args ...string) {
+	tb.Helper()
+	args, want := args[:len(args)-1], args[len(args)-1]
+
+	res, err := c.Do(args...)
+	ok(tb, err)
+	equals(tb, want, res)
+}
+
+// mustOK is a mustDo() which expects an "OK" response
+func mustOK(tb testing.TB, c *proto.Client, args ...string) {
+	tb.Helper()
+	mustDo(tb, c, append(args, proto.Inline("OK"))...)
 }

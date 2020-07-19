@@ -3,8 +3,6 @@ package miniredis
 import (
 	"testing"
 
-	"github.com/gomodule/redigo/redis"
-
 	"github.com/alicebob/miniredis/v2/proto"
 )
 
@@ -13,62 +11,82 @@ func TestAuth(t *testing.T) {
 		s, err := Run()
 		ok(t, err)
 		defer s.Close()
-		c, err := redis.Dial("tcp", s.Addr())
+		c, err := proto.Dial(s.Addr())
 		ok(t, err)
+		defer c.Close()
 
-		_, err = c.Do("AUTH", "foo", "bar", "baz")
-		mustFail(t, err, "ERR syntax error")
+		mustDo(t, c,
+			"AUTH", "foo", "bar", "baz",
+			proto.Error("ERR syntax error"),
+		)
 
 		s.RequireAuth("nocomment")
-		_, err = c.Do("PING", "foo", "bar")
-		mustFail(t, err, "NOAUTH Authentication required.")
-
-		_, err = c.Do("AUTH", "wrongpasswd")
-		mustFail(t, err, "WRONGPASS invalid username-password pair")
-
-		_, err = c.Do("AUTH", "nocomment")
-		ok(t, err)
-
-		_, err = c.Do("PING")
-		ok(t, err)
+		mustDo(t, c,
+			"PING", "foo", "bar",
+			proto.Error("NOAUTH Authentication required."),
+		)
+		mustDo(t, c,
+			"AUTH", "wrongpasswd",
+			proto.Error("WRONGPASS invalid username-password pair"),
+		)
+		mustDo(t, c,
+			"AUTH", "nocomment",
+			proto.Inline("OK"),
+		)
+		mustDo(t, c,
+			"PING",
+			proto.Inline("PONG"),
+		)
 	})
 
 	t.Run("another user", func(t *testing.T) {
 		s, err := Run()
 		ok(t, err)
 		defer s.Close()
-		c, err := redis.Dial("tcp", s.Addr())
+		c, err := proto.Dial(s.Addr())
 		ok(t, err)
+		defer c.Close()
 
 		s.RequireUserAuth("hello", "world")
-		_, err = c.Do("PING", "foo", "bar")
-		mustFail(t, err, "NOAUTH Authentication required.")
-
-		_, err = c.Do("AUTH", "hello", "wrongpasswd")
-		mustFail(t, err, "WRONGPASS invalid username-password pair")
-
-		_, err = c.Do("AUTH", "goodbye", "world")
-		mustFail(t, err, "WRONGPASS invalid username-password pair")
-
-		_, err = c.Do("AUTH", "hello", "world")
-		ok(t, err)
-
-		_, err = c.Do("PING")
-		ok(t, err)
+		mustDo(t, c,
+			"PING", "foo", "bar",
+			proto.Error("NOAUTH Authentication required."),
+		)
+		mustDo(t, c,
+			"AUTH", "hello", "wrongpasswd",
+			proto.Error("WRONGPASS invalid username-password pair"),
+		)
+		mustDo(t, c,
+			"AUTH", "goodbye", "world",
+			proto.Error("WRONGPASS invalid username-password pair"),
+		)
+		mustDo(t, c,
+			"AUTH", "hello", "world",
+			proto.Inline("OK"),
+		)
+		mustDo(t, c,
+			"PING",
+			proto.Inline("PONG"),
+		)
 	})
 
 	t.Run("error cases", func(t *testing.T) {
 		s, err := Run()
 		ok(t, err)
 		defer s.Close()
-		c, err := redis.Dial("tcp", s.Addr())
+		c, err := proto.Dial(s.Addr())
 		ok(t, err)
+		defer c.Close()
 
-		_, err = c.Do("AUTH")
-		mustFail(t, err, "ERR wrong number of arguments for 'auth' command")
+		mustDo(t, c,
+			"AUTH",
+			proto.Error("ERR wrong number of arguments for 'auth' command"),
+		)
 
-		_, err = c.Do("AUTH", "foo", "bar", "baz")
-		mustFail(t, err, "ERR syntax error")
+		mustDo(t, c,
+			"AUTH", "foo", "bar", "baz",
+			proto.Error("ERR syntax error"),
+		)
 	})
 }
 
@@ -81,21 +99,24 @@ func TestPing(t *testing.T) {
 	defer c.Close()
 
 	t.Run("no args", func(t *testing.T) {
-		res, err := c.Do("PING")
-		ok(t, err)
-		equals(t, proto.Inline("PONG"), res)
+		mustDo(t, c,
+			"PING",
+			proto.Inline("PONG"),
+		)
 	})
 
 	t.Run("args", func(t *testing.T) {
-		res, err := c.Do("PING", "hi")
-		ok(t, err)
-		equals(t, proto.String("hi"), res)
+		mustDo(t, c,
+			"PING", "hi",
+			proto.String("hi"),
+		)
 	})
 
 	t.Run("error", func(t *testing.T) {
-		res, err := c.Do("PING", "foo", "bar")
-		ok(t, err)
-		equals(t, proto.Error(errWrongNumber("ping")), res)
+		mustDo(t, c,
+			"PING", "foo", "bar",
+			proto.Error(errWrongNumber("ping")),
+		)
 	})
 }
 
@@ -103,140 +124,156 @@ func TestEcho(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
-	r, err := redis.String(c.Do("ECHO", "hello\nworld"))
-	ok(t, err)
-	equals(t, "hello\nworld", r)
+	mustDo(t, c,
+		"ECHO", "hello\nworld",
+		proto.String("hello\nworld"),
+	)
+
+	mustDo(t, c,
+		"ECHO",
+		proto.Error(errWrongNumber("echo")),
+	)
 }
 
 func TestSelect(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
-	_, err = redis.String(c.Do("SET", "foo", "bar"))
-	ok(t, err)
+	mustOK(t, c, "SET", "foo", "bar")
+	mustOK(t, c, "SELECT", "5")
+	mustOK(t, c, "SET", "foo", "baz")
 
-	_, err = redis.String(c.Do("SELECT", "5"))
-	ok(t, err)
+	t.Run("direct access", func(t *testing.T) {
+		got, err := s.Get("foo")
+		ok(t, err)
+		equals(t, "bar", got)
 
-	_, err = redis.String(c.Do("SET", "foo", "baz"))
-	ok(t, err)
+		s.Select(5)
+		got, err = s.Get("foo")
+		ok(t, err)
+		equals(t, "baz", got)
+	})
 
-	// Direct access.
-	got, err := s.Get("foo")
+	// Another connection should have its own idea of the selected db:
+	c2, err := proto.Dial(s.Addr())
 	ok(t, err)
-	equals(t, "bar", got)
-	s.Select(5)
-	got, err = s.Get("foo")
-	ok(t, err)
-	equals(t, "baz", got)
-
-	// Another connection should have its own idea of the db:
-	c2, err := redis.Dial("tcp", s.Addr())
-	ok(t, err)
-	v, err := redis.String(c2.Do("GET", "foo"))
-	ok(t, err)
-	equals(t, "bar", v)
+	defer c2.Close()
+	mustDo(t, c2,
+		"GET", "foo",
+		proto.String("bar"),
+	)
 }
 
 func TestSwapdb(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
-	_, err = redis.String(c.Do("SET", "foo", "bar"))
-	ok(t, err)
+	mustOK(t, c, "SET", "foo", "bar")
+	mustOK(t, c, "SELECT", "5")
+	mustOK(t, c, "SET", "foo", "baz")
+	mustOK(t, c, "SWAPDB", "0", "5")
 
-	_, err = redis.String(c.Do("SELECT", "5"))
-	ok(t, err)
+	t.Run("direct", func(t *testing.T) {
+		got, err := s.Get("foo")
+		ok(t, err)
+		equals(t, "baz", got)
+		s.Select(5)
+		got, err = s.Get("foo")
+		ok(t, err)
+		equals(t, "bar", got)
+	})
 
-	_, err = redis.String(c.Do("SET", "foo", "baz"))
-	ok(t, err)
+	t.Run("another connection", func(t *testing.T) {
+		c2, err := proto.Dial(s.Addr())
+		ok(t, err)
+		defer c2.Close()
+		mustDo(t, c2,
+			"GET", "foo",
+			proto.String("baz"),
+		)
+	})
 
-	res, err := redis.String(c.Do("SWAPDB", "0", "5"))
-	ok(t, err)
-	equals(t, "OK", res)
-
-	got, err := s.Get("foo")
-	ok(t, err)
-	equals(t, "baz", got)
-	s.Select(5)
-	got, err = s.Get("foo")
-	ok(t, err)
-	equals(t, "bar", got)
-
-	// Another connection should have its own idea of the db:
-	c2, err := redis.Dial("tcp", s.Addr())
-	ok(t, err)
-	v, err := redis.String(c2.Do("GET", "foo"))
-	ok(t, err)
-	equals(t, "baz", v)
-
-	// errors
-	{
-		_, err := redis.String(c.Do("SWAPDB"))
-		mustFail(t, err, errWrongNumber("SWAPDB"))
-
-		_, err = redis.String(c.Do("SWAPDB", 1, 2, 3))
-		mustFail(t, err, errWrongNumber("SWAPDB"))
-
-		_, err = redis.String(c.Do("SWAPDB", "foo", 2))
-		mustFail(t, err, "ERR invalid first DB index")
-
-		_, err = redis.String(c.Do("SWAPDB", 1, "bar"))
-		mustFail(t, err, "ERR invalid second DB index")
-
-		_, err = redis.String(c.Do("SWAPDB", "foo", "bar"))
-		mustFail(t, err, "ERR invalid first DB index")
-
-		_, err = redis.String(c.Do("SWAPDB", -1, 2))
-		mustFail(t, err, "ERR DB index is out of range")
-
-		_, err = redis.String(c.Do("SWAPDB", 1, -2))
-		mustFail(t, err, "ERR DB index is out of range")
-	}
+	t.Run("errors", func(t *testing.T) {
+		mustDo(t, c,
+			"SWAPDB",
+			proto.Error(errWrongNumber("SWAPDB")),
+		)
+		mustDo(t, c,
+			"SWAPDB", "1", "2", "3",
+			proto.Error(errWrongNumber("SWAPDB")),
+		)
+		mustDo(t, c,
+			"SWAPDB", "foo", "2",
+			proto.Error("ERR invalid first DB index"),
+		)
+		mustDo(t, c,
+			"SWAPDB", "1", "bar",
+			proto.Error("ERR invalid second DB index"),
+		)
+		mustDo(t, c,
+			"SWAPDB", "foo", "bar",
+			proto.Error("ERR invalid first DB index"),
+		)
+		mustDo(t, c,
+			"SWAPDB", "-1", "2",
+			proto.Error("ERR DB index is out of range"),
+		)
+		mustDo(t, c,
+			"SWAPDB", "1", "-2",
+			proto.Error("ERR DB index is out of range"),
+		)
+	})
 }
 
 func TestQuit(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
-	v, err := redis.String(c.Do("QUIT"))
-	ok(t, err)
-	equals(t, "OK", v)
+	mustOK(t, c, "QUIT")
 
-	v, err = redis.String(c.Do("PING"))
+	res, err := c.Do("PING")
 	assert(t, err != nil, "QUIT closed the client")
-	equals(t, "", v)
+	equals(t, "", res)
 }
 
 func TestSetError(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
-	r, err := redis.String(c.Do("PING"))
-	ok(t, err)
-	equals(t, "PONG", r)
+	mustDo(t, c,
+		"PING",
+		proto.Inline("PONG"),
+	)
 
 	s.SetError("LOADING Redis is loading the dataset in memory")
-	_, err = c.Do("PING", "hi")
-	mustFail(t, err, "LOADING Redis is loading the dataset in memory")
+	mustDo(t, c,
+		"ECHO",
+		proto.Error("LOADING Redis is loading the dataset in memory"),
+	)
 
 	s.SetError("")
-	r, err = redis.String(c.Do("PING"))
-	ok(t, err)
-	equals(t, "PONG", r)
+	mustDo(t, c,
+		"PING",
+		proto.Inline("PONG"),
+	)
 }
