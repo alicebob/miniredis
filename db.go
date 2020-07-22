@@ -303,9 +303,20 @@ func (db *RedisDB) setIsMember(k, v string) bool {
 // hashFields returns all (sorted) keys ('fields') for a hash key.
 func (db *RedisDB) hashFields(k string) []string {
 	v := db.hashKeys[k]
-	r := make([]string, 0, len(v))
+	var r []string
 	for k := range v {
 		r = append(r, k)
+	}
+	sort.Strings(r)
+	return r
+}
+
+// hashValues returns all (sorted) values a hash key.
+func (db *RedisDB) hashValues(k string) []string {
+	h := db.hashKeys[k]
+	var r []string
+	for _, v := range h {
+		r = append(r, v)
 	}
 	sort.Strings(r)
 	return r

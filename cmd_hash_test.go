@@ -1,150 +1,137 @@
 package miniredis
 
 import (
-	"sort"
 	"testing"
 	"time"
 
 	"github.com/gomodule/redigo/redis"
+
+	"github.com/alicebob/miniredis/v2/proto"
 )
 
 func TestHash(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
-	{
-		b, err := redis.Int(c.Do("HSET", "aap", "noot", "mies"))
-		ok(t, err)
-		equals(t, 1, b) // New field.
-	}
+	must1(t, c, "HSET", "aap", "noot", "mies")
 
-	{
-		v, err := redis.String(c.Do("HGET", "aap", "noot"))
-		ok(t, err)
-		equals(t, "mies", v)
+	t.Run("basic", func(t *testing.T) {
+		mustDo(t, c,
+			"HGET", "aap", "noot",
+			proto.String("mies"),
+		)
 		equals(t, "mies", s.HGet("aap", "noot"))
-	}
 
-	{
-		b, err := redis.Int(c.Do("HSET", "aap", "noot", "mies"))
-		ok(t, err)
-		equals(t, 0, b) // Existing field.
-	}
+		// Existing field.
+		must0(t, c, "HSET", "aap", "noot", "mies")
 
-	{
-		b, err := redis.Int(c.Do("HSET", "aaa", "bbb", "cc", "ddd", "ee"))
-		ok(t, err)
-		equals(t, 2, b) // Multiple fields.
-	}
+		// Multiple fields.
+		mustDo(t, c,
+			"HSET", "aaa", "bbb", "cc", "ddd", "ee",
+			proto.Int(2),
+		)
 
-	{
-		v1, err := redis.String(c.Do("HGET", "aaa", "bbb"))
-		ok(t, err)
-		equals(t, "cc", v1)
+		mustDo(t, c,
+			"HGET", "aaa", "bbb",
+			proto.String("cc"),
+		)
 		equals(t, "cc", s.HGet("aaa", "bbb"))
-		v2, err := redis.String(c.Do("HGET", "aaa", "ddd"))
-		ok(t, err)
-		equals(t, "ee", v2)
+		mustDo(t, c,
+			"HGET", "aaa", "ddd",
+			proto.String("ee"),
+		)
 		equals(t, "ee", s.HGet("aaa", "ddd"))
-	}
+	})
 
-	// Wrong type of key
-	{
-		_, err := redis.String(c.Do("SET", "foo", "bar"))
-		ok(t, err)
-		_, err = redis.Int(c.Do("HSET", "foo", "noot", "mies"))
-		mustFail(t, err, "WRONGTYPE Operation against a key holding the wrong kind of value")
-	}
+	t.Run("wrong key type", func(t *testing.T) {
+		mustOK(t, c, "SET", "foo", "bar")
+		mustDo(t, c,
+			"HSET", "foo", "noot", "mies",
+			proto.Error("WRONGTYPE Operation against a key holding the wrong kind of value"),
+		)
+	})
 
-	// HSET with unmatched pairs
-	{
-		_, err := redis.Int(c.Do("HSET", "a", "b", "c", "d"))
-		mustFail(t, err, "ERR wrong number of arguments for HMSET")
-	}
+	t.Run("unmatched pairs", func(t *testing.T) {
+		mustDo(t, c,
+			"HSET", "a", "b", "c", "d",
+			proto.Error("ERR wrong number of arguments for HMSET"),
+		)
+	})
 
-	// hash exists, key doesn't.
-	{
-		b, err := c.Do("HGET", "aap", "nosuch")
-		ok(t, err)
-		equals(t, nil, b)
-	}
+	t.Run("no such key", func(t *testing.T) {
+		mustNil(t, c, "HGET", "aap", "nosuch")
+	})
 
-	// hash doesn't exists.
-	{
-		b, err := c.Do("HGET", "nosuch", "nosuch")
-		ok(t, err)
-		equals(t, nil, b)
+	t.Run("no such hash", func(t *testing.T) {
+		mustNil(t, c, "HGET", "nosuch", "nosuch")
 		equals(t, "", s.HGet("nosuch", "nosuch"))
-	}
+	})
 
-	// HGET on wrong type
-	{
-		_, err := redis.Int(c.Do("HGET", "aap"))
-		mustFail(t, err, "ERR wrong number of arguments for 'hget' command")
-	}
+	t.Run("wrong type", func(t *testing.T) {
+		mustDo(t, c,
+			"HGET", "aap",
+			proto.Error("ERR wrong number of arguments for 'hget' command"),
+		)
+	})
 
-	// Direct HSet()
-	{
+	t.Run("direct HSet()", func(t *testing.T) {
 		s.HSet("wim", "zus", "jet")
-		v, err := redis.String(c.Do("HGET", "wim", "zus"))
-		ok(t, err)
-		equals(t, "jet", v)
-	}
+		mustDo(t, c,
+			"HGET", "wim", "zus",
+			proto.String("jet"),
+		)
 
-	// Direct HSet() multiple
-	{
 		s.HSet("xxx", "yyy", "a", "zzz", "b")
-		v1, err := redis.String(c.Do("HGET", "xxx", "yyy"))
-		ok(t, err)
-		equals(t, "a", v1)
-		v2, err := redis.String(c.Do("HGET", "xxx", "zzz"))
-		ok(t, err)
-		equals(t, "b", v2)
-	}
+		mustDo(t, c,
+			"HGET", "xxx", "yyy",
+			proto.String("a"),
+		)
+		mustDo(t, c,
+			"HGET", "xxx", "zzz",
+			proto.String("b"),
+		)
+	})
 }
 
 func TestHashSetNX(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	// New Hash
-	v, err := redis.Int(c.Do("HSETNX", "wim", "zus", "jet"))
-	ok(t, err)
-	equals(t, 1, v)
+	must1(t, c, "HSETNX", "wim", "zus", "jet")
 
-	v, err = redis.Int(c.Do("HSETNX", "wim", "zus", "jet"))
-	ok(t, err)
-	equals(t, 0, v)
+	must0(t, c, "HSETNX", "wim", "zus", "jet")
 
 	// Just a new key
-	v, err = redis.Int(c.Do("HSETNX", "wim", "aap", "noot"))
-	ok(t, err)
-	equals(t, 1, v)
+	must1(t, c, "HSETNX", "wim", "aap", "noot")
 
 	// Wrong key type
 	s.Set("foo", "bar")
-	_, err = redis.Int(c.Do("HSETNX", "foo", "nosuch", "nosuch"))
-	assert(t, err != nil, "no HSETNX error")
+	mustDo(t, c,
+		"HSETNX", "foo", "nosuch", "nosuch",
+		proto.Error("WRONGTYPE Operation against a key holding the wrong kind of value"),
+	)
 }
 
 func TestHashMSet(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	// New Hash
 	{
-		v, err := redis.String(c.Do("HMSET", "hash", "wim", "zus", "jet", "vuur"))
-		ok(t, err)
-		equals(t, "OK", v)
+		mustOK(t, c, "HMSET", "hash", "wim", "zus", "jet", "vuur")
 
 		equals(t, "zus", s.HGet("hash", "wim"))
 		equals(t, "vuur", s.HGet("hash", "jet"))
@@ -153,24 +140,19 @@ func TestHashMSet(t *testing.T) {
 	// Doesn't touch ttl.
 	{
 		s.SetTTL("hash", time.Second*999)
-		v, err := redis.String(c.Do("HMSET", "hash", "gijs", "lam"))
-		ok(t, err)
-		equals(t, "OK", v)
+		mustOK(t, c, "HMSET", "hash", "gijs", "lam")
 		equals(t, time.Second*999, s.TTL("hash"))
 	}
 
 	{
 		// Wrong key type
 		s.Set("str", "value")
-		_, err = redis.Int(c.Do("HMSET", "str", "key", "value"))
-		assert(t, err != nil, "no HSETerror")
+		mustDo(t, c, "HMSET", "str", "key", "value", proto.Error("WRONGTYPE Operation against a key holding the wrong kind of value"))
+
 		// Usage error
-		_, err = redis.Int(c.Do("HMSET", "str"))
-		assert(t, err != nil, "no HSETerror")
-		_, err = redis.Int(c.Do("HMSET", "str", "odd"))
-		assert(t, err != nil, "no HSETerror")
-		_, err = redis.Int(c.Do("HMSET", "str", "key", "value", "odd"))
-		assert(t, err != nil, "no HSETerror")
+		mustDo(t, c, "HMSET", "str", proto.Error(errWrongNumber("hmset")))
+		mustDo(t, c, "HMSET", "str", "odd", proto.Error(errWrongNumber("hmset")))
+		mustDo(t, c, "HMSET", "str", "key", "value", "odd", proto.Error("ERR wrong number of arguments for HMSET"))
 	}
 }
 
@@ -178,36 +160,28 @@ func TestHashDel(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	s.HSet("wim", "zus", "jet")
 	s.HSet("wim", "teun", "vuur")
 	s.HSet("wim", "gijs", "lam")
 	s.HSet("wim", "kees", "bok")
-	v, err := redis.Int(c.Do("HDEL", "wim", "zus", "gijs"))
-	ok(t, err)
-	equals(t, 2, v)
+	mustDo(t, c, "HDEL", "wim", "zus", "gijs", proto.Int(2))
 
-	v, err = redis.Int(c.Do("HDEL", "wim", "nosuch"))
-	ok(t, err)
-	equals(t, 0, v)
+	must0(t, c, "HDEL", "wim", "nosuch")
 
 	// Deleting all makes the key disappear
-	v, err = redis.Int(c.Do("HDEL", "wim", "teun", "kees"))
-	ok(t, err)
-	equals(t, 2, v)
+	mustDo(t, c, "HDEL", "wim", "teun", "kees", proto.Int(2))
 	assert(t, !s.Exists("wim"), "no more wim key")
 
 	// Key doesn't exists.
-	v, err = redis.Int(c.Do("HDEL", "nosuch", "nosuch"))
-	ok(t, err)
-	equals(t, 0, v)
+	must0(t, c, "HDEL", "nosuch", "nosuch")
 
 	// Wrong key type
 	s.Set("foo", "bar")
-	_, err = redis.Int(c.Do("HDEL", "foo", "nosuch"))
-	assert(t, err != nil, "no HDEL error")
+	mustDo(t, c, "HDEL", "foo", "nosuch", proto.Error(msgWrongType))
 
 	// Direct HDel()
 	s.HSet("aap", "noot", "mies")
@@ -219,94 +193,82 @@ func TestHashExists(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	s.HSet("wim", "zus", "jet")
 	s.HSet("wim", "teun", "vuur")
-	v, err := redis.Int(c.Do("HEXISTS", "wim", "zus"))
-	ok(t, err)
-	equals(t, 1, v)
-
-	v, err = redis.Int(c.Do("HEXISTS", "wim", "nosuch"))
-	ok(t, err)
-	equals(t, 0, v)
-
-	v, err = redis.Int(c.Do("HEXISTS", "nosuch", "nosuch"))
-	ok(t, err)
-	equals(t, 0, v)
+	must1(t, c, "HEXISTS", "wim", "zus")
+	must0(t, c, "HEXISTS", "wim", "nosuch")
+	must0(t, c, "HEXISTS", "nosuch", "nosuch")
 
 	// Wrong key type
 	s.Set("foo", "bar")
-	_, err = redis.Int(c.Do("HEXISTS", "foo", "nosuch"))
-	assert(t, err != nil, "no HDEL error")
+	mustDo(t, c,
+		"HEXISTS", "foo", "nosuch",
+		proto.Error(msgWrongType),
+	)
 }
 
 func TestHashGetall(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	s.HSet("wim", "zus", "jet")
 	s.HSet("wim", "teun", "vuur")
 	s.HSet("wim", "gijs", "lam")
 	s.HSet("wim", "kees", "bok")
-	v, err := redis.Strings(c.Do("HGETALL", "wim"))
-	ok(t, err)
-	equals(t, 8, len(v))
-	d := map[string]string{}
-	for len(v) > 0 {
-		d[v[0]] = v[1]
-		v = v[2:]
-	}
-	equals(t, map[string]string{
-		"zus":  "jet",
-		"teun": "vuur",
-		"gijs": "lam",
-		"kees": "bok",
-	}, d)
+	mustDo(t, c,
+		"HGETALL", "wim",
+		proto.Strings(
+			"gijs", "lam",
+			"kees", "bok",
+			"teun", "vuur",
+			"zus", "jet",
+		),
+	)
 
-	v, err = redis.Strings(c.Do("HGETALL", "nosuch"))
-	ok(t, err)
-	equals(t, 0, len(v))
+	mustDo(t, c, "HGETALL", "nosuch",
+		proto.Strings(),
+	)
 
 	// Wrong key type
 	s.Set("foo", "bar")
-	_, err = redis.Int(c.Do("HGETALL", "foo"))
-	assert(t, err != nil, "no HGETALL error")
+	mustDo(t, c, "HGETALL", "foo",
+		proto.Error(msgWrongType),
+	)
 }
 
 func TestHashKeys(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	s.HSet("wim", "zus", "jet")
 	s.HSet("wim", "teun", "vuur")
 	s.HSet("wim", "gijs", "lam")
 	s.HSet("wim", "kees", "bok")
-	{
-		v, err := redis.Strings(c.Do("HKEYS", "wim"))
-		ok(t, err)
-		equals(t, 4, len(v))
-		sort.Strings(v)
-		equals(t, []string{
+	mustDo(t, c,
+		"HKEYS", "wim",
+		proto.Strings(
 			"gijs",
 			"kees",
 			"teun",
 			"zus",
-		}, v)
-	}
+		),
+	)
 
-	// Direct command
-	{
+	t.Run("direct", func(t *testing.T) {
 		direct, err := s.HKeys("wim")
 		ok(t, err)
-		sort.Strings(direct)
 		equals(t, []string{
 			"gijs",
 			"kees",
@@ -315,73 +277,62 @@ func TestHashKeys(t *testing.T) {
 		}, direct)
 		_, err = s.HKeys("nosuch")
 		equals(t, err, ErrKeyNotFound)
-	}
+	})
 
-	v, err := redis.Strings(c.Do("HKEYS", "nosuch"))
-	ok(t, err)
-	equals(t, 0, len(v))
+	mustDo(t, c, "HKEYS", "nosuch", proto.Strings())
 
 	// Wrong key type
 	s.Set("foo", "bar")
-	_, err = redis.Int(c.Do("HKEYS", "foo"))
-	assert(t, err != nil, "no HKEYS error")
+	mustDo(t, c, "HKEYS", "foo", proto.Error(msgWrongType))
 }
 
 func TestHashValues(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	s.HSet("wim", "zus", "jet")
 	s.HSet("wim", "teun", "vuur")
 	s.HSet("wim", "gijs", "lam")
 	s.HSet("wim", "kees", "bok")
-	v, err := redis.Strings(c.Do("HVALS", "wim"))
-	ok(t, err)
-	equals(t, 4, len(v))
-	sort.Strings(v)
-	equals(t, []string{
-		"bok",
-		"jet",
-		"lam",
-		"vuur",
-	}, v)
+	mustDo(t, c, "HVALS", "wim",
+		proto.Strings(
+			"bok",
+			"jet",
+			"lam",
+			"vuur",
+		),
+	)
 
-	v, err = redis.Strings(c.Do("HVALS", "nosuch"))
-	ok(t, err)
-	equals(t, 0, len(v))
+	mustDo(t, c, "HVALS", "nosuch", proto.Strings())
 
 	// Wrong key type
 	s.Set("foo", "bar")
-	_, err = redis.Int(c.Do("HVALS", "foo"))
-	assert(t, err != nil, "no HVALS error")
+	mustDo(t, c, "HVALS", "foo", proto.Error(msgWrongType))
 }
 
 func TestHashLen(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	s.HSet("wim", "zus", "jet")
 	s.HSet("wim", "teun", "vuur")
 	s.HSet("wim", "gijs", "lam")
 	s.HSet("wim", "kees", "bok")
-	v, err := redis.Int(c.Do("HLEN", "wim"))
-	ok(t, err)
-	equals(t, 4, v)
+	mustDo(t, c, "HLEN", "wim", proto.Int(4))
 
-	v, err = redis.Int(c.Do("HLEN", "nosuch"))
-	ok(t, err)
-	equals(t, 0, v)
+	must0(t, c, "HLEN", "nosuch")
 
 	// Wrong key type
 	s.Set("foo", "bar")
-	_, err = redis.Int(c.Do("HLEN", "foo"))
-	assert(t, err != nil, "no HLEN error")
+	mustDo(t, c, "HLEN", "foo", proto.Error(msgWrongType))
 }
 
 func TestHashMget(t *testing.T) {
