@@ -4,8 +4,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gomodule/redigo/redis"
-
 	"github.com/alicebob/miniredis/v2/proto"
 )
 
@@ -339,147 +337,167 @@ func TestHashMget(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	s.HSet("wim", "zus", "jet")
 	s.HSet("wim", "teun", "vuur")
 	s.HSet("wim", "gijs", "lam")
 	s.HSet("wim", "kees", "bok")
-	v, err := redis.Values(c.Do("HMGET", "wim", "zus", "nosuch", "kees"))
-	ok(t, err)
-	equals(t, 3, len(v))
-	equals(t, "jet", string(v[0].([]byte)))
-	equals(t, nil, v[1])
-	equals(t, "bok", string(v[2].([]byte)))
+	mustDo(t, c,
+		"HMGET", "wim", "zus", "nosuch", "kees",
+		proto.Array(
+			proto.String("jet"),
+			proto.Nil,
+			proto.String("bok"),
+		),
+	)
 
-	v, err = redis.Values(c.Do("HMGET", "nosuch", "zus", "kees"))
-	ok(t, err)
-	equals(t, 2, len(v))
-	equals(t, nil, v[0])
-	equals(t, nil, v[1])
+	mustDo(t, c,
+		"HMGET", "nosuch", "zus", "kees",
+		proto.Array(
+			proto.Nil,
+			proto.Nil,
+		),
+	)
 
 	// Wrong key type
 	s.Set("foo", "bar")
-	_, err = redis.Int(c.Do("HMGET", "foo", "bar"))
-	assert(t, err != nil, "no HMGET error")
+	mustDo(t, c,
+		"HMGET", "foo", "bar",
+		proto.Error(msgWrongType),
+	)
 }
 
 func TestHashIncrby(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	// New key
-	{
-		v, err := redis.Int(c.Do("HINCRBY", "hash", "field", 1))
-		ok(t, err)
-		equals(t, 1, v)
-	}
+	must1(t, c, "HINCRBY", "hash", "field", "1")
 
 	// Existing key
-	{
-		v, err := redis.Int(c.Do("HINCRBY", "hash", "field", 100))
-		ok(t, err)
-		equals(t, 101, v)
-	}
+	mustDo(t, c,
+		"HINCRBY", "hash", "field", "100",
+		proto.Int(101),
+	)
 
 	// Minus works.
-	{
-		v, err := redis.Int(c.Do("HINCRBY", "hash", "field", -12))
-		ok(t, err)
-		equals(t, 101-12, v)
-	}
+	mustDo(t, c,
+		"HINCRBY", "hash", "field", "-12",
+		proto.Int(101-12),
+	)
 
-	// Direct usage
-	s.HIncr("hash", "field", -3)
-	equals(t, "86", s.HGet("hash", "field"))
+	t.Run("direct", func(t *testing.T) {
+		s.HIncr("hash", "field", -3)
+		equals(t, "86", s.HGet("hash", "field"))
+	})
 
-	// Error cases.
-	{
+	t.Run("errors", func(t *testing.T) {
 		// Wrong key type
 		s.Set("str", "cake")
-		_, err = redis.Values(c.Do("HINCRBY", "str", "case", 4))
-		assert(t, err != nil, "no HINCRBY error")
+		mustDo(t, c,
+			"HINCRBY", "str", "case", "4",
+			proto.Error(msgWrongType),
+		)
 
-		_, err = redis.Values(c.Do("HINCRBY", "str", "case", "foo"))
-		assert(t, err != nil, "no HINCRBY error")
+		mustDo(t, c,
+			"HINCRBY", "str", "case", "foo",
+			proto.Error("ERR value is not an integer or out of range"),
+		)
 
-		_, err = redis.Values(c.Do("HINCRBY", "str"))
-		assert(t, err != nil, "no HINCRBY error")
-	}
+		mustDo(t, c,
+			"HINCRBY", "str",
+			proto.Error(errWrongNumber("hincrby")),
+		)
+	})
 }
 
 func TestHashIncrbyfloat(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	// Existing key
 	{
 		s.HSet("hash", "field", "12")
-		v, err := redis.Float64(c.Do("HINCRBYFLOAT", "hash", "field", "400.12"))
-		ok(t, err)
-		equals(t, 412.12, v)
+		mustDo(t, c,
+			"HINCRBYFLOAT", "hash", "field", "400.12",
+			proto.String("412.12"),
+		)
 		equals(t, "412.12", s.HGet("hash", "field"))
 	}
 
 	// Existing key, not a number
 	{
 		s.HSet("hash", "field", "noint")
-		_, err := redis.Float64(c.Do("HINCRBYFLOAT", "hash", "field", "400"))
-		assert(t, err != nil, "do HINCRBYFLOAT error")
+		mustDo(t, c,
+			"HINCRBYFLOAT", "hash", "field", "400",
+			proto.Error("ERR value is not a valid float"),
+		)
 	}
 
 	// New key
 	{
-		v, err := redis.Float64(c.Do("HINCRBYFLOAT", "hash", "newfield", "40.33"))
-		ok(t, err)
-		equals(t, 40.33, v)
+		mustDo(t, c,
+			"HINCRBYFLOAT", "hash", "newfield", "40.33",
+			proto.String("40.33"),
+		)
 		equals(t, "40.33", s.HGet("hash", "newfield"))
 	}
 
-	// Direct usage
-	{
+	t.Run("direct", func(t *testing.T) {
 		s.HSet("hash", "field", "500.1")
 		f, err := s.HIncrfloat("hash", "field", 12)
 		ok(t, err)
 		equals(t, 512.1, f)
 		equals(t, "512.1", s.HGet("hash", "field"))
-	}
+	})
 
-	// Wrong type of existing key
-	{
+	t.Run("errors", func(t *testing.T) {
 		s.Set("wrong", "type")
-		_, err := redis.Int(c.Do("HINCRBYFLOAT", "wrong", "type", "400"))
-		assert(t, err != nil, "do HINCRBYFLOAT error")
-	}
-
-	// Wrong usage
-	{
-		_, err := redis.Int(c.Do("HINCRBYFLOAT"))
-		assert(t, err != nil, "do HINCRBYFLOAT error")
-		_, err = redis.Int(c.Do("HINCRBYFLOAT", "wrong"))
-		assert(t, err != nil, "do HINCRBYFLOAT error")
-		_, err = redis.Int(c.Do("HINCRBYFLOAT", "wrong", "value"))
-		assert(t, err != nil, "do HINCRBYFLOAT error")
-		_, err = redis.Int(c.Do("HINCRBYFLOAT", "wrong", "value", "noint"))
-		assert(t, err != nil, "do HINCRBYFLOAT error")
-		_, err = redis.Int(c.Do("HINCRBYFLOAT", "foo", "bar", 12, "tomanye"))
-		assert(t, err != nil, "do HINCRBYFLOAT error")
-	}
+		mustDo(t, c,
+			"HINCRBYFLOAT", "wrong", "type", "400",
+			proto.Error(msgWrongType),
+		)
+		mustDo(t, c,
+			"HINCRBYFLOAT",
+			proto.Error(errWrongNumber("hincrbyfloat")),
+		)
+		mustDo(t, c,
+			"HINCRBYFLOAT", "wrong",
+			proto.Error(errWrongNumber("hincrbyfloat")),
+		)
+		mustDo(t, c,
+			"HINCRBYFLOAT", "wrong", "value",
+			proto.Error(errWrongNumber("hincrbyfloat")),
+		)
+		mustDo(t, c,
+			"HINCRBYFLOAT", "wrong", "value", "noint",
+			proto.Error("ERR value is not a valid float"),
+		)
+		mustDo(t, c,
+			"HINCRBYFLOAT", "foo", "bar", "12", "tomanye",
+			proto.Error(errWrongNumber("hincrbyfloat")),
+		)
+	})
 }
 
 func TestHscan(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	// We cheat with hscan. It always returns everything.
 
@@ -487,82 +505,82 @@ func TestHscan(t *testing.T) {
 	s.HSet("h", "field2", "value2")
 
 	// No problem
-	{
-		res, err := redis.Values(c.Do("HSCAN", "h", 0))
-		ok(t, err)
-		equals(t, 2, len(res))
-
-		var c int
-		var keys []string
-		_, err = redis.Scan(res, &c, &keys)
-		ok(t, err)
-		equals(t, 0, c)
-		equals(t, []string{"field1", "value1", "field2", "value2"}, keys)
-	}
+	mustDo(t, c,
+		"HSCAN", "h", "0",
+		proto.Array(
+			proto.String("0"),
+			proto.Array(
+				proto.String("field1"),
+				proto.String("value1"),
+				proto.String("field2"),
+				proto.String("value2"),
+			),
+		),
+	)
 
 	// Invalid cursor
-	{
-		res, err := redis.Values(c.Do("HSCAN", "h", 42))
-		ok(t, err)
-		equals(t, 2, len(res))
-
-		var c int
-		var keys []string
-		_, err = redis.Scan(res, &c, &keys)
-		ok(t, err)
-		equals(t, 0, c)
-		equals(t, []string(nil), keys)
-	}
+	mustDo(t, c,
+		"HSCAN", "h", "42",
+		proto.Array(
+			proto.String("0"),
+			proto.Array(),
+		),
+	)
 
 	// COUNT (ignored)
-	{
-		res, err := redis.Values(c.Do("HSCAN", "h", 0, "COUNT", 200))
-		ok(t, err)
-		equals(t, 2, len(res))
-
-		var c int
-		var keys []string
-		_, err = redis.Scan(res, &c, &keys)
-		ok(t, err)
-		equals(t, 0, c)
-		equals(t, []string{"field1", "value1", "field2", "value2"}, keys)
-	}
+	mustDo(t, c,
+		"HSCAN", "h", "0", "COUNT", "200",
+		proto.Array(
+			proto.String("0"),
+			proto.Array(
+				proto.String("field1"),
+				proto.String("value1"),
+				proto.String("field2"),
+				proto.String("value2"),
+			),
+		),
+	)
 
 	// MATCH
-	{
-		s.HSet("h", "aap", "a")
-		s.HSet("h", "noot", "b")
-		s.HSet("h", "mies", "m")
-		res, err := redis.Values(c.Do("HSCAN", "h", 0, "MATCH", "mi*"))
-		ok(t, err)
-		equals(t, 2, len(res))
-
-		var c int
-		var keys []string
-		_, err = redis.Scan(res, &c, &keys)
-		ok(t, err)
-		equals(t, 0, c)
-		equals(t, []string{"mies", "m"}, keys)
-	}
+	s.HSet("h", "aap", "a")
+	s.HSet("h", "noot", "b")
+	s.HSet("h", "mies", "m")
+	mustDo(t, c,
+		"HSCAN", "h", "0", "MATCH", "mi*",
+		proto.Array(
+			proto.String("0"),
+			proto.Array(
+				proto.String("mies"),
+				proto.String("m"),
+			),
+		),
+	)
 
 	t.Run("errors", func(t *testing.T) {
-		_, err := redis.Int(c.Do("HSCAN"))
-		mustFail(t, err, "ERR wrong number of arguments for 'hscan' command")
-
-		_, err = redis.Int(c.Do("HSCAN", "set"))
-		mustFail(t, err, "ERR wrong number of arguments for 'hscan' command")
-
-		_, err = redis.Int(c.Do("HSCAN", "set", "noint"))
-		mustFail(t, err, "ERR invalid cursor")
-
-		_, err = redis.Int(c.Do("HSCAN", "set", 1, "MATCH"))
-		mustFail(t, err, "ERR syntax error")
-
-		_, err = redis.Int(c.Do("HSCAN", "set", 1, "COUNT"))
-		mustFail(t, err, "ERR syntax error")
-
-		_, err = redis.Int(c.Do("HSCAN", "set", 1, "COUNT", "noint"))
-		mustFail(t, err, "ERR value is not an integer or out of range")
+		mustDo(t, c,
+			"HSCAN",
+			proto.Error(errWrongNumber("hscan")),
+		)
+		mustDo(t, c,
+			"HSCAN", "set",
+			proto.Error(errWrongNumber("hscan")),
+		)
+		mustDo(t, c,
+			"HSCAN", "set", "noint",
+			proto.Error("ERR invalid cursor"),
+		)
+		mustDo(t, c,
+			"HSCAN", "set", "1", "MATCH",
+			proto.Error("ERR syntax error"),
+		)
+		mustDo(t, c,
+			"HSCAN", "set", "1", "COUNT",
+			proto.Error("ERR syntax error"),
+		)
+		mustDo(t, c,
+			"HSCAN", "set", "1", "COUNT", "noint",
+			proto.Error("ERR value is not an integer or out of range"),
+		)
 	})
 }
 
@@ -570,49 +588,60 @@ func TestHstrlen(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	t.Run("basic", func(t *testing.T) {
 		s.HSet("myhash", "foo", "bar")
-		n, err := redis.Int(c.Do("HSTRLEN", "myhash", "foo"))
-		ok(t, err)
-		equals(t, 3, n)
+		mustDo(t, c,
+			"HSTRLEN", "myhash", "foo",
+			proto.Int(3),
+		)
 	})
 
 	t.Run("no such key", func(t *testing.T) {
 		s.HSet("myhash", "foo", "bar")
-		n, err := redis.Int(c.Do("HSTRLEN", "myhash", "nosuch"))
-		ok(t, err)
-		equals(t, 0, n)
+		must0(t, c,
+			"HSTRLEN", "myhash", "nosuch",
+		)
 	})
 
 	t.Run("no such hash", func(t *testing.T) {
 		s.HSet("myhash", "foo", "bar")
-		n, err := redis.Int(c.Do("HSTRLEN", "yourhash", "foo"))
-		ok(t, err)
-		equals(t, 0, n)
+		must0(t, c,
+			"HSTRLEN", "yourhash", "foo",
+		)
 	})
 
 	t.Run("utf8", func(t *testing.T) {
 		s.HSet("myhash", "snow", "☃☃☃")
-		n, err := redis.Int(c.Do("HSTRLEN", "myhash", "snow"))
-		ok(t, err)
-		equals(t, 9, n)
+		mustDo(t, c,
+			"HSTRLEN", "myhash", "snow",
+			proto.Int(9),
+		)
 	})
 
 	t.Run("errors", func(t *testing.T) {
-		_, err := redis.Int(c.Do("HSTRLEN"))
-		mustFail(t, err, "ERR wrong number of arguments for 'hstrlen' command")
+		mustDo(t, c,
+			"HSTRLEN",
+			proto.Error("ERR wrong number of arguments for 'hstrlen' command"),
+		)
 
-		_, err = redis.Int(c.Do("HSTRLEN", "bar"))
-		mustFail(t, err, "ERR wrong number of arguments for 'hstrlen' command")
+		mustDo(t, c,
+			"HSTRLEN", "bar",
+			proto.Error("ERR wrong number of arguments for 'hstrlen' command"),
+		)
 
-		_, err = redis.Int(c.Do("HSTRLEN", "bar", "baz", "bak"))
-		mustFail(t, err, "ERR wrong number of arguments for 'hstrlen' command")
+		mustDo(t, c,
+			"HSTRLEN", "bar", "baz", "bak",
+			proto.Error("ERR wrong number of arguments for 'hstrlen' command"),
+		)
 
 		s.Set("notahash", "bar")
-		_, err = redis.Int(c.Do("HSTRLEN", "notahash", "bar"))
-		mustFail(t, err, "WRONGTYPE Operation against a key holding the wrong kind of value")
+		mustDo(t, c,
+			"HSTRLEN", "notahash", "bar",
+			proto.Error("WRONGTYPE Operation against a key holding the wrong kind of value"),
+		)
 	})
 }
