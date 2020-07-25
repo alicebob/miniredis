@@ -6,6 +6,24 @@ import (
 	"github.com/gomodule/redigo/redis"
 )
 
+func setup(t *testing.T) (*Miniredis, redis.Conn, func()) {
+	s, err := Run()
+	ok(t, err)
+	c1, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+	return s, c1, func() { s.Close() }
+}
+
+func setup2(t *testing.T) (*Miniredis, redis.Conn, redis.Conn, func()) {
+	s, err := Run()
+	ok(t, err)
+	c1, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+	c2, err := redis.Dial("tcp", s.Addr())
+	ok(t, err)
+	return s, c1, c2, func() { s.Close() }
+}
+
 func TestSubscribe(t *testing.T) {
 	s, c, done := setup(t)
 	defer done()
