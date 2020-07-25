@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gomodule/redigo/redis"
+	"github.com/alicebob/miniredis/v2/proto"
 )
 
 // Test DBSIZE, FLUSHDB, and FLUSHALL.
@@ -12,8 +12,9 @@ func TestCmdServer(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	// Set something
 	{
@@ -23,70 +24,83 @@ func TestCmdServer(t *testing.T) {
 	}
 
 	{
-		n, err := redis.Int(c.Do("DBSIZE"))
-		ok(t, err)
-		equals(t, 2, n)
+		mustDo(t, c,
+			"DBSIZE",
+			proto.Int(2),
+		)
 
-		b, err := redis.String(c.Do("FLUSHDB"))
-		ok(t, err)
-		equals(t, "OK", b)
+		mustOK(t, c,
+			"FLUSHDB",
+		)
+		must0(t, c,
+			"DBSIZE",
+		)
 
-		n, err = redis.Int(c.Do("DBSIZE"))
-		ok(t, err)
-		equals(t, 0, n)
+		mustOK(t, c,
+			"SELECT", "1",
+		)
 
-		_, err = c.Do("SELECT", 1)
-		ok(t, err)
+		must1(t, c,
+			"DBSIZE",
+		)
 
-		n, err = redis.Int(c.Do("DBSIZE"))
-		ok(t, err)
-		equals(t, 1, n)
+		mustOK(t, c,
+			"FLUSHALL",
+		)
 
-		b, err = redis.String(c.Do("FLUSHALL"))
-		ok(t, err)
-		equals(t, "OK", b)
+		must0(t, c,
+			"DBSIZE",
+		)
 
-		n, err = redis.Int(c.Do("DBSIZE"))
-		ok(t, err)
-		equals(t, 0, n)
+		mustOK(t, c,
+			"SELECT", "4",
+		)
 
-		_, err = c.Do("SELECT", 4)
-		ok(t, err)
-
-		n, err = redis.Int(c.Do("DBSIZE"))
-		ok(t, err)
-		equals(t, 0, n)
-
+		must0(t, c,
+			"DBSIZE",
+		)
 	}
 
 	{
-		b, err := redis.String(c.Do("FLUSHDB", "ASYNC"))
-		ok(t, err)
-		equals(t, "OK", b)
+		mustOK(t, c,
+			"FLUSHDB", "ASYNC",
+		)
 
-		b, err = redis.String(c.Do("FLUSHALL", "ASYNC"))
-		ok(t, err)
-		equals(t, "OK", b)
+		mustOK(t, c,
+			"FLUSHALL", "ASYNC",
+		)
 	}
 
 	{
-		_, err := redis.Int(c.Do("DBSIZE", "FOO"))
-		assert(t, err != nil, "no DBSIZE error")
+		mustDo(t, c,
+			"DBSIZE", "FOO",
+			proto.Error(errWrongNumber("dbsize")),
+		)
 
-		_, err = redis.Int(c.Do("FLUSHDB", "FOO"))
-		assert(t, err != nil, "no FLUSHDB error")
+		mustDo(t, c,
+			"FLUSHDB", "FOO",
+			proto.Error("ERR syntax error"),
+		)
 
-		_, err = redis.Int(c.Do("FLUSHDB", "ASYNC", "FOO"))
-		assert(t, err != nil, "no FLUSHDB error")
+		mustDo(t, c,
+			"FLUSHDB", "ASYNC", "FOO",
+			proto.Error("ERR syntax error"),
+		)
 
-		_, err = redis.Int(c.Do("FLUSHALL", "FOO"))
-		assert(t, err != nil, "no FLUSHALL error")
+		mustDo(t, c,
+			"FLUSHALL", "FOO",
+			proto.Error("ERR syntax error"),
+		)
 
-		_, err = redis.Int(c.Do("FLUSHALL", "ASYNC", "FOO"))
-		assert(t, err != nil, "no FLUSHALL error")
+		mustDo(t, c,
+			"FLUSHALL", "ASYNC", "FOO",
+			proto.Error("ERR syntax error"),
+		)
 
-		_, err = redis.Int(c.Do("FLUSHALL", "ASYNC", "ASYNC"))
-		assert(t, err != nil, "no FLUSHALL error")
+		mustDo(t, c,
+			"FLUSHALL", "ASYNC", "ASYNC",
+			proto.Error("ERR syntax error"),
+		)
 	}
 }
 
@@ -95,25 +109,21 @@ func TestCmdServerTime(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
-	var seconds, microseconds int
-
-	res, err := redis.Values(c.Do("TIME"))
+	_, err = c.Do("TIME")
 	ok(t, err)
-	_, err = redis.Scan(res, &seconds, &microseconds)
-	ok(t, err)
-	assert(t, seconds > 0, "seconds")
 
 	s.SetTime(time.Unix(100, 123456789))
-	res, err = redis.Values(c.Do("TIME"))
-	ok(t, err)
-	_, err = redis.Scan(res, &seconds, &microseconds)
-	ok(t, err)
-	equals(t, seconds, 100)
-	equals(t, microseconds, 123456)
+	mustDo(t, c,
+		"TIME",
+		proto.Strings("100", "123456"),
+	)
 
-	_, err = redis.MultiBulk(c.Do("TIME", "FOO"))
-	assert(t, err != nil, "no TIME error")
+	mustDo(t, c,
+		"TIME", "FOO",
+		proto.Error(errWrongNumber("time")),
+	)
 }
