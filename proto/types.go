@@ -45,3 +45,12 @@ func Strings(args ...string) string {
 	}
 	return Array(strings...)
 }
+
+// Ints is a helper to build 1 dimensional int arrays.
+func Ints(args ...int) string {
+	var ints []string
+	for _, a := range args {
+		ints = append(ints, Int(a))
+	}
+	return Array(ints...)
+}

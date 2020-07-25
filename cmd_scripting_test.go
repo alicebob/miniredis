@@ -1,81 +1,93 @@
 package miniredis
 
 import (
-	"strings"
 	"testing"
 
-	"github.com/gomodule/redigo/redis"
+	"github.com/alicebob/miniredis/v2/proto"
 )
 
 func TestEval(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
 
-	{
-		b, err := redis.Int(c.Do("EVAL", "return 42", 0))
-		ok(t, err)
-		equals(t, 42, b)
-	}
+	mustDo(t, c,
+		"EVAL", "return 42", "0",
+		proto.Int(42),
+	)
 
-	{
-		b, err := redis.Strings(c.Do("EVAL", "return {KEYS[1], ARGV[1]}", 1, "key1", "key2"))
-		ok(t, err)
-		equals(t, []string{"key1", "key2"}, b)
-	}
+	mustDo(t, c,
+		"EVAL", "return {KEYS[1], ARGV[1]}", "1", "key1", "key2",
+		proto.Strings("key1", "key2"),
+	)
 
-	{
-		b, err := redis.Strings(c.Do("EVAL", "return {ARGV[1]}", 0, "key1"))
-		ok(t, err)
-		equals(t, []string{"key1"}, b)
-	}
+	mustDo(t, c,
+		"EVAL", "return {ARGV[1]}", "0", "key1",
+		proto.Strings("key1"),
+	)
 
 	// Invalid args
-	_, err = c.Do("EVAL", 42, 0)
-	assert(t, err != nil, "no EVAL error")
+	mustDo(t, c,
+		"EVAL", "42", "0",
+		proto.Error("ERR Error compiling script (new function): <string> line:1(column:2) near '42':   syntax error "),
+	)
 
-	_, err = c.Do("EVAL", "return 42")
-	mustFail(t, err, errWrongNumber("eval"))
+	mustDo(t, c,
+		"EVAL", "return 42",
+		proto.Error(errWrongNumber("eval")),
+	)
 
-	_, err = c.Do("EVAL", "return 42", 1)
-	mustFail(t, err, msgInvalidKeysNumber)
+	mustDo(t, c,
+		"EVAL", "return 42", "1",
+		proto.Error(msgInvalidKeysNumber),
+	)
 
-	_, err = c.Do("EVAL", "return 42", -1)
-	mustFail(t, err, msgNegativeKeysNumber)
+	mustDo(t, c,
+		"EVAL", "return 42", "-1",
+		proto.Error(msgNegativeKeysNumber),
+	)
 
-	_, err = c.Do("EVAL", "return 42", "letter")
-	mustFail(t, err, msgInvalidInt)
+	mustDo(t, c,
+		"EVAL", "return 42", "letter",
+		proto.Error(msgInvalidInt),
+	)
 
-	_, err = c.Do("EVAL", "[", 0)
-	assert(t, err != nil, "no EVAL error")
+	mustDo(t, c,
+		"EVAL", "[", "0",
+		proto.Error("ERR Error compiling script (new function): <string> line:1(column:1) near '[':   syntax error "),
+	)
 
-	_, err = c.Do("EVAL", "os.exit(42)", 0)
-	assert(t, err != nil, "no EVAL error")
+	mustDo(t, c,
+		"EVAL", "os.exit(42)",
+		proto.Error(errWrongNumber("eval")),
+	)
 
-	{
-		b, err := redis.String(c.Do("EVAL", `return string.gsub("foo", "o", "a")`, 0))
-		ok(t, err)
-		equals(t, "faa", b)
-	}
+	mustDo(t, c,
+		"EVAL", `return string.gsub("foo", "o", "a")`,
+		proto.Error(errWrongNumber("eval")),
+	)
 
-	_, err = c.Do("EVAL", "return someGlobal", 0)
-	if err == nil || !strings.Contains(err.Error(), "Script attempted to access nonexistent global variable 'someGlobal'") {
-		t.Error("unexpected error", err)
-	}
+	mustContain(t, c,
+		"EVAL", "return someGlobal", "0",
+		"Script attempted to access nonexistent global variable 'someGlobal'",
+	)
 
-	_, err = c.Do("EVAL", "someGlobal = 5", 0)
-	if err == nil || !strings.Contains(err.Error(), "Script attempted to create global variable 'someGlobal'") {
-		t.Error("unexpected error", err)
-	}
+	mustContain(t, c,
+		"EVAL", "someGlobal = 5", "0",
+		"Script attempted to create global variable 'someGlobal'",
+	)
 
 	t.Run("bigger float value", func(t *testing.T) {
-		_, err = c.Do("EVAL", "return redis.call('expire','foo', 999999)", 0)
+		must0(t, c,
+			"EVAL", "return redis.call('expire','foo', 999999)", "0",
+		)
 		ok(t, err)
-		_, err = c.Do("EVAL", "return redis.call('expire','foo',1000000)", 0)
-		ok(t, err)
+		must0(t, c,
+			"EVAL", "return redis.call('expire','foo',1000000)", "0",
+		)
 	})
 }
 
@@ -83,25 +95,31 @@ func TestEvalCall(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
 
-	_, err = c.Do("EVAL", "redis.call()", "0")
-	assert(t, err != nil, "no EVAL error")
+	mustContain(t, c,
+		"EVAL", "redis.call()", "0",
+		"Error compiling script",
+	)
 
-	_, err = c.Do("EVAL", "redis.call({})", "0")
-	assert(t, err != nil, "no EVAL error")
+	mustContain(t, c,
+		"EVAL", "redis.call({})", "0",
+		"Error compiling script",
+	)
 
-	_, err = c.Do("EVAL", "redis.call(1)", "0")
-	assert(t, err != nil, "no EVAL error")
+	mustContain(t, c,
+		"EVAL", "redis.call(1)", "0",
+		"Error compiling script",
+	)
 }
 
 func TestScript(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
 
@@ -109,423 +127,380 @@ func TestScript(t *testing.T) {
 		script1sha = "a42059b356c875f0717db19a51f6aaca9ae659ea"
 		script2sha = "1fa00e76656cc152ad327c13fe365858fd7be306" // "return 42"
 	)
-	{
-		v, err := redis.String(c.Do("SCRIPT", "LOAD", "return {KEYS[1],KEYS[2],ARGV[1],ARGV[2]}"))
-		ok(t, err)
-		equals(t, script1sha, v)
-	}
+	mustDo(t, c,
+		"SCRIPT", "LOAD", "return {KEYS[1],KEYS[2],ARGV[1],ARGV[2]}",
+		proto.String(script1sha),
+	)
 
-	{
-		v, err := redis.String(c.Do("SCRIPT", "LOAD", "return 42"))
-		ok(t, err)
-		equals(t, script2sha, v)
-	}
+	mustDo(t, c,
+		"SCRIPT", "LOAD", "return 42",
+		proto.String(script2sha),
+	)
 
-	{
-		v, err := redis.Int64s(c.Do("SCRIPT", "EXISTS", script1sha, script2sha, "invalid sha"))
-		ok(t, err)
-		equals(t, []int64{1, 1, 0}, v)
-	}
+	mustDo(t, c,
+		"SCRIPT", "EXISTS", script1sha, script2sha, "invalid sha",
+		proto.Array(proto.Int(1), proto.Int(1), proto.Int(0)),
+	)
 
-	{
-		v, err := redis.String(c.Do("SCRIPT", "FLUSH"))
-		ok(t, err)
-		equals(t, "OK", v)
-	}
+	mustOK(t, c,
+		"SCRIPT", "FLUSH",
+	)
 
-	{
-		v, err := redis.Int64s(c.Do("SCRIPT", "EXISTS", script1sha))
-		ok(t, err)
-		equals(t, []int64{0}, v)
-	}
+	mustDo(t, c,
+		"SCRIPT", "EXISTS", script1sha,
+		proto.Array(proto.Int(0)),
+	)
 
-	{
-		v, err := redis.Int64s(c.Do("SCRIPT", "EXISTS"))
-		ok(t, err)
-		equals(t, []int64{}, v)
-	}
+	mustDo(t, c,
+		"SCRIPT", "EXISTS",
+		proto.Array(),
+	)
 
-	_, err = c.Do("SCRIPT")
-	mustFail(t, err, errWrongNumber("script"))
+	mustDo(t, c,
+		"SCRIPT",
+		proto.Error(errWrongNumber("script")),
+	)
 
-	_, err = c.Do("SCRIPT", "LOAD")
-	mustFail(t, err, "ERR Unknown subcommand or wrong number of arguments for 'LOAD'. Try SCRIPT HELP.")
+	mustDo(t, c,
+		"SCRIPT", "LOAD",
+		proto.Error("ERR Unknown subcommand or wrong number of arguments for 'LOAD'. Try SCRIPT HELP."),
+	)
 
-	_, err = c.Do("SCRIPT", "LOAD", "return 42", "FOO")
-	mustFail(t, err, "ERR Unknown subcommand or wrong number of arguments for 'LOAD'. Try SCRIPT HELP.")
+	mustDo(t, c,
+		"SCRIPT", "LOAD", "return 42", "FOO",
+		proto.Error("ERR Unknown subcommand or wrong number of arguments for 'LOAD'. Try SCRIPT HELP."),
+	)
 
-	_, err = c.Do("SCRIPT", "LOAD", "[")
-	assert(t, err != nil, "no SCRIPT lOAD error")
+	mustContain(t, c,
+		"SCRIPT", "LOAD", "[",
+		"Error compiling script",
+	)
 
-	_, err = c.Do("SCRIPT", "FLUSH", "1")
-	mustFail(t, err, "ERR Unknown subcommand or wrong number of arguments for 'FLUSH'. Try SCRIPT HELP.")
+	mustDo(t, c,
+		"SCRIPT", "FLUSH", "1",
+		proto.Error("ERR Unknown subcommand or wrong number of arguments for 'FLUSH'. Try SCRIPT HELP."),
+	)
 
-	_, err = c.Do("SCRIPT", "FOO")
-	mustFail(t, err, "ERR Unknown subcommand or wrong number of arguments for 'FOO'. Try SCRIPT HELP.")
+	mustDo(t, c,
+		"SCRIPT", "FOO",
+		proto.Error("ERR Unknown subcommand or wrong number of arguments for 'FOO'. Try SCRIPT HELP."),
+	)
 }
 
 func TestCJSON(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
 
-	test := func(expr, want string) {
-		t.Helper()
-		str, err := redis.String(c.Do("EVAL", expr, 0))
-		ok(t, err)
-		equals(t, str, want)
-	}
-	test(
-		`return cjson.decode('{"id":"foo"}')['id']`,
-		"foo",
+	mustDo(t, c,
+		"EVAL", `return cjson.decode('{"id":"foo"}')['id']`, "0",
+		proto.String("foo"),
 	)
-	test(
-		`return cjson.encode({foo=42})`,
-		`{"foo":42}`,
+	mustDo(t, c,
+		"EVAL", `return cjson.encode({foo=42})`, "0",
+		proto.String(`{"foo":42}`),
 	)
 
-	_, err = c.Do("EVAL", `redis.encode()`, 0)
-	assert(t, err != nil, "lua error")
-	_, err = c.Do("EVAL", `redis.encode("1", "2")`, 0)
-	assert(t, err != nil, "lua error")
-	_, err = c.Do("EVAL", `redis.decode()`, 0)
-	assert(t, err != nil, "lua error")
-	_, err = c.Do("EVAL", `redis.decode("{")`, 0)
-	assert(t, err != nil, "lua error")
-	_, err = c.Do("EVAL", `redis.decode("1", "2")`, 0)
-	assert(t, err != nil, "lua error")
+	mustContain(t, c,
+		"EVAL", `redis.encode()`, "0",
+		"Error compiling script",
+	)
+	mustContain(t, c,
+		"EVAL", `redis.encode("1", "2")`, "0",
+		"Error compiling script",
+	)
+	mustContain(t, c,
+		"EVAL", `redis.decode()`, "0",
+		"Error compiling script",
+	)
+	mustContain(t, c,
+		"EVAL", `redis.decode("{")`, "0",
+		"Error compiling script",
+	)
+	mustContain(t, c,
+		"EVAL", `redis.decode("1", "2")`, "0",
+		"Error compiling script",
+	)
 }
 
 func TestSha1Hex(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
 
-	test1 := func(val interface{}, want string) {
+	test1 := func(val string, want string) {
 		t.Helper()
-		str, err := redis.String(c.Do("EVAL", "return redis.sha1hex(ARGV[1])", 0, val))
-		ok(t, err)
-		equals(t, str, want)
+		mustDo(t, c,
+			"EVAL", "return redis.sha1hex(ARGV[1])", "0", val,
+			proto.String(want),
+		)
 	}
 	test1("foo", "0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33")
 	test1("bar", "62cdb7020ff920e5aa642c3d4066950dd1f01f4d")
 	test1("0", "b6589fc6ab0dc82cf12099d1c2d40ab994e8410c")
-	test1(0, "b6589fc6ab0dc82cf12099d1c2d40ab994e8410c")
-	test1(nil, "da39a3ee5e6b4b0d3255bfef95601890afd80709")
 
 	test2 := func(eval, want string) {
 		t.Helper()
-		have, err := redis.String(c.Do("EVAL", eval, 0))
-		ok(t, err)
-		equals(t, have, want)
+		mustDo(t, c,
+			"EVAL", eval, "0",
+			proto.String(want),
+		)
 	}
 	test2("return redis.sha1hex({})", "da39a3ee5e6b4b0d3255bfef95601890afd80709")
 	test2("return redis.sha1hex(nil)", "da39a3ee5e6b4b0d3255bfef95601890afd80709")
 	test2("return redis.sha1hex(42)", "92cfceb39d57d914ed8b14d0e37643de0797ae56")
 
-	_, err = c.Do("EVAL", "redis.sha1hex()", 0)
-	assert(t, err != nil, "lua error")
+	mustContain(t, c,
+		"EVAL", "redis.sha1hex()", "0",
+		"wrong number of arguments",
+	)
 }
 
 func TestEvalsha(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
 
 	script1sha := "bfbf458525d6a0b19200bfd6db3af481156b367b"
-	{
-		v, err := redis.String(c.Do("SCRIPT", "LOAD", "return {KEYS[1],ARGV[1]}"))
-		ok(t, err)
-		equals(t, script1sha, v)
-	}
+	mustDo(t, c,
+		"SCRIPT", "LOAD", "return {KEYS[1],ARGV[1]}",
+		proto.String(script1sha),
+	)
+	mustDo(t, c,
+		"EVALSHA", script1sha, "1", "key1", "key2",
+		proto.Strings("key1", "key2"),
+	)
 
-	{
-		b, err := redis.Strings(c.Do("EVALSHA", script1sha, 1, "key1", "key2"))
-		ok(t, err)
-		equals(t, []string{"key1", "key2"}, b)
-	}
+	mustDo(t, c,
+		"EVALSHA",
+		proto.Error(errWrongNumber("evalsha")),
+	)
 
-	_, err = c.Do("EVALSHA")
-	mustFail(t, err, errWrongNumber("evalsha"))
+	mustDo(t, c,
+		"EVALSHA", "foo",
+		proto.Error(errWrongNumber("evalsha")),
+	)
 
-	_, err = c.Do("EVALSHA", "foo")
-	mustFail(t, err, errWrongNumber("evalsha"))
+	mustDo(t, c,
+		"EVALSHA", "foo", "0",
+		proto.Error(msgNoScriptFound),
+	)
 
-	_, err = c.Do("EVALSHA", "foo", 0)
-	mustFail(t, err, msgNoScriptFound)
+	mustDo(t, c,
+		"EVALSHA", script1sha, script1sha,
+		proto.Error(msgInvalidInt),
+	)
 
-	_, err = c.Do("EVALSHA", script1sha, script1sha)
-	mustFail(t, err, msgInvalidInt)
+	mustDo(t, c,
+		"EVALSHA", script1sha, "-1",
+		proto.Error(msgNegativeKeysNumber),
+	)
 
-	_, err = c.Do("EVALSHA", script1sha, -1)
-	mustFail(t, err, msgNegativeKeysNumber)
+	mustDo(t, c,
+		"EVALSHA", script1sha, "1",
+		proto.Error(msgInvalidKeysNumber),
+	)
 
-	_, err = c.Do("EVALSHA", script1sha, 1)
-	mustFail(t, err, msgInvalidKeysNumber)
-
-	_, err = c.Do("EVALSHA", "foo", 1, "bar")
-	mustFail(t, err, msgNoScriptFound)
+	mustDo(t, c,
+		"EVALSHA", "foo", "1", "bar",
+		proto.Error(msgNoScriptFound),
+	)
 }
 
 func TestCmdEvalReply(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
 
-	test := func(script string, args []interface{}, expected interface{}) {
-		t.Helper()
-		reply, err := c.Do("EVAL", append([]interface{}{script}, args...)...)
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-			return
-		}
-		equals(t, expected, reply)
-	}
-
 	// return nil
-	test(
-		"",
-		[]interface{}{
-			0,
-		},
-		nil,
+	mustNil(t, c,
+		"EVAL", "", "0",
 	)
 	// return boolean true
-	test(
-		"return true",
-		[]interface{}{
-			0,
-		},
-		int64(1),
+	must1(t, c,
+		"EVAL", "return true", "0",
 	)
 	// return boolean false
-	test(
-		"return false",
-		[]interface{}{
-			0,
-		},
-		nil,
+	mustNil(t, c,
+		"EVAL", "return false", "0",
 	)
 	// return single number
-	test(
-		"return 10",
-		[]interface{}{
-			0,
-		},
-		int64(10),
+	mustDo(t, c,
+		"EVAL", "return 10", "0",
+		proto.Int(10),
 	)
 	// return single float
-	test(
-		"return 12.345",
-		[]interface{}{
-			0,
-		},
-		int64(12),
+	mustDo(t, c,
+		"EVAL", "return 12.345", "0",
+		proto.Int(12),
 	)
 	// return multiple numbers
-	test(
-		"return 10, 20",
-		[]interface{}{
-			0,
-		},
-		int64(10),
+	mustDo(t, c,
+		"EVAL", "return 10, 20", "0",
+		proto.Int(10),
 	)
 	// return single string
-	test(
-		"return 'test'",
-		[]interface{}{
-			0,
-		},
-		[]byte("test"),
+	mustDo(t, c,
+		"EVAL", "return 'test'", "0",
+		proto.String("test"),
 	)
-	// return multiple string
-	test(
-		"return 'test1', 'test2'",
-		[]interface{}{
-			0,
-		},
-		[]byte("test1"),
+	// return multiple strings
+	mustDo(t, c,
+		"EVAL", "return 'test1', 'test2'", "0",
+		proto.String("test1"),
 	)
 	// return single table multiple integer
-	test(
-		"return {10, 20}",
-		[]interface{}{
-			0,
-		},
-		[]interface{}{
-			int64(10),
-			int64(20),
-		},
+	mustDo(t, c,
+		"EVAL", "return {10, 20}", "0",
+		proto.Array(
+			proto.Int(10),
+			proto.Int(20),
+		),
 	)
 	// return single table multiple string
-	test(
-		"return {'test1', 'test2'}",
-		[]interface{}{
-			0,
-		},
-		[]interface{}{
-			[]byte("test1"),
-			[]byte("test2"),
-		},
+	mustDo(t, c,
+		"EVAL", "return {'test1', 'test2'}", "0",
+		proto.Strings("test1", "test2"),
 	)
 	// return nested table
-	test(
-		"return {10, 20, {30, 40}}",
-		[]interface{}{
-			0,
-		},
-		[]interface{}{
-			int64(10),
-			int64(20),
-			[]interface{}{
-				int64(30),
-				int64(40),
-			},
-		},
+	mustDo(t, c,
+		"EVAL", "return {10, 20, {30, 40}}", "0",
+		proto.Array(
+			proto.Int(10),
+			proto.Int(20),
+			proto.Ints(30, 40),
+		),
 	)
 	// return combination table
-	test(
-		"return {10, 20, {30, 'test', true, 40}, false}",
-		[]interface{}{
-			0,
-		},
-		[]interface{}{
-			int64(10),
-			int64(20),
-			[]interface{}{
-				int64(30),
-				[]byte("test"),
-				int64(1),
-				int64(40),
-			},
-			nil,
-		},
+	mustDo(t, c,
+		"EVAL", "return {10, 20, {30, 'test', true, 40}, false}", "0",
+		proto.Array(
+			proto.Int(10),
+			proto.Int(20),
+			proto.Array(
+				proto.Int(30),
+				proto.String("test"),
+				proto.Int(1),
+				proto.Int(40),
+			),
+			proto.Nil,
+		),
 	)
 	// KEYS and ARGV
-	test(
-		"return {KEYS[1],KEYS[2],ARGV[1],ARGV[2]}",
-		[]interface{}{
-			2,
+	mustDo(t, c,
+		"EVAL", "return {KEYS[1],KEYS[2],ARGV[1],ARGV[2]}",
+		"2", "key1", "key2", "first", "second",
+		proto.Strings(
 			"key1",
 			"key2",
 			"first",
 			"second",
-		},
-		[]interface{}{
-			[]byte("key1"),
-			[]byte("key2"),
-			[]byte("first"),
-			[]byte("second"),
-		},
+		),
 	)
 
-	{
-		_, err := c.Do("EVAL", `return {err="broken"}`, 0)
-		mustFail(t, err, "broken")
+	mustDo(t, c,
+		"EVAL", `return {err="broken"}`, "0",
+		proto.Error("broken"),
+	)
 
-		_, err = c.Do("EVAL", `return redis.error_reply("broken")`, 0)
-		mustFail(t, err, "broken")
-	}
+	mustDo(t, c,
+		"EVAL", `return redis.error_reply("broken")`, "0",
+		proto.Error("broken"),
+	)
 
-	{
-		v, err := redis.String(c.Do("EVAL", `return {ok="good"}`, 0))
-		ok(t, err)
-		equals(t, "good", v)
+	mustDo(t, c,
+		"EVAL", `return {ok="good"}`, "0",
+		proto.Inline("good"),
+	)
 
-		v, err = redis.String(c.Do("EVAL", `return redis.status_reply("good")`, 0))
-		ok(t, err)
-		equals(t, "good", v)
-	}
+	mustDo(t, c,
+		"EVAL", `return redis.status_reply("good")`, "0",
+		proto.Inline("good"),
+	)
 
-	_, err = c.Do("EVAL", `return redis.error_reply()`, 0)
-	assert(t, err != nil, "no EVAL error")
+	mustContain(t, c,
+		"EVAL", `return redis.error_reply()`, "0",
+		"string expected, got nil",
+	)
 
-	_, err = c.Do("EVAL", `return redis.error_reply(1)`, 0)
-	assert(t, err != nil, "no EVAL error")
+	mustContain(t, c,
+		"EVAL", `return redis.error_reply(1)`, "0",
+		"string expected, got number",
+	)
 
-	_, err = c.Do("EVAL", `return redis.status_reply()`, 0)
-	assert(t, err != nil, "no EVAL error")
+	mustContain(t, c,
+		"EVAL", `return redis.status_reply()`, "0",
+		"string expected, got nil",
+	)
 
-	_, err = c.Do("EVAL", `return redis.status_reply(1)`, 0)
-	assert(t, err != nil, "no EVAL error")
+	mustContain(t, c,
+		"EVAL", `return redis.status_reply(1)`, "0",
+		"string expected, got number",
+	)
 }
 
 func TestCmdEvalResponse(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
 
-	{
-		v, err := redis.String(c.Do("EVAL", "return redis.call('set','foo','bar')", 0))
-		ok(t, err)
-		equals(t, "OK", v)
-	}
+	mustOK(t, c,
+		"EVAL", "return redis.call('set','foo','bar')", "0",
+	)
 
-	{
-		v, err := redis.String(c.Do("EVAL", "return redis.call('get','foo')", 0))
-		ok(t, err)
-		equals(t, "bar", v)
-	}
+	mustDo(t, c,
+		"EVAL", "return redis.call('get','foo')", "0",
+		proto.String("bar"),
+	)
+	mustNil(t, c,
+		"EVAL", "return redis.call('get','nosuch')", "0",
+	)
 
-	{
-		v, err := c.Do("EVAL", "return redis.call('get','nosuch')", 0)
-		ok(t, err)
-		equals(t, nil, v)
-	}
+	mustOK(t, c,
+		"EVAL", "return redis.call('HMSET', 'mkey', 'foo','bar','foo1','bar1')", "0",
+	)
 
-	{
-		v, err := redis.String(c.Do("EVAL", "return redis.call('HMSET', 'mkey', 'foo','bar','foo1','bar1')", 0))
-		ok(t, err)
-		equals(t, "OK", v)
-	}
+	mustDo(t, c,
+		"EVAL", "return redis.call('HGETALL','mkey')", "0",
+		proto.Strings("foo", "bar", "foo1", "bar1"),
+	)
 
-	{
-		v, err := redis.Strings(c.Do("EVAL", "return redis.call('HGETALL','mkey')", 0))
-		ok(t, err)
-		equals(t, []string{"foo", "bar", "foo1", "bar1"}, v)
-	}
+	mustDo(t, c,
+		"EVAL", "return redis.call('HMGET','mkey', 'foo1')", "0",
+		proto.Strings("bar1"),
+	)
 
-	{
-		v, err := redis.Strings(c.Do("EVAL", "return redis.call('HMGET','mkey', 'foo1')", 0))
-		ok(t, err)
-		equals(t, []string{"bar1"}, v)
-	}
+	mustDo(t, c,
+		"EVAL", "return redis.call('HMGET','mkey', 'foo')", "0",
+		proto.Strings("bar"),
+	)
 
-	{
-		v, err := redis.Strings(c.Do("EVAL", "return redis.call('HMGET','mkey', 'foo')", 0))
-		ok(t, err)
-		equals(t, []string{"bar"}, v)
-	}
-
-	{
-		v, err := c.Do("EVAL", "return redis.call('HMGET','mkey', 'bad', 'key')", 0)
-		ok(t, err)
-		equals(t, []interface{}{nil, nil}, v)
-	}
+	mustDo(t, c,
+		"EVAL", "return redis.call('HMGET','mkey', 'bad', 'key')", "0",
+		proto.Array(proto.Nil, proto.Nil),
+	)
 }
 
 func TestCmdEvalAuth(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
 
@@ -533,125 +508,124 @@ func TestCmdEvalAuth(t *testing.T) {
 
 	s.RequireAuth("123password")
 
-	_, err = c.Do("EVAL", eval, 0)
-	mustFail(t, err, "NOAUTH Authentication required.")
+	mustDo(t, c,
+		"EVAL", eval, "0",
+		proto.Error("NOAUTH Authentication required."),
+	)
 
-	_, err = c.Do("AUTH", "123password")
-	ok(t, err)
+	mustOK(t, c,
+		"AUTH", "123password",
+	)
 
-	_, err = c.Do("EVAL", eval, 0)
-	ok(t, err)
+	mustOK(t, c,
+		"EVAL", eval, "0",
+	)
 }
 
 func TestLuaReplicate(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
 
-	_, err = c.Do("EVAL", "redis.replicate_commands()", 0)
-	ok(t, err)
+	mustNil(t, c,
+		"EVAL", "redis.replicate_commands()", "0",
+	)
 }
 
 func TestLuaTX(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
 
-	// EVAL
-	{
-		b, err := redis.String(c.Do("MULTI"))
-		ok(t, err)
-		equals(t, "OK", b)
+	t.Run("eval", func(t *testing.T) {
+		mustOK(t, c,
+			"MULTI",
+		)
+		mustDo(t, c,
+			"EVAL", "return {ARGV[1]}", "0", "key1",
+			proto.Inline("QUEUED"),
+		)
+		mustDo(t, c,
+			"EXEC",
+			proto.Array(
+				proto.Strings("key1"), // EVAL
+			),
+		)
+	})
 
-		b, err = redis.String(c.Do("EVAL", "return {ARGV[1]}", 0, "key1"))
-		ok(t, err)
-		equals(t, "QUEUED", b)
-
-		v, err := redis.Values(c.Do("EXEC"))
-		ok(t, err)
-		equals(t, 1, len(redis.Args(v)))
-		v0, err := redis.Strings(v[0], nil)
-		ok(t, err)
-		equals(t, []string{"key1"}, v0)
-	}
-
-	// EVALSHA
-	{
+	t.Run("evalsha", func(t *testing.T) {
 		script1sha := "bfbf458525d6a0b19200bfd6db3af481156b367b"
+		mustOK(t, c,
+			"MULTI",
+		)
+		mustDo(t, c,
+			"SCRIPT", "LOAD", "return {KEYS[1],ARGV[1]}",
+			proto.Inline("QUEUED"),
+		)
+		mustDo(t, c,
+			"EVALSHA", script1sha, "1", "key1", "key2",
+			proto.Inline("QUEUED"),
+		)
+		mustDo(t, c,
+			"EXEC",
+			proto.Array(
+				proto.String(script1sha),      // SCRIPT
+				proto.Strings("key1", "key2"), // EVALSHA
+			),
+		)
+	})
 
-		b, err := redis.String(c.Do("MULTI"))
-		ok(t, err)
-		equals(t, "OK", b)
+	t.Run("compile", func(t *testing.T) {
+		// compiling is done inside the transaction
+		mustOK(t, c,
+			"SET", "foo", "12",
+		)
 
-		b, err = redis.String(c.Do("SCRIPT", "LOAD", "return {KEYS[1],ARGV[1]}"))
-		ok(t, err)
-		equals(t, "QUEUED", b)
+		mustOK(t, c,
+			"MULTI",
+		)
+		mustDo(t, c,
+			"SCRIPT", "LOAD", "foobar",
+			proto.Inline("QUEUED"),
+		)
+		mustDo(t, c,
+			"GET", "foo",
+			proto.Inline("QUEUED"),
+		)
+		mustDo(t, c,
+			"EXEC",
+			proto.Array(
+				proto.Error("ERR Error compiling script (new function): user_script at EOF:   parse error "),
+				proto.String("12"),
+			),
+		)
+	})
 
-		b, err = redis.String(c.Do("EVALSHA", script1sha, 1, "key1", "key2"))
-		ok(t, err)
-		equals(t, "QUEUED", b)
-
-		v, err := redis.Values(c.Do("EXEC"))
-		ok(t, err)
-		equals(t, 2, len(redis.Args(v)))
-		v0, err := redis.String(v[0], nil)
-		ok(t, err)
-		v1, err := redis.Strings(v[1], nil)
-		ok(t, err)
-		equals(t, script1sha, v0)               // SCRIPT
-		equals(t, []string{"key1", "key2"}, v1) // EVALSHA
-	}
-
-	// compiling is done inside the transaction
-	{
-		b, err := redis.String(c.Do("SET", "foo", "12"))
-		ok(t, err)
-		equals(t, "OK", b)
-
-		b, err = redis.String(c.Do("MULTI"))
-		ok(t, err)
-		equals(t, "OK", b)
-
-		b, err = redis.String(c.Do("SCRIPT", "LOAD", "foobar"))
-		ok(t, err)
-		equals(t, "QUEUED", b)
-
-		b, err = redis.String(c.Do("GET", "foo"))
-		ok(t, err)
-		equals(t, "QUEUED", b)
-
-		v, err := redis.Values(c.Do("EXEC"))
-		ok(t, err)
-		equals(t, 2, len(redis.Args(v)))
-		_, err = redis.String(v[0], nil)
-		mustFail(t, err, "ERR Error compiling script (new function): user_script at EOF:   parse error ")
-		v1, err := redis.String(v[1], nil)
-		ok(t, err)
-		equals(t, "12", v1)
-	}
-
-	// misc SCRIPT subcommands
-	{
-		b, err := redis.String(c.Do("MULTI"))
-		ok(t, err)
-		equals(t, "OK", b)
-
-		b, err = redis.String(c.Do("SCRIPT", "EXISTS", "123"))
-		ok(t, err)
-		equals(t, "QUEUED", b)
-
-		b, err = redis.String(c.Do("SCRIPT", "FLUSH"))
-		ok(t, err)
-		equals(t, "QUEUED", b)
-
-		v, err := redis.Values(c.Do("EXEC"))
-		ok(t, err)
-		equals(t, 2, len(redis.Args(v)))
-	}
+	t.Run("misc", func(t *testing.T) {
+		// misc SCRIPT subcommands
+		mustOK(t, c,
+			"MULTI",
+		)
+		mustDo(t, c,
+			"SCRIPT", "EXISTS", "123",
+			proto.Inline("QUEUED"),
+		)
+		mustDo(t, c,
+			"SCRIPT", "FLUSH",
+			proto.Inline("QUEUED"),
+		)
+		mustDo(t, c,
+			"EXEC",
+			proto.Array(
+				proto.Ints(0),
+				proto.Inline("OK"),
+			),
+		)
+	})
 }

@@ -2,6 +2,7 @@ package miniredis
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/alicebob/miniredis/v2/proto"
@@ -84,4 +85,16 @@ func mustRead(tb testing.TB, c *proto.Client, want string) {
 	res, err := c.Read()
 	ok(tb, err)
 	equals(tb, want, res)
+}
+
+// execute a Do(args[,-1]...), which result needs to Contain() the same as the last arg.
+func mustContain(tb testing.TB, c *proto.Client, args ...string) {
+	tb.Helper()
+	args, want := args[:len(args)-1], args[len(args)-1]
+
+	res, err := c.Do(args...)
+	ok(tb, err)
+	if !strings.Contains(res, want) {
+		tb.Errorf("expected %q in %q", want, res)
+	}
 }
