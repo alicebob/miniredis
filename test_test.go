@@ -77,3 +77,11 @@ func must1(tb testing.TB, c *proto.Client, args ...string) {
 	tb.Helper()
 	mustDo(tb, c, append(args, proto.Int(1))...)
 }
+
+// execute a Read()
+func mustRead(tb testing.TB, c *proto.Client, want string) {
+	tb.Helper()
+	res, err := c.Read()
+	ok(tb, err)
+	equals(tb, want, res)
+}

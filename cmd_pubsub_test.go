@@ -3,157 +3,170 @@ package miniredis
 import (
 	"testing"
 
-	"github.com/gomodule/redigo/redis"
+	"github.com/alicebob/miniredis/v2/proto"
 )
 
-func setup(t *testing.T) (*Miniredis, redis.Conn, func()) {
-	s, err := Run()
-	ok(t, err)
-	c1, err := redis.Dial("tcp", s.Addr())
-	ok(t, err)
-	return s, c1, func() { s.Close() }
-}
-
-func setup2(t *testing.T) (*Miniredis, redis.Conn, redis.Conn, func()) {
-	s, err := Run()
-	ok(t, err)
-	c1, err := redis.Dial("tcp", s.Addr())
-	ok(t, err)
-	c2, err := redis.Dial("tcp", s.Addr())
-	ok(t, err)
-	return s, c1, c2, func() { s.Close() }
-}
-
 func TestSubscribe(t *testing.T) {
-	s, c, done := setup(t)
-	defer done()
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := proto.Dial(s.Addr())
+	ok(t, err)
 	defer c.Close()
 
-	{
-		a, err := redis.Values(c.Do("SUBSCRIBE", "event1"))
-		ok(t, err)
-		equals(t, []interface{}{[]byte("subscribe"), []byte("event1"), int64(1)}, a)
-	}
-
-	{
-		a, err := redis.Values(c.Do("SUBSCRIBE", "event2"))
-		ok(t, err)
-		equals(t, []interface{}{[]byte("subscribe"), []byte("event2"), int64(2)}, a)
-	}
-
-	{
-		a, err := redis.Values(c.Do("SUBSCRIBE", "event3", "event4"))
-		ok(t, err)
-		equals(t, []interface{}{[]byte("subscribe"), []byte("event3"), int64(3)}, a)
-
-		a, err = redis.Values(c.Receive())
-		ok(t, err)
-		equals(t, []interface{}{[]byte("subscribe"), []byte("event4"), int64(4)}, a)
-	}
+	mustDo(t, c,
+		"SUBSCRIBE", "event1",
+		proto.Array(
+			proto.String("subscribe"),
+			proto.String("event1"),
+			proto.Int(1),
+		),
+	)
+	mustDo(t, c,
+		"SUBSCRIBE", "event2",
+		proto.Array(
+			proto.String("subscribe"),
+			proto.String("event2"),
+			proto.Int(2),
+		),
+	)
+	mustDo(t, c,
+		"SUBSCRIBE", "event3", "event4",
+		proto.Array(
+			proto.String("subscribe"),
+			proto.String("event3"),
+			proto.Int(3),
+		),
+	)
+	mustRead(t, c,
+		proto.Array(
+			proto.String("subscribe"),
+			proto.String("event4"),
+			proto.Int(4),
+		),
+	)
 
 	{
 		// publish something!
-		a, err := redis.Values(c.Do("SUBSCRIBE", "colors"))
-		ok(t, err)
-		equals(t, []interface{}{[]byte("subscribe"), []byte("colors"), int64(5)}, a)
-
+		mustDo(t, c,
+			"SUBSCRIBE", "colors",
+			proto.Array(
+				proto.String("subscribe"),
+				proto.String("colors"),
+				proto.Int(5),
+			),
+		)
 		n := s.Publish("colors", "green")
 		equals(t, 1, n)
 
-		s, err := redis.Strings(c.Receive())
-		ok(t, err)
-		equals(t, []string{"message", "colors", "green"}, s)
+		mustRead(t, c,
+			proto.Strings("message", "colors", "green"),
+		)
 	}
 }
 
 func TestUnsubscribe(t *testing.T) {
-	_, c, done := setup(t)
-	defer done()
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := proto.Dial(s.Addr())
+	ok(t, err)
+	defer c.Close()
 
-	ok(t, c.Send("SUBSCRIBE", "event1", "event2", "event3", "event4", "event5"))
-	c.Flush()
-	c.Receive()
-	c.Receive()
-	c.Receive()
-	c.Receive()
-	c.Receive()
+	mustDo(t, c,
+		"SUBSCRIBE", "event1", "event2", "event3", "event4", "event5",
+		proto.Array(
+			proto.String("subscribe"),
+			proto.String("event1"),
+			proto.Int(1),
+		),
+	)
+	mustRead(t, c, proto.Array(proto.String("subscribe"), proto.String("event2"), proto.Int(2)))
+	mustRead(t, c, proto.Array(proto.String("subscribe"), proto.String("event3"), proto.Int(3)))
+	mustRead(t, c, proto.Array(proto.String("subscribe"), proto.String("event4"), proto.Int(4)))
+	mustRead(t, c, proto.Array(proto.String("subscribe"), proto.String("event5"), proto.Int(5)))
 
-	{
-		a, err := redis.Values(c.Do("UNSUBSCRIBE", "event1", "event2"))
-		ok(t, err)
-		equals(t, []interface{}{[]byte("unsubscribe"), []byte("event1"), int64(4)}, a)
+	mustDo(t, c,
+		"UNSUBSCRIBE", "event1", "event2",
+		proto.Array(
+			proto.String("unsubscribe"),
+			proto.String("event1"),
+			proto.Int(4),
+		),
+	)
+	mustRead(t, c, proto.Array(proto.String("unsubscribe"), proto.String("event2"), proto.Int(3)))
 
-		a, err = redis.Values(c.Receive())
-		ok(t, err)
-		equals(t, []interface{}{[]byte("unsubscribe"), []byte("event2"), int64(3)}, a)
-	}
+	mustDo(t, c,
+		"UNSUBSCRIBE", "event3",
+		proto.Array(
+			proto.String("unsubscribe"),
+			proto.String("event3"),
+			proto.Int(2),
+		),
+	)
 
-	{
-		a, err := redis.Values(c.Do("UNSUBSCRIBE", "event3"))
-		ok(t, err)
-		equals(t, []interface{}{[]byte("unsubscribe"), []byte("event3"), int64(2)}, a)
-	}
-
-	{
-		a, err := redis.Values(c.Do("UNSUBSCRIBE", "event999"))
-		ok(t, err)
-		equals(t, []interface{}{[]byte("unsubscribe"), []byte("event999"), int64(2)}, a)
-	}
+	mustDo(t, c,
+		"UNSUBSCRIBE", "event999",
+		proto.Array(
+			proto.String("unsubscribe"),
+			proto.String("event999"),
+			proto.Int(2),
+		),
+	)
 
 	{
 		// unsub the rest
-		ok(t, c.Send("UNSUBSCRIBE"))
-		c.Flush()
-		seen := map[string]bool{}
-		for i := 0; i < 2; i++ {
-			vs, err := redis.Values(c.Receive())
-			ok(t, err)
-			equals(t, 3, len(vs))
-			equals(t, "unsubscribe", string(vs[0].([]byte)))
-			seen[string(vs[1].([]byte))] = true
-			equals(t, 1-i, int(vs[2].(int64)))
-		}
-		equals(t,
-			map[string]bool{
-				"event4": true,
-				"event5": true,
-			},
-			seen,
+		mustDo(t, c,
+			"UNSUBSCRIBE", "event4",
+			proto.Array(
+				proto.String("unsubscribe"),
+				proto.String("event4"),
+				proto.Int(1),
+			),
+		)
+		mustDo(t, c,
+			"UNSUBSCRIBE", "event5",
+			proto.Array(
+				proto.String("unsubscribe"),
+				proto.String("event5"),
+				proto.Int(0),
+			),
 		)
 	}
 }
 
 func TestPsubscribe(t *testing.T) {
-	s, c, done := setup(t)
-	defer done()
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := proto.Dial(s.Addr())
+	ok(t, err)
+	defer c.Close()
+
+	mustDo(t, c,
+		"PSUBSCRIBE", "event1",
+		proto.Array(proto.String("psubscribe"), proto.String("event1"), proto.Int(1)),
+	)
+
+	mustDo(t, c,
+		"PSUBSCRIBE", "event2?",
+		proto.Array(proto.String("psubscribe"), proto.String("event2?"), proto.Int(2)),
+	)
 
 	{
-		a, err := redis.Values(c.Do("PSUBSCRIBE", "event1"))
-		ok(t, err)
-		equals(t, []interface{}{[]byte("psubscribe"), []byte("event1"), int64(1)}, a)
+		mustDo(t, c,
+			"PSUBSCRIBE", "event3*", "event4[abc]",
+			proto.Array(proto.String("psubscribe"), proto.String("event3*"), proto.Int(3)),
+		)
+		mustRead(t, c,
+			proto.Array(proto.String("psubscribe"), proto.String("event4[abc]"), proto.Int(4)),
+		)
 	}
 
-	{
-		a, err := redis.Values(c.Do("PSUBSCRIBE", "event2?"))
-		ok(t, err)
-		equals(t, []interface{}{[]byte("psubscribe"), []byte("event2?"), int64(2)}, a)
-	}
-
-	{
-		a, err := redis.Values(c.Do("PSUBSCRIBE", "event3*", "event4[abc]"))
-		ok(t, err)
-		equals(t, []interface{}{[]byte("psubscribe"), []byte("event3*"), int64(3)}, a)
-
-		a, err = redis.Values(c.Receive())
-		ok(t, err)
-		equals(t, []interface{}{[]byte("psubscribe"), []byte("event4[abc]"), int64(4)}, a)
-	}
-
-	{
-		a, err := redis.Values(c.Do("PSUBSCRIBE", "event5[]"))
-		ok(t, err)
-		equals(t, []interface{}{[]byte("psubscribe"), []byte("event5[]"), int64(5)}, a)
-	}
+	mustDo(t, c,
+		"PSUBSCRIBE", "event5[]",
+		proto.Array(proto.String("psubscribe"), proto.String("event5[]"), proto.Int(5)),
+	)
 
 	{
 		// publish some things!
@@ -163,65 +176,54 @@ func TestPsubscribe(t *testing.T) {
 		n = s.Publish("event4d", "hello 4d?")
 		equals(t, 0, n)
 
-		s, err := redis.Strings(c.Receive())
-		ok(t, err)
-		equals(t, []string{"pmessage", "event4[abc]", "event4b", "hello 4b!"}, s)
+		mustRead(t, c,
+			proto.Strings("pmessage", "event4[abc]", "event4b", "hello 4b!"),
+		)
 	}
 }
 
 func TestPunsubscribe(t *testing.T) {
-	_, c, done := setup(t)
-	defer done()
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := proto.Dial(s.Addr())
+	ok(t, err)
+	defer c.Close()
 
-	c.Send("PSUBSCRIBE", "event1", "event2?", "event3*", "event4[abc]", "event5[]")
-	c.Flush()
-	c.Receive()
-	c.Receive()
-	c.Receive()
-	c.Receive()
-	c.Receive()
+	mustDo(t, c,
+		"PSUBSCRIBE", "event1", "event2?", "event3*", "event4[abc]", "event5[]",
+		proto.Array(
+			proto.String("psubscribe"),
+			proto.String("event1"),
+			proto.Int(1),
+		),
+	)
+	mustRead(t, c, proto.Array(proto.String("psubscribe"), proto.String("event2?"), proto.Int(2)))
+	mustRead(t, c, proto.Array(proto.String("psubscribe"), proto.String("event3*"), proto.Int(3)))
+	mustRead(t, c, proto.Array(proto.String("psubscribe"), proto.String("event4[abc]"), proto.Int(4)))
+	mustRead(t, c, proto.Array(proto.String("psubscribe"), proto.String("event5[]"), proto.Int(5)))
 
 	{
-		ok(t, c.Send("PUNSUBSCRIBE", "event1", "event2?"))
-		c.Flush()
-		seen := map[string]bool{}
-		for i := 0; i < 2; i++ {
-			vs, err := redis.Values(c.Receive())
-			ok(t, err)
-			equals(t, 3, len(vs))
-			equals(t, "punsubscribe", string(vs[0].([]byte)))
-			seen[string(vs[1].([]byte))] = true
-			equals(t, 4-i, int(vs[2].(int64)))
-		}
-		equals(t,
-			map[string]bool{
-				"event1":  true,
-				"event2?": true,
-			},
-			seen,
+		mustDo(t, c,
+			"PUNSUBSCRIBE", "event1", "event2?",
+			proto.Array(proto.String("punsubscribe"), proto.String("event1"), proto.Int(4)),
+		)
+		mustRead(t, c,
+			proto.Array(proto.String("punsubscribe"), proto.String("event2?"), proto.Int(3)),
 		)
 	}
 
 	// punsub the rest
 	{
-		ok(t, c.Send("PUNSUBSCRIBE"))
-		c.Flush()
-		seen := map[string]bool{}
-		for i := 0; i < 3; i++ {
-			vs, err := redis.Values(c.Receive())
-			ok(t, err)
-			equals(t, 3, len(vs))
-			equals(t, "punsubscribe", string(vs[0].([]byte)))
-			seen[string(vs[1].([]byte))] = true
-			equals(t, 2-i, int(vs[2].(int64)))
-		}
-		equals(t,
-			map[string]bool{
-				"event3*":     true,
-				"event4[abc]": true,
-				"event5[]":    true,
-			},
-			seen,
+		mustDo(t, c,
+			"PUNSUBSCRIBE",
+			proto.Array(proto.String("punsubscribe"), proto.String("event3*"), proto.Int(2)),
+		)
+		mustRead(t, c,
+			proto.Array(proto.String("punsubscribe"), proto.String("event4[abc]"), proto.Int(1)),
+		)
+		mustRead(t, c,
+			proto.Array(proto.String("punsubscribe"), proto.String("event5[]"), proto.Int(0)),
 		)
 	}
 }
@@ -229,195 +231,286 @@ func TestPunsubscribe(t *testing.T) {
 func TestPublishMode(t *testing.T) {
 	// only pubsub related commands should be accepted while there are
 	// subscriptions.
-	_, c, done := setup(t)
-	defer done()
-
-	_, err := c.Do("SUBSCRIBE", "birds")
+	s, err := Run()
 	ok(t, err)
-
-	_, err = c.Do("SET", "foo", "bar")
-	mustFail(t, err, "ERR Can't execute 'set': only (P)SUBSCRIBE / (P)UNSUBSCRIBE / PING / QUIT are allowed in this context")
-
-	_, err = c.Do("UNSUBSCRIBE", "birds")
+	defer s.Close()
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
+
+	mustDo(t, c,
+		"SUBSCRIBE", "birds",
+		proto.Array(
+			proto.String("subscribe"),
+			proto.String("birds"),
+			proto.Int(1),
+		),
+	)
+
+	mustDo(t, c,
+		"SET", "foo", "bar",
+		proto.Error("ERR Can't execute 'set': only (P)SUBSCRIBE / (P)UNSUBSCRIBE / PING / QUIT are allowed in this context"),
+	)
+
+	mustDo(t, c,
+		"UNSUBSCRIBE", "birds",
+		proto.Array(
+			proto.String("unsubscribe"),
+			proto.String("birds"),
+			proto.Int(0),
+		),
+	)
 
 	// no subs left. All should be fine now.
-	_, err = c.Do("SET", "foo", "bar")
-	ok(t, err)
+	mustOK(t, c,
+		"SET", "foo", "bar",
+	)
 }
 
 func TestPublish(t *testing.T) {
-	s, c, c2, done := setup2(t)
-	defer done()
-
-	a, err := redis.Values(c2.Do("SUBSCRIBE", "event1"))
+	s, err := Run()
 	ok(t, err)
-	equals(t, []interface{}{[]byte("subscribe"), []byte("event1"), int64(1)}, a)
+	defer s.Close()
+	c1, err := proto.Dial(s.Addr())
+	ok(t, err)
+	defer c1.Close()
+	c2, err := proto.Dial(s.Addr())
+	ok(t, err)
+	defer c2.Close()
+
+	mustDo(t, c2,
+		"SUBSCRIBE", "event1",
+		proto.Array(
+			proto.String("subscribe"),
+			proto.String("event1"),
+			proto.Int(1),
+		),
+	)
 
 	{
-		n, err := redis.Int(c.Do("PUBLISH", "event1", "message2"))
-		ok(t, err)
-		equals(t, 1, n)
-
-		s, err := redis.Strings(c2.Receive())
-		ok(t, err)
-		equals(t, []string{"message", "event1", "message2"}, s)
+		must1(t, c1,
+			"PUBLISH", "event1", "message2",
+		)
+		mustRead(t, c2,
+			proto.Strings("message", "event1", "message2"),
+		)
 	}
 
 	// direct access
 	{
 		equals(t, 1, s.Publish("event1", "message3"))
 
-		s, err := redis.Strings(c2.Receive())
-		ok(t, err)
-		equals(t, []string{"message", "event1", "message3"}, s)
+		mustRead(t, c2,
+			proto.Strings("message", "event1", "message3"),
+		)
 	}
 
 	// Wrong usage
-	{
-		_, err := c2.Do("PUBLISH", "foo", "bar")
-		mustFail(t, err, "ERR Can't execute 'publish': only (P)SUBSCRIBE / (P)UNSUBSCRIBE / PING / QUIT are allowed in this context")
-	}
+	mustDo(t, c2,
+		"PUBLISH", "foo", "bar",
+		proto.Error("ERR Can't execute 'publish': only (P)SUBSCRIBE / (P)UNSUBSCRIBE / PING / QUIT are allowed in this context"),
+	)
 }
 
 func TestPublishMix(t *testing.T) {
 	// SUBSCRIBE and PSUBSCRIBE
-	_, c, done := setup(t)
-	defer done()
-
-	a, err := redis.Values(c.Do("SUBSCRIBE", "c1"))
+	s, err := Run()
 	ok(t, err)
-	equals(t, 1, int(a[2].(int64)))
-
-	a, err = redis.Values(c.Do("PSUBSCRIBE", "c1"))
+	defer s.Close()
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
-	equals(t, 2, int(a[2].(int64)))
+	defer c.Close()
 
-	a, err = redis.Values(c.Do("SUBSCRIBE", "c2"))
-	ok(t, err)
-	equals(t, 3, int(a[2].(int64)))
+	mustDo(t, c,
+		"SUBSCRIBE", "c1",
+		proto.Array(
+			proto.String("subscribe"),
+			proto.String("c1"),
+			proto.Int(1),
+		),
+	)
 
-	a, err = redis.Values(c.Do("PUNSUBSCRIBE", "c1"))
-	ok(t, err)
-	equals(t, 2, int(a[2].(int64)))
+	mustDo(t, c,
+		"PSUBSCRIBE", "c1",
+		proto.Array(
+			proto.String("psubscribe"),
+			proto.String("c1"),
+			proto.Int(2),
+		),
+	)
 
-	a, err = redis.Values(c.Do("UNSUBSCRIBE", "c1"))
-	ok(t, err)
-	equals(t, 1, int(a[2].(int64)))
+	mustDo(t, c,
+		"SUBSCRIBE", "c2",
+		proto.Array(
+			proto.String("subscribe"),
+			proto.String("c2"),
+			proto.Int(3),
+		),
+	)
+
+	mustDo(t, c,
+		"PUNSUBSCRIBE", "c1",
+		proto.Array(
+			proto.String("punsubscribe"),
+			proto.String("c1"),
+			proto.Int(2),
+		),
+	)
+
+	mustDo(t, c,
+		"UNSUBSCRIBE", "c1",
+		proto.Array(
+			proto.String("unsubscribe"),
+			proto.String("c1"),
+			proto.Int(1),
+		),
+	)
 }
 
 func TestPubsubChannels(t *testing.T) {
-	_, c1, c2, done := setup2(t)
-	defer done()
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c1, err := proto.Dial(s.Addr())
+	ok(t, err)
+	defer c1.Close()
+	c2, err := proto.Dial(s.Addr())
+	ok(t, err)
+	defer c2.Close()
 
-	a, err := redis.Strings(c1.Do("PUBSUB", "CHANNELS"))
-	ok(t, err)
-	equals(t, []string{}, a)
+	mustDo(t, c1,
+		"PUBSUB", "CHANNELS",
+		proto.Strings(),
+	)
 
-	a, err = redis.Strings(c1.Do("PUBSUB", "CHANNELS", "event1[abc]"))
-	ok(t, err)
-	equals(t, []string{}, a)
+	mustDo(t, c1,
+		"PUBSUB", "CHANNELS", "event1[abc]",
+		proto.Strings(),
+	)
 
-	n, err := redis.Values(c2.Do("SUBSCRIBE", "event1", "event1b", "event1c"))
-	ok(t, err)
-	ni, _ := n[2].(int64)
-	equals(t, 1, int(ni))
-	// sub "event1b"
-	n, err = redis.Values(c2.Receive())
-	ok(t, err)
-	ni, _ = n[2].(int64)
-	equals(t, 2, int(ni))
-	// sub "event1c"
-	n, err = redis.Values(c2.Receive())
-	ok(t, err)
-	ni, _ = n[2].(int64)
-	equals(t, 3, int(ni))
+	mustDo(t, c2,
+		"SUBSCRIBE", "event1", "event1b", "event1c",
+		proto.Array(
+			proto.String("subscribe"),
+			proto.String("event1"),
+			proto.Int(1),
+		),
+	)
+	mustRead(t, c2, proto.Array(proto.String("subscribe"), proto.String("event1b"), proto.Int(2)))
+	mustRead(t, c2, proto.Array(proto.String("subscribe"), proto.String("event1c"), proto.Int(3)))
 
-	a, err = redis.Strings(c1.Do("PUBSUB", "CHANNELS"))
-	ok(t, err)
-	equals(t, []string{"event1", "event1b", "event1c"}, a)
-
-	a, err = redis.Strings(c1.Do("PUBSUB", "CHANNELS", "event1b"))
-	ok(t, err)
-	equals(t, []string{"event1b"}, a)
-
-	a, err = redis.Strings(c1.Do("PUBSUB", "CHANNELS", "event1[abc]"))
-	ok(t, err)
-	equals(t, []string{"event1b", "event1c"}, a)
+	mustDo(t, c1,
+		"PUBSUB", "CHANNELS",
+		proto.Strings("event1", "event1b", "event1c"),
+	)
+	mustDo(t, c1,
+		"PUBSUB", "CHANNELS", "event1b",
+		proto.Strings("event1b"),
+	)
+	mustDo(t, c1,
+		"PUBSUB", "CHANNELS", "event1[abc]",
+		proto.Strings("event1b", "event1c"),
+	)
 
 	// workaround to make sure c2 stays alive; likely a go1.12-ism
-	_, err = c1.Do("PING")
-	ok(t, err)
-	_, err = c2.Do("PING")
-	ok(t, err)
+	mustDo(t, c1, "PING", proto.Inline("PONG"))
+	mustDo(t, c2, "PING", "foo", proto.Strings("pong", "foo"))
 }
 
 func TestPubsubNumsub(t *testing.T) {
-	_, c, c2, done := setup2(t)
-	defer done()
-
-	_, err := c2.Do("SUBSCRIBE", "event1", "event2", "event3")
+	s, err := Run()
 	ok(t, err)
+	defer s.Close()
+	c1, err := proto.Dial(s.Addr())
+	ok(t, err)
+	defer c1.Close()
+	c2, err := proto.Dial(s.Addr())
+	ok(t, err)
+	defer c2.Close()
 
-	{
-		a, err := redis.Values(c.Do("PUBSUB", "NUMSUB"))
-		ok(t, err)
-		equals(t, []interface{}{}, a)
-	}
+	mustDo(t, c2,
+		"SUBSCRIBE", "event1", "event2", "event3",
+		proto.Array(proto.String("subscribe"), proto.String("event1"), proto.Int(1)),
+	)
+	mustRead(t, c2, proto.Array(proto.String("subscribe"), proto.String("event2"), proto.Int(2)))
+	mustRead(t, c2, proto.Array(proto.String("subscribe"), proto.String("event3"), proto.Int(3)))
 
-	{
-		a, err := redis.Values(c.Do("PUBSUB", "NUMSUB", "event1"))
-		ok(t, err)
-		equals(t, []interface{}{[]byte("event1"), int64(1)}, a)
-	}
+	mustDo(t, c1,
+		"PUBSUB", "NUMSUB",
+		proto.Strings(),
+	)
+	mustDo(t, c1,
+		"PUBSUB", "NUMSUB", "event1",
+		proto.Array(
+			proto.String("event1"),
+			proto.Int(1),
+		),
+	)
+	mustDo(t, c1,
+		"PUBSUB", "NUMSUB", "event12", "event3",
+		proto.Array(
+			proto.String("event12"),
+			proto.Int(0),
+			proto.String("event3"),
+			proto.Int(1),
+		),
+	)
 
-	{
-		a, err := redis.Values(c.Do("PUBSUB", "NUMSUB", "event12", "event3"))
-		ok(t, err)
-		equals(t,
-			[]interface{}{
-				[]byte("event12"), int64(0),
-				[]byte("event3"), int64(1),
-			},
-			a,
-		)
-	}
 }
 
 func TestPubsubNumpat(t *testing.T) {
-	s, c, done := setup(t)
-	defer done()
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := proto.Dial(s.Addr())
+	ok(t, err)
+	defer c.Close()
 
-	{
-		a, err := redis.Int(c.Do("PUBSUB", "NUMPAT"))
-		ok(t, err)
-		equals(t, 0, a)
-	}
+	must0(t, c,
+		"PUBSUB", "NUMPAT",
+	)
 
 	equals(t, 0, s.PubSubNumPat())
 }
 
 func TestPubSubBadArgs(t *testing.T) {
-	for _, command := range [9]struct {
-		command string
-		args    []interface{}
-		err     string
-	}{
-		{"SUBSCRIBE", []interface{}{}, "ERR wrong number of arguments for 'subscribe' command"},
-		{"PSUBSCRIBE", []interface{}{}, "ERR wrong number of arguments for 'psubscribe' command"},
-		{"PUBLISH", []interface{}{}, "ERR wrong number of arguments for 'publish' command"},
-		{"PUBLISH", []interface{}{"event1"}, "ERR wrong number of arguments for 'publish' command"},
-		{"PUBLISH", []interface{}{"event1", "message2", "message3"}, "ERR wrong number of arguments for 'publish' command"},
-		{"PUBSUB", []interface{}{}, "ERR wrong number of arguments for 'pubsub' command"},
-		{"PUBSUB", []interface{}{"FOOBAR"}, "ERR Unknown subcommand or wrong number of arguments for 'FOOBAR'. Try PUBSUB HELP."},
-		{"PUBSUB", []interface{}{"NUMPAT", "FOOBAR"}, "ERR Unknown subcommand or wrong number of arguments for 'NUMPAT'. Try PUBSUB HELP."},
-		{"PUBSUB", []interface{}{"CHANNELS", "FOOBAR1", "FOOBAR2"}, "ERR Unknown subcommand or wrong number of arguments for 'CHANNELS'. Try PUBSUB HELP."},
-	} {
-		_, c, done := setup(t)
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := proto.Dial(s.Addr())
+	ok(t, err)
+	defer c.Close()
 
-		_, err := c.Do(command.command, command.args...)
-		mustFail(t, err, command.err)
-
-		done()
-	}
+	mustDo(t, c,
+		"SUBSCRIBE",
+		proto.Error("ERR wrong number of arguments for 'subscribe' command"),
+	)
+	mustDo(t, c,
+		"PSUBSCRIBE",
+		proto.Error("ERR wrong number of arguments for 'psubscribe' command"),
+	)
+	mustDo(t, c,
+		"PUBLISH",
+		proto.Error("ERR wrong number of arguments for 'publish' command"),
+	)
+	mustDo(t, c,
+		"PUBLISH", "event1",
+		proto.Error("ERR wrong number of arguments for 'publish' command"),
+	)
+	mustDo(t, c,
+		"PUBLISH", "event1", "message2", "message3",
+		proto.Error("ERR wrong number of arguments for 'publish' command"),
+	)
+	mustDo(t, c,
+		"PUBSUB",
+		proto.Error("ERR wrong number of arguments for 'pubsub' command"),
+	)
+	mustDo(t, c,
+		"PUBSUB", "FOOBAR",
+		proto.Error("ERR Unknown subcommand or wrong number of arguments for 'FOOBAR'. Try PUBSUB HELP."),
+	)
+	mustDo(t, c,
+		"PUBSUB", "CHANNELS", "FOOBAR1", "FOOBAR2",
+		proto.Error("ERR Unknown subcommand or wrong number of arguments for 'CHANNELS'. Try PUBSUB HELP."),
+	)
 }

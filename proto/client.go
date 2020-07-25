@@ -32,3 +32,7 @@ func (c *Client) Do(cmd ...string) (string, error) {
 	}
 	return Read(c.r)
 }
+
+func (c *Client) Read() (string, error) {
+	return Read(c.r)
+}
