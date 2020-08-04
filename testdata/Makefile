@@ -6,7 +6,8 @@ gen:
     	-keyout server.key \
     	-out server.crt \
     	-days 3650 \
-    	-subj "/C=GB/ST=London/L=London/O=Global Security/OU=IT Department/CN=Server"
+    	-addext "subjectAltName = DNS:Server" \
+    	-subj "/C=GB/ST=London/L=London/O=Global Security/OU=IT Department"
 	openssl req \
     	-x509 \
     	-nodes \
@@ -14,4 +15,5 @@ gen:
     	-keyout client.key \
     	-out client.crt \
     	-days 3650 \
-    	-subj "/C=GB/ST=London/L=London/O=Global Security/OU=IT Department/CN=Client"
+    	-addext "subjectAltName = DNS:Client" \
+    	-subj "/C=GB/ST=London/L=London/O=Global Security/OU=IT Department"
