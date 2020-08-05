@@ -6,19 +6,110 @@ import (
 	"fmt"
 	"io"
 	"strconv"
+	"strings"
 )
 
-var ErrProtocol = errors.New("invalid request")
+var (
+	ErrProtocol   = errors.New("invalid request")
+	ErrUnexpected = errors.New("not what you asked for")
+)
 
-// Read a single command, returning it raw. Used to read replies from redis.
-// Understands RESP3 proto.
-func Read(r *bufio.Reader) (string, error) {
+func readLine(r *bufio.Reader) (string, error) {
 	line, err := r.ReadString('\n')
 	if err != nil {
 		return "", err
 	}
 	if len(line) < 3 {
 		return "", ErrProtocol
+	}
+	return line, nil
+}
+
+// Read an array, with all elements are the raw redis commands
+func ReadArray(b string) ([]string, error) {
+	r := bufio.NewReader(strings.NewReader(b))
+	line, err := readLine(r)
+	if err != nil {
+		return nil, err
+	}
+
+	switch line[0] {
+	default:
+		return nil, ErrUnexpected
+	case '*':
+		length, err := strconv.Atoi(line[1 : len(line)-2])
+		if err != nil {
+			return nil, err
+		}
+		var res []string
+		for i := 0; i < length; i++ {
+			next, err := Read(r)
+			if err != nil {
+				return nil, err
+			}
+			res = append(res, next)
+		}
+		return res, nil
+	}
+}
+
+func ReadString(b string) (string, error) {
+	r := bufio.NewReader(strings.NewReader(b))
+	line, err := readLine(r)
+	if err != nil {
+		return "", err
+	}
+
+	switch line[0] {
+	default:
+		return "", ErrUnexpected
+	case '$':
+		// bulk strings are: `$5\r\nhello\r\n`
+		length, err := strconv.Atoi(line[1 : len(line)-2])
+		if err != nil {
+			return "", err
+		}
+		if length < 0 {
+			// -1 is a nil response
+			return line, nil
+		}
+		var (
+			buf = make([]byte, length+2)
+			pos = 0
+		)
+		for pos < length+2 {
+			n, err := r.Read(buf[pos:])
+			if err != nil {
+				return "", err
+			}
+			pos += n
+		}
+		return string(buf[:len(buf)-2]), nil
+	}
+}
+
+func ReadStrings(b string) ([]string, error) {
+	elems, err := ReadArray(b)
+	if err != nil {
+		return nil, err
+	}
+	var res []string
+	for _, e := range elems {
+		s, err := ReadString(e)
+		if err != nil {
+			return nil, err
+		}
+		res = append(res, s)
+	}
+	return res, nil
+}
+
+// Read a single command, returning it raw. Used to read replies from redis.
+// Understands RESP3 proto.
+func Read(r *bufio.Reader) (string, error) {
+	line, err := readLine(r)
+	if err != nil {
+		return "", err
 	}
 
 	// TODO: all other cases.

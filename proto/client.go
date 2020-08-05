@@ -36,3 +36,12 @@ func (c *Client) Do(cmd ...string) (string, error) {
 func (c *Client) Read() (string, error) {
 	return Read(c.r)
 }
+
+// Do() + ReadStrings()
+func (c *Client) DoStrings(cmd ...string) ([]string, error) {
+	res, err := c.Do(cmd...)
+	if err != nil {
+		return nil, err
+	}
+	return ReadStrings(res)
+}

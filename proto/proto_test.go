@@ -2,6 +2,7 @@ package proto
 
 import (
 	"bufio"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -81,4 +82,34 @@ func TestRead(t *testing.T) {
 	t.Run("nil", func(t *testing.T) {
 		test(t, "$-1\r\n")
 	})
+}
+
+func TestReadArray(t *testing.T) {
+	have, err := ReadArray(Strings("foo", "bar"))
+	if err != nil {
+		t.Errorf("read: %s", err)
+	}
+	if want := []string{String("foo"), String("bar")}; !reflect.DeepEqual(have, want) {
+		t.Errorf("have %q, want %q", have, want)
+	}
+}
+
+func TestReadString(t *testing.T) {
+	have, err := ReadString(String("foo"))
+	if err != nil {
+		t.Errorf("read: %s", err)
+	}
+	if want := "foo"; have != want {
+		t.Errorf("have %q, want %q", have, want)
+	}
+}
+
+func TestReadStrings(t *testing.T) {
+	have, err := ReadStrings(Strings("foo", "bar"))
+	if err != nil {
+		t.Errorf("read: %s", err)
+	}
+	if want := []string{"foo", "bar"}; !reflect.DeepEqual(have, want) {
+		t.Errorf("have %q, want %q", have, want)
+	}
 }
