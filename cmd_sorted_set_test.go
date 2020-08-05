@@ -4,7 +4,7 @@ import (
 	"math"
 	"testing"
 
-	"github.com/gomodule/redigo/redis"
+	"github.com/alicebob/miniredis/v2/proto"
 )
 
 // Test ZADD / ZCARD / ZRANK / ZREVRANK.
@@ -12,60 +12,67 @@ func TestSortedSet(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	{
-		b, err := redis.Int(c.Do("ZADD", "z", 1, "one", 2, "two", 3, "three"))
-		ok(t, err)
-		equals(t, 3, b) // New elements.
+		mustDo(t, c,
+			"ZADD", "z", "1", "one", "2", "two", "3", "three",
+			proto.Int(3),
+		)
 
-		b, err = redis.Int(c.Do("ZCARD", "z"))
-		ok(t, err)
-		equals(t, 3, b)
+		mustDo(t, c,
+			"ZCARD", "z",
+			proto.Int(3),
+		)
 
-		m, err := redis.Int(c.Do("ZRANK", "z", "one"))
-		ok(t, err)
-		equals(t, 0, m)
-		m, err = redis.Int(c.Do("ZRANK", "z", "three"))
-		ok(t, err)
-		equals(t, 2, m)
+		must0(t, c,
+			"ZRANK", "z", "one",
+		)
+		mustDo(t, c,
+			"ZRANK", "z", "three",
+			proto.Int(2),
+		)
 
-		m, err = redis.Int(c.Do("ZREVRANK", "z", "one"))
-		ok(t, err)
-		equals(t, 2, m)
-		m, err = redis.Int(c.Do("ZREVRANK", "z", "three"))
-		ok(t, err)
-		equals(t, 0, m)
+		mustDo(t, c,
+			"ZREVRANK", "z", "one",
+			proto.Int(2),
+		)
+		must0(t, c,
+			"ZREVRANK", "z", "three",
+		)
 	}
 
 	// TYPE of our zset
-	{
-		s, err := redis.String(c.Do("TYPE", "z"))
-		ok(t, err)
-		equals(t, "zset", s)
-	}
+	mustDo(t, c,
+		"TYPE", "z",
+		proto.Inline("zset"),
+	)
 
 	// Replace a key
 	{
-		b, err := redis.Int(c.Do("ZADD", "z", 2.1, "two"))
-		ok(t, err)
-		equals(t, 0, b) // No new elements.
+		must0(t, c,
+			"ZADD", "z", "2.1", "two",
+		)
 
-		b, err = redis.Int(c.Do("ZCARD", "z"))
-		ok(t, err)
-		equals(t, 3, b)
+		mustDo(t, c,
+			"ZCARD", "z",
+			proto.Int(3),
+		)
 	}
 
 	// To infinity!
 	{
-		b, err := redis.Int(c.Do("ZADD", "zinf", "inf", "plus inf", "-inf", "minus inf", 10, "ten"))
-		ok(t, err)
-		equals(t, 3, b)
+		mustDo(t, c,
+			"ZADD", "zinf", "inf", "plus inf", "-inf", "minus inf", "10", "ten",
+			proto.Int(3),
+		)
 
-		b, err = redis.Int(c.Do("ZCARD", "zinf"))
-		ok(t, err)
-		equals(t, 3, b)
+		mustDo(t, c,
+			"ZCARD", "zinf",
+			proto.Int(3),
+		)
 
 		smap, err := s.SortedSet("zinf")
 		ok(t, err)
@@ -78,19 +85,21 @@ func TestSortedSet(t *testing.T) {
 
 	// Invalid score
 	{
-		_, err := c.Do("ZADD", "z", "noint", "two")
-		assert(t, err != nil, "ZADD err")
+		mustDo(t, c,
+			"ZADD", "z", "noint", "two",
+			proto.Error("ERR value is not a valid float"),
+		)
 	}
 
 	// ZRANK on non-existing key/member
 	{
-		m, err := c.Do("ZRANK", "z", "nosuch")
-		ok(t, err)
-		equals(t, nil, m)
+		mustNil(t, c,
+			"ZRANK", "z", "nosuch",
+		)
 
-		m, err = c.Do("ZRANK", "nosuch", "nosuch")
-		ok(t, err)
-		equals(t, nil, m)
+		mustNil(t, c,
+			"ZRANK", "nosuch", "nosuch",
+		)
 	}
 
 	// Direct usage
@@ -110,29 +119,40 @@ func TestSortedSet(t *testing.T) {
 		equals(t, []string{"noot", "aap"}, members)
 	}
 
-	// Error cases
-	{
+	t.Run("errors", func(t *testing.T) {
 		// Wrong type of key
-		_, err := redis.String(c.Do("SET", "str", "value"))
-		ok(t, err)
+		mustOK(t, c, "SET", "str", "value")
+		mustDo(t, c,
+			"ZRANK", "str", "foo",
+			proto.Error(msgWrongType),
+		)
+		mustDo(t, c,
+			"ZRANK",
+			proto.Error(errWrongNumber("zrank")),
+		)
+		mustDo(t, c,
+			"ZRANK", "set", "spurious", "args",
+			proto.Error(errWrongNumber("zrank")),
+		)
 
-		_, err = redis.Int(c.Do("ZRANK", "str"))
-		assert(t, err != nil, "ZRANK error")
-		_, err = redis.String(c.Do("ZRANK"))
-		assert(t, err != nil, "ZRANK error")
-		_, err = redis.String(c.Do("ZRANK", "set", "spurious"))
-		assert(t, err != nil, "ZRANK error")
+		mustDo(t, c,
+			"ZREVRANK",
+			proto.Error(errWrongNumber("zrevrank")),
+		)
 
-		_, err = redis.String(c.Do("ZDEVRANK"))
-		assert(t, err != nil, "ZDEVRANK error")
-
-		_, err = redis.Int(c.Do("ZCARD", "str"))
-		assert(t, err != nil, "ZCARD error")
-		_, err = redis.String(c.Do("ZCARD"))
-		assert(t, err != nil, "ZCARD error")
-		_, err = redis.String(c.Do("ZCARD", "set", "spurious"))
-		assert(t, err != nil, "ZCARD error")
-	}
+		mustDo(t, c,
+			"ZCARD", "str",
+			proto.Error(msgWrongType),
+		)
+		mustDo(t, c,
+			"ZCARD",
+			proto.Error(errWrongNumber("zcard")),
+		)
+		mustDo(t, c,
+			"ZCARD", "set", "spurious",
+			proto.Error(errWrongNumber("zcard")),
+		)
+	})
 }
 
 // Test ZADD
@@ -140,96 +160,118 @@ func TestSortedSetAdd(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	{
-		b, err := redis.Int(c.Do("ZADD", "z", 1, "one", 2, "two", 3, "three"))
-		ok(t, err)
-		equals(t, 3, b) // New elements.
+		mustDo(t, c,
+			"ZADD", "z", "1", "one", "2", "two", "3", "three",
+			proto.Int(3),
+		)
 
-		b, err = redis.Int(c.Do("ZADD", "z", 1, "one", 2.1, "two", 3, "three"))
-		ok(t, err)
-		equals(t, 0, b) // no new elements
+		must0(t, c,
+			"ZADD", "z", "1", "one", "2.1", "two", "3", "three",
+		)
 
-		b, err = redis.Int(c.Do("ZADD", "z", "CH", 1, "one", 2.2, "two", 3, "three"))
-		ok(t, err)
-		equals(t, 1, b)
+		must1(t, c,
+			"ZADD", "z", "CH", "1", "one", "2.2", "two", "3", "three",
+		)
 
-		b, err = redis.Int(c.Do("ZADD", "z", "NX", 1, "one", 2.2, "two", 3, "three"))
-		ok(t, err)
-		equals(t, 0, b)
+		must0(t, c,
+			"ZADD", "z", "NX", "1", "one", "2.2", "two", "3", "three",
+		)
 
-		b, err = redis.Int(c.Do("ZADD", "z", "NX", 1, "one", 4, "four"))
-		ok(t, err)
-		equals(t, 1, b)
+		must1(t, c,
+			"ZADD", "z", "NX", "1", "one", "4", "four",
+		)
 
-		b, err = redis.Int(c.Do("ZADD", "z", "XX", 1.1, "one", 4, "four"))
-		ok(t, err)
-		equals(t, 0, b)
+		must0(t, c,
+			"ZADD", "z", "XX", "1.1", "one", "4", "four",
+		)
 
-		b, err = redis.Int(c.Do("ZADD", "z", "XX", "CH", 1.2, "one", 4, "four"))
-		ok(t, err)
-		equals(t, 1, b)
+		must1(t, c,
+			"ZADD", "z", "XX", "CH", "1.2", "one", "4", "four",
+		)
 
-		n, err := redis.Float64(c.Do("ZADD", "z", "INCR", 1.2, "one"))
-		ok(t, err)
-		equals(t, 2.4, n)
+		mustDo(t, c,
+			"ZADD", "z", "INCR", "1.2", "one",
+			proto.String("2.4"),
+		)
 
-		z, err := c.Do("ZADD", "z", "INCR", "NX", 1.2, "one")
-		ok(t, err)
-		equals(t, nil, z)
+		mustNil(t, c,
+			"ZADD", "z", "INCR", "NX", "1.2", "one",
+		)
 
-		n, err = redis.Float64(c.Do("ZADD", "z", "INCR", "XX", 1.2, "one"))
-		ok(t, err)
-		equals(t, 3.6, n)
+		mustDo(t, c,
+			"ZADD", "z", "INCR", "XX", "1.2", "one",
+			proto.String("3.6"),
+		)
 
-		z, err = c.Do("ZADD", "q", "INCR", "XX", 1.2, "one")
-		ok(t, err)
-		equals(t, nil, z)
+		mustNil(t, c,
+			"ZADD", "q", "INCR", "XX", "1.2", "one",
+		)
 
-		n, err = redis.Float64(c.Do("ZADD", "q", "INCR", "NX", 1.2, "one"))
-		ok(t, err)
-		equals(t, 1.2, n)
+		mustDo(t, c,
+			"ZADD", "q", "INCR", "NX", "1.2", "one",
+			proto.String("1.2"),
+		)
 
-		z, err = c.Do("ZADD", "q", "INCR", "NX", 1.2, "one")
-		ok(t, err)
-		equals(t, nil, z)
+		mustNil(t, c,
+			"ZADD", "q", "INCR", "NX", "1.2", "one",
+		)
 
 		// CH is ignored with INCR
-		n, err = redis.Float64(c.Do("ZADD", "z", "INCR", "CH", 1.2, "one"))
-		ok(t, err)
-		equals(t, 4.8, n)
+		mustDo(t, c,
+			"ZADD", "z", "INCR", "CH", "1.2", "one",
+			proto.String("4.8"),
+		)
 	}
 
-	// Error cases
-	{
+	t.Run("errors", func(t *testing.T) {
 		// Wrong type of key
-		_, err := redis.String(c.Do("SET", "str", "value"))
-		ok(t, err)
+		mustOK(t, c, "SET", "str", "value")
 
 		_, err = s.ZAdd("str", 1.0, "hi")
 		mustFail(t, err, msgWrongType)
 
-		_, err = redis.Int(c.Do("ZADD", "str", 1.0, "hi"))
-		mustFail(t, err, msgWrongType)
-		_, err = redis.String(c.Do("ZADD"))
-		assert(t, err != nil, "ZADD error")
-		_, err = redis.String(c.Do("ZADD", "set"))
-		assert(t, err != nil, "ZADD error")
-		_, err = redis.String(c.Do("ZADD", "set", 1.0))
-		assert(t, err != nil, "ZADD error")
-		_, err = redis.String(c.Do("ZADD", "set", 1.0, "foo", 1.0)) // odd
-		assert(t, err != nil, "ZADD error")
-		_, err = redis.String(c.Do("ZADD", "set", "MX", 1.0))
-		assert(t, err != nil, "ZADD error")
-		_, err = redis.String(c.Do("ZADD", "set", 1.0, "key", "MX"))
-		assert(t, err != nil, "ZADD error")
-		_, err = redis.String(c.Do("ZADD", "set", "MX", "XX", 1.0, "foo"))
-		assert(t, err != nil, "ZADD error")
-		_, err = redis.String(c.Do("ZADD", "set", "INCR", 1.0, "foo", 2.3, "bar"))
-		assert(t, err != nil, "ZADD error")
-	}
+		mustDo(t, c,
+			"ZADD", "str", "1.0", "hi",
+			proto.Error(msgWrongType),
+		)
+		mustDo(t, c,
+			"ZADD",
+			proto.Error(errWrongNumber("zadd")),
+		)
+		mustDo(t, c,
+			"ZADD", "set",
+			proto.Error(errWrongNumber("zadd")),
+		)
+		mustDo(t, c,
+			"ZADD", "set", "1.0",
+			proto.Error(errWrongNumber("zadd")),
+		)
+		mustDo(t, c,
+			"ZADD", "set", "1.0", "foo", "1.0",
+			proto.Error(msgSyntaxError),
+		)
+		mustDo(t, c,
+			"ZADD", "set", "MX", "1.0",
+			proto.Error("ERR value is not a valid float"),
+		)
+		mustDo(t, c,
+			"ZADD", "set", "1.0", "key", "MX",
+			proto.Error(msgSyntaxError),
+		)
+		mustDo(t, c,
+			"ZADD", "set", "MX", "XX", "1.0", "foo",
+			proto.Error("ERR value is not a valid float"),
+		)
+		mustDo(t, c,
+			"ZADD", "set", "INCR", "1.0", "foo", "2.3", "bar",
+			proto.Error("ERR INCR option supports a single increment-element pair"),
+		)
+	})
 }
 
 // Test ZRANGE and ZREVRANGE
@@ -238,8 +280,9 @@ func TestSortedSetRange(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	s.ZAdd("z", 1, "one")
 	s.ZAdd("z", 2, "two")
@@ -249,89 +292,111 @@ func TestSortedSetRange(t *testing.T) {
 	s.ZAdd("z", math.Inf(+1), "inf")
 
 	{
-		b, err := redis.Strings(c.Do("ZRANGE", "z", 0, -1))
-		ok(t, err)
-		equals(t, []string{"one", "two", "zwei", "drei", "three", "inf"}, b)
+		mustDo(t, c,
+			"ZRANGE", "z", "0", "-1",
+			proto.Strings("one", "two", "zwei", "drei", "three", "inf"),
+		)
 
-		b, err = redis.Strings(c.Do("ZREVRANGE", "z", 0, -1))
-		ok(t, err)
-		equals(t, []string{"inf", "three", "drei", "zwei", "two", "one"}, b)
+		mustDo(t, c,
+			"ZREVRANGE", "z", "0", "-1",
+			proto.Strings("inf", "three", "drei", "zwei", "two", "one"),
+		)
 	}
 	{
-		b, err := redis.Strings(c.Do("ZRANGE", "z", 0, 1))
-		ok(t, err)
-		equals(t, []string{"one", "two"}, b)
+		mustDo(t, c,
+			"ZRANGE", "z", "0", "1",
+			proto.Strings("one", "two"),
+		)
 
-		b, err = redis.Strings(c.Do("ZREVRANGE", "z", 0, 1))
-		ok(t, err)
-		equals(t, []string{"inf", "three"}, b)
+		mustDo(t, c,
+			"ZREVRANGE", "z", "0", "1",
+			proto.Strings("inf", "three"),
+		)
 	}
 	{
-		b, err := redis.Strings(c.Do("ZRANGE", "z", -1, -1))
-		ok(t, err)
-		equals(t, []string{"inf"}, b)
+		mustDo(t, c,
+			"ZRANGE", "z", "-1", "-1",
+			proto.Strings("inf"),
+		)
 
-		b, err = redis.Strings(c.Do("ZREVRANGE", "z", -1, -1))
-		ok(t, err)
-		equals(t, []string{"one"}, b)
+		mustDo(t, c,
+			"ZREVRANGE", "z", "-1", "-1",
+			proto.Strings("one"),
+		)
 	}
 
 	// weird cases.
-	{
-		b, err := redis.Strings(c.Do("ZRANGE", "z", -100, -100))
-		ok(t, err)
-		equals(t, []string{}, b)
-	}
-	{
-		b, err := redis.Strings(c.Do("ZRANGE", "z", 100, 400))
-		ok(t, err)
-		equals(t, []string{}, b)
-	}
+	mustDo(t, c,
+		"ZRANGE", "z", "-100", "-100",
+		proto.Strings(),
+	)
+	mustDo(t, c,
+		"ZRANGE", "z", "100", "400",
+		proto.Strings(),
+	)
+
 	// Nonexistent key
-	{
-		b, err := redis.Strings(c.Do("ZRANGE", "nosuch", 1, 4))
-		ok(t, err)
-		equals(t, []string{}, b)
-	}
+	mustDo(t, c,
+		"ZRANGE", "nosuch", "1", "4",
+		proto.Strings(),
+	)
 
 	// With scores
 	{
-		b, err := redis.Strings(c.Do("ZRANGE", "z", 1, 2, "WITHSCORES"))
-		ok(t, err)
-		equals(t, []string{"two", "2", "zwei", "2"}, b)
+		mustDo(t, c,
+			"ZRANGE", "z", "1", "2", "WITHSCORES",
+			proto.Strings("two", "2", "zwei", "2"),
+		)
 
-		b, err = redis.Strings(c.Do("ZREVRANGE", "z", 1, 2, "WITHSCORES"))
-		ok(t, err)
-		equals(t, []string{"three", "3", "drei", "3"}, b)
+		mustDo(t, c,
+			"ZREVRANGE", "z", "1", "2", "WITHSCORES",
+			proto.Strings("three", "3", "drei", "3"),
+		)
 	}
 	// INF in WITHSCORES
 	{
-		b, err := redis.Strings(c.Do("ZRANGE", "z", 4, -1, "WITHSCORES"))
-		ok(t, err)
-		equals(t, []string{"three", "3", "inf", "inf"}, b)
+		mustDo(t, c,
+			"ZRANGE", "z", "4", "-1", "WITHSCORES",
+			proto.Strings("three", "3", "inf", "inf"),
+		)
 	}
 
-	// Error cases
-	{
-		_, err = redis.String(c.Do("ZRANGE"))
-		assert(t, err != nil, "ZRANGE error")
-		_, err = redis.String(c.Do("ZREVRANGE"))
-		assert(t, err != nil, "ZREVRANGE error")
-		_, err = redis.String(c.Do("ZRANGE", "set"))
-		assert(t, err != nil, "ZRANGE error")
-		_, err = redis.String(c.Do("ZRANGE", "set", 1))
-		assert(t, err != nil, "ZRANGE error")
-		_, err = redis.String(c.Do("ZRANGE", "set", "noint", 1))
-		assert(t, err != nil, "ZRANGE error")
-		_, err = redis.String(c.Do("ZRANGE", "set", 1, "noint"))
-		assert(t, err != nil, "ZRANGE error")
-		_, err = redis.String(c.Do("ZRANGE", "set", 1, 2, "toomany"))
-		assert(t, err != nil, "ZRANGE error")
+	t.Run("errors", func(t *testing.T) {
+		mustDo(t, c,
+			"ZRANGE",
+			proto.Error(errWrongNumber("zrange")),
+		)
+		mustDo(t, c,
+			"ZREVRANGE",
+			proto.Error(errWrongNumber("zrevrange")),
+		)
+		mustDo(t, c,
+			"ZRANGE", "set",
+			proto.Error(errWrongNumber("zrange")),
+		)
+		mustDo(t, c,
+			"ZRANGE", "set", "1",
+			proto.Error(errWrongNumber("zrange")),
+		)
+		mustDo(t, c,
+			"ZRANGE", "set", "noint", "1",
+			proto.Error(msgInvalidInt),
+		)
+		mustDo(t, c,
+			"ZRANGE", "set", "1", "noint",
+			proto.Error(msgInvalidInt),
+		)
+		mustDo(t, c,
+			"ZRANGE", "set", "1", "2", "toomany",
+			proto.Error(msgSyntaxError),
+		)
 		// Wrong type of key
 		s.Set("str", "value")
-		_, err = redis.Int(c.Do("ZRANGE", "str", 1, 2))
-		assert(t, err != nil, "ZRANGE error")
-	}
+		mustDo(t, c,
+			"ZRANGE", "str", "1", "2",
+			proto.Error(msgWrongType),
+		)
+	})
 }
 
 // Test ZRANGEBYSCORE,  ZREVRANGEBYSCORE, and ZCOUNT
@@ -339,8 +404,9 @@ func TestSortedSetRangeByScore(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	s.ZAdd("z", -273.15, "zero kelvin")
 	s.ZAdd("z", -4, "minusfour")
@@ -353,177 +419,223 @@ func TestSortedSetRangeByScore(t *testing.T) {
 
 	// Normal cases
 	{
-		b, err := redis.Strings(c.Do("ZRANGEBYSCORE", "z", "-inf", "inf"))
-		ok(t, err)
-		equals(t, []string{"zero kelvin", "minusfour", "one", "two", "zwei", "drei", "three", "inf"}, b)
+		mustDo(t, c,
+			"ZRANGEBYSCORE", "z", "-inf", "inf",
+			proto.Strings("zero kelvin", "minusfour", "one", "two", "zwei", "drei", "three", "inf"),
+		)
 
-		b, err = redis.Strings(c.Do("ZREVRANGEBYSCORE", "z", "inf", "-inf"))
-		ok(t, err)
-		equals(t, []string{"inf", "three", "drei", "zwei", "two", "one", "minusfour", "zero kelvin"}, b)
+		mustDo(t, c,
+			"ZREVRANGEBYSCORE", "z", "inf", "-inf",
+			proto.Strings("inf", "three", "drei", "zwei", "two", "one", "minusfour", "zero kelvin"),
+		)
 
-		i, err := redis.Int(c.Do("ZCOUNT", "z", "-inf", "inf"))
-		ok(t, err)
-		equals(t, 8, i)
+		mustDo(t, c,
+			"ZCOUNT", "z", "-inf", "inf",
+			proto.Int(8),
+		)
 	}
 	{
-		b, err := redis.Strings(c.Do("ZRANGEBYSCORE", "z", "2", "3"))
-		ok(t, err)
-		equals(t, []string{"two", "zwei", "drei", "three"}, b)
+		mustDo(t, c,
+			"ZRANGEBYSCORE", "z", "2", "3",
+			proto.Strings("two", "zwei", "drei", "three"),
+		)
 
-		b, err = redis.Strings(c.Do("ZRANGEBYSCORE", "z", "4", "4"))
-		ok(t, err)
-		equals(t, []string{}, b)
+		mustDo(t, c,
+			"ZRANGEBYSCORE", "z", "4", "4",
+			proto.Strings(),
+		)
 
-		b, err = redis.Strings(c.Do("ZREVRANGEBYSCORE", "z", "3", "2"))
-		ok(t, err)
-		equals(t, []string{"three", "drei", "zwei", "two"}, b)
+		mustDo(t, c,
+			"ZREVRANGEBYSCORE", "z", "3", "2",
+			proto.Strings("three", "drei", "zwei", "two"),
+		)
 
-		b, err = redis.Strings(c.Do("ZREVRANGEBYSCORE", "z", "4", "4"))
-		ok(t, err)
-		equals(t, []string{}, b)
+		mustDo(t, c,
+			"ZREVRANGEBYSCORE", "z", "4", "4",
+			proto.Strings(),
+		)
 
-		i, err := redis.Int(c.Do("ZCOUNT", "z", "2", "3"))
-		ok(t, err)
-		equals(t, 4, i)
+		mustDo(t, c,
+			"ZCOUNT", "z", "2", "3",
+			proto.Int(4),
+		)
 	}
 	// Exclusive min
 	{
-		b, err := redis.Strings(c.Do("ZRANGEBYSCORE", "z", "(2", "3"))
-		ok(t, err)
-		equals(t, []string{"drei", "three"}, b)
+		mustDo(t, c,
+			"ZRANGEBYSCORE", "z", "(2", "3",
+			proto.Strings("drei", "three"),
+		)
 
-		i, err := redis.Int(c.Do("ZCOUNT", "z", "(2", "3"))
-		ok(t, err)
-		equals(t, 2, i)
+		mustDo(t, c,
+			"ZCOUNT", "z", "(2", "3",
+			proto.Int(2),
+		)
 	}
 	// Exclusive max
-	{
-		b, err := redis.Strings(c.Do("ZRANGEBYSCORE", "z", "2", "(3"))
-		ok(t, err)
-		equals(t, []string{"two", "zwei"}, b)
-	}
+	mustDo(t, c,
+		"ZRANGEBYSCORE", "z", "2", "(3",
+		proto.Strings("two", "zwei"),
+	)
+
 	// Exclusive both
-	{
-		b, err := redis.Strings(c.Do("ZRANGEBYSCORE", "z", "(2", "(3"))
-		ok(t, err)
-		equals(t, []string{}, b)
-	}
+	mustDo(t, c,
+		"ZRANGEBYSCORE", "z", "(2", "(3",
+		proto.Strings(),
+	)
+
 	// Wrong ranges
 	{
-		b, err := redis.Strings(c.Do("ZRANGEBYSCORE", "z", "+inf", "-inf"))
-		ok(t, err)
-		equals(t, []string{}, b)
+		mustDo(t, c,
+			"ZRANGEBYSCORE", "z", "+inf", "-inf",
+			proto.Strings(),
+		)
 
-		b, err = redis.Strings(c.Do("ZREVRANGEBYSCORE", "z", "-inf", "+inf"))
-		ok(t, err)
-		equals(t, []string{}, b)
+		mustDo(t, c,
+			"ZREVRANGEBYSCORE", "z", "-inf", "+inf",
+			proto.Strings(),
+		)
 	}
 
 	// No such key
-	{
-		b, err := redis.Strings(c.Do("ZRANGEBYSCORE", "nosuch", "-inf", "inf"))
-		ok(t, err)
-		equals(t, []string{}, b)
-	}
+	mustDo(t, c,
+		"ZRANGEBYSCORE", "nosuch", "-inf", "inf",
+		proto.Strings(),
+	)
 
 	// With scores
-	{
-		b, err := redis.Strings(c.Do("ZRANGEBYSCORE", "z", "(1", 2, "WITHSCORES"))
-		ok(t, err)
-		equals(t, []string{"two", "2", "zwei", "2"}, b)
-	}
+	mustDo(t, c,
+		"ZRANGEBYSCORE", "z", "(1", "2", "WITHSCORES",
+		proto.Strings("two", "2", "zwei", "2"),
+	)
 
 	// With LIMIT
 	// (note, this is SQL like logic, not the redis RANGE logic)
 	{
-		b, err := redis.Strings(c.Do("ZRANGEBYSCORE", "z", "-inf", "inf", "LIMIT", 1, 2))
-		ok(t, err)
-		equals(t, []string{"minusfour", "one"}, b)
+		mustDo(t, c,
+			"ZRANGEBYSCORE", "z", "-inf", "inf", "LIMIT", "1", "2",
+			proto.Strings("minusfour", "one"),
+		)
 
-		b, err = redis.Strings(c.Do("ZREVRANGEBYSCORE", "z", "inf", "-inf", "LIMIT", 1, 2))
-		ok(t, err)
-		equals(t, []string{"three", "drei"}, b)
+		mustDo(t, c,
+			"ZREVRANGEBYSCORE", "z", "inf", "-inf", "LIMIT", "1", "2",
+			proto.Strings("three", "drei"),
+		)
 
-		b, err = redis.Strings(c.Do("ZRANGEBYSCORE", "z", "1", "inf", "LIMIT", 1, 2000))
-		ok(t, err)
-		equals(t, []string{"two", "zwei", "drei", "three", "inf"}, b)
+		mustDo(t, c,
+			"ZRANGEBYSCORE", "z", "1", "inf", "LIMIT", "1", "2000",
+			proto.Strings("two", "zwei", "drei", "three", "inf"),
+		)
 
-		b, err = redis.Strings(c.Do("ZREVRANGEBYSCORE", "z", "inf", "1", "LIMIT", 1, 2000))
-		ok(t, err)
-		equals(t, []string{"three", "drei", "zwei", "two", "one"}, b)
+		mustDo(t, c,
+			"ZREVRANGEBYSCORE", "z", "inf", "1", "LIMIT", "1", "2000",
+			proto.Strings("three", "drei", "zwei", "two", "one"),
+		)
 
 		// Negative start limit. No go.
-		b, err = redis.Strings(c.Do("ZRANGEBYSCORE", "z", "-inf", "inf", "LIMIT", -1, 2))
-		ok(t, err)
-		equals(t, []string{}, b)
+		mustDo(t, c,
+			"ZRANGEBYSCORE", "z", "-inf", "inf", "LIMIT", "-1", "2",
+			proto.Strings(),
+		)
 
 		// Negative end limit. Is fine but ignored.
-		b, err = redis.Strings(c.Do("ZRANGEBYSCORE", "z", "-inf", "inf", "LIMIT", 1, -2))
-		ok(t, err)
-		equals(t, []string{"minusfour", "one", "two", "zwei", "drei", "three", "inf"}, b)
+		mustDo(t, c,
+			"ZRANGEBYSCORE", "z", "-inf", "inf", "LIMIT", "1", "-2",
+			proto.Strings("minusfour", "one", "two", "zwei", "drei", "three", "inf"),
+		)
 	}
 	// Everything
 	{
-		b, err := redis.Strings(c.Do("ZRANGEBYSCORE", "z", "-inf", "inf", "WITHSCORES", "LIMIT", 1, 2))
-		ok(t, err)
-		equals(t, []string{"minusfour", "-4", "one", "1"}, b)
+		mustDo(t, c,
+			"ZRANGEBYSCORE", "z", "-inf", "inf", "WITHSCORES", "LIMIT", "1", "2",
+			proto.Strings("minusfour", "-4", "one", "1"),
+		)
 
-		b, err = redis.Strings(c.Do("ZRANGEBYSCORE", "z", "-inf", "inf", "LIMIT", 1, 2, "WITHSCORES"))
-		ok(t, err)
-		equals(t, []string{"minusfour", "-4", "one", "1"}, b)
+		mustDo(t, c,
+			"ZRANGEBYSCORE", "z", "-inf", "inf", "LIMIT", "1", "2", "WITHSCORES",
+			proto.Strings("minusfour", "-4", "one", "1"),
+		)
 	}
 
-	// Error cases
-	{
-		_, err = redis.String(c.Do("ZRANGEBYSCORE"))
-		assert(t, err != nil, "ZRANGEBYSCORE error")
-		_, err = redis.String(c.Do("ZRANGEBYSCORE", "set"))
-		assert(t, err != nil, "ZRANGEBYSCORE error")
-		_, err = redis.String(c.Do("ZRANGEBYSCORE", "set", 1))
-		assert(t, err != nil, "ZRANGEBYSCORE error")
-		_, err = redis.String(c.Do("ZRANGEBYSCORE", "set", "nofloat", 1))
-		assert(t, err != nil, "ZRANGEBYSCORE error")
-		_, err = redis.String(c.Do("ZRANGEBYSCORE", "set", 1, "nofloat"))
-		assert(t, err != nil, "ZRANGEBYSCORE error")
-		_, err = redis.String(c.Do("ZRANGEBYSCORE", "set", 1, 2, "toomany"))
-		assert(t, err != nil, "ZRANGEBYSCORE error")
-		_, err = redis.String(c.Do("ZRANGEBYSCORE", "set", "[1", 2, "toomany"))
-		assert(t, err != nil, "ZRANGEBYSCORE error")
-		_, err = redis.String(c.Do("ZRANGEBYSCORE", "set", 1, "[2", "toomany"))
-		assert(t, err != nil, "ZRANGEBYSCORE error")
-		_, err = redis.String(c.Do("ZRANGEBYSCORE", "set", "[1", 2, "LIMIT", "noint", 1))
-		assert(t, err != nil, "ZRANGEBYSCORE error")
-		_, err = redis.String(c.Do("ZRANGEBYSCORE", "set", "[1", 2, "LIMIT", 1, "noint"))
-		assert(t, err != nil, "ZRANGEBYSCORE error")
+	t.Run("errors", func(t *testing.T) {
+		mustDo(t, c,
+			"ZRANGEBYSCORE",
+			proto.Error(errWrongNumber("zrangebyscore")),
+		)
+		mustDo(t, c,
+			"ZRANGEBYSCORE", "set",
+			proto.Error(errWrongNumber("zrangebyscore")),
+		)
+		mustDo(t, c,
+			"ZRANGEBYSCORE", "set", "1",
+			proto.Error(errWrongNumber("zrangebyscore")),
+		)
+		mustDo(t, c,
+			"ZRANGEBYSCORE", "set", "nofloat", "1",
+			proto.Error("ERR min or max is not a float"),
+		)
+		mustDo(t, c,
+			"ZRANGEBYSCORE", "set", "1", "nofloat",
+			proto.Error("ERR min or max is not a float"),
+		)
+		mustDo(t, c,
+			"ZRANGEBYSCORE", "set", "1", "2", "toomany",
+			proto.Error(msgSyntaxError),
+		)
+		mustDo(t, c,
+			"ZRANGEBYSCORE", "set", "[1", "2", "toomany",
+			proto.Error("ERR min or max is not a float"),
+		)
+		mustDo(t, c,
+			"ZRANGEBYSCORE", "set", "1", "[2", "toomany",
+			proto.Error("ERR min or max is not a float"),
+		)
+		mustDo(t, c,
+			"ZRANGEBYSCORE", "set", "[1", "2", "LIMIT", "noint", "1",
+			proto.Error("ERR min or max is not a float"),
+		)
+		mustDo(t, c,
+			"ZRANGEBYSCORE", "set", "[1", "2", "LIMIT", "1", "noint",
+			proto.Error("ERR min or max is not a float"),
+		)
 		// Wrong type of key
 		s.Set("str", "value")
-		_, err = redis.Int(c.Do("ZRANGEBYSCORE", "str", 1, 2))
-		assert(t, err != nil, "ZRANGEBYSCORE error")
+		mustDo(t, c,
+			"ZRANGEBYSCORE", "str", "1", "2",
+			proto.Error(msgWrongType),
+		)
 
-		_, err = redis.String(c.Do("ZREVRANGEBYSCORE"))
-		assert(t, err != nil, "ZREVRANGEBYSCORE error")
+		mustDo(t, c,
+			"ZREVRANGEBYSCORE",
+			proto.Error(errWrongNumber("zrevrangebyscore")),
+		)
 
-		_, err = redis.String(c.Do("ZCOUNT"))
-		assert(t, err != nil, "ZCOUNT error")
-	}
+		mustDo(t, c,
+			"ZCOUNT",
+			proto.Error(errWrongNumber("zcount")),
+		)
+	})
 }
 
 func TestIssue10(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	s.ZAdd("key", 3.3, "element")
 
-	b, err := redis.Strings(c.Do("ZRANGEBYSCORE", "key", "3.3", "3.3"))
-	ok(t, err)
-	equals(t, []string{"element"}, b)
+	mustDo(t, c,
+		"ZRANGEBYSCORE", "key", "3.3", "3.3",
+		proto.Strings("element"),
+	)
 
-	b, err = redis.Strings(c.Do("ZRANGEBYSCORE", "key", "4.3", "4.3"))
-	ok(t, err)
-	equals(t, []string{}, b)
+	mustDo(t, c,
+		"ZRANGEBYSCORE", "key", "4.3", "4.3",
+		proto.Strings(),
+	)
 }
 
 // Test ZREM
@@ -531,8 +643,9 @@ func TestSortedSetRem(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	s.ZAdd("z", 1, "one")
 	s.ZAdd("z", 2, "two")
@@ -540,24 +653,23 @@ func TestSortedSetRem(t *testing.T) {
 
 	// Simple delete
 	{
-		b, err := redis.Int(c.Do("ZREM", "z", "two", "zwei", "nosuch"))
-		ok(t, err)
-		equals(t, 2, b)
+		mustDo(t, c,
+			"ZREM", "z", "two", "zwei", "nosuch",
+			proto.Int(2),
+		)
 		assert(t, s.Exists("z"), "key is there")
 	}
 	// Delete the last member
 	{
-		b, err := redis.Int(c.Do("ZREM", "z", "one"))
-		ok(t, err)
-		equals(t, 1, b)
+		must1(t, c,
+			"ZREM", "z", "one",
+		)
 		assert(t, !s.Exists("z"), "key is gone")
 	}
 	// Nonexistent key
-	{
-		b, err := redis.Int(c.Do("ZREM", "nosuch", "member"))
-		ok(t, err)
-		equals(t, 0, b)
-	}
+	must0(t, c,
+		"ZREM", "nosuch", "member",
+	)
 
 	// Direct
 	{
@@ -572,17 +684,22 @@ func TestSortedSetRem(t *testing.T) {
 		equals(t, []string{"one", "zwei"}, members)
 	}
 
-	// Error cases
-	{
-		_, err = redis.String(c.Do("ZREM"))
-		assert(t, err != nil, "ZREM error")
-		_, err = redis.String(c.Do("ZREM", "set"))
-		assert(t, err != nil, "ZREM error")
+	t.Run("errors", func(t *testing.T) {
+		mustDo(t, c,
+			"ZREM",
+			proto.Error(errWrongNumber("zrem")),
+		)
+		mustDo(t, c,
+			"ZREM", "set",
+			proto.Error(errWrongNumber("zrem")),
+		)
 		// Wrong type of key
 		s.Set("str", "value")
-		_, err = redis.Int(c.Do("ZREM", "str", "aap"))
-		assert(t, err != nil, "ZREM error")
-	}
+		mustDo(t, c,
+			"ZREM", "str", "aap",
+			proto.Error(msgWrongType),
+		)
+	})
 }
 
 // Test ZREMRANGEBYLEX
@@ -590,8 +707,9 @@ func TestSortedSetRemRangeByLex(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	s.ZAdd("z", 12, "zero kelvin")
 	s.ZAdd("z", 12, "minusfour")
@@ -605,9 +723,10 @@ func TestSortedSetRemRangeByLex(t *testing.T) {
 
 	// Inclusive range
 	{
-		b, err := redis.Int(c.Do("ZREMRANGEBYLEX", "z", "[o", "[three"))
-		ok(t, err)
-		equals(t, 3, b)
+		mustDo(t, c,
+			"ZREMRANGEBYLEX", "z", "[o", "[three",
+			proto.Int(3),
+		)
 
 		members, err := s.ZMembers("z")
 		ok(t, err)
@@ -618,38 +737,48 @@ func TestSortedSetRemRangeByLex(t *testing.T) {
 	}
 
 	// Wrong ranges
-	{
-		b, err := redis.Int(c.Do("ZREMRANGEBYLEX", "z", "+", "(z"))
-		ok(t, err)
-		equals(t, 0, b)
-	}
+	must0(t, c,
+		"ZREMRANGEBYLEX", "z", "+", "(z",
+	)
 
 	// No such key
-	{
-		b, err := redis.Int(c.Do("ZREMRANGEBYLEX", "nosuch", "-", "+"))
-		ok(t, err)
-		equals(t, 0, b)
-	}
+	must0(t, c,
+		"ZREMRANGEBYLEX", "nosuch", "-", "+",
+	)
 
-	// Error cases
-	{
-		_, err = c.Do("ZREMRANGEBYLEX")
-		assert(t, err != nil, "ZREMRANGEBYLEX error")
-		_, err = c.Do("ZREMRANGEBYLEX", "set")
-		assert(t, err != nil, "ZREMRANGEBYLEX error")
-		_, err = c.Do("ZREMRANGEBYLEX", "set", "1", "[a")
-		assert(t, err != nil, "ZREMRANGEBYLEX error")
-		_, err = c.Do("ZREMRANGEBYLEX", "set", "[a", "1")
-		assert(t, err != nil, "ZREMRANGEBYLEX error")
-		_, err = c.Do("ZREMRANGEBYLEX", "set", "[a", "!a")
-		assert(t, err != nil, "ZREMRANGEBYLEX error")
-		_, err = c.Do("ZREMRANGEBYLEX", "set", "-", "+", "toomany")
-		assert(t, err != nil, "ZREMRANGEBYLEX error")
+	t.Run("errors", func(t *testing.T) {
+		mustDo(t, c,
+			"ZREMRANGEBYLEX",
+			proto.Error(errWrongNumber("zremrangebylex")),
+		)
+		mustDo(t, c,
+			"ZREMRANGEBYLEX", "set",
+			proto.Error(errWrongNumber("zremrangebylex")),
+		)
+		mustDo(t, c,
+			"ZREMRANGEBYLEX", "set", "1", "[a",
+			proto.Error("ERR min or max not valid string range item"),
+		)
+		mustDo(t, c,
+			"ZREMRANGEBYLEX", "set", "[a", "1",
+			proto.Error("ERR min or max not valid string range item"),
+		)
+		mustDo(t, c,
+			"ZREMRANGEBYLEX", "set", "[a", "!a",
+			proto.Error("ERR min or max not valid string range item"),
+		)
+		mustDo(t, c,
+			"ZREMRANGEBYLEX", "set", "-", "+", "toomany",
+			proto.Error(errWrongNumber("zremrangebylex")),
+		)
+
 		// Wrong type of key
 		s.Set("str", "value")
-		_, err = c.Do("ZREMRANGEBYLEX", "str", "-", "+")
-		assert(t, err != nil, "ZREMRANGEBYLEX error")
-	}
+		mustDo(t, c,
+			"ZREMRANGEBYLEX", "str", "-", "+",
+			proto.Error(msgWrongType),
+		)
+	})
 }
 
 // Test ZREMRANGEBYRANK
@@ -657,8 +786,9 @@ func TestSortedSetRemRangeByRank(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	s.ZAdd("z", 1, "one")
 	s.ZAdd("z", 2, "two")
@@ -668,60 +798,71 @@ func TestSortedSetRemRangeByRank(t *testing.T) {
 	s.ZAdd("z", math.Inf(+1), "inf")
 
 	{
-		n, err := redis.Int(c.Do("ZREMRANGEBYRANK", "z", -2, -1))
-		ok(t, err)
-		equals(t, 2, n)
+		mustDo(t, c,
+			"ZREMRANGEBYRANK", "z", "-2", "-1",
+			proto.Int(2),
+		)
 
-		b, err := redis.Strings(c.Do("ZRANGE", "z", 0, -1))
-		ok(t, err)
-		equals(t, []string{"one", "two", "zwei", "drei"}, b)
+		mustDo(t, c,
+			"ZRANGE", "z", "0", "-1",
+			proto.Strings("one", "two", "zwei", "drei"),
+		)
 	}
 
 	// weird cases.
-	{
-		n, err := redis.Int(c.Do("ZREMRANGEBYRANK", "z", -100, -100))
-		ok(t, err)
-		equals(t, 0, n)
-	}
-	{
-		n, err := redis.Int(c.Do("ZREMRANGEBYRANK", "z", 100, 400))
-		ok(t, err)
-		equals(t, 0, n)
-	}
+	must0(t, c,
+		"ZREMRANGEBYRANK", "z", "-100", "-100",
+	)
+	must0(t, c,
+		"ZREMRANGEBYRANK", "z", "100", "400",
+	)
+
 	// Nonexistent key
-	{
-		n, err := redis.Int(c.Do("ZREMRANGEBYRANK", "nosuch", 1, 4))
-		ok(t, err)
-		equals(t, 0, n)
-	}
+	must0(t, c,
+		"ZREMRANGEBYRANK", "nosuch", "1", "4",
+	)
 
 	// Delete all. Key should be gone.
 	{
-		n, err := redis.Int(c.Do("ZREMRANGEBYRANK", "z", 0, -1))
-		ok(t, err)
-		equals(t, 4, n)
+		mustDo(t, c,
+			"ZREMRANGEBYRANK", "z", "0", "-1",
+			proto.Int(4),
+		)
 		equals(t, false, s.Exists("z"))
 	}
 
-	// Error cases
-	{
-		_, err = redis.String(c.Do("ZREMRANGEBYRANK"))
-		assert(t, err != nil, "ZREMRANGEBYRANK error")
-		_, err = redis.String(c.Do("ZREMRANGEBYRANK", "set"))
-		assert(t, err != nil, "ZREMRANGEBYRANK error")
-		_, err = redis.String(c.Do("ZREMRANGEBYRANK", "set", 1))
-		assert(t, err != nil, "ZREMRANGEBYRANK error")
-		_, err = redis.String(c.Do("ZREMRANGEBYRANK", "set", "noint", 1))
-		assert(t, err != nil, "ZREMRANGEBYRANK error")
-		_, err = redis.String(c.Do("ZREMRANGEBYRANK", "set", 1, "noint"))
-		assert(t, err != nil, "ZREMRANGEBYRANK error")
-		_, err = redis.String(c.Do("ZREMRANGEBYRANK", "set", 1, 2, "toomany"))
-		assert(t, err != nil, "ZREMRANGEBYRANK error")
+	t.Run("errors", func(t *testing.T) {
+		mustDo(t, c,
+			"ZREMRANGEBYRANK",
+			proto.Error(errWrongNumber("zremrangebyrank")),
+		)
+		mustDo(t, c,
+			"ZREMRANGEBYRANK", "set",
+			proto.Error(errWrongNumber("zremrangebyrank")),
+		)
+		mustDo(t, c,
+			"ZREMRANGEBYRANK", "set", "1",
+			proto.Error(errWrongNumber("zremrangebyrank")),
+		)
+		mustDo(t, c,
+			"ZREMRANGEBYRANK", "set", "noint", "1",
+			proto.Error(msgInvalidInt),
+		)
+		mustDo(t, c,
+			"ZREMRANGEBYRANK", "set", "1", "noint",
+			proto.Error(msgInvalidInt),
+		)
+		mustDo(t, c,
+			"ZREMRANGEBYRANK", "set", "1", "2", "toomany",
+			proto.Error(errWrongNumber("zremrangebyrank")),
+		)
 		// Wrong type of key
 		s.Set("str", "value")
-		_, err = redis.Int(c.Do("ZREMRANGEBYRANK", "str", 1, 2))
-		assert(t, err != nil, "ZREMRANGEBYRANK error")
-	}
+		mustDo(t, c,
+			"ZREMRANGEBYRANK", "str", "1", "2",
+			proto.Error(msgWrongType),
+		)
+	})
 }
 
 // Test ZREMRANGEBYSCORE
@@ -729,8 +870,9 @@ func TestSortedSetRangeRemByScore(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	s.ZAdd("z", -273.15, "zero kelvin")
 	s.ZAdd("z", -4, "minusfour")
@@ -743,58 +885,71 @@ func TestSortedSetRangeRemByScore(t *testing.T) {
 
 	// Normal cases
 	{
-		n, err := redis.Int(c.Do("ZREMRANGEBYSCORE", "z", "-inf", 1))
-		ok(t, err)
-		equals(t, 3, n)
+		mustDo(t, c,
+			"ZREMRANGEBYSCORE", "z", "-inf", "1",
+			proto.Int(3),
+		)
 
-		b, err := redis.Strings(c.Do("ZRANGE", "z", 0, -1))
-		ok(t, err)
-		equals(t, []string{"two", "zwei", "drei", "three", "inf"}, b)
+		mustDo(t, c,
+			"ZRANGE", "z", "0", "-1",
+			proto.Strings("two", "zwei", "drei", "three", "inf"),
+		)
 	}
 	// Exclusive min
 	{
-		n, err := redis.Int(c.Do("ZREMRANGEBYSCORE", "z", "(2", "(4"))
-		ok(t, err)
-		equals(t, 2, n)
+		mustDo(t, c,
+			"ZREMRANGEBYSCORE", "z", "(2", "(4",
+			proto.Int(2),
+		)
 
-		b, err := redis.Strings(c.Do("ZRANGE", "z", 0, -1))
-		ok(t, err)
-		equals(t, []string{"two", "zwei", "inf"}, b)
+		mustDo(t, c,
+			"ZRANGE", "z", "0", "-1",
+			proto.Strings("two", "zwei", "inf"),
+		)
 	}
 
 	// Wrong ranges
-	{
-		n, err := redis.Int(c.Do("ZREMRANGEBYSCORE", "z", "+inf", "-inf"))
-		ok(t, err)
-		equals(t, 0, n)
-	}
+	must0(t, c,
+		"ZREMRANGEBYSCORE", "z", "+inf", "-inf",
+	)
 
 	// No such key
-	{
-		n, err := redis.Int(c.Do("ZREMRANGEBYSCORE", "nosuch", "-inf", "inf"))
-		ok(t, err)
-		equals(t, 0, n)
-	}
+	must0(t, c,
+		"ZREMRANGEBYSCORE", "nosuch", "-inf", "inf",
+	)
 
-	// Error cases
-	{
-		_, err = redis.String(c.Do("ZREMRANGEBYSCORE"))
-		assert(t, err != nil, "ZREMRANGEBYSCORE error")
-		_, err = redis.String(c.Do("ZREMRANGEBYSCORE", "set"))
-		assert(t, err != nil, "ZREMRANGEBYSCORE error")
-		_, err = redis.String(c.Do("ZREMRANGEBYSCORE", "set", 1))
-		assert(t, err != nil, "ZREMRANGEBYSCORE error")
-		_, err = redis.String(c.Do("ZREMRANGEBYSCORE", "set", "nofloat", 1))
-		assert(t, err != nil, "ZREMRANGEBYSCORE error")
-		_, err = redis.String(c.Do("ZREMRANGEBYSCORE", "set", 1, "nofloat"))
-		assert(t, err != nil, "ZREMRANGEBYSCORE error")
-		_, err = redis.String(c.Do("ZREMRANGEBYSCORE", "set", 1, 2, "toomany"))
-		assert(t, err != nil, "ZREMRANGEBYSCORE error")
+	t.Run("errors", func(t *testing.T) {
+		mustDo(t, c,
+			"ZREMRANGEBYSCORE",
+			proto.Error(errWrongNumber("zremrangebyscore")),
+		)
+		mustDo(t, c,
+			"ZREMRANGEBYSCORE", "set",
+			proto.Error(errWrongNumber("zremrangebyscore")),
+		)
+		mustDo(t, c,
+			"ZREMRANGEBYSCORE", "set", "1",
+			proto.Error(errWrongNumber("zremrangebyscore")),
+		)
+		mustDo(t, c,
+			"ZREMRANGEBYSCORE", "set", "nofloat", "1",
+			proto.Error(msgInvalidMinMax),
+		)
+		mustDo(t, c,
+			"ZREMRANGEBYSCORE", "set", "1", "nofloat",
+			proto.Error(msgInvalidMinMax),
+		)
+		mustDo(t, c,
+			"ZREMRANGEBYSCORE", "set", "1", "2", "toomany",
+			proto.Error(errWrongNumber("zremrangebyscore")),
+		)
 		// Wrong type of key
 		s.Set("str", "value")
-		_, err = redis.Int(c.Do("ZREMRANGEBYSCORE", "str", 1, 2))
-		assert(t, err != nil, "ZREMRANGEBYSCORE error")
-	}
+		mustDo(t, c,
+			"ZREMRANGEBYSCORE", "str", "1", "2",
+			proto.Error(msgWrongType),
+		)
+	})
 }
 
 // Test ZSCORE
@@ -802,31 +957,29 @@ func TestSortedSetScore(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	s.ZAdd("z", 1, "one")
 	s.ZAdd("z", 2, "two")
 	s.ZAdd("z", 2, "zwei")
 
 	// Simple case
-	{
-		b, err := redis.Float64(c.Do("ZSCORE", "z", "two"))
-		ok(t, err)
-		equals(t, 2.0, b)
-	}
+	mustDo(t, c,
+		"ZSCORE", "z", "two",
+		proto.String("2"),
+	)
+
 	// no such member
-	{
-		b, err := c.Do("ZSCORE", "z", "nosuch")
-		ok(t, err)
-		equals(t, nil, b)
-	}
+	mustNil(t, c,
+		"ZSCORE", "z", "nosuch",
+	)
+
 	// no such key
-	{
-		b, err := c.Do("ZSCORE", "nosuch", "nosuch")
-		ok(t, err)
-		equals(t, nil, b)
-	}
+	mustNil(t, c,
+		"ZSCORE", "nosuch", "nosuch",
+	)
 
 	// Direct
 	{
@@ -837,19 +990,26 @@ func TestSortedSetScore(t *testing.T) {
 		equals(t, 2.0, score)
 	}
 
-	// Error cases
-	{
-		_, err = redis.String(c.Do("ZSCORE"))
-		assert(t, err != nil, "ZSCORE error")
-		_, err = redis.String(c.Do("ZSCORE", "key"))
-		assert(t, err != nil, "ZSCORE error")
-		_, err = redis.String(c.Do("ZSCORE", "too", "many", "arguments"))
-		assert(t, err != nil, "ZSCORE error")
-		// Wrong type of key
+	t.Run("errors", func(t *testing.T) {
+		mustDo(t, c,
+			"ZSCORE",
+			proto.Error(errWrongNumber("zscore")),
+		)
+		mustDo(t, c,
+			"ZSCORE", "key",
+			proto.Error(errWrongNumber("zscore")),
+		)
+		mustDo(t, c,
+			"ZSCORE", "too", "many", "arguments",
+			proto.Error(errWrongNumber("zscore")),
+		)
+
 		s.Set("str", "value")
-		_, err = redis.Int(c.Do("ZSCORE", "str", "aap"))
-		assert(t, err != nil, "ZSCORE error")
-	}
+		mustDo(t, c,
+			"ZSCORE", "str", "aap",
+			proto.Error(msgWrongType),
+		)
+	})
 }
 
 // Test ZRANGEBYLEX, ZREVRANGEBYLEX, ZLEXCOUNT
@@ -857,8 +1017,9 @@ func TestSortedSetRangeByLex(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	s.ZAdd("z", 12, "zero kelvin")
 	s.ZAdd("z", 12, "minusfour")
@@ -872,160 +1033,209 @@ func TestSortedSetRangeByLex(t *testing.T) {
 
 	// Normal cases
 	{
-		b, err := redis.Strings(c.Do("ZRANGEBYLEX", "z", "-", "+"))
-		ok(t, err)
-		equals(t, []string{
-			"drei",
-			"inf",
-			"minusfour",
-			"one",
-			"oneone",
-			"three",
-			"two",
-			"zero kelvin",
-			"zwei",
-		}, b)
+		mustDo(t, c,
+			"ZRANGEBYLEX", "z", "-", "+",
+			proto.Strings(
+				"drei",
+				"inf",
+				"minusfour",
+				"one",
+				"oneone",
+				"three",
+				"two",
+				"zero kelvin",
+				"zwei",
+			),
+		)
 
-		b, err = redis.Strings(c.Do("ZRANGEBYLEX", "z", "[zz", "+"))
-		ok(t, err)
-		equals(t, []string{}, b)
+		mustDo(t, c,
+			"ZRANGEBYLEX", "z", "[zz", "+",
+			proto.Strings(),
+		)
 
-		b, err = redis.Strings(c.Do("ZREVRANGEBYLEX", "z", "+", "-"))
-		ok(t, err)
-		equals(t, []string{
-			"zwei",
-			"zero kelvin",
-			"two",
-			"three",
-			"oneone",
-			"one",
-			"minusfour",
-			"inf",
-			"drei",
-		}, b)
+		mustDo(t, c,
+			"ZREVRANGEBYLEX", "z", "+", "-",
+			proto.Strings(
+				"zwei",
+				"zero kelvin",
+				"two",
+				"three",
+				"oneone",
+				"one",
+				"minusfour",
+				"inf",
+				"drei",
+			),
+		)
 
-		i, err := redis.Int(c.Do("ZLEXCOUNT", "z", "-", "+"))
-		ok(t, err)
-		equals(t, 9, i)
+		mustDo(t, c,
+			"ZLEXCOUNT", "z", "-", "+",
+			proto.Int(9),
+		)
 	}
+
 	// Inclusive range
 	{
-		b, err := redis.Strings(c.Do("ZRANGEBYLEX", "z", "[o", "[three"))
-		ok(t, err)
-		equals(t, []string{"one", "oneone", "three"}, b)
+		mustDo(t, c,
+			"ZRANGEBYLEX", "z", "[o", "[three",
+			proto.Strings("one", "oneone", "three"),
+		)
 
-		b, err = redis.Strings(c.Do("ZREVRANGEBYLEX", "z", "[three", "[o"))
-		ok(t, err)
-		equals(t, []string{"three", "oneone", "one"}, b)
+		mustDo(t, c,
+			"ZREVRANGEBYLEX", "z", "[three", "[o",
+			proto.Strings("three", "oneone", "one"),
+		)
 
-		i, err := redis.Int(c.Do("ZLEXCOUNT", "z", "[o", "[three"))
-		ok(t, err)
-		equals(t, 3, i)
+		mustDo(t, c,
+			"ZLEXCOUNT", "z", "[o", "[three",
+			proto.Int(3),
+		)
 	}
-	// Inclusive range
+
+	// Exclusive range
 	{
-		b, err := redis.Strings(c.Do("ZRANGEBYLEX", "z", "(o", "(z"))
-		ok(t, err)
-		equals(t, []string{"one", "oneone", "three", "two"}, b)
+		mustDo(t, c,
+			"ZRANGEBYLEX", "z", "(o", "(z",
+			proto.Strings("one", "oneone", "three", "two"),
+		)
 
-		b, err = redis.Strings(c.Do("ZREVRANGEBYLEX", "z", "(z", "(o"))
-		ok(t, err)
-		equals(t, []string{"two", "three", "oneone", "one"}, b)
+		mustDo(t, c,
+			"ZREVRANGEBYLEX", "z", "(z", "(o",
+			proto.Strings("two", "three", "oneone", "one"),
+		)
 
-		i, err := redis.Int(c.Do("ZLEXCOUNT", "z", "(o", "(z"))
-		ok(t, err)
-		equals(t, 4, i)
+		mustDo(t, c,
+			"ZLEXCOUNT", "z", "(o", "(z",
+			proto.Int(4),
+		)
 	}
+
 	// Wrong ranges
 	{
-		b, err := redis.Strings(c.Do("ZRANGEBYLEX", "z", "+", "(z"))
-		ok(t, err)
-		equals(t, []string{}, b)
+		mustDo(t, c,
+			"ZRANGEBYLEX", "z", "+", "(z",
+			proto.Strings(),
+		)
 
-		b, err = redis.Strings(c.Do("ZREVRANGEBYLEX", "z", "(z", "+"))
-		ok(t, err)
-		equals(t, []string{}, b)
+		mustDo(t, c,
+			"ZREVRANGEBYLEX", "z", "(z", "+",
+			proto.Strings(),
+		)
 
-		b, err = redis.Strings(c.Do("ZRANGEBYLEX", "z", "(a", "-"))
-		ok(t, err)
-		equals(t, []string{}, b)
+		mustDo(t, c,
+			"ZRANGEBYLEX", "z", "(a", "-",
+			proto.Strings(),
+		)
 
-		b, err = redis.Strings(c.Do("ZREVRANGEBYLEX", "z", "-", "(a"))
-		ok(t, err)
-		equals(t, []string{}, b)
+		mustDo(t, c,
+			"ZREVRANGEBYLEX", "z", "-", "(a",
+			proto.Strings(),
+		)
 
-		b, err = redis.Strings(c.Do("ZRANGEBYLEX", "z", "(z", "(a"))
-		ok(t, err)
-		equals(t, []string{}, b)
+		mustDo(t, c,
+			"ZRANGEBYLEX", "z", "(z", "(a",
+			proto.Strings(),
+		)
 
-		i, err := redis.Int(c.Do("ZLEXCOUNT", "z", "(z", "(z"))
-		ok(t, err)
-		equals(t, 0, i)
+		must0(t, c,
+			"ZLEXCOUNT", "z", "(z", "(z",
+		)
 	}
 
 	// No such key
 	{
-		b, err := redis.Strings(c.Do("ZRANGEBYLEX", "nosuch", "-", "+"))
-		ok(t, err)
-		equals(t, []string{}, b)
+		mustDo(t, c,
+			"ZRANGEBYLEX", "nosuch", "-", "+",
+			proto.Strings(),
+		)
 
-		i, err := redis.Int(c.Do("ZLEXCOUNT", "nosuch", "-", "+"))
-		ok(t, err)
-		equals(t, 0, i)
+		must0(t, c,
+			"ZLEXCOUNT", "nosuch", "-", "+",
+		)
 	}
 
 	// With LIMIT
 	// (note, this is SQL like logic, not the redis RANGE logic)
 	{
-		b, err := redis.Strings(c.Do("ZRANGEBYLEX", "z", "-", "+", "LIMIT", 1, 2))
-		ok(t, err)
-		equals(t, []string{"inf", "minusfour"}, b)
+		mustDo(t, c,
+			"ZRANGEBYLEX", "z", "-", "+", "LIMIT", "1", "2",
+			proto.Strings("inf", "minusfour"),
+		)
 
 		// Negative start limit. No go.
-		b, err = redis.Strings(c.Do("ZRANGEBYLEX", "z", "-", "+", "LIMIT", -1, 2))
-		ok(t, err)
-		equals(t, []string{}, b)
+		mustDo(t, c,
+			"ZRANGEBYLEX", "z", "-", "+", "LIMIT", "-1", "2",
+			proto.Strings(),
+		)
 
 		// Negative end limit. Is fine but ignored.
-		b, err = redis.Strings(c.Do("ZRANGEBYLEX", "z", "-", "+", "LIMIT", 1, -2))
-		ok(t, err)
-		equals(t, []string{"inf", "minusfour", "one", "oneone", "three", "two", "zero kelvin", "zwei"}, b)
+		mustDo(t, c,
+			"ZRANGEBYLEX", "z", "-", "+", "LIMIT", "1", "-2",
+			proto.Strings("inf", "minusfour", "one", "oneone", "three", "two", "zero kelvin", "zwei"),
+		)
 	}
 
-	// Error cases
-	{
-		_, err = c.Do("ZRANGEBYLEX")
-		assert(t, err != nil, "ZRANGEBYLEX error")
-		_, err = c.Do("ZRANGEBYLEX", "set")
-		assert(t, err != nil, "ZRANGEBYLEX error")
-		_, err = c.Do("ZRANGEBYLEX", "set", "1", "[a")
-		assert(t, err != nil, "ZRANGEBYLEX error")
-		_, err = c.Do("ZRANGEBYLEX", "set", "[a", "1")
-		assert(t, err != nil, "ZRANGEBYLEX error")
-		_, err = c.Do("ZRANGEBYLEX", "set", "[a", "!a")
-		assert(t, err != nil, "ZRANGEBYLEX error")
-		_, err = c.Do("ZRANGEBYLEX", "set", "-", "+", "toomany")
-		assert(t, err != nil, "ZRANGEBYLEX error")
-		_, err = c.Do("ZRANGEBYLEX", "set", "[1", "(1", "LIMIT", "noint", 1)
-		assert(t, err != nil, "ZRANGEBYLEX error")
-		_, err = c.Do("ZRANGEBYLEX", "set", "[1", "(1", "LIMIT", 1, "noint")
-		assert(t, err != nil, "ZRANGEBYLEX error")
-		// Wrong type of key
+	t.Run("errors", func(t *testing.T) {
+		mustDo(t, c,
+			"ZRANGEBYLEX",
+			proto.Error(errWrongNumber("zrangebylex")),
+		)
+		mustDo(t, c,
+			"ZRANGEBYLEX", "set",
+			proto.Error(errWrongNumber("zrangebylex")),
+		)
+		mustDo(t, c,
+			"ZRANGEBYLEX", "set", "1", "[a",
+			proto.Error(msgInvalidRangeItem),
+		)
+		mustDo(t, c,
+			"ZRANGEBYLEX", "set", "[a", "1",
+			proto.Error(msgInvalidRangeItem),
+		)
+		mustDo(t, c,
+			"ZRANGEBYLEX", "set", "[a", "!a",
+			proto.Error(msgInvalidRangeItem),
+		)
+		mustDo(t, c,
+			"ZRANGEBYLEX", "set", "-", "+", "toomany",
+			proto.Error(msgSyntaxError),
+		)
+		mustDo(t, c,
+			"ZRANGEBYLEX", "set", "[1", "(1", "LIMIT", "noint", "1",
+			proto.Error(msgInvalidInt),
+		)
+		mustDo(t, c,
+			"ZRANGEBYLEX", "set", "[1", "(1", "LIMIT", "1", "noint",
+			proto.Error(msgInvalidInt),
+		)
+
 		s.Set("str", "value")
-		_, err = c.Do("ZRANGEBYLEX", "str", "-", "+")
-		assert(t, err != nil, "ZRANGEBYLEX error")
+		mustDo(t, c,
+			"ZRANGEBYLEX", "str", "-", "+",
+			proto.Error(msgWrongType),
+		)
 
-		_, err = c.Do("ZLEXCOUNT")
-		assert(t, err != nil, "ZLEXCOUNT error")
-		_, err = c.Do("ZLEXCOUNT", "k")
-		assert(t, err != nil, "ZLEXCOUNT error")
-		_, err = c.Do("ZLEXCOUNT", "k", "[a", "a")
-		assert(t, err != nil, "ZLEXCOUNT error")
-		_, err = c.Do("ZLEXCOUNT", "k", "a", "(a")
-		assert(t, err != nil, "ZLEXCOUNT error")
-		_, err = c.Do("ZLEXCOUNT", "k", "(a", "(a", "toomany")
-		assert(t, err != nil, "ZLEXCOUNT error")
-	}
+		mustDo(t, c,
+			"ZLEXCOUNT",
+			proto.Error(errWrongNumber("zlexcount")),
+		)
+		mustDo(t, c,
+			"ZLEXCOUNT", "k",
+			proto.Error(errWrongNumber("zlexcount")),
+		)
+		mustDo(t, c,
+			"ZLEXCOUNT", "k", "[a", "a",
+			proto.Error(msgInvalidRangeItem),
+		)
+		mustDo(t, c,
+			"ZLEXCOUNT", "k", "a", "(a",
+			proto.Error(msgInvalidRangeItem),
+		)
+		mustDo(t, c,
+			"ZLEXCOUNT", "k", "(a", "(a", "toomany",
+			proto.Error(errWrongNumber("zlexcount")),
+		)
+	})
 }
 
 // Test ZINCRBY
@@ -1033,50 +1243,64 @@ func TestSortedSetIncrby(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	// Normal cases
 	{
 		// New key
-		b, err := redis.Float64(c.Do("ZINCRBY", "z", 1, "member"))
-		ok(t, err)
-		equals(t, 1.0, b)
+		mustDo(t, c,
+			"ZINCRBY", "z", "1", "member",
+			proto.String("1"),
+		)
 
 		// Existing key
-		b, err = redis.Float64(c.Do("ZINCRBY", "z", 2.5, "member"))
-		ok(t, err)
-		equals(t, 3.5, b)
+		mustDo(t, c,
+			"ZINCRBY", "z", "2.5", "member",
+			proto.String("3.5"),
+		)
 
 		// New member
-		b, err = redis.Float64(c.Do("ZINCRBY", "z", 1, "othermember"))
-		ok(t, err)
-		equals(t, 1.0, b)
+		mustDo(t, c,
+			"ZINCRBY", "z", "1", "othermember",
+			proto.String("1"),
+		)
 	}
 
-	// Error cases
-	{
-		_, err = redis.String(c.Do("ZINCRBY"))
-		assert(t, err != nil, "ZINCRBY error")
-		_, err = redis.String(c.Do("ZINCRBY", "set"))
-		assert(t, err != nil, "ZINCRBY error")
-		_, err = redis.String(c.Do("ZINCRBY", "set", "nofloat", "a"))
-		assert(t, err != nil, "ZINCRBY error")
-		_, err = redis.String(c.Do("ZINCRBY", "set", 1.0, "too", "many"))
-		assert(t, err != nil, "ZINCRBY error")
-		// Wrong type of key
+	t.Run("errors", func(t *testing.T) {
+		mustDo(t, c,
+			"ZINCRBY",
+			proto.Error(errWrongNumber("zincrby")),
+		)
+		mustDo(t, c,
+			"ZINCRBY", "set",
+			proto.Error(errWrongNumber("zincrby")),
+		)
+		mustDo(t, c,
+			"ZINCRBY", "set", "nofloat", "a",
+			proto.Error(msgInvalidFloat),
+		)
+		mustDo(t, c,
+			"ZINCRBY", "set", "1.0", "too", "many",
+			proto.Error(errWrongNumber("zincrby")),
+		)
+
 		s.Set("str", "value")
-		_, err = c.Do("ZINCRBY", "str", 1.0, "member")
-		assert(t, err != nil, "ZINCRBY error")
-	}
+		mustDo(t, c,
+			"ZINCRBY", "str", "1.0", "member",
+			proto.Error(msgWrongType),
+		)
+	})
 }
 
 func TestZscan(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	// We cheat with zscan. It always returns everything.
 
@@ -1084,90 +1308,98 @@ func TestZscan(t *testing.T) {
 	s.ZAdd("h", 2.0, "field2")
 
 	// No problem
-	{
-		res, err := redis.Values(c.Do("ZSCAN", "h", 0))
-		ok(t, err)
-		equals(t, 2, len(res))
-
-		var c int
-		var keys []string
-		_, err = redis.Scan(res, &c, &keys)
-		ok(t, err)
-		equals(t, 0, c)
-		equals(t, []string{"field1", "1", "field2", "2"}, keys)
-	}
+	mustDo(t, c,
+		"ZSCAN", "h", "0",
+		proto.Array(
+			proto.String("0"),
+			proto.Array(
+				proto.String("field1"),
+				proto.String("1"),
+				proto.String("field2"),
+				proto.String("2"),
+			),
+		),
+	)
 
 	// Invalid cursor
-	{
-		res, err := redis.Values(c.Do("ZSCAN", "h", 42))
-		ok(t, err)
-		equals(t, 2, len(res))
-
-		var c int
-		var keys []string
-		_, err = redis.Scan(res, &c, &keys)
-		ok(t, err)
-		equals(t, 0, c)
-		equals(t, []string(nil), keys)
-	}
+	mustDo(t, c,
+		"ZSCAN", "h", "42",
+		proto.Array(
+			proto.String("0"),
+			proto.Array(),
+		),
+	)
 
 	// COUNT (ignored)
-	{
-		res, err := redis.Values(c.Do("ZSCAN", "h", 0, "COUNT", 200))
-		ok(t, err)
-		equals(t, 2, len(res))
-
-		var c int
-		var keys []string
-		_, err = redis.Scan(res, &c, &keys)
-		ok(t, err)
-		equals(t, 0, c)
-		equals(t, []string{"field1", "1", "field2", "2"}, keys)
-	}
+	mustDo(t, c,
+		"ZSCAN", "h", "0", "COUNT", "200",
+		proto.Array(
+			proto.String("0"),
+			proto.Array(
+				proto.String("field1"),
+				proto.String("1"),
+				proto.String("field2"),
+				proto.String("2"),
+			),
+		),
+	)
 
 	// MATCH
-	{
-		s.ZAdd("h", 3.0, "aap")
-		s.ZAdd("h", 4.0, "noot")
-		s.ZAdd("h", 5.0, "mies")
-		res, err := redis.Values(c.Do("ZSCAN", "h", 0, "MATCH", "mi*"))
-		ok(t, err)
-		equals(t, 2, len(res))
+	s.ZAdd("h", 3.0, "aap")
+	s.ZAdd("h", 4.0, "noot")
+	s.ZAdd("h", 5.0, "mies")
+	mustDo(t, c,
+		"ZSCAN", "h", "0", "MATCH", "mi*",
+		proto.Array(
+			proto.String("0"),
+			proto.Array(
+				proto.String("mies"),
+				proto.String("5"),
+			),
+		),
+	)
 
-		var c int
-		var keys []string
-		_, err = redis.Scan(res, &c, &keys)
-		ok(t, err)
-		equals(t, 0, c)
-		equals(t, []string{"mies", "5"}, keys)
-	}
+	t.Run("errors", func(t *testing.T) {
+		mustDo(t, c,
+			"ZSCAN",
+			proto.Error(errWrongNumber("zscan")),
+		)
+		mustDo(t, c,
+			"ZSCAN", "set",
+			proto.Error(errWrongNumber("zscan")),
+		)
+		mustDo(t, c,
+			"ZSCAN", "set", "noint",
+			proto.Error("ERR invalid cursor"),
+		)
+		mustDo(t, c,
+			"ZSCAN", "set", "0", "MATCH",
+			proto.Error(msgSyntaxError),
+		)
+		mustDo(t, c,
+			"ZSCAN", "set", "0", "COUNT",
+			proto.Error(msgSyntaxError),
+		)
+		mustDo(t, c,
+			"ZSCAN", "set", "0", "COUNT", "noint",
+			proto.Error(msgInvalidInt),
+		)
 
-	// Wrong usage
-	{
-		_, err := redis.Int(c.Do("ZSCAN"))
-		assert(t, err != nil, "do ZSCAN error")
-		_, err = redis.Int(c.Do("ZSCAN", "set"))
-		assert(t, err != nil, "do ZSCAN error")
-		_, err = redis.Int(c.Do("ZSCAN", "set", "noint"))
-		assert(t, err != nil, "do ZSCAN error")
-		_, err = redis.Int(c.Do("ZSCAN", "set", 1, "MATCH"))
-		assert(t, err != nil, "do ZSCAN error")
-		_, err = redis.Int(c.Do("ZSCAN", "set", 1, "COUNT"))
-		assert(t, err != nil, "do ZSCAN error")
-		_, err = redis.Int(c.Do("ZSCAN", "set", 1, "COUNT", "noint"))
-		assert(t, err != nil, "do ZSCAN error")
 		s.Set("str", "value")
-		_, err = redis.Int(c.Do("ZSCAN", "str", 1))
-		assert(t, err != nil, "do ZSCAN error")
-	}
+		mustDo(t, c,
+			"ZSCAN", "str", "0",
+			proto.Error(msgWrongType),
+		)
+	})
 }
 
 func TestZunionstore(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	s.ZAdd("h1", 1.0, "field1")
 	s.ZAdd("h1", 2.0, "field2")
@@ -1175,9 +1407,10 @@ func TestZunionstore(t *testing.T) {
 	s.ZAdd("h2", 2.0, "field2")
 
 	t.Run("simple case", func(t *testing.T) {
-		res, err := redis.Int(c.Do("ZUNIONSTORE", "new", 2, "h1", "h2"))
-		ok(t, err)
-		equals(t, 2, res)
+		mustDo(t, c,
+			"ZUNIONSTORE", "new", "2", "h1", "h2",
+			proto.Int(2),
+		)
 
 		ss, err := s.SortedSet("new")
 		ok(t, err)
@@ -1188,9 +1421,10 @@ func TestZunionstore(t *testing.T) {
 		s.ZAdd("h3", 1.0, "field1")
 		s.ZAdd("h3", 3.0, "field3")
 
-		res, err := redis.Int(c.Do("ZUNIONSTORE", "h3", 2, "h1", "h3"))
-		ok(t, err)
-		equals(t, 3, res)
+		mustDo(t, c,
+			"ZUNIONSTORE", "h3", "2", "h1", "h3",
+			proto.Int(3),
+		)
 
 		ss, err := s.SortedSet("h3")
 		ok(t, err)
@@ -1198,9 +1432,10 @@ func TestZunionstore(t *testing.T) {
 	})
 
 	t.Run("WEIGHTS", func(t *testing.T) {
-		res, err := redis.Int(c.Do("ZUNIONSTORE", "weighted", 2, "h1", "h2", "WeIgHtS", "4.5", "12"))
-		ok(t, err)
-		equals(t, 2, res)
+		mustDo(t, c,
+			"ZUNIONSTORE", "weighted", "2", "h1", "h2", "WeIgHtS", "4.5", "12",
+			proto.Int(2),
+		)
 
 		ss, err := s.SortedSet("weighted")
 		ok(t, err)
@@ -1208,9 +1443,10 @@ func TestZunionstore(t *testing.T) {
 	})
 
 	t.Run("AGGREGATE", func(t *testing.T) {
-		res, err := redis.Int(c.Do("ZUNIONSTORE", "aggr", 2, "h1", "h2", "AgGrEgAtE", "min"))
-		ok(t, err)
-		equals(t, 2, res)
+		mustDo(t, c,
+			"ZUNIONSTORE", "aggr", "2", "h1", "h2", "AgGrEgAtE", "min",
+			proto.Int(2),
+		)
 
 		ss, err := s.SortedSet("aggr")
 		ok(t, err)
@@ -1218,46 +1454,77 @@ func TestZunionstore(t *testing.T) {
 	})
 
 	t.Run("normal set", func(t *testing.T) {
-		_, err := c.Do("SADD", "set", "aap", "noot", "mies")
-		ok(t, err)
-		res, err := redis.Int(c.Do("ZUNIONSTORE", "aggr", 1, "set"))
-		ok(t, err)
-		equals(t, 3, res)
+		mustDo(t, c,
+			"SADD", "set", "aap", "noot", "mies",
+			proto.Int(3),
+		)
+		mustDo(t, c,
+			"ZUNIONSTORE", "aggr", "1", "set",
+			proto.Int(3),
+		)
 	})
 
 	t.Run("wrong usage", func(t *testing.T) {
-		_, err := redis.Int(c.Do("ZUNIONSTORE"))
-		assert(t, err != nil, "do ZUNIONSTORE error")
-		_, err = redis.Int(c.Do("ZUNIONSTORE", "set"))
-		assert(t, err != nil, "do ZUNIONSTORE error")
-		_, err = redis.Int(c.Do("ZUNIONSTORE", "set", "noint"))
-		assert(t, err != nil, "do ZUNIONSTORE error")
-		_, err = redis.Int(c.Do("ZUNIONSTORE", "set", 0, "key"))
-		assert(t, err != nil, "do ZUNIONSTORE error")
-		_, err = redis.Int(c.Do("ZUNIONSTORE", "set", -1, "key"))
-		assert(t, err != nil, "do ZUNIONSTORE error")
-		_, err = redis.Int(c.Do("ZUNIONSTORE", "set", 1, "too", "many"))
-		assert(t, err != nil, "do ZUNIONSTORE error")
-		_, err = redis.Int(c.Do("ZUNIONSTORE", "set", 2, "key"))
-		assert(t, err != nil, "do ZUNIONSTORE error")
+		mustDo(t, c,
+			"ZUNIONSTORE",
+			proto.Error(errWrongNumber("zunionstore")),
+		)
+		mustDo(t, c,
+			"ZUNIONSTORE", "set",
+			proto.Error(errWrongNumber("zunionstore")),
+		)
+		mustDo(t, c,
+			"ZUNIONSTORE", "set", "noint",
+			proto.Error(errWrongNumber("zunionstore")),
+		)
+		mustDo(t, c,
+			"ZUNIONSTORE", "set", "0", "key",
+			proto.Error("ERR at least 1 input key is needed for ZUNIONSTORE/ZINTERSTORE"),
+		)
+		mustDo(t, c,
+			"ZUNIONSTORE", "set", "-1", "key",
+			proto.Error("ERR at least 1 input key is needed for ZUNIONSTORE/ZINTERSTORE"),
+		)
+		mustDo(t, c,
+			"ZUNIONSTORE", "set", "1", "too", "many",
+			proto.Error(msgSyntaxError),
+		)
+		mustDo(t, c,
+			"ZUNIONSTORE", "set", "2", "key",
+			proto.Error(msgSyntaxError),
+		)
 
-		_, err = redis.Int(c.Do("ZUNIONSTORE", "set", 2, "k1", "k2", "WEIGHTS"))
-		assert(t, err != nil, "do ZUNIONSTORE error")
-		_, err = redis.Int(c.Do("ZUNIONSTORE", "set", 2, "k1", "k2", "WEIGHTS", 1, 2, 3))
-		assert(t, err != nil, "do ZUNIONSTORE error")
-		_, err = redis.Int(c.Do("ZUNIONSTORE", "set", 2, "k1", "k2", "WEIGHTS", 1, "nof"))
-		assert(t, err != nil, "do ZUNIONSTORE error")
+		mustDo(t, c,
+			"ZUNIONSTORE", "set", "2", "k1", "k2", "WEIGHTS",
+			proto.Error(msgSyntaxError),
+		)
+		mustDo(t, c,
+			"ZUNIONSTORE", "set", "2", "k1", "k2", "WEIGHTS", "1", "2", "3",
+			proto.Error(msgSyntaxError),
+		)
+		mustDo(t, c,
+			"ZUNIONSTORE", "set", "2", "k1", "k2", "WEIGHTS", "1", "nof",
+			proto.Error("ERR weight value is not a float"),
+		)
 
-		_, err = redis.Int(c.Do("ZUNIONSTORE", "set", 2, "k1", "k2", "AGGREGATE"))
-		assert(t, err != nil, "do ZUNIONSTORE error")
-		_, err = redis.Int(c.Do("ZUNIONSTORE", "set", 2, "k1", "k2", "AGGREGATE", "foo"))
-		assert(t, err != nil, "do ZUNIONSTORE error")
-		_, err = redis.Int(c.Do("ZUNIONSTORE", "set", 2, "k1", "k2", "AGGREGATE", "sum", "foo"))
-		assert(t, err != nil, "do ZUNIONSTORE error")
+		mustDo(t, c,
+			"ZUNIONSTORE", "set", "2", "k1", "k2", "AGGREGATE",
+			proto.Error(msgSyntaxError),
+		)
+		mustDo(t, c,
+			"ZUNIONSTORE", "set", "2", "k1", "k2", "AGGREGATE", "foo",
+			proto.Error(msgSyntaxError),
+		)
+		mustDo(t, c,
+			"ZUNIONSTORE", "set", "2", "k1", "k2", "AGGREGATE", "sum", "foo",
+			proto.Error(msgSyntaxError),
+		)
 
 		s.Set("str", "value")
-		_, err = redis.Int(c.Do("ZUNIONSTORE", "set", 1, "str"))
-		assert(t, err != nil, "do ZUNIONSTORE error")
+		mustDo(t, c,
+			"ZUNIONSTORE", "set", "1", "str",
+			proto.Error(msgWrongType),
+		)
 	})
 }
 
@@ -1265,8 +1532,9 @@ func TestZinterstore(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	s.ZAdd("h1", 1.0, "field1")
 	s.ZAdd("h1", 2.0, "field2")
@@ -1277,9 +1545,10 @@ func TestZinterstore(t *testing.T) {
 
 	// Simple case
 	{
-		res, err := redis.Int(c.Do("ZINTERSTORE", "new", 2, "h1", "h2"))
-		ok(t, err)
-		equals(t, 2, res)
+		mustDo(t, c,
+			"ZINTERSTORE", "new", "2", "h1", "h2",
+			proto.Int(2),
+		)
 
 		ss, err := s.SortedSet("new")
 		ok(t, err)
@@ -1288,9 +1557,10 @@ func TestZinterstore(t *testing.T) {
 
 	// WEIGHTS
 	{
-		res, err := redis.Int(c.Do("ZINTERSTORE", "weighted", 2, "h1", "h2", "WeIgHtS", "4.5", "12"))
-		ok(t, err)
-		equals(t, 2, res)
+		mustDo(t, c,
+			"ZINTERSTORE", "weighted", "2", "h1", "h2", "WeIgHtS", "4.5", "12",
+			proto.Int(2),
+		)
 
 		ss, err := s.SortedSet("weighted")
 		ok(t, err)
@@ -1299,52 +1569,82 @@ func TestZinterstore(t *testing.T) {
 
 	// AGGREGATE
 	{
-		res, err := redis.Int(c.Do("ZINTERSTORE", "aggr", 2, "h1", "h2", "AgGrEgAtE", "min"))
-		ok(t, err)
-		equals(t, 2, res)
+		mustDo(t, c,
+			"ZINTERSTORE", "aggr", "2", "h1", "h2", "AgGrEgAtE", "min",
+			proto.Int(2),
+		)
 
 		ss, err := s.SortedSet("aggr")
 		ok(t, err)
 		equals(t, map[string]float64{"field1": 1.0, "field2": 2.0}, ss)
 	}
 
-	// Wrong usage
-	{
-		_, err := redis.Int(c.Do("ZINTERSTORE"))
-		assert(t, err != nil, "do ZINTERSTORE error")
-		_, err = redis.Int(c.Do("ZINTERSTORE", "set"))
-		assert(t, err != nil, "do ZINTERSTORE error")
-		_, err = redis.Int(c.Do("ZINTERSTORE", "set", "noint"))
-		assert(t, err != nil, "do ZINTERSTORE error")
-		_, err = redis.Int(c.Do("ZINTERSTORE", "set", 0, "key"))
-		assert(t, err != nil, "do ZINTERSTORE error")
-		_, err = redis.Int(c.Do("ZINTERSTORE", "set", -1, "key"))
-		assert(t, err != nil, "do ZINTERSTORE error")
-		_, err = redis.Int(c.Do("ZINTERSTORE", "set", 1, "too", "many"))
-		assert(t, err != nil, "do ZINTERSTORE error")
-		_, err = redis.Int(c.Do("ZINTERSTORE", "set", 2, "key"))
-		assert(t, err != nil, "do ZINTERSTORE error")
+	t.Run("errors", func(t *testing.T) {
+		mustDo(t, c,
+			"ZINTERSTORE",
+			proto.Error(errWrongNumber("zinterstore")),
+		)
+		mustDo(t, c,
+			"ZINTERSTORE", "set",
+			proto.Error(errWrongNumber("zinterstore")),
+		)
+		mustDo(t, c,
+			"ZINTERSTORE", "set", "noint",
+			proto.Error(errWrongNumber("zinterstore")),
+		)
+		mustDo(t, c,
+			"ZINTERSTORE", "set", "0", "key",
+			proto.Error("ERR at least 1 input key is needed for ZUNIONSTORE/ZINTERSTORE"),
+		)
+		mustDo(t, c,
+			"ZINTERSTORE", "set", "-1", "key",
+			proto.Error("ERR at least 1 input key is needed for ZUNIONSTORE/ZINTERSTORE"),
+		)
+		mustDo(t, c,
+			"ZINTERSTORE", "set", "1", "too", "many",
+			proto.Error(msgSyntaxError),
+		)
+		mustDo(t, c,
+			"ZINTERSTORE", "set", "2", "key",
+			proto.Error(msgSyntaxError),
+		)
 
-		_, err = redis.Int(c.Do("ZINTERSTORE", "set", 2, "k1", "k2", "WEIGHTS"))
-		assert(t, err != nil, "do ZINTERSTORE error")
-		_, err = redis.Int(c.Do("ZINTERSTORE", "set", 2, "k1", "k2", "WEIGHTS", 1, 2, 3))
-		assert(t, err != nil, "do ZINTERSTORE error")
-		_, err = redis.Int(c.Do("ZINTERSTORE", "set", 2, "k1", "k2", "WEIGHTS", 1, "nof"))
-		assert(t, err != nil, "do ZINTERSTORE error")
+		mustDo(t, c,
+			"ZINTERSTORE", "set", "2", "k1", "k2", "WEIGHTS",
+			proto.Error(msgSyntaxError),
+		)
+		mustDo(t, c,
+			"ZINTERSTORE", "set", "2", "k1", "k2", "WEIGHTS", "1", "2", "3",
+			proto.Error(msgSyntaxError),
+		)
+		mustDo(t, c,
+			"ZINTERSTORE", "set", "2", "k1", "k2", "WEIGHTS", "1", "nof",
+			proto.Error("ERR weight value is not a float"),
+		)
 
-		_, err = redis.Int(c.Do("ZINTERSTORE", "set", 2, "k1", "k2", "AGGREGATE"))
-		assert(t, err != nil, "do ZINTERSTORE error")
-		_, err = redis.Int(c.Do("ZINTERSTORE", "set", 2, "k1", "k2", "AGGREGATE", "foo"))
-		assert(t, err != nil, "do ZINTERSTORE error")
-		_, err = redis.Int(c.Do("ZINTERSTORE", "set", 2, "k1", "k2", "AGGREGATE", "sum", "foo"))
-		assert(t, err != nil, "do ZINTERSTORE error")
+		mustDo(t, c,
+			"ZINTERSTORE", "set", "2", "k1", "k2", "AGGREGATE",
+			proto.Error(msgSyntaxError),
+		)
+		mustDo(t, c,
+			"ZINTERSTORE", "set", "2", "k1", "k2", "AGGREGATE", "foo",
+			proto.Error(msgSyntaxError),
+		)
+		mustDo(t, c,
+			"ZINTERSTORE", "set", "2", "k1", "k2", "AGGREGATE", "sum", "foo",
+			proto.Error(msgSyntaxError),
+		)
 
 		s.Set("str", "value")
-		_, err = redis.Int(c.Do("ZINTERSTORE", "set", 1, "str"))
-		assert(t, err != nil, "do ZINTERSTORE error")
-		_, err = redis.Int(c.Do("ZINTERSTORE", "set", 2, "set", "str"))
-		assert(t, err != nil, "do ZINTERSTORE error")
-	}
+		mustDo(t, c,
+			"ZINTERSTORE", "set", "1", "str",
+			proto.Error(msgWrongType),
+		)
+		mustDo(t, c,
+			"ZINTERSTORE", "set", "2", "set", "str",
+			proto.Error(msgWrongType),
+		)
+	})
 }
 
 func TestSSRange(t *testing.T) {
@@ -1429,8 +1729,9 @@ func TestSortedSetPopMin(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	s.ZAdd("z", 1, "one")
 	s.ZAdd("z", 2, "two")
@@ -1439,57 +1740,55 @@ func TestSortedSetPopMin(t *testing.T) {
 	s.ZAdd("z", 3, "drei")
 	s.ZAdd("z", math.Inf(+1), "inf")
 
-	{
-		n, err := redis.Strings(c.Do("ZPOPMIN", "z", 2))
-		ok(t, err)
-		equals(t, 4, len(n))
+	mustDo(t, c,
+		"ZPOPMIN", "z", "2",
+		proto.Strings("one", "1", "two", "2"),
+	)
 
-		equals(t, []string{"one", "1", "two", "2"}, n)
-	}
 	// Get one - without count
-	{
-		n, err := redis.Strings(c.Do("ZPOPMIN", "z"))
-		ok(t, err)
-		equals(t, 2, len(n))
-		equals(t, []string{"zwei", "2"}, n)
-	}
-	// weird cases.
-	{
-		n, err := redis.Strings(c.Do("ZPOPMIN", "z", -100))
-		ok(t, err)
-		equals(t, 0, len(n))
-	}
-	// Nonexistent key
-	{
-		n, err := redis.Strings(c.Do("ZPOPMIN", "nosuch", 1))
-		ok(t, err)
-		equals(t, 0, len(n))
-	}
-	// Get more than exist
-	{
-		n, err := redis.Strings(c.Do("ZPOPMIN", "z", 100))
-		ok(t, err)
-		equals(t, 6, len(n))
-		equals(t, []string{"drei", "3", "three", "3", "inf", "inf"}, n)
-	}
+	mustDo(t, c,
+		"ZPOPMIN", "z",
+		proto.Strings("zwei", "2"),
+	)
 
-	// Error cases
-	{
-		_, err = redis.String(c.Do("ZPOPMIN"))
-		assert(t, err != nil, "ZPOPMIN error")
-		_, err = redis.String(c.Do("ZPOPMIN", "set"))
-		assert(t, err != nil, "ZPOPMIN error")
-		_, err = redis.String(c.Do("ZPOPMIN", "set", 1))
-		assert(t, err != nil, "ZPOPMIN error")
-		_, err = redis.String(c.Do("ZPOPMIN", "set", "noint"))
-		assert(t, err != nil, "ZPOPMIN error")
-		_, err = redis.String(c.Do("ZPOPMIN", "set", 1, "toomany"))
-		assert(t, err != nil, "ZPOPMIN error")
-		// Wrong type of key
+	// weird cases.
+	mustDo(t, c,
+		"ZPOPMIN", "z", "-100",
+		proto.Strings(),
+	)
+
+	// Nonexistent key
+	mustDo(t, c,
+		"ZPOPMIN", "nosuch", "1",
+		proto.Strings(),
+	)
+
+	// Get more than exist
+	mustDo(t, c,
+		"ZPOPMIN", "z", "100",
+		proto.Strings("drei", "3", "three", "3", "inf", "inf"),
+	)
+
+	t.Run("errors", func(t *testing.T) {
+		mustDo(t, c,
+			"ZPOPMIN",
+			proto.Error(errWrongNumber("zpopmin")),
+		)
+		mustDo(t, c,
+			"ZPOPMIN", "set", "noint",
+			proto.Error(msgInvalidInt),
+		)
+		mustDo(t, c,
+			"ZPOPMIN", "set", "1", "toomany",
+			proto.Error(msgSyntaxError),
+		)
+
 		s.Set("str", "value")
-		_, err = redis.Int(c.Do("ZPOPMIN", "str", 1, 2))
-		assert(t, err != nil, "ZPOPMIN error")
-	}
+		mustDo(t, c,
+			"ZPOPMIN", "str", "1",
+			proto.Error(msgWrongType),
+		)
+	})
 }
 
 // Test ZPOPMAX
@@ -1497,8 +1796,9 @@ func TestSortedSetPopMax(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	s.ZAdd("z", 1, "one")
 	s.ZAdd("z", 2, "two")
@@ -1507,55 +1807,54 @@ func TestSortedSetPopMax(t *testing.T) {
 	s.ZAdd("z", 3, "drei")
 	s.ZAdd("z", math.Inf(+1), "inf")
 
-	{
-		n, err := redis.Strings(c.Do("ZPOPMAX", "z", 2))
-		ok(t, err)
-		equals(t, 4, len(n))
+	mustDo(t, c,
+		"ZPOPMAX", "z", "2",
+		proto.Strings("inf", "inf", "three", "3"),
+	)
 
-		equals(t, []string{"inf", "inf", "three", "3"}, n)
-	}
 	// Get one - without count
-	{
-		n, err := redis.Strings(c.Do("ZPOPMAX", "z"))
-		ok(t, err)
-		equals(t, 2, len(n))
-		equals(t, []string{"drei", "3"}, n)
-	}
-	// weird cases.
-	{
-		n, err := redis.Strings(c.Do("ZPOPMAX", "z", -100))
-		ok(t, err)
-		equals(t, 0, len(n))
-	}
-	// Nonexistent key
-	{
-		n, err := redis.Strings(c.Do("ZPOPMAX", "nosuch", 1))
-		ok(t, err)
-		equals(t, 0, len(n))
-	}
-	// Get more than exist
-	{
-		n, err := redis.Strings(c.Do("ZPOPMAX", "z", 100))
-		ok(t, err)
-		equals(t, 6, len(n))
-		equals(t, []string{"zwei", "2", "two", "2", "one", "1"}, n)
-	}
+	mustDo(t, c,
+		"ZPOPMAX", "z",
+		proto.Strings("drei", "3"),
+	)
 
-	// Error cases
-	{
-		_, err = redis.String(c.Do("ZPOPMAX"))
-		assert(t, err != nil, "ZPOPMAX error")
-		_, err = redis.String(c.Do("ZPOPMAX", "set"))
-		assert(t, err != nil, "ZPOPMAX error")
-		_, err = redis.String(c.Do("ZPOPMAX", "set", 1))
-		assert(t, err != nil, "ZPOPMAX error")
-		_, err = redis.String(c.Do("ZPOPMAX", "set", "noint"))
-		assert(t, err != nil, "ZPOPMAX error")
-		_, err = redis.String(c.Do("ZPOPMAX", "set", 1, "toomany"))
-		assert(t, err != nil, "ZPOPMAX error")
-		// Wrong type of key
+	// weird cases.
+	mustDo(t, c,
+		"ZPOPMAX", "z", "-100",
+		proto.Strings(),
+	)
+
+	// Nonexistent key
+	mustDo(t, c,
+		"ZPOPMAX", "nosuch", "1",
+		proto.Strings(),
+	)
+
+	// Get more than exist
+	mustDo(t, c,
+		"ZPOPMAX", "z", "100",
+		proto.Strings("zwei", "2", "two", "2", "one", "1"),
+	)
+
+	t.Run("errors", func(t *testing.T) {
+		mustDo(t, c,
+			"ZPOPMAX",
+			proto.Error(errWrongNumber("zpopmax")),
+		)
+
+		mustDo(t, c,
+			"ZPOPMAX", "set", "noint",
+			proto.Error(msgInvalidInt),
+		)
+		mustDo(t, c,
+			"ZPOPMAX", "set", "1", "toomany",
+			proto.Error(msgSyntaxError),
+		)
+
 		s.Set("str", "value")
-		_, err = redis.Int(c.Do("ZPOPMAX", "str", 1, 2))
-		assert(t, err != nil, "ZPOPMAX error")
-	}
+		mustDo(t, c,
+			"ZPOPMAX", "str", "1",
+			proto.Error(msgWrongType),
+		)
+	})
 }
