@@ -3,64 +3,75 @@ package miniredis
 import (
 	"testing"
 
-	"github.com/gomodule/redigo/redis"
+	"github.com/alicebob/miniredis/v2/proto"
 )
 
 func TestMulti(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	// Do accept MULTI, but use it as a no-op
-	r, err := redis.String(c.Do("MULTI"))
-	ok(t, err)
-	equals(t, "OK", r)
+	mustOK(t, c,
+		"MULTI",
+	)
 }
 
 func TestExec(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	// Exec without MULTI.
-	_, err = c.Do("EXEC")
-	assert(t, err != nil, "do EXEC error")
+	mustDo(t, c,
+		"EXEC",
+		proto.Error("ERR EXEC without MULTI"),
+	)
 }
 
 func TestDiscard(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	// DISCARD without MULTI.
-	_, err = c.Do("DISCARD")
-	assert(t, err != nil, "do DISCARD error")
+	mustDo(t, c,
+		"DISCARD",
+		proto.Error("ERR DISCARD without MULTI"),
+	)
 }
 
 func TestWatch(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	// Simple WATCH
-	r, err := redis.String(c.Do("WATCH", "foo"))
-	ok(t, err)
-	equals(t, "OK", r)
+	mustOK(t, c,
+		"WATCH", "foo",
+	)
 
 	// Can't do WATCH in a MULTI
 	{
-		_, err = redis.String(c.Do("MULTI"))
-		ok(t, err)
-		_, err = redis.String(c.Do("WATCH", "foo"))
-		assert(t, err != nil, "do WATCH error")
+		mustOK(t, c,
+			"MULTI",
+		)
+		mustDo(t, c,
+			"WATCH", "foo",
+			proto.Error("ERR WATCH in MULTI"),
+		)
 	}
 }
 
@@ -69,54 +80,58 @@ func TestSimpleTransaction(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
-	b, err := redis.String(c.Do("MULTI"))
-	ok(t, err)
-	equals(t, "OK", b)
+	mustOK(t, c,
+		"MULTI",
+	)
 
-	b, err = redis.String(c.Do("SET", "aap", 1))
-	ok(t, err)
-	equals(t, "QUEUED", b)
+	mustDo(t, c,
+		"SET", "aap", "1",
+		proto.Inline("QUEUED"),
+	)
 
 	// Not set yet.
 	equals(t, false, s.Exists("aap"))
 
-	v, err := redis.Values(c.Do("EXEC"))
-	ok(t, err)
-	equals(t, 1, len(redis.Args(v)))
-	equals(t, "OK", v[0])
+	mustDo(t, c,
+		"EXEC",
+		proto.Array(proto.Inline("OK")),
+	)
 
 	// SET should be back to normal mode
-	b, err = redis.String(c.Do("SET", "aap", 1))
-	ok(t, err)
-	equals(t, "OK", b)
+	mustOK(t, c,
+		"SET", "aap", "1",
+	)
 }
 
 func TestDiscardTransaction(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	s.Set("aap", "noot")
 
-	b, err := redis.String(c.Do("MULTI"))
-	ok(t, err)
-	equals(t, "OK", b)
+	mustOK(t, c,
+		"MULTI",
+	)
 
-	b, err = redis.String(c.Do("SET", "aap", "mies"))
-	ok(t, err)
-	equals(t, "QUEUED", b)
+	mustDo(t, c,
+		"SET", "aap", "mies",
+		proto.Inline("QUEUED"),
+	)
 
 	// Not committed
 	s.CheckGet(t, "aap", "noot")
 
-	v, err := redis.String(c.Do("DISCARD"))
-	ok(t, err)
-	equals(t, "OK", v)
+	mustOK(t, c,
+		"DISCARD",
+	)
 
 	// TX didn't get executed
 	s.CheckGet(t, "aap", "noot")
@@ -126,28 +141,35 @@ func TestTxQueueErr(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
-	b, err := redis.String(c.Do("MULTI"))
-	ok(t, err)
-	equals(t, "OK", b)
+	mustOK(t, c,
+		"MULTI",
+	)
 
-	b, err = redis.String(c.Do("SET", "aap", "mies"))
-	ok(t, err)
-	equals(t, "QUEUED", b)
+	mustDo(t, c,
+		"SET", "aap", "mies",
+		proto.Inline("QUEUED"),
+	)
 
 	// That's an error!
-	_, err = redis.String(c.Do("SET", "aap"))
-	assert(t, err != nil, "do SET error")
+	mustDo(t, c,
+		"SET", "aap",
+		proto.Error(errWrongNumber("set")),
+	)
 
 	// Thisone is ok again
-	b, err = redis.String(c.Do("SET", "noot", "vuur"))
-	ok(t, err)
-	equals(t, "QUEUED", b)
+	mustDo(t, c,
+		"SET", "noot", "vuur",
+		proto.Inline("QUEUED"),
+	)
 
-	_, err = redis.String(c.Do("EXEC"))
-	assert(t, err != nil, "do EXEC error")
+	mustDo(t, c,
+		"EXEC",
+		proto.Error("EXECABORT Transaction discarded because of previous errors."),
+	)
 
 	// Didn't get EXECed
 	equals(t, false, s.Exists("aap"))
@@ -158,26 +180,28 @@ func TestTxWatch(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	s.Set("one", "two")
-	b, err := redis.String(c.Do("WATCH", "one"))
-	ok(t, err)
-	equals(t, "OK", b)
+	mustOK(t, c,
+		"WATCH", "one",
+	)
 
-	b, err = redis.String(c.Do("MULTI"))
-	ok(t, err)
-	equals(t, "OK", b)
+	mustOK(t, c,
+		"MULTI",
+	)
 
-	b, err = redis.String(c.Do("GET", "one"))
-	ok(t, err)
-	equals(t, "QUEUED", b)
+	mustDo(t, c,
+		"GET", "one",
+		proto.Inline("QUEUED"),
+	)
 
-	v, err := redis.Values(c.Do("EXEC"))
-	ok(t, err)
-	equals(t, 1, len(v))
-	equals(t, []byte("two"), v[0])
+	mustDo(t, c,
+		"EXEC",
+		proto.Strings("two"),
+	)
 }
 
 func TestTxWatchErr(t *testing.T) {
@@ -185,76 +209,84 @@ func TestTxWatchErr(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
-	c2, err := redis.Dial("tcp", s.Addr())
+	defer c.Close()
+	c2, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c2.Close()
 
 	s.Set("one", "two")
-	b, err := redis.String(c.Do("WATCH", "one"))
-	ok(t, err)
-	equals(t, "OK", b)
+	mustOK(t, c,
+		"WATCH", "one",
+		proto.String(""),
+	)
 
 	// Here comes client 2
-	b, err = redis.String(c2.Do("SET", "one", "three"))
-	ok(t, err)
-	equals(t, "OK", b)
+	mustOK(t, c2, "SET", "one", "three")
 
-	b, err = redis.String(c.Do("MULTI"))
-	ok(t, err)
-	equals(t, "OK", b)
+	mustOK(t, c,
+		"MULTI",
+	)
 
-	b, err = redis.String(c.Do("GET", "one"))
-	ok(t, err)
-	equals(t, "QUEUED", b)
+	mustDo(t, c,
+		"GET", "one",
+		proto.Inline("QUEUED"),
+	)
 
-	_, err = redis.Values(c.Do("EXEC"))
-	equals(t, err, redis.ErrNil)
+	mustNil(t, c,
+		"EXEC",
+	)
 
 	// It did get updated, and we're not in a transaction anymore.
-	b, err = redis.String(c.Do("GET", "one"))
-	ok(t, err)
-	equals(t, "three", b)
+	mustDo(t, c,
+		"GET", "one",
+		proto.String("three"),
+	)
 }
 
 func TestUnwatch(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
-	c2, err := redis.Dial("tcp", s.Addr())
+	defer c.Close()
+	c2, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c2.Close()
 
 	s.Set("one", "two")
-	b, err := redis.String(c.Do("WATCH", "one"))
-	ok(t, err)
-	equals(t, "OK", b)
+	mustOK(t, c,
+		"WATCH", "one",
+	)
 
-	b, err = redis.String(c.Do("UNWATCH"))
-	ok(t, err)
-	equals(t, "OK", b)
+	mustOK(t, c,
+		"UNWATCH",
+	)
 
 	// Here comes client 2
-	b, err = redis.String(c2.Do("SET", "one", "three"))
-	ok(t, err)
-	equals(t, "OK", b)
+	mustOK(t, c2,
+		"SET", "one", "three",
+	)
 
-	b, err = redis.String(c.Do("MULTI"))
-	ok(t, err)
-	equals(t, "OK", b)
+	mustOK(t, c,
+		"MULTI",
+	)
 
-	b, err = redis.String(c.Do("SET", "one", "four"))
-	ok(t, err)
-	equals(t, "QUEUED", b)
+	mustDo(t, c,
+		"SET", "one", "four",
+		proto.Inline("QUEUED"),
+	)
 
-	v, err := redis.Values(c.Do("EXEC"))
-	ok(t, err)
-	equals(t, 1, len(v))
-	equals(t, "OK", v[0])
+	mustDo(t, c,
+		"EXEC",
+		proto.Array(proto.Inline("OK")),
+	)
 
 	// It did get updated by our TX
-	b, err = redis.String(c.Do("GET", "one"))
-	ok(t, err)
-	equals(t, "four", b)
+	mustDo(t, c,
+		"GET", "one",
+		proto.String("four"),
+	)
 }
