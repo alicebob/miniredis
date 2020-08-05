@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gomodule/redigo/redis"
+	"github.com/alicebob/miniredis/v2/proto"
 )
 
 // Test starting/stopping a server
@@ -14,17 +14,16 @@ func TestServer(t *testing.T) {
 	ok(t, err)
 	defer s.Close()
 
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
-	_, err = c.Do("PING")
-	ok(t, err)
+	defer c.Close()
+	mustDo(t, c, "PING", proto.Inline("PONG"))
 
 	// A single client
 	equals(t, 1, s.CurrentConnectionCount())
 	equals(t, 1, s.TotalConnectionCount())
 	equals(t, 1, s.CommandCount())
-	_, err = c.Do("PING")
-	ok(t, err)
+	mustDo(t, c, "PING", proto.Inline("PONG"))
 	equals(t, 2, s.CommandCount())
 }
 
@@ -59,16 +58,15 @@ func TestRestart(t *testing.T) {
 		t.Fatalf("have: %s, want: %s", have, want)
 	}
 
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
-	_, err = c.Do("PING")
-	ok(t, err)
+	defer c.Close()
+	mustDo(t, c, "PING", proto.Inline("PONG"))
 
-	red, err := redis.String(c.Do("GET", "color"))
-	ok(t, err)
-	if have, want := red, "red"; have != want {
-		t.Errorf("have: %s, want: %s", have, want)
-	}
+	mustDo(t, c,
+		"GET", "color",
+		proto.String("red"),
+	)
 }
 
 // Test a custom addr
@@ -78,10 +76,10 @@ func TestAddr(t *testing.T) {
 	ok(t, err)
 	defer m.Close()
 
-	c, err := redis.Dial("tcp", "127.0.0.1:7887")
+	c, err := proto.Dial("127.0.0.1:7887")
 	ok(t, err)
-	_, err = c.Do("PING")
-	ok(t, err)
+	defer c.Close()
+	mustDo(t, c, "PING", proto.Inline("PONG"))
 }
 
 func TestDump(t *testing.T) {
@@ -239,6 +237,8 @@ func TestExpireWithFastForward(t *testing.T) {
 	equals(t, 1, len(s.Keys()))
 }
 
+/*
+we don't have the redis client anymore
 func TestPool(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
@@ -254,3 +254,4 @@ func TestPool(t *testing.T) {
 	c := pool.Get()
 	c.Close()
 }
+*/
