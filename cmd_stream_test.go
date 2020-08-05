@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gomodule/redigo/redis"
+	"github.com/alicebob/miniredis/v2/proto"
 )
 
 // Test XADD / XLEN / XRANGE
@@ -15,28 +15,30 @@ func TestStream(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
 
-	res, err := redis.String(c.Do("XADD", "s", "1234567-89", "one", "1", "two", "2"))
-	ok(t, err)
-	equals(t, "1234567-89", res)
+	mustDo(t, c,
+		"XADD", "s", "1234567-89", "one", "1", "two", "2",
+		proto.String("1234567-89"),
+	)
 
-	count, err := redis.Int(c.Do("XLEN", "s"))
-	ok(t, err)
-	equals(t, 1, count)
+	must1(t, c,
+		"XLEN", "s",
+	)
 
 	t.Run("TYPE", func(t *testing.T) {
-		s, err := redis.String(c.Do("TYPE", "s"))
-		ok(t, err)
-		equals(t, "stream", s)
+		mustDo(t, c,
+			"TYPE", "s",
+			proto.Inline("stream"),
+		)
 	})
 
-	info, err := redis.Int64Map(c.Do("XINFO", "STREAM", "s"))
-	ok(t, err)
-
-	equals(t, map[string]int64{"length": 1}, info)
+	mustDo(t, c,
+		"XINFO", "STREAM", "s",
+		proto.Array(proto.String("length"), proto.Int(1)),
+	)
 
 	now := time.Date(2001, 1, 1, 4, 4, 5, 4000000, time.UTC)
 	s.SetTime(now)
@@ -75,16 +77,17 @@ func TestStreamAdd(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
 
 	t.Run("XADD", func(t *testing.T) {
-		res, err := redis.String(c.Do("XADD", "s", "123456", "one", "11", "two", "22"))
-		ok(t, err)
-		equals(t, "123456-0", res)
+		mustDo(t, c,
+			"XADD", "s", "123456", "one", "11", "two", "22",
+			proto.String("123456-0"),
+		)
 
-		res, err = redis.String(c.Do("XADD", "s", "*", "one", "1", "two", "2"))
+		res, err := c.Do("XADD", "s", "*", "one", "1", "two", "2")
 		ok(t, err)
 		exp := `\d+-0`
 		matched, err := regexp.MatchString(exp, res)
@@ -92,25 +95,29 @@ func TestStreamAdd(t *testing.T) {
 		assert(t, matched, "expected: %#v got: %#v", exp, res)
 
 		k := fmt.Sprintf("%d-0", uint64(math.MaxUint64-100))
-		res, err = redis.String(c.Do("XADD", "s", k, "one", "11", "two", "22"))
-		ok(t, err)
-		equals(t, k, res)
+		mustDo(t, c,
+			"XADD", "s", k, "one", "11", "two", "22",
+			proto.String(k),
+		)
 
-		res, err = redis.String(c.Do("XADD", "s", "*", "one", "111", "two", "222"))
-		ok(t, err)
-		equals(t, fmt.Sprintf("%d-1", uint64(math.MaxUint64-100)), res)
+		mustDo(t, c,
+			"XADD", "s", "*", "one", "111", "two", "222",
+			proto.String(fmt.Sprintf("%d-1", uint64(math.MaxUint64-100))),
+		)
 	})
 
 	t.Run("XADD SetTime", func(t *testing.T) {
 		now := time.Date(2001, 1, 1, 4, 4, 5, 4000000, time.UTC)
 		s.SetTime(now)
-		id, err := redis.String(c.Do("XADD", "now", "*", "one", "1"))
-		ok(t, err)
-		equals(t, "978321845004-0", id)
+		mustDo(t, c,
+			"XADD", "now", "*", "one", "1",
+			proto.String("978321845004-0"),
+		)
 
-		id, err = redis.String(c.Do("XADD", "now", "*", "two", "2"))
-		ok(t, err)
-		equals(t, "978321845004-1", id)
+		mustDo(t, c,
+			"XADD", "now", "*", "two", "2",
+			proto.String("978321845004-1"),
+		)
 	})
 
 	t.Run("XADD MAXLEN", func(t *testing.T) {
@@ -118,7 +125,7 @@ func TestStreamAdd(t *testing.T) {
 		s.SetTime(now)
 
 		for i := 0; i < 100; i++ {
-			_, err := redis.String(c.Do("XADD", "nowy", "MAXLEN", "10", "*", "one", "1"))
+			_, err := c.Do("XADD", "nowy", "MAXLEN", "10", "*", "one", "1")
 			ok(t, err)
 			nowy, _ := s.Stream("nowy")
 			assert(t, len(nowy) <= 10, "deleted entries")
@@ -127,7 +134,7 @@ func TestStreamAdd(t *testing.T) {
 		equals(t, 10, len(nowy))
 
 		for i := 0; i < 100; i++ {
-			_, err := redis.String(c.Do("XADD", "nowz", "MAXLEN", "~", "10", "*", "one", "1"))
+			_, err := c.Do("XADD", "nowz", "MAXLEN", "~", "10", "*", "one", "1")
 			ok(t, err)
 			nowz, _ := s.Stream("nowz")
 			assert(t, len(nowz) <= 10, "deleted entries")
@@ -138,34 +145,57 @@ func TestStreamAdd(t *testing.T) {
 
 	t.Run("error cases", func(t *testing.T) {
 		// Wrong type of key
-		_, err := redis.String(c.Do("SET", "str", "value"))
-		ok(t, err)
+		mustOK(t, c,
+			"SET", "str", "value",
+		)
 		_, err = s.XAdd("str", "*", []string{"hi", "1"})
 		mustFail(t, err, msgWrongType)
+		mustDo(t, c,
+			"XADD", "str", "*", "hi", "1",
+			proto.Error(msgWrongType),
+		)
 
-		_, err = redis.String(c.Do("XADD", "str", "*", "hi", "1"))
-		mustFail(t, err, msgWrongType)
-		_, err = redis.String(c.Do("XADD"))
-		assert(t, err != nil, "XADD error")
-		_, err = redis.String(c.Do("XADD", "s"))
-		assert(t, err != nil, "XADD error")
-		_, err = redis.String(c.Do("XADD", "s", "*"))
-		assert(t, err != nil, "XADD error")
-		_, err = redis.String(c.Do("XADD", "s", "*", "key")) // odd
-		assert(t, err != nil, "XADD error")
-		_, err = redis.String(c.Do("XADD", "s", "MAXLEN", "!!!", "1000", "*", "key"))
-		assert(t, err != nil, "XADD error")
-		_, err = redis.String(c.Do("XADD", "s", "MAXLEN", "~", "thousand", "*", "key"))
-		assert(t, err != nil, "XADD error")
+		mustDo(t, c,
+			"XADD",
+			proto.Error(errWrongNumber("xadd")),
+		)
+		mustDo(t, c,
+			"XADD", "s",
+			proto.Error(errWrongNumber("xadd")),
+		)
+		mustDo(t, c,
+			"XADD", "s", "*",
+			proto.Error(errWrongNumber("xadd")),
+		)
+		mustDo(t, c,
+			"XADD", "s", "*", "key",
+			proto.Error(errWrongNumber("xadd")),
+		)
+		mustDo(t, c,
+			"XADD", "s", "MAXLEN", "!!!", "1000", "*", "key",
+			proto.Error(msgInvalidInt),
+		)
+		mustDo(t, c,
+			"XADD", "s", "MAXLEN", "~", "thousand", "*", "key",
+			proto.Error(msgInvalidInt),
+		)
 
-		_, err = redis.String(c.Do("XADD", "s", "a-b", "one", "111", "two", "222")) // invalid id format
-		assert(t, err != nil, "XADD error")
-		_, err = redis.String(c.Do("XADD", "s", "0-0", "one", "111", "two", "222")) // invalid id format
-		assert(t, err != nil, "XADD error")
-		_, err = redis.String(c.Do("XADD", "s", "1234567-89", "one", "111", "two", "222")) // invalid id value
-		assert(t, err != nil, "XADD error")
-		_, err = redis.String(c.Do("XADD", "s", fmt.Sprintf("%d-0", uint64(math.MaxUint64-100)), "one", "111", "two", "222")) // invalid id value
-		assert(t, err != nil, "XADD error")
+		mustDo(t, c,
+			"XADD", "s", "a-b", "one", "111", "two", "222",
+			proto.Error("ERR Invalid stream ID specified as stream command argument"),
+		)
+		mustDo(t, c,
+			"XADD", "s", "0-0", "one", "111", "two", "222",
+			proto.Error("ERR The ID specified in XADD must be greater than 0-0"),
+		)
+		mustDo(t, c,
+			"XADD", "s", "1234567-89", "one", "111", "two", "222",
+			proto.Error("ERR The ID specified in XADD is equal or smaller than the target stream top item"),
+		)
+		mustDo(t, c,
+			"XADD", "s", fmt.Sprintf("%d-0", uint64(math.MaxUint64-100)),
+			proto.Error(errWrongNumber("xadd")),
+		)
 	})
 }
 
@@ -174,35 +204,39 @@ func TestStreamLen(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
 
-	_, err = redis.String(c.Do("XADD", "s", "*", "one", "1", "two", "2"))
+	_, err = c.Do("XADD", "s", "*", "one", "1", "two", "2")
 	ok(t, err)
-	_, err = redis.String(c.Do("XADD", "s", "*", "one", "11", "two", "22"))
+	_, err = c.Do("XADD", "s", "*", "one", "11", "two", "22")
 	ok(t, err)
 
 	t.Run("XLEN", func(t *testing.T) {
-		count, err := redis.Int(c.Do("XLEN", "s"))
-		ok(t, err)
-		equals(t, 2, count)
+		mustDo(t, c,
+			"XLEN", "s",
+			proto.Int(2),
+		)
 
-		count, err = redis.Int(c.Do("XLEN", "s3"))
-		ok(t, err)
-		equals(t, 0, count)
+		must0(t, c,
+			"XLEN", "s3",
+		)
 	})
 
 	t.Run("error cases", func(t *testing.T) {
-		// Wrong type of key
-		_, err := redis.String(c.Do("SET", "str", "value"))
-		ok(t, err)
+		mustDo(t, c,
+			"XLEN",
+			proto.Error(errWrongNumber("xlen")),
+		)
 
-		_, err = redis.Int(c.Do("XLEN"))
-		mustFail(t, err, errWrongNumber("xlen"))
-
-		_, err = redis.Int(c.Do("XLEN", "str"))
-		mustFail(t, err, msgWrongType)
+		mustOK(t, c,
+			"SET", "str", "value",
+		)
+		mustDo(t, c,
+			"XLEN", "str",
+			proto.Error(msgWrongType),
+		)
 	})
 }
 
@@ -211,78 +245,77 @@ func TestStreamRange(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
 
-	_, err = redis.String(c.Do("XADD", "planets", "0-1", "name", "Mercury", "greek-god", "Hermes", "idx", "1"))
+	_, err = c.Do("XADD", "planets", "0-1", "name", "Mercury", "greek-god", "Hermes", "idx", "1")
 	ok(t, err)
-	_, err = redis.String(c.Do("XADD", "planets", "1-0", "name", "Venus", "greek-god", "Aphrodite", "idx", "2"))
+	_, err = c.Do("XADD", "planets", "1-0", "name", "Venus", "greek-god", "Aphrodite", "idx", "2")
 	ok(t, err)
-	_, err = redis.String(c.Do("XADD", "planets", "2-1", "name", "Earth", "greek-god", "", "idx", "3"))
+	_, err = c.Do("XADD", "planets", "2-1", "name", "Earth", "greek-god", "", "idx", "3")
 	ok(t, err)
-	_, err = redis.String(c.Do("XADD", "planets", "3-0", "greek-god", "Ares", "name", "Mars", "idx", "4"))
+	_, err = c.Do("XADD", "planets", "3-0", "greek-god", "Ares", "name", "Mars", "idx", "4")
 	ok(t, err)
-	_, err = redis.String(c.Do("XADD", "planets", "4-1", "name", "Jupiter", "greek-god", "Dias", "idx", "5"))
+	_, err = c.Do("XADD", "planets", "4-1", "name", "Jupiter", "greek-god", "Dias", "idx", "5")
 	ok(t, err)
 
 	t.Run("XRANGE", func(t *testing.T) {
-		res, err := redis.Values(c.Do("XRANGE", "planets", "1", "+"))
-		ok(t, err)
-		equals(t, 4, len(res))
+		mustDo(t, c,
+			"XRANGE", "planets", "1", "+",
+			proto.Array(
+				proto.Array(proto.String("1-0"), proto.Strings("name", "Venus", "greek-god", "Aphrodite", "idx", "2")),
+				proto.Array(proto.String("2-1"), proto.Strings("name", "Earth", "greek-god", "", "idx", "3")),
+				proto.Array(proto.String("3-0"), proto.Strings("greek-god", "Ares", "name", "Mars", "idx", "4")),
+				proto.Array(proto.String("4-1"), proto.Strings("name", "Jupiter", "greek-god", "Dias", "idx", "5")),
+			),
+		)
 
-		item := res[1].([]interface{})
-		id := string(item[0].([]byte))
-
-		vals := item[1].([]interface{})
-		field := string(vals[0].([]byte))
-		value := string(vals[1].([]byte))
-
-		equals(t, "2-1", id)
-		equals(t, "name", field)
-		equals(t, "Earth", value)
-
-		res, err = redis.Values(c.Do("XREVRANGE", "planets", "3", "1"))
-		ok(t, err)
-		equals(t, 3, len(res))
-
-		item = res[2].([]interface{})
-		id = string(item[0].([]byte))
-
-		vals = item[1].([]interface{})
-		field = string(vals[0].([]byte))
-		value = string(vals[1].([]byte))
-
-		equals(t, "1-0", id)
-		equals(t, "name", field)
-		equals(t, "Venus", value)
+		mustDo(t, c,
+			"XREVRANGE", "planets", "3", "1",
+			proto.Array(
+				proto.Array(proto.String("3-0"), proto.Strings("greek-god", "Ares", "name", "Mars", "idx", "4")),
+				proto.Array(proto.String("2-1"), proto.Strings("name", "Earth", "greek-god", "", "idx", "3")),
+				proto.Array(proto.String("1-0"), proto.Strings("name", "Venus", "greek-god", "Aphrodite", "idx", "2")),
+			),
+		)
 	})
 
 	t.Run("error cases", func(t *testing.T) {
-		// Wrong type of key
-		_, err := redis.String(c.Do("SET", "str", "value"))
-		ok(t, err)
+		mustOK(t, c, "SET", "str", "value")
+		mustDo(t, c,
+			"XRANGE", "str", "-", "+",
+			proto.Error(msgWrongType),
+		)
 
-		_, err = redis.Int(c.Do("XRANGE", "str", "-", "+"))
-		mustFail(t, err, msgWrongType)
-
-		_, err = redis.Int(c.Do("XRANGE", "str", "-", "+"))
-		mustFail(t, err, msgWrongType)
-
-		_, err = redis.Int(c.Do("XRANGE"))
-		mustFail(t, err, errWrongNumber("xrange"))
-		_, err = redis.Int(c.Do("XRANGE", "foo"))
-		mustFail(t, err, errWrongNumber("xrange"))
-		_, err = redis.Int(c.Do("XRANGE", "foo", 1))
-		mustFail(t, err, errWrongNumber("xrange"))
-		_, err = redis.Int(c.Do("XRANGE", "foo", 2, 3, "toomany"))
-		mustFail(t, err, msgSyntaxError)
-		_, err = c.Do("XRANGE", "foo", 2, 3, "COUNT", "noint")
-		mustFail(t, err, msgInvalidInt)
-		_, err = c.Do("XRANGE", "foo", 2, 3, "COUNT", 1, "toomany")
-		mustFail(t, err, msgSyntaxError)
-		_, err = c.Do("XRANGE", "foo", "-", "noint")
-		mustFail(t, err, msgInvalidStreamID)
+		mustDo(t, c,
+			"XRANGE",
+			proto.Error(errWrongNumber("xrange")),
+		)
+		mustDo(t, c,
+			"XRANGE", "foo",
+			proto.Error(errWrongNumber("xrange")),
+		)
+		mustDo(t, c,
+			"XRANGE", "foo", "1",
+			proto.Error(errWrongNumber("xrange")),
+		)
+		mustDo(t, c,
+			"XRANGE", "foo", "2", "3", "toomany",
+			proto.Error(msgSyntaxError),
+		)
+		mustDo(t, c,
+			"XRANGE", "foo", "2", "3", "COUNT", "noint",
+			proto.Error(msgInvalidInt),
+		)
+		mustDo(t, c,
+			"XRANGE", "foo", "2", "3", "COUNT", "1", "toomany",
+			proto.Error(msgSyntaxError),
+		)
+		mustDo(t, c,
+			"XRANGE", "foo", "-", "noint",
+			proto.Error(msgInvalidStreamID),
+		)
 	})
 }
 
@@ -291,20 +324,24 @@ func TestStreamInfo(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
 
-	_, err = redis.Strings(c.Do("XINFO", "STREAM", "planets"))
-	mustFail(t, err, "ERR stream planets not exists")
+	mustDo(t, c,
+		"XINFO", "STREAM", "planets",
+		proto.Error("ERR stream planets not exists"),
+	)
 
-	_, err = redis.String(c.Do("XADD", "planets", "0-1", "name", "Mercury", "greek-god", "Hermes", "idx", "1"))
-	ok(t, err)
+	mustDo(t, c,
+		"XADD", "planets", "0-1", "name", "Mercury", "greek-god", "Hermes", "idx", "1",
+		proto.String("0-1"),
+	)
 
-	info, err := redis.Int64Map(c.Do("XINFO", "STREAM", "planets"))
-	ok(t, err)
-
-	equals(t, map[string]int64{"length": 1}, info)
+	mustDo(t, c,
+		"XINFO", "STREAM", "planets",
+		proto.Array(proto.String("length"), proto.Int(1)),
+	)
 }
 
 // Test XGROUP
@@ -312,19 +349,22 @@ func TestStreamGroup(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
 
-	_, err = redis.String(c.Do("XGROUP", "CREATE", "s", "processing", "$"))
-	mustFail(t, err, "ERR stream s not exists")
+	mustDo(t, c,
+		"XGROUP", "CREATE", "s", "processing", "$",
+		proto.Error("ERR stream s not exists"),
+	)
 
-	_, err = redis.String(c.Do("XGROUP", "CREATE", "s", "processing", "$", "MKSTREAM"))
-	ok(t, err)
+	mustOK(t, c,
+		"XGROUP", "CREATE", "s", "processing", "$", "MKSTREAM",
+	)
 
-	count, err := redis.Int(c.Do("XLEN", "s"))
-	ok(t, err)
-	equals(t, 0, count)
+	must0(t, c,
+		"XLEN", "s",
+	)
 }
 
 // Test XREADGROUP
@@ -332,37 +372,50 @@ func TestStreamReadGroup(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
 
-	_, err = redis.Values(c.Do("XREADGROUP", "GROUP", "processing", "alice", "STREAMS", "planets", ">"))
-	mustFail(t, err, "stream planets not exists")
+	mustDo(t, c,
+		"XREADGROUP", "GROUP", "processing", "alice", "STREAMS", "planets", ">",
+		proto.Error("stream planets not exists"),
+	)
 
-	_, err = redis.String(c.Do("XGROUP", "CREATE", "planets", "processing", "$", "MKSTREAM"))
-	ok(t, err)
+	mustOK(t, c,
+		"XGROUP", "CREATE", "planets", "processing", "$", "MKSTREAM",
+	)
 
-	_, err = redis.Values(c.Do("XREADGROUP", "GROUP", "processing", "alice", "STREAMS", "planets", ">"))
-	mustFail(t, err, redis.ErrNil.Error())
+	mustNil(t, c,
+		"XREADGROUP", "GROUP", "processing", "alice", "STREAMS", "planets", ">",
+	)
 
-	_, err = redis.String(c.Do("XADD", "planets", "0-1", "name", "Mercury"))
-	ok(t, err)
+	mustDo(t, c,
+		"XADD", "planets", "0-1", "name", "Mercury",
+		proto.String("0-1"),
+	)
 
-	count, err := redis.Int(c.Do("XLEN", "planets"))
-	ok(t, err)
-	equals(t, 1, count)
+	must1(t, c,
+		"XLEN", "planets",
+	)
 
-	msgs, err := redis.Values(c.Do("XREADGROUP", "GROUP", "processing", "alice", "STREAMS", "planets", ">"))
-	ok(t, err)
-	equals(t, []interface{}{[]interface{}{[]byte("planets"), []interface{}{[]interface{}{[]byte("0-1"), []interface{}{[]byte("name"), []byte("Mercury")}}}}}, msgs)
+	mustDo(t, c,
+		"XREADGROUP", "GROUP", "processing", "alice", "STREAMS", "planets", ">",
+		proto.Array(
+			proto.Array(proto.String("planets"), proto.Array(proto.Array(proto.String("0-1"), proto.Strings("name", "Mercury")))),
+		),
+	)
 
-	msgs, err = redis.Values(c.Do("XREADGROUP", "GROUP", "processing", "alice", "STREAMS", "planets", ">"))
-	mustFail(t, err, redis.ErrNil.Error())
+	mustNil(t, c,
+		"XREADGROUP", "GROUP", "processing", "alice", "STREAMS", "planets", ">",
+	)
 
 	// Read from PEL
-	msgs, err = redis.Values(c.Do("XREADGROUP", "GROUP", "processing", "alice", "STREAMS", "planets", "0-0"))
-	ok(t, err)
-	equals(t, []interface{}{[]interface{}{[]byte("planets"), []interface{}{[]interface{}{[]byte("0-1"), []interface{}{[]byte("name"), []byte("Mercury")}}}}}, msgs)
+	mustDo(t, c,
+		"XREADGROUP", "GROUP", "processing", "alice", "STREAMS", "planets", "0-0",
+		proto.Array(
+			proto.Array(proto.String("planets"), proto.Array(proto.Array(proto.String("0-1"), proto.Strings("name", "Mercury")))),
+		),
+	)
 }
 
 // Test XDEL
@@ -370,26 +423,33 @@ func TestStreamDelete(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
 
-	_, err = redis.String(c.Do("XGROUP", "CREATE", "planets", "processing", "$", "MKSTREAM"))
-	ok(t, err)
+	mustOK(t, c,
+		"XGROUP", "CREATE", "planets", "processing", "$", "MKSTREAM",
+	)
 
-	_, err = redis.String(c.Do("XADD", "planets", "0-1", "name", "Mercury"))
-	ok(t, err)
+	mustDo(t, c,
+		"XADD", "planets", "0-1", "name", "Mercury",
+		proto.String("0-1"),
+	)
 
-	msgs, err := redis.Values(c.Do("XREADGROUP", "GROUP", "processing", "alice", "STREAMS", "planets", ">"))
-	ok(t, err)
-	equals(t, []interface{}{[]interface{}{[]byte("planets"), []interface{}{[]interface{}{[]byte("0-1"), []interface{}{[]byte("name"), []byte("Mercury")}}}}}, msgs)
+	mustDo(t, c,
+		"XREADGROUP", "GROUP", "processing", "alice", "STREAMS", "planets", ">",
+		proto.Array(
+			proto.Array(proto.String("planets"), proto.Array(proto.Array(proto.String("0-1"), proto.Strings("name", "Mercury")))),
+		),
+	)
 
-	count, err := redis.Int(c.Do("XDEL", "planets", "0-1"))
-	ok(t, err)
-	equals(t, 1, count)
+	must1(t, c,
+		"XDEL", "planets", "0-1",
+	)
 
-	_, err = redis.Values(c.Do("XREADGROUP", "GROUP", "processing", "alice", "STREAMS", "planets", "0-0"))
-	mustFail(t, err, redis.ErrNil.Error())
+	mustNil(t, c,
+		"XREADGROUP", "GROUP", "processing", "alice", "STREAMS", "planets", "0-0",
+	)
 }
 
 // Test XACK
@@ -397,24 +457,31 @@ func TestStreamAck(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
 
-	_, err = redis.String(c.Do("XGROUP", "CREATE", "planets", "processing", "$", "MKSTREAM"))
-	ok(t, err)
+	mustOK(t, c,
+		"XGROUP", "CREATE", "planets", "processing", "$", "MKSTREAM",
+	)
 
-	_, err = redis.String(c.Do("XADD", "planets", "0-1", "name", "Mercury"))
-	ok(t, err)
+	mustDo(t, c,
+		"XADD", "planets", "0-1", "name", "Mercury",
+		proto.String("0-1"),
+	)
 
-	msgs, err := redis.Values(c.Do("XREADGROUP", "GROUP", "processing", "alice", "STREAMS", "planets", ">"))
-	ok(t, err)
-	equals(t, []interface{}{[]interface{}{[]byte("planets"), []interface{}{[]interface{}{[]byte("0-1"), []interface{}{[]byte("name"), []byte("Mercury")}}}}}, msgs)
+	mustDo(t, c,
+		"XREADGROUP", "GROUP", "processing", "alice", "STREAMS", "planets", ">",
+		proto.Array(
+			proto.Array(proto.String("planets"), proto.Array(proto.Array(proto.String("0-1"), proto.Strings("name", "Mercury")))),
+		),
+	)
 
-	count, err := redis.Int(c.Do("XACK", "planets", "processing", "0-1"))
-	ok(t, err)
-	equals(t, 1, count)
+	must1(t, c,
+		"XACK", "planets", "processing", "0-1",
+	)
 
-	_, err = redis.Values(c.Do("XREADGROUP", "GROUP", "processing", "alice", "STREAMS", "planets", "0-0"))
-	mustFail(t, err, redis.ErrNil.Error())
+	mustNil(t, c,
+		"XREADGROUP", "GROUP", "processing", "alice", "STREAMS", "planets", "0-0",
+	)
 }
