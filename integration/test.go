@@ -12,8 +12,10 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/alicebob/miniredis/v2"
 	"github.com/gomodule/redigo/redis"
+
+	"github.com/alicebob/miniredis/v2"
+	"github.com/alicebob/miniredis/v2/proto"
 )
 
 type command struct {
@@ -148,6 +150,21 @@ func testCommandsTLS(t *testing.T, commands ...command) {
 	sReal, sRealAddr := RedisTLS()
 	defer sReal.Close()
 	runCommandsTLS(t, sRealAddr, sMini.Addr(), commands)
+}
+
+func testRaw(t *testing.T, cb func(*client)) {
+	t.Helper()
+
+	sMini, err := miniredis.Run()
+	ok(t, err)
+	defer sMini.Close()
+
+	sReal, sRealAddr := Redis()
+	defer sReal.Close()
+
+	client := newClient(t, sRealAddr, sMini.Addr())
+
+	cb(client)
 }
 
 // like testCommands, but multiple connections
@@ -482,5 +499,51 @@ func roundFloats(r interface{}, pos int) interface{} {
 	default:
 		fmt.Printf("unhandled type: %T FIXME\n", r)
 		return nil
+	}
+}
+
+// client which compares two redises
+type client struct {
+	t          *testing.T
+	real, mini *proto.Client
+}
+
+func newClient(t *testing.T, realAddr, miniAddr string) *client {
+	t.Helper()
+
+	cReal, err := proto.Dial(realAddr)
+	ok(t, err)
+
+	cMini, err := proto.Dial(miniAddr)
+	ok(t, err)
+
+	return &client{
+		t:    t,
+		real: cReal,
+		mini: cMini,
+	}
+}
+
+// result must match exactly
+func (c *client) Do(cmd string, args ...string) {
+	c.t.Helper()
+
+	resReal, errReal := c.real.Do(append([]string{cmd}, args...)...)
+	if errReal != nil {
+		c.t.Errorf("error from realredis: %s", errReal)
+		return
+	}
+
+	resMini, errMini := c.mini.Do(append([]string{cmd}, args...)...)
+	if errMini != nil {
+		c.t.Errorf("error from miniredis: %s", errMini)
+		return
+	}
+
+	c.t.Logf("want %q have %q\n", string(resReal), string(resMini))
+
+	if resReal != resMini {
+		c.t.Errorf("expected: %q got: %q", string(resReal), string(resMini))
+		return
 	}
 }

@@ -1,58 +1,70 @@
 package miniredis
 
 import (
+	"strings"
 	"testing"
 	"time"
 
-	"github.com/gomodule/redigo/redis"
+	"github.com/alicebob/miniredis/v2/proto"
 )
 
-func setup(t *testing.T) (*Miniredis, redis.Conn, func()) {
-	s, err := Run()
+// execute command in a go routine. Used to test blocking commands.
+func goStrings(t *testing.T, s *Miniredis, args ...string) <-chan string {
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
-	c1, err := redis.Dial("tcp", s.Addr())
-	ok(t, err)
-	return s, c1, func() { s.Close() }
-}
 
-func setup2(t *testing.T) (*Miniredis, redis.Conn, redis.Conn, func()) {
-	s, err := Run()
-	ok(t, err)
-	c1, err := redis.Dial("tcp", s.Addr())
-	ok(t, err)
-	c2, err := redis.Dial("tcp", s.Addr())
-	ok(t, err)
-	return s, c1, c2, func() { s.Close() }
+	got := make(chan string, 1)
+	go func() {
+		defer c.Close()
+		defer close(got)
+		res, err := c.Do(args...)
+		if err != nil {
+			t.Error(err.Error())
+			return
+		}
+		got <- res
+	}()
+	return got
 }
 
 func TestLpush(t *testing.T) {
-	s, c, done := setup(t)
-	defer done()
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := proto.Dial(s.Addr())
+	ok(t, err)
+	defer c.Close()
 
 	t.Run("basic", func(t *testing.T) {
-		b, err := redis.Int(c.Do("LPUSH", "l", "aap", "noot", "mies"))
-		ok(t, err)
-		equals(t, 3, b) // New length.
+		mustDo(t, c,
+			"LPUSH", "l", "aap", "noot", "mies",
+			proto.Int(3), // new length.
+		)
 
-		r, err := redis.Strings(c.Do("LRANGE", "l", "0", "0"))
-		ok(t, err)
-		equals(t, []string{"mies"}, r)
+		mustDo(t, c,
+			"LRANGE", "l", "0", "0",
+			proto.Strings("mies"),
+		)
 
-		r, err = redis.Strings(c.Do("LRANGE", "l", "-1", "-1"))
-		ok(t, err)
-		equals(t, []string{"aap"}, r)
+		mustDo(t, c,
+			"LRANGE", "l", "-1", "-1",
+			proto.Strings("aap"),
+		)
 
-		b, err = redis.Int(c.Do("LPUSH", "l", "aap2", "noot2", "mies2"))
-		ok(t, err)
-		equals(t, 6, b) // New length.
+		mustDo(t, c,
+			"LPUSH", "l", "aap2", "noot2", "mies2",
+			proto.Int(6),
+		)
 
-		r, err = redis.Strings(c.Do("LRANGE", "l", "0", "0"))
-		ok(t, err)
-		equals(t, []string{"mies2"}, r)
+		mustDo(t, c,
+			"LRANGE", "l", "0", "0",
+			proto.Strings("mies2"),
+		)
 
-		r, err = redis.Strings(c.Do("LRANGE", "l", "-1", "-1"))
-		ok(t, err)
-		equals(t, []string{"aap"}, r)
+		mustDo(t, c,
+			"LRANGE", "l", "-1", "-1",
+			proto.Strings("aap"),
+		)
 	})
 
 	t.Run("direct", func(t *testing.T) {
@@ -84,20 +96,26 @@ func TestLpush(t *testing.T) {
 			equals(t, 1, l)
 		}()
 
-		v, err := redis.String(c.Do("BRPOPLPUSH", "q1", "q2", "1"))
-		ok(t, err)
-		equals(t, "a", v)
+		mustDo(t, c,
+			"BRPOPLPUSH", "q1", "q2", "1",
+			proto.String("a"),
+		)
 	})
 
 	t.Run("errors", func(t *testing.T) {
-		_, err := redis.Int(c.Do("LPUSH"))
-		assert(t, err != nil, "LPUSH error")
-		_, err = redis.Int(c.Do("LPUSH", "l"))
-		assert(t, err != nil, "LPUSH error")
-		_, err = redis.String(c.Do("SET", "str", "value"))
-		ok(t, err)
-		_, err = redis.Int(c.Do("LPUSH", "str", "noot", "mies"))
-		assert(t, err != nil, "LPUSH error")
+		mustDo(t, c,
+			"LPUSH",
+			proto.Error("ERR wrong number of arguments for 'lpush' command"),
+		)
+		mustDo(t, c,
+			"LPUSH", "l",
+			proto.Error("ERR wrong number of arguments for 'lpush' command"),
+		)
+		mustOK(t, c, "SET", "str", "value")
+		mustDo(t, c,
+			"LPUSH", "str", "noot", "mies",
+			proto.Error(msgWrongType),
+		)
 	})
 }
 
@@ -105,55 +123,66 @@ func TestLpushx(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	{
-		b, err := redis.Int(c.Do("LPUSHX", "l", "aap"))
-		ok(t, err)
-		equals(t, 0, b)
+		must0(t, c,
+			"LPUSHX", "l", "aap",
+		)
 		equals(t, false, s.Exists("l"))
 
 		// Create the list with a normal LPUSH
-		b, err = redis.Int(c.Do("LPUSH", "l", "noot"))
-		ok(t, err)
-		equals(t, 1, b)
+		must1(t, c,
+			"LPUSH", "l", "noot",
+		)
 		equals(t, true, s.Exists("l"))
 
-		b, err = redis.Int(c.Do("LPUSHX", "l", "mies"))
-		ok(t, err)
-		equals(t, 2, b)
+		mustDo(t, c,
+			"LPUSHX", "l", "mies",
+			proto.Int(2),
+		)
 		equals(t, true, s.Exists("l"))
 	}
 
 	// Push more.
 	{
-		b, err := redis.Int(c.Do("LPUSH", "l2", "aap1"))
-		ok(t, err)
-		equals(t, 1, b)
-		b, err = redis.Int(c.Do("LPUSHX", "l2", "aap2", "noot2", "mies2"))
-		ok(t, err)
-		equals(t, 4, b)
+		must1(t, c,
+			"LPUSH", "l2", "aap1",
+		)
+		mustDo(t, c,
+			"LPUSHX", "l2", "aap2", "noot2", "mies2",
+			proto.Int(4),
+		)
 
-		r, err := redis.Strings(c.Do("LRANGE", "l2", "0", "0"))
-		ok(t, err)
-		equals(t, []string{"mies2"}, r)
+		mustDo(t, c,
+			"LRANGE", "l2", "0", "0",
+			proto.Strings("mies2"),
+		)
 
-		r, err = redis.Strings(c.Do("LRANGE", "l2", "-1", "-1"))
-		ok(t, err)
-		equals(t, []string{"aap1"}, r)
+		mustDo(t, c,
+			"LRANGE", "l2", "-1", "-1",
+			proto.Strings("aap1"),
+		)
 	}
 
 	// Errors
 	{
-		_, err = redis.Int(c.Do("LPUSHX"))
-		assert(t, err != nil, "LPUSHX error")
-		_, err = redis.Int(c.Do("LPUSHX", "l"))
-		assert(t, err != nil, "LPUSHX error")
-		_, err := redis.String(c.Do("SET", "str", "value"))
-		ok(t, err)
-		_, err = redis.Int(c.Do("LPUSHX", "str", "mies"))
-		assert(t, err != nil, "LPUSHX error")
+		mustDo(t, c,
+			"LPUSHX",
+			proto.Error("ERR wrong number of arguments for 'lpushx' command"),
+		)
+		mustDo(t, c,
+			"LPUSHX", "l",
+			proto.Error("ERR wrong number of arguments for 'lpushx' command"),
+		)
+
+		mustOK(t, c, "SET", "str", "value")
+		mustDo(t, c,
+			"LPUSHX", "str", "mies",
+			proto.Error(msgWrongType),
+		)
 	}
 
 }
@@ -162,36 +191,37 @@ func TestLpop(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
-	b, err := redis.Int(c.Do("LPUSH", "l", "aap", "noot", "mies"))
-	ok(t, err)
-	equals(t, 3, b) // New length.
+	mustDo(t, c,
+		"LPUSH", "l", "aap", "noot", "mies",
+		proto.Int(3),
+	)
 
 	// Simple pops.
 	{
-		el, err := redis.String(c.Do("LPOP", "l"))
-		ok(t, err)
-		equals(t, "mies", el)
+		mustDo(t, c,
+			"LPOP", "l",
+			proto.String("mies"),
+		)
 
-		el, err = redis.String(c.Do("LPOP", "l"))
-		ok(t, err)
-		equals(t, "noot", el)
+		mustDo(t, c,
+			"LPOP", "l",
+			proto.String("noot"),
+		)
 
-		el, err = redis.String(c.Do("LPOP", "l"))
-		ok(t, err)
-		equals(t, "aap", el)
+		mustDo(t, c,
+			"LPOP", "l",
+			proto.String("aap"),
+		)
 
 		// Last element has been popped. Key is gone.
-		i, err := redis.Int(c.Do("EXISTS", "l"))
-		ok(t, err)
-		equals(t, 0, i)
+		must0(t, c, "EXISTS", "l")
 
 		// Can pop non-existing keys just fine.
-		v, err := c.Do("LPOP", "l")
-		ok(t, err)
-		equals(t, nil, v)
+		mustNil(t, c, "LPOP", "l")
 	}
 }
 
@@ -199,36 +229,43 @@ func TestRPushPop(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	{
-		b, err := redis.Int(c.Do("RPUSH", "l", "aap", "noot", "mies"))
-		ok(t, err)
-		equals(t, 3, b) // New length.
+		mustDo(t, c,
+			"RPUSH", "l", "aap", "noot", "mies",
+			proto.Int(3),
+		)
 
-		r, err := redis.Strings(c.Do("LRANGE", "l", "0", "0"))
-		ok(t, err)
-		equals(t, []string{"aap"}, r)
+		mustDo(t, c,
+			"LRANGE", "l", "0", "0",
+			proto.Strings("aap"),
+		)
 
-		r, err = redis.Strings(c.Do("LRANGE", "l", "-1", "-1"))
-		ok(t, err)
-		equals(t, []string{"mies"}, r)
+		mustDo(t, c,
+			"LRANGE", "l", "-1", "-1",
+			proto.Strings("mies"),
+		)
 	}
 
 	// Push more.
 	{
-		b, err := redis.Int(c.Do("RPUSH", "l", "aap2", "noot2", "mies2"))
-		ok(t, err)
-		equals(t, 6, b) // New length.
+		mustDo(t, c,
+			"RPUSH", "l", "aap2", "noot2", "mies2",
+			proto.Int(6),
+		)
 
-		r, err := redis.Strings(c.Do("LRANGE", "l", "0", "0"))
-		ok(t, err)
-		equals(t, []string{"aap"}, r)
+		mustDo(t, c,
+			"LRANGE", "l", "0", "0",
+			proto.Strings("aap"),
+		)
 
-		r, err = redis.Strings(c.Do("LRANGE", "l", "-1", "-1"))
-		ok(t, err)
-		equals(t, []string{"mies2"}, r)
+		mustDo(t, c,
+			"LRANGE", "l", "-1", "-1",
+			proto.Strings("mies2"),
+		)
 	}
 
 	// Direct usage
@@ -255,46 +292,46 @@ func TestRPushPop(t *testing.T) {
 
 	// Wrong type of key
 	{
-		_, err := redis.String(c.Do("SET", "str", "value"))
-		ok(t, err)
-		_, err = redis.Int(c.Do("RPUSH", "str", "noot", "mies"))
-		assert(t, err != nil, "RPUSH error")
+		mustOK(t, c, "SET", "str", "value")
+		mustDo(t, c,
+			"RPUSH", "str", "noot", "mies",
+			proto.Error(msgWrongType),
+		)
 	}
-
 }
 
 func TestRpop(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	s.Push("l", "aap", "noot", "mies")
 
 	// Simple pops.
 	{
-		el, err := redis.String(c.Do("RPOP", "l"))
-		ok(t, err)
-		equals(t, "mies", el)
+		mustDo(t, c,
+			"RPOP", "l",
+			proto.String("mies"),
+		)
 
-		el, err = redis.String(c.Do("RPOP", "l"))
-		ok(t, err)
-		equals(t, "noot", el)
+		mustDo(t, c,
+			"RPOP", "l",
+			proto.String("noot"),
+		)
 
-		el, err = redis.String(c.Do("RPOP", "l"))
-		ok(t, err)
-		equals(t, "aap", el)
+		mustDo(t, c,
+			"RPOP", "l",
+			proto.String("aap"),
+		)
 
 		// Last element has been popped. Key is gone.
-		i, err := redis.Int(c.Do("EXISTS", "l"))
-		ok(t, err)
-		equals(t, 0, i)
+		must0(t, c, "EXISTS", "l")
 
 		// Can pop non-existing keys just fine.
-		v, err := c.Do("RPOP", "l")
-		ok(t, err)
-		equals(t, nil, v)
+		mustNil(t, c, "RPOP", "l")
 	}
 }
 
@@ -302,117 +339,109 @@ func TestLindex(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	s.Push("l", "aap", "noot", "mies", "vuur")
 
-	{
-		el, err := redis.String(c.Do("LINDEX", "l", "0"))
-		ok(t, err)
-		equals(t, "aap", el)
-	}
-	{
-		el, err := redis.String(c.Do("LINDEX", "l", "1"))
-		ok(t, err)
-		equals(t, "noot", el)
-	}
-	{
-		el, err := redis.String(c.Do("LINDEX", "l", "3"))
-		ok(t, err)
-		equals(t, "vuur", el)
-	}
-	// Too many
-	{
-		el, err := c.Do("LINDEX", "l", "3000")
-		ok(t, err)
-		equals(t, nil, el)
-	}
-	{
-		el, err := redis.String(c.Do("LINDEX", "l", "-1"))
-		ok(t, err)
-		equals(t, "vuur", el)
-	}
-	{
-		el, err := redis.String(c.Do("LINDEX", "l", "-2"))
-		ok(t, err)
-		equals(t, "mies", el)
-	}
-	// Too big
-	{
-		el, err := c.Do("LINDEX", "l", "-400")
-		ok(t, err)
-		equals(t, nil, el)
-	}
-	// Non exising key
-	{
-		el, err := c.Do("LINDEX", "nonexisting", "400")
-		ok(t, err)
-		equals(t, nil, el)
-	}
+	mustDo(t, c,
+		"LINDEX", "l", "0",
+		proto.String("aap"),
+	)
+	mustDo(t, c,
+		"LINDEX", "l", "1",
+		proto.String("noot"),
+	)
+	mustDo(t, c,
+		"LINDEX", "l", "3",
+		proto.String("vuur"),
+	)
 
-	// Wrong type of key
-	{
-		_, err := redis.String(c.Do("SET", "str", "value"))
-		ok(t, err)
-		_, err = redis.Int(c.Do("LINDEX", "str", "1"))
-		assert(t, err != nil, "LINDEX error")
+	mustNil(t, c, "LINDEX", "l", "3000") // Too many
+
+	mustDo(t, c,
+		"LINDEX", "l", "-1",
+		proto.String("vuur"),
+	)
+
+	mustDo(t, c,
+		"LINDEX", "l", "-2",
+		proto.String("mies"),
+	)
+
+	mustNil(t, c, "LINDEX", "l", "-400") // Too big
+
+	// Non exising key
+	mustNil(t, c, "LINDEX", "nonexisting", "400")
+
+	t.Run("errors", func(t *testing.T) {
+		// Wrong type of key
+		mustOK(t, c, "SET", "str", "value")
+		mustDo(t, c,
+			"LINDEX", "str", "1",
+			proto.Error(msgWrongType),
+		)
+
 		// Not an integer
-		_, err = redis.String(c.Do("LINDEX", "l", "noint"))
-		assert(t, err != nil, "LINDEX error")
+		mustDo(t, c,
+			"LINDEX", "l", "noint",
+			proto.Error("ERR value is not an integer or out of range"),
+		)
 		// Too many arguments
-		_, err = redis.String(c.Do("LINDEX", "str", "l", "foo"))
-		assert(t, err != nil, "LINDEX error")
-	}
+		mustDo(t, c,
+			"LINDEX", "str", "l", "foo",
+			proto.Error("ERR wrong number of arguments for 'lindex' command"),
+		)
+	})
 }
 
 func TestLlen(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	s.Push("l", "aap", "noot", "mies", "vuur")
 
-	{
-		el, err := redis.Int(c.Do("LLEN", "l"))
-		ok(t, err)
-		equals(t, 4, el)
-	}
+	mustDo(t, c,
+		"LLEN", "l",
+		proto.Int(4),
+	)
 
 	// Non exising key
-	{
-		el, err := redis.Int(c.Do("LLEN", "nonexisting"))
-		ok(t, err)
-		equals(t, 0, el)
-	}
+	must0(t, c,
+		"LLEN", "nonexisting",
+	)
 
 	// Wrong type of key
-	{
-		_, err := redis.String(c.Do("SET", "str", "value"))
-		ok(t, err)
-		_, err = redis.Int(c.Do("LLEN", "str"))
-		assert(t, err != nil, "LLEN error")
-		// Too many arguments
-		_, err = redis.String(c.Do("LLEN", "too", "many"))
-		assert(t, err != nil, "LLEN error")
-	}
+	mustOK(t, c, "SET", "str", "value")
+	mustDo(t, c,
+		"LLEN", "str",
+		proto.Error(msgWrongType),
+	)
+
+	// Too many arguments
+	mustDo(t, c,
+		"LLEN", "too", "many",
+		proto.Error("ERR wrong number of arguments for 'llen' command"),
+	)
 }
 
 func TestLtrim(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	s.Push("l", "aap", "noot", "mies", "vuur")
 
 	{
-		el, err := redis.String(c.Do("LTRIM", "l", 0, 2))
-		ok(t, err)
-		equals(t, "OK", el)
+		mustOK(t, c, "LTRIM", "l", "0", "2")
 		l, err := s.List("l")
 		ok(t, err)
 		equals(t, []string{"aap", "noot", "mies"}, l)
@@ -420,53 +449,62 @@ func TestLtrim(t *testing.T) {
 
 	// Delete key on empty list
 	{
-		el, err := redis.String(c.Do("LTRIM", "l", 0, -99))
-		ok(t, err)
-		equals(t, "OK", el)
+		mustOK(t, c, "LTRIM", "l", "0", "-99")
 		equals(t, false, s.Exists("l"))
 	}
 
-	// Non exising key
-	{
-		el, err := redis.String(c.Do("LTRIM", "nonexisting", 0, 1))
-		ok(t, err)
-		equals(t, "OK", el)
-	}
+	// Not exising key
+	mustOK(t, c, "LTRIM", "nonexisting", "0", "1")
 
 	// Wrong type of key
-	{
+	t.Run("errors", func(t *testing.T) {
 		s.Set("str", "string!")
-		_, err = redis.Int(c.Do("LTRIM", "str", 0, 1))
-		assert(t, err != nil, "LTRIM error")
-		// Too many/little/wrong arguments
-		_, err = redis.String(c.Do("LTRIM", "l", 1, 2, "toomany"))
-		assert(t, err != nil, "LTRIM error")
-		_, err = redis.String(c.Do("LTRIM", "l", 1, "noint"))
-		assert(t, err != nil, "LTRIM error")
-		_, err = redis.String(c.Do("LTRIM", "l", "noint", 1))
-		assert(t, err != nil, "LTRIM error")
-		_, err = redis.String(c.Do("LTRIM", "l", 1))
-		assert(t, err != nil, "LTRIM error")
-		_, err = redis.String(c.Do("LTRIM", "l"))
-		assert(t, err != nil, "LTRIM error")
-		_, err = redis.String(c.Do("LTRIM"))
-		assert(t, err != nil, "LTRIM error")
-	}
+		mustDo(t, c,
+			"LTRIM", "str", "0", "1",
+			proto.Error(msgWrongType),
+		)
+
+		mustDo(t, c,
+			"LTRIM", "l", "1", "2", "toomany",
+			proto.Error(errWrongNumber("ltrim")),
+		)
+		mustDo(t, c,
+			"LTRIM", "l", "1", "noint",
+			proto.Error("ERR value is not an integer or out of range"),
+		)
+		mustDo(t, c,
+			"LTRIM", "l", "noint", "1",
+			proto.Error("ERR value is not an integer or out of range"),
+		)
+		mustDo(t, c,
+			"LTRIM", "l", "1",
+			proto.Error(errWrongNumber("ltrim")),
+		)
+		mustDo(t, c,
+			"LTRIM", "l",
+			proto.Error(errWrongNumber("ltrim")),
+		)
+		mustDo(t, c,
+			"LTRIM",
+			proto.Error(errWrongNumber("ltrim")),
+		)
+	})
 }
 
 func TestLrem(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	// Reverse
 	{
 		s.Push("l", "aap", "noot", "mies", "vuur", "noot", "noot")
-		n, err := redis.Int(c.Do("LREM", "l", -1, "noot"))
-		ok(t, err)
-		equals(t, 1, n)
+		must1(t, c,
+			"LREM", "l", "-1", "noot",
+		)
 		l, err := s.List("l")
 		ok(t, err)
 		equals(t, []string{"aap", "noot", "mies", "vuur", "noot"}, l)
@@ -474,9 +512,10 @@ func TestLrem(t *testing.T) {
 	// Normal
 	{
 		s.Push("l2", "aap", "noot", "mies", "vuur", "noot", "noot")
-		n, err := redis.Int(c.Do("LREM", "l2", 2, "noot"))
-		ok(t, err)
-		equals(t, 2, n)
+		mustDo(t, c,
+			"LREM", "l2", "2", "noot",
+			proto.Int(2),
+		)
 		l, err := s.List("l2")
 		ok(t, err)
 		equals(t, []string{"aap", "mies", "vuur", "noot"}, l)
@@ -485,9 +524,10 @@ func TestLrem(t *testing.T) {
 	// All
 	{
 		s.Push("l3", "aap", "noot", "mies", "vuur", "noot", "noot")
-		n, err := redis.Int(c.Do("LREM", "l3", 0, "noot"))
-		ok(t, err)
-		equals(t, 3, n)
+		mustDo(t, c,
+			"LREM", "l3", "0", "noot",
+			proto.Int(3),
+		)
 		l, err := s.List("l3")
 		ok(t, err)
 		equals(t, []string{"aap", "mies", "vuur"}, l)
@@ -496,9 +536,10 @@ func TestLrem(t *testing.T) {
 	// All
 	{
 		s.Push("l4", "aap", "noot", "mies", "vuur", "noot", "noot")
-		n, err := redis.Int(c.Do("LREM", "l4", 200, "noot"))
-		ok(t, err)
-		equals(t, 3, n)
+		mustDo(t, c,
+			"LREM", "l4", "200", "noot",
+			proto.Int(3),
+		)
 		l, err := s.List("l4")
 		ok(t, err)
 		equals(t, []string{"aap", "mies", "vuur"}, l)
@@ -507,34 +548,45 @@ func TestLrem(t *testing.T) {
 	// Delete key on empty list
 	{
 		s.Push("l5", "noot", "noot", "noot")
-		n, err := redis.Int(c.Do("LREM", "l5", 99, "noot"))
-		ok(t, err)
-		equals(t, 3, n)
+		mustDo(t, c,
+			"LREM", "l5", "99", "noot",
+			proto.Int(3),
+		)
 		equals(t, false, s.Exists("l5"))
 	}
 
 	// Non exising key
-	{
-		n, err := redis.Int(c.Do("LREM", "nonexisting", 0, "aap"))
-		ok(t, err)
-		equals(t, 0, n)
-	}
+	must0(t, c,
+		"LREM", "nonexisting", "0", "aap",
+	)
 
 	// Error cases
 	{
-		_, err = redis.String(c.Do("LREM"))
-		assert(t, err != nil, "LREM error")
-		_, err = redis.String(c.Do("LREM", "l"))
-		assert(t, err != nil, "LREM error")
-		_, err = redis.String(c.Do("LREM", "l", 1))
-		assert(t, err != nil, "LREM error")
-		_, err = redis.String(c.Do("LREM", "l", "noint", "aap"))
-		assert(t, err != nil, "LREM error")
-		_, err = redis.String(c.Do("LREM", "l", 1, "aap", "toomany"))
-		assert(t, err != nil, "LREM error")
+		mustDo(t, c,
+			"LREM",
+			proto.Error(errWrongNumber("lrem")),
+		)
+		mustDo(t, c,
+			"LREM", "l",
+			proto.Error(errWrongNumber("lrem")),
+		)
+		mustDo(t, c,
+			"LREM", "l", "1",
+			proto.Error(errWrongNumber("lrem")),
+		)
+		mustDo(t, c,
+			"LREM", "l", "noint", "aap",
+			proto.Error("ERR value is not an integer or out of range"),
+		)
+		mustDo(t, c,
+			"LREM", "l", "1", "aap", "toomany",
+			proto.Error(errWrongNumber("lrem")),
+		)
 		s.Set("str", "string!")
-		_, err = redis.Int(c.Do("LREM", "str", 0, "aap"))
-		assert(t, err != nil, "LREM error")
+		mustDo(t, c,
+			"LREM", "str", "0", "aap",
+			proto.Error("WRONGTYPE Operation against a key holding the wrong kind of value"),
+		)
 	}
 }
 
@@ -542,75 +594,89 @@ func TestLset(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	s.Push("l", "aap", "noot", "mies", "vuur", "noot", "noot")
 	// Simple LSET
 	{
-		n, err := redis.String(c.Do("LSET", "l", 1, "noot!"))
-		ok(t, err)
-		equals(t, "OK", n)
+		mustOK(t, c, "LSET", "l", "1", "noot!")
 		l, err := s.List("l")
 		ok(t, err)
 		equals(t, []string{"aap", "noot!", "mies", "vuur", "noot", "noot"}, l)
 	}
 
 	{
-		n, err := redis.String(c.Do("LSET", "l", -1, "noot?"))
-		ok(t, err)
-		equals(t, "OK", n)
+		mustOK(t, c,
+			"LSET", "l", "-1", "noot?",
+		)
 		l, err := s.List("l")
 		ok(t, err)
 		equals(t, []string{"aap", "noot!", "mies", "vuur", "noot", "noot?"}, l)
 	}
 
 	// Out of range
-	{
-		_, err := c.Do("LSET", "l", 10000, "aap")
-		assert(t, err != nil, "LSET error")
-
-		_, err = c.Do("LSET", "l", -10000, "aap")
-		assert(t, err != nil, "LSET error")
-	}
+	mustDo(t, c,
+		"LSET", "l", "10000", "aap",
+		proto.Error("ERR index out of range"),
+	)
+	mustDo(t, c,
+		"LSET", "l", "-10000", "aap",
+		proto.Error("ERR index out of range"),
+	)
 
 	// Non exising key
-	{
-		_, err := c.Do("LSET", "nonexisting", 0, "aap")
-		assert(t, err != nil, "LSET error")
-	}
+	mustDo(t, c,
+		"LSET", "nonexisting", "0", "aap",
+		proto.Error("ERR no such key"),
+	)
 
-	// Error cases
-	{
-		_, err = redis.String(c.Do("LSET"))
-		assert(t, err != nil, "LSET error")
-		_, err = redis.String(c.Do("LSET", "l"))
-		assert(t, err != nil, "LSET error")
-		_, err = redis.String(c.Do("LSET", "l", 1))
-		assert(t, err != nil, "LSET error")
-		_, err = redis.String(c.Do("LSET", "l", "noint", "aap"))
-		assert(t, err != nil, "SET error")
-		_, err = redis.String(c.Do("LSET", "l", 1, "aap", "toomany"))
-		assert(t, err != nil, "LSET error")
+	t.Run("errors", func(t *testing.T) {
+		mustDo(t, c,
+			"LSET",
+			proto.Error(errWrongNumber("lset")),
+		)
+		mustDo(t, c,
+			"LSET", "l",
+			proto.Error(errWrongNumber("lset")),
+		)
+		mustDo(t, c,
+			"LSET", "l", "1",
+			proto.Error(errWrongNumber("lset")),
+		)
+		mustDo(t, c,
+			"LSET", "l", "noint", "aap",
+			proto.Error("ERR value is not an integer or out of range"),
+		)
+		mustDo(t, c,
+			"LSET", "l", "1", "aap", "toomany",
+			proto.Error(errWrongNumber("lset")),
+		)
+
 		s.Set("str", "string!")
-		_, err = redis.Int(c.Do("LSET", "str", 0, "aap"))
-		assert(t, err != nil, "LSET error")
-	}
+		mustDo(t, c,
+			"LSET", "str", "0", "aap",
+			proto.Error(msgWrongType),
+		)
+	})
 }
 
 func TestLinsert(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	s.Push("l", "aap", "noot", "mies", "vuur", "noot", "end")
 	// Before
 	{
-		n, err := redis.Int(c.Do("LINSERT", "l", "BEFORE", "noot", "!"))
-		ok(t, err)
-		equals(t, 7, n)
+		mustDo(t, c,
+			"LINSERT", "l", "BEFORE", "noot", "!",
+			proto.Int(7),
+		)
 		l, err := s.List("l")
 		ok(t, err)
 		equals(t, []string{"aap", "!", "noot", "mies", "vuur", "noot", "end"}, l)
@@ -618,9 +684,10 @@ func TestLinsert(t *testing.T) {
 
 	// After
 	{
-		n, err := redis.Int(c.Do("LINSERT", "l", "AFTER", "noot", "?"))
-		ok(t, err)
-		equals(t, 8, n)
+		mustDo(t, c,
+			"LINSERT", "l", "AFTER", "noot", "?",
+			proto.Int(8),
+		)
 		l, err := s.List("l")
 		ok(t, err)
 		equals(t, []string{"aap", "!", "noot", "?", "mies", "vuur", "noot", "end"}, l)
@@ -628,9 +695,10 @@ func TestLinsert(t *testing.T) {
 
 	// Edge case before
 	{
-		n, err := redis.Int(c.Do("LINSERT", "l", "BEFORE", "aap", "["))
-		ok(t, err)
-		equals(t, 9, n)
+		mustDo(t, c,
+			"LINSERT", "l", "BEFORE", "aap", "[",
+			proto.Int(9),
+		)
 		l, err := s.List("l")
 		ok(t, err)
 		equals(t, []string{"[", "aap", "!", "noot", "?", "mies", "vuur", "noot", "end"}, l)
@@ -638,79 +706,93 @@ func TestLinsert(t *testing.T) {
 
 	// Edge case after
 	{
-		n, err := redis.Int(c.Do("LINSERT", "l", "AFTER", "end", "]"))
-		ok(t, err)
-		equals(t, 10, n)
+		mustDo(t, c,
+			"LINSERT", "l", "AFTER", "end", "]",
+			proto.Int(10),
+		)
 		l, err := s.List("l")
 		ok(t, err)
 		equals(t, []string{"[", "aap", "!", "noot", "?", "mies", "vuur", "noot", "end", "]"}, l)
 	}
 
 	// Non exising pivot
-	{
-		n, err := redis.Int(c.Do("LINSERT", "l", "before", "nosuch", "noot"))
-		ok(t, err)
-		equals(t, -1, n)
-	}
+	mustDo(t, c,
+		"LINSERT", "l", "before", "nosuch", "noot",
+		proto.Int(-1),
+	)
 
 	// Non exising key
-	{
-		n, err := redis.Int(c.Do("LINSERT", "nonexisting", "before", "aap",
-			"noot"))
-		ok(t, err)
-		equals(t, 0, n)
-	}
+	must0(t, c,
+		"LINSERT", "nonexisting", "before", "aap", "noot",
+	)
 
-	// Error cases
-	{
-		_, err = redis.String(c.Do("LINSERT"))
-		assert(t, err != nil, "LINSERT error")
-		_, err = redis.String(c.Do("LINSERT", "l"))
-		assert(t, err != nil, "LINSERT error")
-		_, err = redis.String(c.Do("LINSERT", "l", "before"))
-		assert(t, err != nil, "LINSERT error")
-		_, err = redis.String(c.Do("LINSERT", "l", "before", "value"))
-		assert(t, err != nil, "LINSERT error")
-		_, err = redis.String(c.Do("LINSERT", "l", "wrong", "value", "value"))
-		assert(t, err != nil, "LINSERT error")
-		_, err = redis.String(c.Do("LINSERT", "l", "wrong", "value", "value",
-			"toomany"))
-		assert(t, err != nil, "LINSERT error")
+	t.Run("errors", func(t *testing.T) {
+		mustDo(t, c,
+			"LINSERT",
+			proto.Error(errWrongNumber("linsert")),
+		)
+		mustDo(t, c,
+			"LINSERT", "l",
+			proto.Error(errWrongNumber("linsert")),
+		)
+		mustDo(t, c,
+			"LINSERT", "l", "before",
+			proto.Error(errWrongNumber("linsert")),
+		)
+		mustDo(t, c,
+			"LINSERT", "l", "before", "value",
+			proto.Error(errWrongNumber("linsert")),
+		)
+		mustDo(t, c,
+			"LINSERT", "l", "wrong", "value", "value",
+			proto.Error("ERR syntax error"),
+		)
+		mustDo(t, c,
+			"LINSERT", "l", "wrong", "value", "value", "toomany",
+			proto.Error(errWrongNumber("linsert")),
+		)
+
 		s.Set("str", "string!")
-		_, err = redis.String(c.Do("LINSERT", "str", "before", "value", "value"))
-		assert(t, err != nil, "LINSERT error")
-	}
+		mustDo(t, c,
+			"LINSERT", "str", "before", "value", "value",
+			proto.Error(msgWrongType),
+		)
+	})
 }
 
 func TestRpoplpush(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	s.Push("l", "aap", "noot", "mies")
 	s.Push("l2", "vuur", "noot", "end")
 	{
-		n, err := redis.String(c.Do("RPOPLPUSH", "l", "l2"))
-		ok(t, err)
-		equals(t, "mies", n)
+		mustDo(t, c,
+			"RPOPLPUSH", "l", "l2",
+			proto.String("mies"),
+		)
 		s.CheckList(t, "l", "aap", "noot")
 		s.CheckList(t, "l2", "mies", "vuur", "noot", "end")
 	}
 	// Again!
 	{
-		n, err := redis.String(c.Do("RPOPLPUSH", "l", "l2"))
-		ok(t, err)
-		equals(t, "noot", n)
+		mustDo(t, c,
+			"RPOPLPUSH", "l", "l2",
+			proto.String("noot"),
+		)
 		s.CheckList(t, "l", "aap")
 		s.CheckList(t, "l2", "noot", "mies", "vuur", "noot", "end")
 	}
 	// Again!
 	{
-		n, err := redis.String(c.Do("RPOPLPUSH", "l", "l2"))
-		ok(t, err)
-		equals(t, "aap", n)
+		mustDo(t, c,
+			"RPOPLPUSH", "l", "l2",
+			proto.String("aap"),
+		)
 		assert(t, !s.Exists("l"), "l exists")
 		s.CheckList(t, "l2", "aap", "noot", "mies", "vuur", "noot", "end")
 	}
@@ -719,204 +801,224 @@ func TestRpoplpush(t *testing.T) {
 	{
 		s.Push("ll", "aap", "noot", "mies")
 
-		n, err := redis.String(c.Do("RPOPLPUSH", "ll", "nosuch"))
-		ok(t, err)
-		equals(t, "mies", n)
+		mustDo(t, c,
+			"RPOPLPUSH", "ll", "nosuch",
+			proto.String("mies"),
+		)
 		assert(t, s.Exists("nosuch"), "nosuch exists")
 		s.CheckList(t, "ll", "aap", "noot")
 		s.CheckList(t, "nosuch", "mies")
 
-		nada, err := c.Do("RPOPLPUSH", "nosuch2", "ll")
-		ok(t, err)
-		equals(t, nil, nada)
+		mustNil(t, c,
+			"RPOPLPUSH", "nosuch2", "ll",
+		)
 	}
 
 	// Cycle
 	{
 		s.Push("cycle", "aap", "noot", "mies")
 
-		n, err := redis.String(c.Do("RPOPLPUSH", "cycle", "cycle"))
-		ok(t, err)
-		equals(t, "mies", n)
+		mustDo(t, c,
+			"RPOPLPUSH", "cycle", "cycle",
+			proto.String("mies"),
+		)
 		s.CheckList(t, "cycle", "mies", "aap", "noot")
 	}
 
 	// Error cases
-	{
+	t.Run("errors", func(t *testing.T) {
 		s.Push("src", "aap", "noot", "mies")
-		_, err = redis.String(c.Do("RPOPLPUSH"))
-		assert(t, err != nil, "RPOPLPUSH error")
-		_, err = redis.String(c.Do("RPOPLPUSH", "l"))
-		assert(t, err != nil, "RPOPLPUSH error")
-		_, err = redis.String(c.Do("RPOPLPUSH", "too", "many", "arguments"))
-		assert(t, err != nil, "RPOPLPUSH error")
+		mustDo(t, c,
+			"RPOPLPUSH",
+			proto.Error(errWrongNumber("rpoplpush")),
+		)
+		mustDo(t, c,
+			"RPOPLPUSH", "l",
+			proto.Error(errWrongNumber("rpoplpush")),
+		)
+		mustDo(t, c,
+			"RPOPLPUSH", "too", "many", "arguments",
+			proto.Error(errWrongNumber("rpoplpush")),
+		)
+
 		s.Set("str", "string!")
-		_, err = redis.String(c.Do("RPOPLPUSH", "str", "src"))
-		assert(t, err != nil, "RPOPLPUSH error")
-		_, err = redis.String(c.Do("RPOPLPUSH", "src", "str"))
-		assert(t, err != nil, "RPOPLPUSH error")
-	}
+		mustDo(t, c,
+			"RPOPLPUSH", "str", "src",
+			proto.Error(msgWrongType),
+		)
+		mustDo(t, c,
+			"RPOPLPUSH", "src", "str",
+			proto.Error(msgWrongType),
+		)
+	})
 }
 
 func TestRpushx(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	// Simple cases
 	{
 		// No key key
-		i, err := redis.Int(c.Do("RPUSHX", "l", "value"))
-		ok(t, err)
-		equals(t, 0, i)
+		must0(t, c,
+			"RPUSHX", "l", "value",
+		)
 		assert(t, !s.Exists("l"), "l doesn't exist")
 
 		s.Push("l", "aap", "noot")
-
-		i, err = redis.Int(c.Do("RPUSHX", "l", "mies"))
-		ok(t, err)
-		equals(t, 3, i)
+		mustDo(t, c,
+			"RPUSHX", "l", "mies",
+			proto.Int(3),
+		)
 
 		s.CheckList(t, "l", "aap", "noot", "mies")
 	}
 
 	// Push more.
 	{
-		b, err := redis.Int(c.Do("LPUSH", "l2", "aap1"))
-		ok(t, err)
-		equals(t, 1, b)
-		b, err = redis.Int(c.Do("RPUSHX", "l2", "aap2", "noot2", "mies2"))
-		ok(t, err)
-		equals(t, 4, b)
+		must1(t, c,
+			"LPUSH", "l2", "aap1",
+		)
+		mustDo(t, c,
+			"RPUSHX", "l2", "aap2", "noot2", "mies2",
+			proto.Int(4),
+		)
 
-		r, err := redis.Strings(c.Do("LRANGE", "l2", "0", "0"))
-		ok(t, err)
-		equals(t, []string{"aap1"}, r)
+		mustDo(t, c,
+			"LRANGE", "l2", "0", "0",
+			proto.Strings("aap1"),
+		)
 
-		r, err = redis.Strings(c.Do("LRANGE", "l2", "-1", "-1"))
-		ok(t, err)
-		equals(t, []string{"mies2"}, r)
+		mustDo(t, c,
+			"LRANGE", "l2", "-1", "-1",
+			proto.Strings("mies2"),
+		)
 	}
 
-	// Error cases
-	{
+	t.Run("errors", func(t *testing.T) {
 		s.Push("src", "aap", "noot", "mies")
-		_, err = redis.Int(c.Do("RPUSHX"))
-		assert(t, err != nil, "RPUSHX error")
-		_, err = redis.Int(c.Do("RPUSHX", "l"))
-		assert(t, err != nil, "RPUSHX error")
+		mustDo(t, c,
+			"RPUSHX",
+			proto.Error(errWrongNumber("rpushx")),
+		)
+		mustDo(t, c,
+			"RPUSHX", "l",
+			proto.Error(errWrongNumber("rpushx")),
+		)
 		s.Set("str", "string!")
-		_, err = redis.Int(c.Do("RPUSHX", "str", "value"))
-		assert(t, err != nil, "RPUSHX error")
-	}
-}
-
-// execute command in a go routine. Used to test blocking commands.
-func goStrings(t *testing.T, c redis.Conn, cmds ...interface{}) <-chan []string {
-	var (
-		got = make(chan []string, 1)
-	)
-	go func() {
-		res, err := c.Do(cmds[0].(string), cmds[1:]...)
-		if err != nil {
-			got <- []string{err.Error()}
-			return
-		}
-		if res == nil {
-			got <- nil
-		} else {
-			st, _ := redis.Strings(res, err)
-			got <- st
-		}
-	}()
-	return got
+		mustDo(t, c,
+			"RPUSHX", "str", "value",
+			proto.Error(msgWrongType),
+		)
+	})
 }
 
 func TestBrpop(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	// Simple cases
 	{
 		s.Push("ll", "aap", "noot", "mies")
-		v, err := redis.Strings(c.Do("BRPOP", "ll", 1))
-		ok(t, err)
-		equals(t, []string{"ll", "mies"}, v)
+		mustDo(t, c,
+			"BRPOP", "ll", "1",
+			proto.Strings("ll", "mies"),
+		)
 	}
 
-	// Error cases
-	{
-		_, err = redis.String(c.Do("BRPOP"))
-		assert(t, err != nil, "BRPOP error")
-		_, err = redis.String(c.Do("BRPOP", "key"))
-		assert(t, err != nil, "BRPOP error")
-		_, err = redis.String(c.Do("BRPOP", "key", -1))
-		assert(t, err != nil, "BRPOP error")
-		_, err = redis.String(c.Do("BRPOP", "key", "inf"))
-		assert(t, err != nil, "BRPOP error")
-	}
+	t.Run("errors", func(t *testing.T) {
+		mustDo(t, c,
+			"BRPOP",
+			proto.Error(errWrongNumber("brpop")),
+		)
+		mustDo(t, c,
+			"BRPOP", "key",
+			proto.Error(errWrongNumber("brpop")),
+		)
+		mustDo(t, c,
+			"BRPOP", "key", "-1",
+			proto.Error("ERR timeout is negative"),
+		)
+		mustDo(t, c,
+			"BRPOP", "key", "inf",
+			proto.Error("ERR timeout is not a float or out of range"),
+		)
+	})
 }
 
 func TestBrpopSimple(t *testing.T) {
-	_, c1, c2, done := setup2(t)
-	defer done()
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := proto.Dial(s.Addr())
+	ok(t, err)
+	defer c.Close()
 
-	got := goStrings(t, c2, "BRPOP", "mylist", "0")
+	got := goStrings(t, s, "BRPOP", "mylist", "0")
 	time.Sleep(30 * time.Millisecond)
 
-	b, err := redis.Int(c1.Do("RPUSH", "mylist", "e1", "e2", "e3"))
-	ok(t, err)
-	equals(t, 3, b)
+	mustDo(t, c,
+		"RPUSH", "mylist", "e1", "e2", "e3",
+		proto.Int(3),
+	)
 
 	select {
 	case have := <-got:
-		equals(t, []string{"mylist", "e3"}, have)
+		equals(t, proto.Strings("mylist", "e3"), have)
 	case <-time.After(500 * time.Millisecond):
 		t.Error("BRPOP took too long")
 	}
 }
 
 func TestBrpopMulti(t *testing.T) {
-	_, c1, c2, done := setup2(t)
-	defer done()
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := proto.Dial(s.Addr())
+	ok(t, err)
+	defer c.Close()
 
-	got := goStrings(t, c2, "BRPOP", "l1", "l2", "l3", 0)
-	_, err := redis.Int(c1.Do("RPUSH", "l0", "e01"))
-	ok(t, err)
-	_, err = redis.Int(c1.Do("RPUSH", "l2", "e21"))
-	ok(t, err)
-	_, err = redis.Int(c1.Do("RPUSH", "l3", "e31"))
-	ok(t, err)
+	got := goStrings(t, s, "BRPOP", "l1", "l2", "l3", "0")
+	must1(t, c, "RPUSH", "l0", "e01")
+	must1(t, c, "RPUSH", "l2", "e21")
+	must1(t, c, "RPUSH", "l3", "e31")
 
 	select {
 	case have := <-got:
-		equals(t, []string{"l2", "e21"}, have)
+		equals(t, proto.Strings("l2", "e21"), have)
 	case <-time.After(500 * time.Millisecond):
 		t.Error("BRPOP took too long")
 	}
 
-	got = goStrings(t, c2, "BRPOP", "l1", "l2", "l3", 0)
+	got = goStrings(t, s, "BRPOP", "l1", "l2", "l3", "0")
 	select {
 	case have := <-got:
-		equals(t, []string{"l3", "e31"}, have)
+		equals(t, proto.Strings("l3", "e31"), have)
 	case <-time.After(500 * time.Millisecond):
 		t.Error("BRPOP took too long")
 	}
 }
 
 func TestBrpopTimeout(t *testing.T) {
-	_, c, done := setup(t)
-	defer done()
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := proto.Dial(s.Addr())
+	ok(t, err)
+	defer c.Close()
 
-	got := goStrings(t, c, "BRPOP", "l1", 1)
+	got := goStrings(t, s, "BRPOP", "l1", "1")
 	select {
 	case have := <-got:
-		equals(t, []string(nil), have)
+		equals(t, proto.Nil, have)
 	case <-time.After(1500 * time.Millisecond):
 		t.Error("BRPOP took too long")
 	}
@@ -924,45 +1026,57 @@ func TestBrpopTimeout(t *testing.T) {
 
 func TestBrpopTx(t *testing.T) {
 	// BRPOP in a transaction behaves as if the timeout triggers right away
-	m, c, done := setup(t)
-	defer done()
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := proto.Dial(s.Addr())
+	ok(t, err)
+	defer c.Close()
 
 	{
-		_, err := c.Do("MULTI")
-		ok(t, err)
-		s, err := redis.String(c.Do("BRPOP", "l1", 3))
-		ok(t, err)
-		equals(t, "QUEUED", s)
-		s, err = redis.String(c.Do("SET", "foo", "bar"))
-		ok(t, err)
-		equals(t, "QUEUED", s)
+		mustOK(t, c,
+			"MULTI",
+		)
+		mustDo(t, c,
+			"BRPOP", "l1", "3",
+			proto.Inline("QUEUED"),
+		)
+		mustDo(t, c,
+			"SET", "foo", "bar",
+			proto.Inline("QUEUED"),
+		)
 
-		v, err := redis.Values(c.Do("EXEC"))
-		ok(t, err)
-		equals(t, 2, len(redis.Args(v)))
-		equals(t, nil, v[0])
-		equals(t, "OK", v[1])
+		mustDo(t, c,
+			"EXEC",
+			proto.Array(
+				proto.Nil,
+				proto.Inline("OK"),
+			),
+		)
 	}
 
 	// Now set something
-	m.Push("l1", "e1")
-
+	s.Push("l1", "e1")
 	{
-		_, err := c.Do("MULTI")
-		ok(t, err)
-		s, err := redis.String(c.Do("BRPOP", "l1", 3))
-		ok(t, err)
-		equals(t, "QUEUED", s)
-		s, err = redis.String(c.Do("SET", "foo", "bar"))
-		ok(t, err)
-		equals(t, "QUEUED", s)
+		mustOK(t, c,
+			"MULTI",
+		)
+		mustDo(t, c,
+			"BRPOP", "l1", "3",
+			proto.Inline("QUEUED"),
+		)
+		mustDo(t, c,
+			"SET", "foo", "bar",
+			proto.Inline("QUEUED"),
+		)
 
-		v, err := redis.Values(c.Do("EXEC"))
-		ok(t, err)
-		equals(t, 2, len(redis.Args(v)))
-		equals(t, "l1", string(v[0].([]interface{})[0].([]uint8)))
-		equals(t, "e1", string(v[0].([]interface{})[1].([]uint8)))
-		equals(t, "OK", v[1])
+		mustDo(t, c,
+			"EXEC",
+			proto.Array(
+				proto.Strings("l1", "e1"),
+				proto.Inline("OK"),
+			),
+		)
 	}
 }
 
@@ -970,44 +1084,51 @@ func TestBlpop(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
-	// Simple cases
-	{
+	t.Run("basic", func(t *testing.T) {
 		s.Push("ll", "aap", "noot", "mies")
-		v, err := redis.Strings(c.Do("BLPOP", "ll", 1))
-		ok(t, err)
-		equals(t, []string{"ll", "aap"}, v)
-	}
+		mustDo(t, c,
+			"BLPOP", "ll", "1",
+			proto.Strings("ll", "aap"),
+		)
+	})
 
-	// Error cases
-	{
-		_, err = redis.String(c.Do("BLPOP"))
-		assert(t, err != nil, "BLPOP error")
-		_, err = redis.String(c.Do("BLPOP", "key"))
-		assert(t, err != nil, "BLPOP error")
-		_, err = redis.String(c.Do("BLPOP", "key", -1))
-		assert(t, err != nil, "BLPOP error")
-		_, err = redis.String(c.Do("BLPOP", "key", "inf"))
-		assert(t, err != nil, "BLPOP error")
-	}
+	t.Run("errors", func(t *testing.T) {
+		mustDo(t, c,
+			"BLPOP",
+			proto.Error(errWrongNumber("blpop")),
+		)
+		mustDo(t, c,
+			"BLPOP", "key",
+			proto.Error(errWrongNumber("blpop")),
+		)
+		mustDo(t, c,
+			"BLPOP", "key", "-1",
+			proto.Error("ERR timeout is negative"),
+		)
+		mustDo(t, c,
+			"BLPOP", "key", "inf",
+			proto.Error("ERR timeout is not a float or out of range"),
+		)
+	})
 }
 
 func TestBlpopResourceCleanup(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
-	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 
 	// Let's say a client issued BLPOP and then the client was closed
 	go func() {
-		_, err = redis.String(c.Do("BLPOP", "key", 0))
-		assert(t, err != nil, "BLPOP error")
+		_, err := c.Do("BLPOP", "key", "0")
+		assert(t, strings.Contains(err.Error(), "use of closed network connection"), "got a network error")
 	}()
 
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(50 * time.Millisecond)
 
 	c.Close()
 	s.Close() // expect BLPOP to stop blocking
@@ -1017,58 +1138,70 @@ func TestBrpoplpush(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	// Simple cases
 	{
 		s.Push("l1", "aap", "noot", "mies")
-		v, err := redis.String(c.Do("BRPOPLPUSH", "l1", "l2", "1"))
-		ok(t, err)
-		equals(t, "mies", v)
+		mustDo(t, c,
+			"BRPOPLPUSH", "l1", "l2", "1",
+			proto.String("mies"),
+		)
 
 		lv, err := s.List("l2")
 		ok(t, err)
 		equals(t, []string{"mies"}, lv)
 	}
 
-	// Error cases
-	{
-		_, err = redis.String(c.Do("BRPOPLPUSH"))
-		assert(t, err != nil, "BRPOPLPUSH error")
-		_, err = redis.String(c.Do("BRPOPLPUSH", "key"))
-		assert(t, err != nil, "BRPOPLPUSH error")
-		_, err = redis.String(c.Do("BRPOPLPUSH", "key", "bar"))
-		assert(t, err != nil, "BRPOPLPUSH error")
-		_, err = redis.String(c.Do("BRPOPLPUSH", "key", "foo", -1))
-		assert(t, err != nil, "BRPOPLPUSH error")
-		_, err = redis.String(c.Do("BRPOPLPUSH", "key", "foo", "inf"))
-		assert(t, err != nil, "BRPOPLPUSH error")
-		_, err = redis.String(c.Do("BRPOPLPUSH", "key", "foo", 1, "baz"))
-		assert(t, err != nil, "BRPOPLPUSH error")
-	}
+	t.Run("errors", func(t *testing.T) {
+		mustDo(t, c,
+			"BRPOPLPUSH",
+			proto.Error(errWrongNumber("brpoplpush")),
+		)
+		mustDo(t, c,
+			"BRPOPLPUSH", "key",
+			proto.Error(errWrongNumber("brpoplpush")),
+		)
+		mustDo(t, c,
+			"BRPOPLPUSH", "key", "bar",
+			proto.Error(errWrongNumber("brpoplpush")),
+		)
+		mustDo(t, c,
+			"BRPOPLPUSH", "key", "foo", "-1",
+			proto.Error("ERR timeout is negative"),
+		)
+		mustDo(t, c,
+			"BRPOPLPUSH", "key", "foo", "inf",
+			proto.Error("ERR timeout is not a float or out of range"),
+		)
+		mustDo(t, c,
+			"BRPOPLPUSH", "key", "foo", "1", "baz",
+			proto.Error(errWrongNumber("brpoplpush")),
+		)
+	})
 }
 
 func TestBrpoplpushSimple(t *testing.T) {
-	s, c1, c2, done := setup2(t)
-	defer done()
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := proto.Dial(s.Addr())
+	ok(t, err)
+	defer c.Close()
 
-	got := make(chan string, 1)
-	go func() {
-		b, err := redis.String(c2.Do("BRPOPLPUSH", "from", "to", "1"))
-		ok(t, err)
-		got <- b
-	}()
-
+	got := goStrings(t, s, "BRPOPLPUSH", "from", "to", "1")
 	time.Sleep(30 * time.Millisecond)
 
-	b, err := redis.Int(c1.Do("RPUSH", "from", "e1", "e2", "e3"))
-	ok(t, err)
-	equals(t, 3, b)
+	mustDo(t, c,
+		"RPUSH", "from", "e1", "e2", "e3",
+		proto.Int(3),
+	)
 
 	select {
 	case have := <-got:
-		equals(t, "e3", have)
+		equals(t, proto.String("e3"), have)
 	case <-time.After(500 * time.Millisecond):
 		t.Error("BRPOP took too long")
 	}
@@ -1082,13 +1215,14 @@ func TestBrpoplpushSimple(t *testing.T) {
 }
 
 func TestBrpoplpushTimeout(t *testing.T) {
-	_, c, done := setup(t)
-	defer done()
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
 
-	got := goStrings(t, c, "BRPOPLPUSH", "l1", "l2", 1)
+	got := goStrings(t, s, "BRPOPLPUSH", "l1", "l2", "1")
 	select {
 	case have := <-got:
-		equals(t, []string(nil), have)
+		equals(t, proto.Nil, have)
 	case <-time.After(1500 * time.Millisecond):
 		t.Error("BRPOPLPUSH took too long")
 	}

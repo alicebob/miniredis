@@ -30,11 +30,11 @@ func TestEcho(t *testing.T) {
 }
 
 func TestPing(t *testing.T) {
-	testCommands(t,
-		succ("PING"),
-		succ("PING", "hello world"),
-		fail("PING", "hello", "world"),
-	)
+	testRaw(t, func(c *client) {
+		c.Do("PING")
+		c.Do("PING", "hello world")
+		c.Do("PING", "hello", "world")
+	})
 
 	testCommands(t,
 		succ("MULTI"),

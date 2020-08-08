@@ -4,7 +4,7 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/gomodule/redigo/redis"
+	"github.com/alicebob/miniredis/v2/proto"
 )
 
 // Test SADD / SMEMBERS.
@@ -12,40 +12,42 @@ func TestSadd(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	{
-		b, err := redis.Int(c.Do("SADD", "s", "aap", "noot", "mies"))
-		ok(t, err)
-		equals(t, 3, b) // New elements.
+		mustDo(t, c,
+			"SADD", "s", "aap", "noot", "mies",
+			proto.Int(3),
+		)
 
 		members, err := s.Members("s")
 		ok(t, err)
 		equals(t, []string{"aap", "mies", "noot"}, members)
 
-		m, err := redis.Strings(c.Do("SMEMBERS", "s"))
-		ok(t, err)
-		equals(t, []string{"aap", "mies", "noot"}, m)
+		mustDo(t, c,
+			"SMEMBERS", "s",
+			proto.Strings("aap", "mies", "noot"),
+		)
 	}
 
-	{
-		b, err := redis.String(c.Do("TYPE", "s"))
-		ok(t, err)
-		equals(t, "set", b)
-	}
+	mustDo(t, c,
+		"TYPE", "s",
+		proto.Inline("set"),
+	)
 
 	// SMEMBERS on an nonexisting key
-	{
-		m, err := redis.Strings(c.Do("SMEMBERS", "nosuch"))
-		ok(t, err)
-		equals(t, []string{}, m)
-	}
+	mustDo(t, c,
+		"SMEMBERS", "nosuch",
+		proto.Strings(),
+	)
 
 	{
-		b, err := redis.Int(c.Do("SADD", "s", "new", "noot", "mies"))
-		ok(t, err)
-		equals(t, 1, b) // Only one new field.
+		mustDo(t, c,
+			"SADD", "s", "new", "noot", "mies",
+			proto.Int(1), // Only one new field.
+		)
 
 		members, err := s.Members("s")
 		ok(t, err)
@@ -63,21 +65,32 @@ func TestSadd(t *testing.T) {
 	})
 
 	t.Run("errors", func(t *testing.T) {
-		_, err := redis.String(c.Do("SET", "str", "value"))
-		ok(t, err)
-		_, err = redis.Int(c.Do("SADD", "str", "hi"))
-		mustFail(t, err, msgWrongType)
-		_, err = redis.Int(c.Do("SMEMBERS", "str"))
-		mustFail(t, err, msgWrongType)
+		mustOK(t, c, "SET", "str", "value")
+		mustDo(t, c,
+			"SADD", "str", "hi",
+			proto.Error(msgWrongType),
+		)
+		mustDo(t, c,
+			"SMEMBERS", "str",
+			proto.Error(msgWrongType),
+		)
 		// Wrong argument counts
-		_, err = redis.String(c.Do("SADD"))
-		mustFail(t, err, "ERR wrong number of arguments for 'sadd' command")
-		_, err = redis.String(c.Do("SADD", "set"))
-		mustFail(t, err, "ERR wrong number of arguments for 'sadd' command")
-		_, err = redis.String(c.Do("SMEMBERS"))
-		mustFail(t, err, "ERR wrong number of arguments for 'smembers' command")
-		_, err = redis.String(c.Do("SMEMBERS", "set", "spurious"))
-		mustFail(t, err, "ERR wrong number of arguments for 'smembers' command")
+		mustDo(t, c,
+			"SADD",
+			proto.Error(errWrongNumber("sadd")),
+		)
+		mustDo(t, c,
+			"SADD", "set",
+			proto.Error(errWrongNumber("sadd")),
+		)
+		mustDo(t, c,
+			"SMEMBERS",
+			proto.Error(errWrongNumber("smembers")),
+		)
+		mustDo(t, c,
+			"SMEMBERS", "set", "spurious",
+			proto.Error(errWrongNumber("smembers")),
+		)
 	})
 }
 
@@ -86,27 +99,20 @@ func TestSismember(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	s.SetAdd("s", "aap", "noot", "mies")
 
 	{
-		b, err := redis.Int(c.Do("SISMEMBER", "s", "aap"))
-		ok(t, err)
-		equals(t, 1, b)
+		must1(t, c, "SISMEMBER", "s", "aap")
 
-		b, err = redis.Int(c.Do("SISMEMBER", "s", "nosuch"))
-		ok(t, err)
-		equals(t, 0, b)
+		must0(t, c, "SISMEMBER", "s", "nosuch")
 	}
 
 	// a nonexisting key
-	{
-		b, err := redis.Int(c.Do("SISMEMBER", "nosuch", "nosuch"))
-		ok(t, err)
-		equals(t, 0, b)
-	}
+	must0(t, c, "SISMEMBER", "nosuch", "nosuch")
 
 	t.Run("direct usage", func(t *testing.T) {
 		isMember, err := s.IsMember("s", "noot")
@@ -115,17 +121,23 @@ func TestSismember(t *testing.T) {
 	})
 
 	t.Run("errors", func(t *testing.T) {
-		_, err := redis.String(c.Do("SET", "str", "value"))
-		ok(t, err)
-		_, err = redis.Int(c.Do("SISMEMBER", "str"))
-		mustFail(t, err, "ERR wrong number of arguments for 'sismember' command")
-		// Wrong argument counts
-		_, err = redis.String(c.Do("SISMEMBER"))
-		mustFail(t, err, "ERR wrong number of arguments for 'sismember' command")
-		_, err = redis.String(c.Do("SISMEMBER", "set"))
-		mustFail(t, err, "ERR wrong number of arguments for 'sismember' command")
-		_, err = redis.String(c.Do("SISMEMBER", "set", "spurious", "args"))
-		mustFail(t, err, "ERR wrong number of arguments for 'sismember' command")
+		mustOK(t, c, "SET", "str", "value")
+		mustDo(t, c,
+			"SISMEMBER", "str", "foo",
+			proto.Error(msgWrongType),
+		)
+		mustDo(t, c,
+			"SISMEMBER",
+			proto.Error(errWrongNumber("sismember")),
+		)
+		mustDo(t, c,
+			"SISMEMBER", "set",
+			proto.Error(errWrongNumber("sismember")),
+		)
+		mustDo(t, c,
+			"SISMEMBER", "set", "spurious", "args",
+			proto.Error(errWrongNumber("sismember")),
+		)
 	})
 }
 
@@ -134,34 +146,33 @@ func TestSrem(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	s.SetAdd("s", "aap", "noot", "mies", "vuur")
 
 	{
-		b, err := redis.Int(c.Do("SREM", "s", "aap", "noot"))
-		ok(t, err)
-		equals(t, 2, b)
+		mustDo(t, c,
+			"SREM", "s", "aap", "noot",
+			proto.Int(2),
+		)
 
 		members, err := s.Members("s")
 		ok(t, err)
 		equals(t, []string{"mies", "vuur"}, members)
 	}
 
-	// a nonexisting field
-	{
-		b, err := redis.Int(c.Do("SREM", "s", "nosuch"))
-		ok(t, err)
-		equals(t, 0, b)
-	}
+	// a nonexisting key
+	must0(t, c,
+		"SREM", "s", "nosuch",
+		proto.Int(9),
+	)
 
 	// a nonexisting key
-	{
-		b, err := redis.Int(c.Do("SREM", "nosuch", "nosuch"))
-		ok(t, err)
-		equals(t, 0, b)
-	}
+	must0(t, c,
+		"SREM", "nosuch", "nosuch",
+	)
 
 	t.Run("direct usage", func(t *testing.T) {
 		b, err := s.SRem("s", "mies")
@@ -174,17 +185,19 @@ func TestSrem(t *testing.T) {
 	})
 
 	t.Run("errors", func(t *testing.T) {
-		_, err := redis.String(c.Do("SET", "str", "value"))
-		ok(t, err)
-		_, err = redis.Int(c.Do("SREM", "str", "value"))
-		mustFail(t, err, msgWrongType)
-		// Wrong argument counts
-		_, err = redis.String(c.Do("SREM"))
-		mustFail(t, err, "ERR wrong number of arguments for 'srem' command")
-		_, err = redis.String(c.Do("SREM", "set"))
-		mustFail(t, err, "ERR wrong number of arguments for 'srem' command")
-		_, err = redis.String(c.Do("SREM", "set", "spurious", "args"))
-		assert(t, err != nil, "SREM error")
+		mustOK(t, c, "SET", "str", "value")
+		mustDo(t, c,
+			"SREM", "str", "value",
+			proto.Error(msgWrongType),
+		)
+		mustDo(t, c,
+			"SREM",
+			proto.Error(errWrongNumber("srem")),
+		)
+		mustDo(t, c,
+			"SREM", "set",
+			proto.Error(errWrongNumber("srem")),
+		)
 	})
 }
 
@@ -193,15 +206,16 @@ func TestSmove(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	s.SetAdd("s", "aap", "noot")
 
 	{
-		b, err := redis.Int(c.Do("SMOVE", "s", "s2", "aap"))
-		ok(t, err)
-		equals(t, 1, b)
+		must1(t, c,
+			"SMOVE", "s", "s2", "aap",
+		)
 
 		m, err := s.IsMember("s", "aap")
 		ok(t, err)
@@ -213,9 +227,9 @@ func TestSmove(t *testing.T) {
 
 	// Move away the last member
 	{
-		b, err := redis.Int(c.Do("SMOVE", "s", "s2", "noot"))
-		ok(t, err)
-		equals(t, 1, b)
+		must1(t, c,
+			"SMOVE", "s", "s2", "noot",
+		)
 
 		equals(t, false, s.Exists("s"))
 
@@ -225,35 +239,38 @@ func TestSmove(t *testing.T) {
 	}
 
 	// a nonexisting member
-	{
-		b, err := redis.Int(c.Do("SMOVE", "s", "s2", "nosuch"))
-		ok(t, err)
-		equals(t, 0, b)
-	}
+	must0(t, c, "SMOVE", "s", "s2", "nosuch")
 
 	// a nonexisting key
-	{
-		b, err := redis.Int(c.Do("SMOVE", "nosuch", "nosuch2", "nosuch"))
-		ok(t, err)
-		equals(t, 0, b)
-	}
+	must0(t, c, "SMOVE", "nosuch", "nosuch2", "nosuch")
 
 	t.Run("errors", func(t *testing.T) {
-		_, err := redis.String(c.Do("SET", "str", "value"))
-		ok(t, err)
-		_, err = redis.Int(c.Do("SMOVE", "str", "dst", "value"))
-		mustFail(t, err, msgWrongType)
-		_, err = redis.Int(c.Do("SMOVE", "s2", "str", "value"))
-		mustFail(t, err, msgWrongType)
-		// Wrong argument counts
-		_, err = redis.String(c.Do("SMOVE"))
-		mustFail(t, err, "ERR wrong number of arguments for 'smove' command")
-		_, err = redis.String(c.Do("SMOVE", "set"))
-		mustFail(t, err, "ERR wrong number of arguments for 'smove' command")
-		_, err = redis.String(c.Do("SMOVE", "set", "set2"))
-		mustFail(t, err, "ERR wrong number of arguments for 'smove' command")
-		_, err = redis.String(c.Do("SMOVE", "set", "set2", "spurious", "args"))
-		mustFail(t, err, "ERR wrong number of arguments for 'smove' command")
+		mustOK(t, c, "SET", "str", "value")
+		mustDo(t, c,
+			"SMOVE", "str", "dst", "value",
+			proto.Error(msgWrongType),
+		)
+		mustDo(t, c,
+			"SMOVE", "s2", "str", "value",
+			proto.Error(msgWrongType),
+		)
+
+		mustDo(t, c,
+			"SMOVE",
+			proto.Error(errWrongNumber("smove")),
+		)
+		mustDo(t, c,
+			"SMOVE", "set",
+			proto.Error(errWrongNumber("smove")),
+		)
+		mustDo(t, c,
+			"SMOVE", "set", "set2",
+			proto.Error(errWrongNumber("smove")),
+		)
+		mustDo(t, c,
+			"SMOVE", "set", "set2", "spurious", "args",
+			proto.Error(errWrongNumber("smove")),
+		)
 	})
 }
 
@@ -262,52 +279,61 @@ func TestSpop(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	t.Run("basics", func(t *testing.T) {
 		s.SetAdd("s", "aap", "noot")
-		el, err := redis.String(c.Do("SPOP", "s"))
-		ok(t, err)
-		assert(t, el == "aap" || el == "noot", "spop got something")
 
-		el, err = redis.String(c.Do("SPOP", "s"))
+		res, err := c.Do("SPOP", "s")
 		ok(t, err)
-		assert(t, el == "aap" || el == "noot", "spop got something")
+		assert(t, res == proto.String("aap") || res == proto.String("noot"), "spop got something")
+
+		res, err = c.Do("SPOP", "s")
+		ok(t, err)
+		assert(t, res == proto.String("aap") || res == proto.String("noot"), "spop got something")
 
 		assert(t, !s.Exists("s"), "all spopped away")
 	})
 
 	t.Run("nonexisting key", func(t *testing.T) {
-		b, err := c.Do("SPOP", "nosuch")
-		ok(t, err)
-		equals(t, nil, b)
+		mustNil(t, c, "SPOP", "nosuch")
 	})
 
 	t.Run("various errors", func(t *testing.T) {
 		s.SetAdd("chk", "aap", "noot")
 		s.Set("str", "value")
 
-		_, err = redis.String(c.Do("SMOVE"))
-		mustFail(t, err, "ERR wrong number of arguments for 'smove' command")
-		_, err = redis.String(c.Do("SMOVE", "chk", "set2"))
-		mustFail(t, err, "ERR wrong number of arguments for 'smove' command")
+		mustDo(t, c,
+			"SMOVE",
+			proto.Error(errWrongNumber("smove")),
+		)
+		mustDo(t, c,
+			"SMOVE", "chk", "set2",
+			proto.Error(errWrongNumber("smove")),
+		)
 
-		_, err = c.Do("SPOP", "str")
-		mustFail(t, err, msgWrongType)
+		mustDo(t, c,
+			"SPOP", "str",
+			proto.Error(msgWrongType),
+		)
 	})
 
 	t.Run("count argument", func(t *testing.T) {
 		s.SetAdd("s", "aap", "noot", "mies", "vuur")
-		el, err := redis.Strings(c.Do("SPOP", "s", 2))
-		ok(t, err)
-		assert(t, len(el) == 2, "SPOP s 2")
+		mustDo(t, c,
+			"SPOP", "s", "2",
+			proto.Strings("vuur", "mies"),
+		)
 		members, err := s.Members("s")
 		ok(t, err)
 		assert(t, len(members) == 2, "SPOP s 2")
 
-		_, err = c.Do("SPOP", "str", -12)
-		mustFail(t, err, msgOutOfRange)
+		mustDo(t, c,
+			"SPOP", "str", "-12",
+			proto.Error(msgOutOfRange),
+		)
 	})
 }
 
@@ -316,57 +342,62 @@ func TestSrandmember(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	s.SetAdd("s", "aap", "noot", "mies")
 
 	s.Seed(42)
 	// No count
 	{
-		el, err := redis.String(c.Do("SRANDMEMBER", "s"))
+		res, err := c.Do("SRANDMEMBER", "s")
 		ok(t, err)
-		assert(t, el == "aap" || el == "noot" || el == "mies", "srandmember got something")
+		assert(t, res == proto.String("aap") ||
+			res == proto.String("noot") ||
+			res == proto.String("mies"),
+			"srandmember got something",
+		)
 	}
 
 	// Positive count
-	{
-		els, err := redis.Strings(c.Do("SRANDMEMBER", "s", 2))
-		ok(t, err)
-		equals(t, 2, len(els))
-		equals(t, "noot", els[0])
-		equals(t, "mies", els[1])
-	}
+	mustDo(t, c,
+		"SRANDMEMBER", "s", "2",
+		proto.Strings("noot", "mies"),
+	)
 
 	// Negative count
-	{
-		els, err := redis.Strings(c.Do("SRANDMEMBER", "s", -2))
-		ok(t, err)
-		equals(t, 2, len(els))
-		equals(t, "aap", els[0])
-		equals(t, "mies", els[1])
-	}
+	mustDo(t, c,
+		"SRANDMEMBER", "s", "-2",
+		proto.Strings("aap", "mies"),
+	)
 
 	// a nonexisting key
-	{
-		b, err := c.Do("SRANDMEMBER", "nosuch")
-		ok(t, err)
-		equals(t, nil, b)
-	}
+	mustNil(t, c,
+		"SRANDMEMBER", "nosuch",
+	)
 
 	t.Run("errors", func(t *testing.T) {
 		s.SetAdd("chk", "aap", "noot")
 		s.Set("str", "value")
 
-		_, err = redis.String(c.Do("SRANDMEMBER"))
-		mustFail(t, err, "ERR wrong number of arguments for 'srandmember' command")
-		_, err = redis.String(c.Do("SRANDMEMBER", "chk", "noint"))
-		mustFail(t, err, "ERR value is not an integer or out of range")
-		_, err = redis.String(c.Do("SRANDMEMBER", "chk", 1, "toomanu"))
-		mustFail(t, err, "ERR syntax error")
+		mustDo(t, c,
+			"SRANDMEMBER",
+			proto.Error(errWrongNumber("srandmember")),
+		)
+		mustDo(t, c,
+			"SRANDMEMBER", "chk", "noint",
+			proto.Error("ERR value is not an integer or out of range"),
+		)
+		mustDo(t, c,
+			"SRANDMEMBER", "chk", "1", "toomanu",
+			proto.Error("ERR syntax error"),
+		)
 
-		_, err = c.Do("SRANDMEMBER", "str")
-		mustFail(t, err, msgWrongType)
+		mustDo(t, c,
+			"SRANDMEMBER", "str",
+			proto.Error(msgWrongType),
+		)
 	})
 }
 
@@ -375,52 +406,56 @@ func TestSdiff(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	s.SetAdd("s1", "aap", "noot", "mies")
 	s.SetAdd("s2", "noot", "mies", "vuur")
 	s.SetAdd("s3", "aap", "mies", "wim")
 
 	// Simple case
-	{
-		els, err := redis.Strings(c.Do("SDIFF", "s1", "s2"))
-		ok(t, err)
-		equals(t, []string{"aap"}, els)
-	}
+	mustDo(t, c,
+		"SDIFF", "s1", "s2",
+		proto.Strings("aap"),
+	)
 
 	// No other set
 	{
-		els, err := redis.Strings(c.Do("SDIFF", "s1"))
+		res, err := c.DoStrings("SDIFF", "s1")
 		ok(t, err)
-		sort.Strings(els)
-		equals(t, []string{"aap", "mies", "noot"}, els)
+		sort.Strings(res)
+		equals(t, []string{"aap", "mies", "noot"}, res)
 	}
 
 	// 3 sets
-	{
-		els, err := redis.Strings(c.Do("SDIFF", "s1", "s2", "s3"))
-		ok(t, err)
-		equals(t, []string{}, els)
-	}
+	mustDo(t, c,
+		"SDIFF", "s1", "s2", "s3",
+		proto.Strings(),
+	)
 
 	// A nonexisting key
-	{
-		els, err := redis.Strings(c.Do("SDIFF", "s9"))
-		ok(t, err)
-		equals(t, []string{}, els)
-	}
+	mustDo(t, c,
+		"SDIFF", "s9",
+		proto.Strings(),
+	)
 
 	t.Run("errors", func(t *testing.T) {
 		s.SetAdd("chk", "aap", "noot")
 		s.Set("str", "value")
 
-		_, err = redis.String(c.Do("SDIFF"))
-		mustFail(t, err, "ERR wrong number of arguments for 'sdiff' command")
-		_, err = redis.String(c.Do("SDIFF", "str"))
-		mustFail(t, err, msgWrongType)
-		_, err = redis.String(c.Do("SDIFF", "chk", "str"))
-		mustFail(t, err, msgWrongType)
+		mustDo(t, c,
+			"SDIFF",
+			proto.Error(errWrongNumber("sdiff")),
+		)
+		mustDo(t, c,
+			"SDIFF", "str",
+			proto.Error(msgWrongType),
+		)
+		mustDo(t, c,
+			"SDIFF", "chk", "str",
+			proto.Error(msgWrongType),
+		)
 	})
 }
 
@@ -429,8 +464,9 @@ func TestSdiffstore(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	s.SetAdd("s1", "aap", "noot", "mies")
 	s.SetAdd("s2", "noot", "mies", "vuur")
@@ -438,9 +474,9 @@ func TestSdiffstore(t *testing.T) {
 
 	// Simple case
 	{
-		i, err := redis.Int(c.Do("SDIFFSTORE", "res", "s1", "s3"))
-		ok(t, err)
-		equals(t, 1, i)
+		must1(t, c,
+			"SDIFFSTORE", "res", "s1", "s3",
+		)
 		s.CheckSet(t, "res", "noot")
 	}
 
@@ -448,12 +484,18 @@ func TestSdiffstore(t *testing.T) {
 		s.SetAdd("chk", "aap", "noot")
 		s.Set("str", "value")
 
-		_, err = redis.String(c.Do("SDIFFSTORE"))
-		mustFail(t, err, "ERR wrong number of arguments for 'sdiffstore' command")
-		_, err = redis.String(c.Do("SDIFFSTORE", "t"))
-		mustFail(t, err, "ERR wrong number of arguments for 'sdiffstore' command")
-		_, err = redis.String(c.Do("SDIFFSTORE", "t", "str"))
-		mustFail(t, err, msgWrongType)
+		mustDo(t, c,
+			"SDIFFSTORE",
+			proto.Error(errWrongNumber("sdiffstore")),
+		)
+		mustDo(t, c,
+			"SDIFFSTORE", "t",
+			proto.Error(errWrongNumber("sdiffstore")),
+		)
+		mustDo(t, c,
+			"SDIFFSTORE", "t", "str",
+			proto.Error(msgWrongType),
+		)
 	})
 }
 
@@ -462,8 +504,9 @@ func TestSinter(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	s.SetAdd("s1", "aap", "noot", "mies")
 	s.SetAdd("s2", "noot", "mies", "vuur")
@@ -471,51 +514,54 @@ func TestSinter(t *testing.T) {
 
 	// Simple case
 	{
-		els, err := redis.Strings(c.Do("SINTER", "s1", "s2"))
+		res, err := c.DoStrings("SINTER", "s1", "s2")
 		ok(t, err)
-		sort.Strings(els)
-		equals(t, []string{"mies", "noot"}, els)
+		sort.Strings(res)
+		equals(t, []string{"mies", "noot"}, res)
 	}
 
 	// No other set
 	{
-		els, err := redis.Strings(c.Do("SINTER", "s1"))
+		res, err := c.DoStrings("SINTER", "s1")
 		ok(t, err)
-		sort.Strings(els)
-		equals(t, []string{"aap", "mies", "noot"}, els)
+		sort.Strings(res)
+		equals(t, []string{"aap", "mies", "noot"}, res)
 	}
 
 	// 3 sets
-	{
-		els, err := redis.Strings(c.Do("SINTER", "s1", "s2", "s3"))
-		ok(t, err)
-		equals(t, []string{"mies"}, els)
-	}
+	mustDo(t, c,
+		"SINTER", "s1", "s2", "s3",
+		proto.Strings("mies"),
+	)
 
 	// A nonexisting key
-	{
-		els, err := redis.Strings(c.Do("SINTER", "s9"))
-		ok(t, err)
-		equals(t, []string{}, els)
-	}
+	mustDo(t, c,
+		"SINTER", "s9",
+		proto.Strings(),
+	)
 
 	// With one of the keys being an empty set, the resulting set is also empty
-	{
-		els, err := redis.Strings(c.Do("SINTER", "s1", "s9"))
-		ok(t, err)
-		equals(t, []string{}, els)
-	}
+	mustDo(t, c,
+		"SINTER", "s1", "s9",
+		proto.Strings(),
+	)
 
 	t.Run("errors", func(t *testing.T) {
 		s.SetAdd("chk", "aap", "noot")
 		s.Set("str", "value")
 
-		_, err = redis.String(c.Do("SINTER"))
-		mustFail(t, err, "ERR wrong number of arguments for 'sinter' command")
-		_, err = redis.String(c.Do("SINTER", "str"))
-		mustFail(t, err, msgWrongType)
-		_, err = redis.String(c.Do("SINTER", "chk", "str"))
-		mustFail(t, err, msgWrongType)
+		mustDo(t, c,
+			"SINTER",
+			proto.Error(errWrongNumber("sinter")),
+		)
+		mustDo(t, c,
+			"SINTER", "str",
+			proto.Error(msgWrongType),
+		)
+		mustDo(t, c,
+			"SINTER", "chk", "str",
+			proto.Error(msgWrongType),
+		)
 	})
 }
 
@@ -524,8 +570,9 @@ func TestSinterstore(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	s.SetAdd("s1", "aap", "noot", "mies")
 	s.SetAdd("s2", "noot", "mies", "vuur")
@@ -533,17 +580,18 @@ func TestSinterstore(t *testing.T) {
 
 	// Simple case
 	{
-		i, err := redis.Int(c.Do("SINTERSTORE", "res", "s1", "s3"))
-		ok(t, err)
-		equals(t, 2, i)
+		mustDo(t, c,
+			"SINTERSTORE", "res", "s1", "s3",
+			proto.Int(2),
+		)
 		s.CheckSet(t, "res", "aap", "mies")
 	}
 
 	// With one of the keys being an empty set, the resulting set is also empty
 	{
-		i, err := redis.Int(c.Do("SINTERSTORE", "res", "s1", "s9"))
-		ok(t, err)
-		equals(t, 0, i)
+		must0(t, c,
+			"SINTERSTORE", "res", "s1", "s9",
+		)
 		s.CheckSet(t, "res", []string{}...)
 	}
 
@@ -551,12 +599,18 @@ func TestSinterstore(t *testing.T) {
 		s.SetAdd("chk", "aap", "noot")
 		s.Set("str", "value")
 
-		_, err = redis.String(c.Do("SINTERSTORE"))
-		mustFail(t, err, "ERR wrong number of arguments for 'sinterstore' command")
-		_, err = redis.String(c.Do("SINTERSTORE", "t"))
-		mustFail(t, err, "ERR wrong number of arguments for 'sinterstore' command")
-		_, err = redis.String(c.Do("SINTERSTORE", "t", "str"))
-		mustFail(t, err, msgWrongType)
+		mustDo(t, c,
+			"SINTERSTORE",
+			proto.Error(errWrongNumber("sinterstore")),
+		)
+		mustDo(t, c,
+			"SINTERSTORE", "t",
+			proto.Error(errWrongNumber("sinterstore")),
+		)
+		mustDo(t, c,
+			"SINTERSTORE", "t", "str",
+			proto.Error(msgWrongType),
+		)
 	})
 }
 
@@ -565,8 +619,9 @@ func TestSunion(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	s.SetAdd("s1", "aap", "noot", "mies")
 	s.SetAdd("s2", "noot", "mies", "vuur")
@@ -574,45 +629,52 @@ func TestSunion(t *testing.T) {
 
 	// Simple case
 	{
-		els, err := redis.Strings(c.Do("SUNION", "s1", "s2"))
+		res, err := c.DoStrings("SUNION", "s1", "s2")
 		ok(t, err)
-		sort.Strings(els)
-		equals(t, []string{"aap", "mies", "noot", "vuur"}, els)
+		sort.Strings(res)
+		equals(t, []string{"aap", "mies", "noot", "vuur"}, res)
 	}
 
 	// No other set
 	{
-		els, err := redis.Strings(c.Do("SUNION", "s1"))
+		res, err := c.DoStrings("SUNION", "s1")
 		ok(t, err)
-		sort.Strings(els)
-		equals(t, []string{"aap", "mies", "noot"}, els)
+		sort.Strings(res)
+		equals(t, []string{"aap", "mies", "noot"}, res)
 	}
 
 	// 3 sets
 	{
-		els, err := redis.Strings(c.Do("SUNION", "s1", "s2", "s3"))
+		res, err := c.DoStrings("SUNION", "s1", "s2", "s3")
 		ok(t, err)
-		sort.Strings(els)
-		equals(t, []string{"aap", "mies", "noot", "vuur", "wim"}, els)
+		sort.Strings(res)
+		equals(t, []string{"aap", "mies", "noot", "vuur", "wim"}, res)
 	}
 
 	// A nonexisting key
 	{
-		els, err := redis.Strings(c.Do("SUNION", "s9"))
-		ok(t, err)
-		equals(t, []string{}, els)
+		mustDo(t, c,
+			"SUNION", "s9",
+			proto.Strings(),
+		)
 	}
 
 	t.Run("errors", func(t *testing.T) {
 		s.SetAdd("chk", "aap", "noot")
 		s.Set("str", "value")
 
-		_, err = redis.String(c.Do("SUNION"))
-		mustFail(t, err, "ERR wrong number of arguments for 'sunion' command")
-		_, err = redis.String(c.Do("SUNION", "str"))
-		mustFail(t, err, msgWrongType)
-		_, err = redis.String(c.Do("SUNION", "chk", "str"))
-		mustFail(t, err, msgWrongType)
+		mustDo(t, c,
+			"SUNION",
+			proto.Error(errWrongNumber("sunion")),
+		)
+		mustDo(t, c,
+			"SUNION", "str",
+			proto.Error(msgWrongType),
+		)
+		mustDo(t, c,
+			"SUNION", "chk", "str",
+			proto.Error(msgWrongType),
+		)
 	})
 }
 
@@ -621,8 +683,9 @@ func TestSunionstore(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	s.SetAdd("s1", "aap", "noot", "mies")
 	s.SetAdd("s2", "noot", "mies", "vuur")
@@ -630,9 +693,10 @@ func TestSunionstore(t *testing.T) {
 
 	// Simple case
 	{
-		i, err := redis.Int(c.Do("SUNIONSTORE", "res", "s1", "s3"))
-		ok(t, err)
-		equals(t, 4, i)
+		mustDo(t, c,
+			"SUNIONSTORE", "res", "s1", "s3",
+			proto.Int(4),
+		)
 		s.CheckSet(t, "res", "aap", "mies", "noot", "wim")
 	}
 
@@ -640,12 +704,18 @@ func TestSunionstore(t *testing.T) {
 		s.SetAdd("chk", "aap", "noot")
 		s.Set("str", "value")
 
-		_, err = redis.String(c.Do("SUNIONSTORE"))
-		mustFail(t, err, "ERR wrong number of arguments for 'sunionstore' command")
-		_, err = redis.String(c.Do("SUNIONSTORE", "t"))
-		mustFail(t, err, "ERR wrong number of arguments for 'sunionstore' command")
-		_, err = redis.String(c.Do("SUNIONSTORE", "t", "str"))
-		mustFail(t, err, msgWrongType)
+		mustDo(t, c,
+			"SUNIONSTORE",
+			proto.Error(errWrongNumber("sunionstore")),
+		)
+		mustDo(t, c,
+			"SUNIONSTORE", "t",
+			proto.Error(errWrongNumber("sunionstore")),
+		)
+		mustDo(t, c,
+			"SUNIONSTORE", "t", "str",
+			proto.Error(msgWrongType),
+		)
 	})
 }
 
@@ -653,85 +723,88 @@ func TestSscan(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	// We cheat with sscan. It always returns everything.
 
 	s.SetAdd("set", "value1", "value2")
 
 	// No problem
-	{
-		res, err := redis.Values(c.Do("SSCAN", "set", 0))
-		ok(t, err)
-		equals(t, 2, len(res))
-
-		var c int
-		var keys []string
-		_, err = redis.Scan(res, &c, &keys)
-		ok(t, err)
-		equals(t, 0, c)
-		equals(t, []string{"value1", "value2"}, keys)
-	}
+	mustDo(t, c,
+		"SSCAN", "set", "0",
+		proto.Array(
+			proto.String("0"),
+			proto.Array(
+				proto.String("value1"),
+				proto.String("value2"),
+			),
+		),
+	)
 
 	// Invalid cursor
-	{
-		res, err := redis.Values(c.Do("SSCAN", "set", 42))
-		ok(t, err)
-		equals(t, 2, len(res))
-
-		var c int
-		var keys []string
-		_, err = redis.Scan(res, &c, &keys)
-		ok(t, err)
-		equals(t, 0, c)
-		equals(t, []string(nil), keys)
-	}
+	mustDo(t, c,
+		"SSCAN", "set", "42",
+		proto.Array(
+			proto.String("0"),
+			proto.Strings(),
+		),
+	)
 
 	// COUNT (ignored)
-	{
-		res, err := redis.Values(c.Do("SSCAN", "set", 0, "COUNT", 200))
-		ok(t, err)
-		equals(t, 2, len(res))
-
-		var c int
-		var keys []string
-		_, err = redis.Scan(res, &c, &keys)
-		ok(t, err)
-		equals(t, 0, c)
-		equals(t, []string{"value1", "value2"}, keys)
-	}
+	mustDo(t, c,
+		"SSCAN", "set", "0", "COUNT", "200",
+		proto.Array(
+			proto.String("0"),
+			proto.Array(
+				proto.String("value1"),
+				proto.String("value2"),
+			),
+		),
+	)
 
 	// MATCH
-	{
-		s.SetAdd("set", "aap", "noot", "mies")
-		res, err := redis.Values(c.Do("SSCAN", "set", 0, "MATCH", "mi*"))
-		ok(t, err)
-		equals(t, 2, len(res))
-
-		var c int
-		var keys []string
-		_, err = redis.Scan(res, &c, &keys)
-		ok(t, err)
-		equals(t, 0, c)
-		equals(t, []string{"mies"}, keys)
-	}
+	s.SetAdd("set", "aap", "noot", "mies")
+	mustDo(t, c,
+		"SSCAN", "set", "0", "MATCH", "mi*",
+		proto.Array(
+			proto.String("0"),
+			proto.Array(
+				proto.String("mies"),
+			),
+		),
+	)
 
 	t.Run("errors", func(t *testing.T) {
-		_, err := redis.Int(c.Do("SSCAN"))
-		mustFail(t, err, "ERR wrong number of arguments for 'sscan' command")
-		_, err = redis.Int(c.Do("SSCAN", "set"))
-		mustFail(t, err, "ERR wrong number of arguments for 'sscan' command")
-		_, err = redis.Int(c.Do("SSCAN", "set", "noint"))
-		mustFail(t, err, msgInvalidCursor)
-		_, err = redis.Int(c.Do("SSCAN", "set", 1, "MATCH"))
-		mustFail(t, err, msgSyntaxError)
-		_, err = redis.Int(c.Do("SSCAN", "set", 1, "COUNT"))
-		mustFail(t, err, msgSyntaxError)
-		_, err = redis.Int(c.Do("SSCAN", "set", 1, "COUNT", "noint"))
-		mustFail(t, err, msgInvalidInt)
+		mustDo(t, c,
+			"SSCAN",
+			proto.Error(errWrongNumber("sscan")),
+		)
+		mustDo(t, c,
+			"SSCAN", "set",
+			proto.Error(errWrongNumber("sscan")),
+		)
+		mustDo(t, c,
+			"SSCAN", "set", "noint",
+			proto.Error(msgInvalidCursor),
+		)
+		mustDo(t, c,
+			"SSCAN", "set", "0", "MATCH",
+			proto.Error(msgSyntaxError),
+		)
+		mustDo(t, c,
+			"SSCAN", "set", "0", "COUNT",
+			proto.Error(msgSyntaxError),
+		)
+		mustDo(t, c,
+			"SSCAN", "set", "0", "COUNT", "noint",
+			proto.Error(msgInvalidInt),
+		)
 		s.Set("str", "value")
-		_, err = redis.Int(c.Do("SSCAN", "str", 1))
-		assert(t, err != nil, "do SSCAN error")
+		mustDo(t, c,
+			"SSCAN", "str", "0",
+			proto.Error(msgWrongType),
+		)
 	})
 }

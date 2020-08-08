@@ -5,11 +5,11 @@ import (
 	"crypto/x509"
 	"fmt"
 	"io/ioutil"
-	"reflect"
 	"strconv"
 	"strings"
 	"testing"
 
+	"github.com/alicebob/miniredis/v2/proto"
 	"github.com/gomodule/redigo/redis"
 )
 
@@ -73,68 +73,75 @@ func Test(t *testing.T) {
 		c.WriteNull()
 	})
 
-	c, err := redis.Dial("tcp", s.Addr().String())
+	c, err := proto.Dial(s.Addr().String())
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer c.Close()
 
 	{
-		res, err := redis.String(c.Do("PING"))
+		res, err := c.Do("PING")
 		if err != nil {
 			t.Fatal(err)
 		}
-		if have, want := res, "PONG"; have != want {
+		if have, want := res, proto.Inline("PONG"); have != want {
 			t.Errorf("have: %s, want: %s", have, want)
 		}
 	}
 
 	{
-		_, err := c.Do("NOSUCH")
-		if have, want := err.Error(), "ERR unknown command `NOSUCH`, with args beginning with: "; have != want {
-			t.Errorf("have: %s, want: %s", have, want)
-		}
-	}
-
-	{
-		res, err := redis.String(c.Do("pInG"))
+		res, err := c.Do("NOSUCH")
 		if err != nil {
 			t.Fatal(err)
 		}
-		if have, want := res, "PONG"; have != want {
+		if have, want := res, proto.Error("ERR unknown command `NOSUCH`, with args beginning with: "); have != want {
 			t.Errorf("have: %s, want: %s", have, want)
 		}
 	}
 
 	{
-		echo, err := redis.String(c.Do("ECHO", "hello\nworld"))
+		res, err := c.Do("pInG")
 		if err != nil {
 			t.Fatal(err)
 		}
-		if have, want := echo, "hello\nworld"; have != want {
+		if have, want := res, proto.Inline("PONG"); have != want {
 			t.Errorf("have: %s, want: %s", have, want)
 		}
 	}
 
 	{
-		_, err := c.Do("ECHO")
-		if have, want := err.Error(), errWrongNumberOfArgs; have != want {
-			t.Errorf("have: %s, want: %s", have, want)
-		}
-	}
-
-	{
-		dwarfs, err := redis.Strings(c.Do("dwaRFS"))
+		echo, err := c.Do("ECHO", "hello\nworld")
 		if err != nil {
 			t.Fatal(err)
 		}
-		if have, want := dwarfs, []string{"Blick",
+		if have, want := echo, proto.String("hello\nworld"); have != want {
+			t.Errorf("have: %s, want: %s", have, want)
+		}
+	}
+
+	{
+		res, err := c.Do("ECHO")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if have, want := res, proto.Error(errWrongNumberOfArgs); have != want {
+			t.Errorf("have: %s, want: %s", have, want)
+		}
+	}
+
+	{
+		dwarfs, err := c.Do("dwaRFS")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if have, want := dwarfs, proto.Strings("Blick",
 			"Flick",
 			"Glick",
 			"Plick",
 			"Quee",
 			"Snick",
 			"Whick",
-		}; !reflect.DeepEqual(have, want) {
+		); have != want {
 			t.Errorf("have: %s, want: %s", have, want)
 		}
 	}
@@ -144,18 +151,18 @@ func Test(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if have, want := res, interface{}(nil); have != want {
+		if have, want := res, proto.Nil; have != want {
 			t.Errorf("have: %s, want: %s", have, want)
 		}
 	}
 
 	{
 		bigPayload := strings.Repeat("X", 1<<24)
-		echo, err := redis.String(c.Do("ECHO", bigPayload))
+		echo, err := c.Do("ECHO", bigPayload)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if have, want := echo, bigPayload; have != want {
+		if have, want := echo, proto.String(bigPayload); have != want {
 			t.Errorf("have: %s, want: %s", have, want)
 		}
 	}

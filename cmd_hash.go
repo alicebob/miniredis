@@ -399,8 +399,9 @@ func (m *Miniredis) cmdHvals(c *server.Peer, cmd string, args []string) {
 			return
 		}
 
-		c.WriteLen(len(db.hashKeys[key]))
-		for _, v := range db.hashKeys[key] {
+		vals := db.hashValues(key)
+		c.WriteLen(len(vals))
+		for _, v := range vals {
 			c.WriteBulk(v)
 		}
 	})

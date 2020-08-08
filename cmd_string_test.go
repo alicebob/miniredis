@@ -1,10 +1,11 @@
 package miniredis
 
 import (
+	"strconv"
 	"testing"
 	"time"
 
-	"github.com/gomodule/redigo/redis"
+	"github.com/alicebob/miniredis/v2/proto"
 )
 
 // Test simple GET/SET keys
@@ -12,22 +13,20 @@ func TestString(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	// SET command
-	{
-		v, err := redis.String(c.Do("SET", "foo", "bar"))
-		ok(t, err)
-		equals(t, "OK", v)
-	}
+	mustOK(t, c,
+		"SET", "foo", "bar",
+	)
 
 	// GET command
-	{
-		v, err := redis.String(c.Do("GET", "foo"))
-		ok(t, err)
-		equals(t, "bar", v)
-	}
+	mustDo(t, c,
+		"GET", "foo",
+		proto.String("bar"),
+	)
 
 	// Query server directly.
 	{
@@ -40,151 +39,155 @@ func TestString(t *testing.T) {
 	{
 		ok(t, s.Set("aap", "noot"))
 		s.CheckGet(t, "aap", "noot")
-		v, err := redis.String(c.Do("GET", "aap"))
-		ok(t, err)
-		equals(t, "noot", v)
+		mustDo(t, c,
+			"GET", "aap",
+			proto.String("noot"),
+		)
 		s.CheckGet(t, "aap", "noot")
 		// Re-set.
 		ok(t, s.Set("aap", "noot2"))
 	}
 
-	// GET a non-existing key. Should be nil.
-	{
-		b, err := c.Do("GET", "reallynosuchkey")
-		ok(t, err)
-		equals(t, nil, b)
-	}
+	// non-existing key
+	mustNil(t, c,
+		"GET", "reallynosuchkey",
+	)
 
-	// Wrong usage.
-	{
-		_, err := c.Do("HSET", "wim", "zus", "jet")
-		ok(t, err)
-		_, err = c.Do("GET", "wim")
-		assert(t, err != nil, "no GET error")
-	}
+	t.Run("errors", func(t *testing.T) {
+		must1(t, c,
+			"HSET", "wim", "zus", "jet",
+		)
+		mustDo(t, c,
+			"GET", "wim",
+			proto.Error(msgWrongType),
+		)
+	})
 }
 
 func TestSet(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	// Simple case
-	{
-		v, err := redis.String(c.Do("SET", "aap", "noot"))
-		ok(t, err)
-		equals(t, "OK", v)
-	}
+	mustOK(t, c,
+		"SET", "aap", "noot",
+	)
 
 	// Overwrite other types.
-	{
-		s.HSet("wim", "teun", "vuur")
-		v, err := redis.String(c.Do("SET", "wim", "gijs"))
-		ok(t, err)
-		equals(t, "OK", v)
-		s.CheckGet(t, "wim", "gijs")
-	}
+	s.HSet("wim", "teun", "vuur")
+	mustOK(t, c,
+		"SET", "wim", "gijs",
+	)
+	s.CheckGet(t, "wim", "gijs")
 
 	// NX argument
 	{
 		// new key
-		v, err := redis.String(c.Do("SET", "mies", "toon", "NX"))
-		ok(t, err)
-		equals(t, "OK", v)
+		mustOK(t, c,
+			"SET", "mies", "toon", "NX",
+		)
 		// now existing key
-		nx, err := c.Do("SET", "mies", "toon", "NX")
-		ok(t, err)
-		equals(t, nil, nx)
+		mustNil(t, c,
+			"SET", "mies", "toon", "NX",
+		)
 		// lowercase NX is no problem
-		nx, err = c.Do("SET", "mies", "toon", "nx")
-		ok(t, err)
-		equals(t, nil, nx)
+		mustNil(t, c,
+			"SET", "mies", "toon", "nx",
+		)
 	}
 
 	// XX argument - only set if exists
 	{
 		// new key, no go
-		v, err := c.Do("SET", "one", "two", "XX")
-		ok(t, err)
-		equals(t, nil, v)
+		mustNil(t, c,
+			"SET", "one", "two", "XX",
+		)
 
 		s.Set("one", "three")
 
-		v, err = c.Do("SET", "one", "two", "XX")
-		ok(t, err)
-		equals(t, "OK", v)
+		mustOK(t, c,
+			"SET", "one", "two", "XX",
+		)
 		s.CheckGet(t, "one", "two")
 
 		// XX with another key type
 		s.HSet("eleven", "twelve", "thirteen")
-		h, err := redis.String(c.Do("SET", "eleven", "fourteen", "XX"))
-		ok(t, err)
-		equals(t, "OK", h)
+		mustOK(t, c,
+			"SET", "eleven", "fourteen", "XX",
+		)
 		s.CheckGet(t, "eleven", "fourteen")
 	}
 
 	// EX or PX argument. TTL values.
 	{
-		v, err := c.Do("SET", "one", "two", "EX", 1299)
-		ok(t, err)
-		equals(t, "OK", v)
+		mustOK(t, c,
+			"SET", "one", "two", "EX", "1299",
+		)
 		s.CheckGet(t, "one", "two")
 		equals(t, time.Second*1299, s.TTL("one"))
 
-		v, err = c.Do("SET", "three", "four", "PX", 8888)
-		ok(t, err)
-		equals(t, "OK", v)
+		mustOK(t, c,
+			"SET", "three", "four", "PX", "8888",
+		)
 		s.CheckGet(t, "three", "four")
 		equals(t, time.Millisecond*8888, s.TTL("three"))
 
-		_, err = c.Do("SET", "one", "two", "EX", "notimestamp")
-		assert(t, err != nil, "no SET error on invalid EX")
+		mustDo(t, c,
+			"SET", "one", "two", "EX", "notimestamp",
+			proto.Error(msgInvalidInt),
+		)
 
-		_, err = c.Do("SET", "one", "two", "EX")
-		assert(t, err != nil, "no SET error on missing EX argument")
+		mustDo(t, c,
+			"SET", "one", "two", "EX",
+			proto.Error(msgInvalidInt),
+		)
 
-		_, err = redis.String(c.Do("SET", "aap", "noot", "EX", 0))
-		assert(t, err != nil, "no SET EX error")
-		_, err = redis.String(c.Do("SET", "aap", "noot", "EX", -100))
-		assert(t, err != nil, "no SET EX error")
+		mustDo(t, c,
+			"SET", "aap", "noot", "EX", "0",
+			proto.Error("ERR invalid expire time in set"),
+		)
+		mustDo(t, c,
+			"SET", "aap", "noot", "EX", "-100",
+			proto.Error("ERR invalid expire time in set"),
+		)
 	}
 
 	// Invalid argument
-	{
-		_, err := c.Do("SET", "one", "two", "FOO")
-		assert(t, err != nil, "no SET error")
-	}
+	mustDo(t, c,
+		"SET", "one", "two", "FOO",
+		proto.Error(msgSyntaxError),
+	)
 }
 
 func TestMget(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	s.Set("zus", "jet")
 	s.Set("teun", "vuur")
 	s.Set("gijs", "lam")
 	s.Set("kees", "bok")
-	{
-		v, err := redis.Values(c.Do("MGET", "zus", "nosuch", "kees"))
-		ok(t, err)
-		equals(t, 3, len(v))
-		equals(t, "jet", string(v[0].([]byte)))
-		equals(t, nil, v[1])
-		equals(t, "bok", string(v[2].([]byte)))
-	}
+
+	mustDo(t, c,
+		"MGET", "zus", "nosuch", "kees",
+		proto.Array(proto.String("jet"), proto.Nil, proto.String("bok")),
+	)
 
 	// Wrong key type returns nil
 	{
 		s.HSet("aap", "foo", "bar")
-		v, err := redis.Values(c.Do("MGET", "aap"))
-		ok(t, err)
-		equals(t, 1, len(v))
-		equals(t, nil, v[0])
+		mustDo(t, c,
+			"MGET", "aap",
+			proto.Array(proto.Nil),
+		)
 	}
 }
 
@@ -192,13 +195,14 @@ func TestMset(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	{
-		v, err := redis.String(c.Do("MSET", "zus", "jet", "teun", "vuur", "gijs", "lam"))
-		ok(t, err)
-		equals(t, "OK", v)
+		mustOK(t, c,
+			"MSET", "zus", "jet", "teun", "vuur", "gijs", "lam",
+		)
 		s.CheckGet(t, "zus", "jet")
 		s.CheckGet(t, "teun", "vuur")
 		s.CheckGet(t, "gijs", "lam")
@@ -207,17 +211,17 @@ func TestMset(t *testing.T) {
 	// Other types are overwritten
 	{
 		s.HSet("aap", "foo", "bar")
-		v, err := redis.String(c.Do("MSET", "aap", "jet"))
-		ok(t, err)
-		equals(t, "OK", v)
+		mustOK(t, c,
+			"MSET", "aap", "jet",
+		)
 		s.CheckGet(t, "aap", "jet")
 	}
 
 	// Odd argument list is not OK
-	{
-		_, err := redis.String(c.Do("MSET", "zus", "jet", "teun"))
-		assert(t, err != nil, "No MSET error")
-	}
+	mustDo(t, c,
+		"MSET", "zus", "jet", "teun",
+		proto.Error("ERR wrong number of arguments for MSET"),
+	)
 
 	// TTL is cleared
 	{
@@ -225,9 +229,9 @@ func TestMset(t *testing.T) {
 		s.HSet("aap", "foo", "bar") // even for weird keys.
 		s.SetTTL("aap", time.Second*999)
 		s.SetTTL("foo", time.Second*999)
-		v, err := redis.String(c.Do("MSET", "aap", "noot", "foo", "baz"))
-		ok(t, err)
-		equals(t, "OK", v)
+		mustOK(t, c,
+			"MSET", "aap", "noot", "foo", "baz",
+		)
 		equals(t, time.Duration(0), s.TTL("aap"))
 		equals(t, time.Duration(0), s.TTL("foo"))
 	}
@@ -237,38 +241,50 @@ func TestSetex(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	// Usual case
 	{
-		v, err := redis.String(c.Do("SETEX", "aap", 1234, "noot"))
-		ok(t, err)
-		equals(t, "OK", v)
+		mustOK(t, c,
+			"SETEX", "aap", "1234", "noot",
+		)
 		s.CheckGet(t, "aap", "noot")
 		equals(t, time.Second*1234, s.TTL("aap"))
 	}
 
 	// Same thing
-	{
-		_, err := redis.String(c.Do("SETEX", "aap", "1234", "noot"))
-		ok(t, err)
-	}
+	mustOK(t, c,
+		"SETEX", "aap", "1234", "noot",
+	)
 
 	// Error cases
 	{
-		_, err := redis.String(c.Do("SETEX", "aap", "nottl", "noot"))
-		assert(t, err != nil, "no SETEX error")
-		_, err = redis.String(c.Do("SETEX", "aap"))
-		assert(t, err != nil, "no SETEX error")
-		_, err = redis.String(c.Do("SETEX", "aap", 12))
-		assert(t, err != nil, "no SETEX error")
-		_, err = redis.String(c.Do("SETEX", "aap", 12, "noot", "toomuch"))
-		assert(t, err != nil, "no SETEX error")
-		_, err = redis.String(c.Do("SETEX", "aap", 0, "noot"))
-		assert(t, err != nil, "no SETEX error")
-		_, err = redis.String(c.Do("SETEX", "aap", -10, "noot"))
-		assert(t, err != nil, "no SETEX error")
+		mustDo(t, c,
+			"SETEX", "aap", "nottl", "noot",
+			proto.Error(msgInvalidInt),
+		)
+		mustDo(t, c,
+			"SETEX", "aap",
+			proto.Error(errWrongNumber("setex")),
+		)
+		mustDo(t, c,
+			"SETEX", "aap", "12",
+			proto.Error(errWrongNumber("setex")),
+		)
+		mustDo(t, c,
+			"SETEX", "aap", "12", "noot", "toomuch",
+			proto.Error(errWrongNumber("setex")),
+		)
+		mustDo(t, c,
+			"SETEX", "aap", "0", "noot",
+			proto.Error("ERR invalid expire time in setex"),
+		)
+		mustDo(t, c,
+			"SETEX", "aap", "-10", "noot",
+			proto.Error("ERR invalid expire time in setex"),
+		)
 	}
 }
 
@@ -276,38 +292,50 @@ func TestPsetex(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	// Usual case
 	{
-		v, err := redis.String(c.Do("PSETEX", "aap", 1234, "noot"))
-		ok(t, err)
-		equals(t, "OK", v)
+		mustOK(t, c,
+			"PSETEX", "aap", "1234", "noot",
+		)
 		s.CheckGet(t, "aap", "noot")
 		equals(t, time.Millisecond*1234, s.TTL("aap"))
 	}
 
 	// Same thing
-	{
-		_, err := redis.String(c.Do("PSETEX", "aap", "1234", "noot"))
-		ok(t, err)
-	}
+	mustOK(t, c,
+		"PSETEX", "aap", "1234", "noot",
+	)
 
 	// Error cases
 	{
-		_, err := redis.String(c.Do("PSETEX", "aap", "nottl", "noot"))
-		assert(t, err != nil, "no PSETEX error")
-		_, err = redis.String(c.Do("PSETEX", "aap"))
-		assert(t, err != nil, "no PSETEX error")
-		_, err = redis.String(c.Do("PSETEX", "aap", 12))
-		assert(t, err != nil, "no PSETEX error")
-		_, err = redis.String(c.Do("PSETEX", "aap", 12, "noot", "toomuch"))
-		assert(t, err != nil, "no PSETEX error")
-		_, err = redis.String(c.Do("PSETEX", "aap", 0, "noot"))
-		assert(t, err != nil, "no PSETEX error")
-		_, err = redis.String(c.Do("PSETEX", "aap", -10, "noot"))
-		assert(t, err != nil, "no PSETEX error")
+		mustDo(t, c,
+			"PSETEX", "aap", "nottl", "noot",
+			proto.Error(msgInvalidInt),
+		)
+		mustDo(t, c,
+			"PSETEX", "aap",
+			proto.Error(errWrongNumber("psetex")),
+		)
+		mustDo(t, c,
+			"PSETEX", "aap", "12",
+			proto.Error(errWrongNumber("psetex")),
+		)
+		mustDo(t, c,
+			"PSETEX", "aap", "12", "noot", "toomuch",
+			proto.Error(errWrongNumber("psetex")),
+		)
+		mustDo(t, c,
+			"PSETEX", "aap", "0", "noot",
+			proto.Error("ERR invalid expire time in psetex"),
+		)
+		mustDo(t, c,
+			"PSETEX", "aap", "-10", "noot",
+			proto.Error("ERR invalid expire time in psetex"),
+		)
 	}
 }
 
@@ -315,32 +343,33 @@ func TestSetnx(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	// Existing key
 	{
 		s.Set("foo", "bar")
-		v, err := redis.Int(c.Do("SETNX", "foo", "not bar"))
-		ok(t, err)
-		equals(t, 0, v)
+		must0(t, c,
+			"SETNX", "foo", "not bar",
+		)
 		s.CheckGet(t, "foo", "bar")
 	}
 
 	// New key
 	{
-		v, err := redis.Int(c.Do("SETNX", "notfoo", "also not bar"))
-		ok(t, err)
-		equals(t, 1, v)
+		must1(t, c,
+			"SETNX", "notfoo", "also not bar",
+		)
 		s.CheckGet(t, "notfoo", "also not bar")
 	}
 
 	// Existing key of a different type
 	{
 		s.HSet("foo", "bar", "baz")
-		v, err := redis.Int(c.Do("SETNX", "foo", "not bar"))
-		ok(t, err)
-		equals(t, 0, v)
+		must0(t, c,
+			"SETNX", "foo", "not bar",
+		)
 		equals(t, "hash", s.Type("foo"))
 		_, err = s.Get("foo")
 		equals(t, ErrWrongType, err)
@@ -352,38 +381,44 @@ func TestIncr(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	// Existing key
 	{
 		s.Set("foo", "12")
-		v, err := redis.Int(c.Do("INCR", "foo"))
-		ok(t, err)
-		equals(t, 13, v)
+		mustDo(t, c,
+			"INCR", "foo",
+			proto.Int(13),
+		)
 		s.CheckGet(t, "foo", "13")
 	}
 
 	// Existing key, not an integer
 	{
 		s.Set("foo", "noint")
-		_, err := redis.Int(c.Do("INCR", "foo"))
-		assert(t, err != nil, "do INCR error")
+		mustDo(t, c,
+			"INCR", "foo",
+			proto.Error(msgInvalidInt),
+		)
 	}
 
 	// New key
 	{
-		v, err := redis.Int(c.Do("INCR", "bar"))
-		ok(t, err)
-		equals(t, 1, v)
+		must1(t, c,
+			"INCR", "bar",
+		)
 		s.CheckGet(t, "bar", "1")
 	}
 
 	// Wrong type of existing key
 	{
 		s.HSet("wrong", "aap", "noot")
-		_, err := redis.Int(c.Do("INCR", "wrong"))
-		assert(t, err != nil, "do INCR error")
+		mustDo(t, c,
+			"INCR", "wrong",
+			proto.Error(msgWrongType),
+		)
 	}
 
 	// Direct usage
@@ -400,10 +435,14 @@ func TestIncr(t *testing.T) {
 
 	// Wrong usage
 	{
-		_, err := redis.Int(c.Do("INCR"))
-		assert(t, err != nil, "do INCR error")
-		_, err = redis.Int(c.Do("INCR", "new", "key"))
-		assert(t, err != nil, "do INCR error")
+		mustDo(t, c,
+			"INCR",
+			proto.Error(errWrongNumber("incr")),
+		)
+		mustDo(t, c,
+			"INCR", "new", "key",
+			proto.Error(errWrongNumber("incr")),
+		)
 	}
 }
 
@@ -411,52 +450,63 @@ func TestIncrBy(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	// Existing key
 	{
 		s.Set("foo", "12")
-		v, err := redis.Int(c.Do("INCRBY", "foo", "400"))
-		ok(t, err)
-		equals(t, 412, v)
+		mustDo(t, c,
+			"INCRBY", "foo", "400",
+			proto.Int(412),
+		)
 		s.CheckGet(t, "foo", "412")
 	}
 
 	// Existing key, not an integer
 	{
 		s.Set("foo", "noint")
-		_, err := redis.Int(c.Do("INCRBY", "foo", "400"))
-		assert(t, err != nil, "do INCRBY error")
+		mustDo(t, c,
+			"INCRBY", "foo", "400",
+			proto.Error(msgInvalidInt),
+		)
 	}
 
 	// New key
 	{
-		v, err := redis.Int(c.Do("INCRBY", "bar", "4000"))
-		ok(t, err)
-		equals(t, 4000, v)
+		mustDo(t, c,
+			"INCRBY", "bar", "4000",
+			proto.Int(4000),
+		)
 		s.CheckGet(t, "bar", "4000")
 	}
 
 	// Wrong type of existing key
 	{
 		s.HSet("wrong", "aap", "noot")
-		_, err := redis.Int(c.Do("INCRBY", "wrong", "400"))
-		assert(t, err != nil, "do INCRBY error")
+		mustDo(t, c,
+			"INCRBY", "wrong", "400",
+			proto.Error(msgWrongType),
+		)
 	}
 
 	// Amount not an interger
-	{
-		_, err := redis.Int(c.Do("INCRBY", "key", "noint"))
-		assert(t, err != nil, "do INCRBY error")
-	}
+	mustDo(t, c,
+		"INCRBY", "key", "noint",
+		proto.Error(msgInvalidInt),
+	)
 
 	// Wrong usage
 	{
-		_, err := redis.Int(c.Do("INCRBY"))
-		assert(t, err != nil, "do INCRBY error")
-		_, err = redis.Int(c.Do("INCRBY", "another", "new", "key"))
-		assert(t, err != nil, "do INCRBY error")
+		mustDo(t, c,
+			"INCRBY",
+			proto.Error(errWrongNumber("incrby")),
+		)
+		mustDo(t, c,
+			"INCRBY", "another", "new", "key",
+			proto.Error(errWrongNumber("incrby")),
+		)
 	}
 }
 
@@ -464,30 +514,35 @@ func TestIncrbyfloat(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	// Existing key
 	{
 		s.Set("foo", "12")
-		v, err := redis.Float64(c.Do("INCRBYFLOAT", "foo", "400.12"))
-		ok(t, err)
-		equals(t, 412.12, v)
+		mustDo(t, c,
+			"INCRBYFLOAT", "foo", "400.12",
+			proto.String("412.12"),
+		)
 		s.CheckGet(t, "foo", "412.12")
 	}
 
 	// Existing key, not a number
 	{
 		s.Set("foo", "noint")
-		_, err := redis.Float64(c.Do("INCRBYFLOAT", "foo", "400"))
-		assert(t, err != nil, "do INCRBYFLOAT error")
+		mustDo(t, c,
+			"INCRBYFLOAT", "foo", "400",
+			proto.Error(msgInvalidFloat),
+		)
 	}
 
 	// New key
 	{
-		v, err := redis.Float64(c.Do("INCRBYFLOAT", "bar", "40.33"))
-		ok(t, err)
-		equals(t, 40.33, v)
+		mustDo(t, c,
+			"INCRBYFLOAT", "bar", "40.33",
+			proto.String("40.33"),
+		)
 		s.CheckGet(t, "bar", "40.33")
 	}
 
@@ -507,22 +562,28 @@ func TestIncrbyfloat(t *testing.T) {
 	// Wrong type of existing key
 	{
 		s.HSet("wrong", "aap", "noot")
-		_, err := redis.Int(c.Do("INCRBYFLOAT", "wrong", "400"))
-		assert(t, err != nil, "do INCRBYFLOAT error")
+		mustDo(t, c,
+			"INCRBYFLOAT", "wrong", "400",
+			proto.Error(msgWrongType),
+		)
 	}
 
 	// Amount not a number
-	{
-		_, err := redis.Int(c.Do("INCRBYFLOAT", "key", "noint"))
-		assert(t, err != nil, "do INCRBYFLOAT error")
-	}
+	mustDo(t, c,
+		"INCRBYFLOAT", "key", "noint",
+		proto.Error(msgInvalidFloat),
+	)
 
 	// Wrong usage
 	{
-		_, err := redis.Int(c.Do("INCRBYFLOAT"))
-		assert(t, err != nil, "do INCRBYFLOAT error")
-		_, err = redis.Int(c.Do("INCRBYFLOAT", "another", "new", "key"))
-		assert(t, err != nil, "do INCRBYFLOAT error")
+		mustDo(t, c,
+			"INCRBYFLOAT",
+			proto.Error(errWrongNumber("incrbyfloat")),
+		)
+		mustDo(t, c,
+			"INCRBYFLOAT", "another", "new", "key",
+			proto.Error(errWrongNumber("incrbyfloat")),
+		)
 	}
 }
 
@@ -530,52 +591,63 @@ func TestDecrBy(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	// Existing key
 	{
 		s.Set("foo", "12")
-		v, err := redis.Int(c.Do("DECRBY", "foo", "400"))
-		ok(t, err)
-		equals(t, -388, v)
+		mustDo(t, c,
+			"DECRBY", "foo", "400",
+			proto.Int(-388),
+		)
 		s.CheckGet(t, "foo", "-388")
 	}
 
 	// Existing key, not an integer
 	{
 		s.Set("foo", "noint")
-		_, err := redis.Int(c.Do("DECRBY", "foo", "400"))
-		assert(t, err != nil, "do DECRBY error")
+		mustDo(t, c,
+			"DECRBY", "foo", "400",
+			proto.Error(msgInvalidInt),
+		)
 	}
 
 	// New key
 	{
-		v, err := redis.Int(c.Do("DECRBY", "bar", "4000"))
-		ok(t, err)
-		equals(t, -4000, v)
+		mustDo(t, c,
+			"DECRBY", "bar", "4000",
+			proto.Int(-4000),
+		)
 		s.CheckGet(t, "bar", "-4000")
 	}
 
 	// Wrong type of existing key
 	{
 		s.HSet("wrong", "aap", "noot")
-		_, err := redis.Int(c.Do("DECRBY", "wrong", "400"))
-		assert(t, err != nil, "do DECRBY error")
+		mustDo(t, c,
+			"DECRBY", "wrong", "400",
+			proto.Error(msgWrongType),
+		)
 	}
 
 	// Amount not an interger
-	{
-		_, err := redis.Int(c.Do("DECRBY", "key", "noint"))
-		assert(t, err != nil, "do DECRBY error")
-	}
+	mustDo(t, c,
+		"DECRBY", "key", "noint",
+		proto.Error(msgInvalidInt),
+	)
 
 	// Wrong usage
 	{
-		_, err := redis.Int(c.Do("DECRBY"))
-		assert(t, err != nil, "do DECRBY error")
-		_, err = redis.Int(c.Do("DECRBY", "another", "new", "key"))
-		assert(t, err != nil, "do DECRBY error")
+		mustDo(t, c,
+			"DECRBY",
+			proto.Error(errWrongNumber("decrby")),
+		)
+		mustDo(t, c,
+			"DECRBY", "another", "new", "key",
+			proto.Error(errWrongNumber("decrby")),
+		)
 	}
 }
 
@@ -583,46 +655,57 @@ func TestDecr(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	// Existing key
 	{
 		s.Set("foo", "12")
-		v, err := redis.Int(c.Do("DECR", "foo"))
-		ok(t, err)
-		equals(t, 11, v)
+		mustDo(t, c,
+			"DECR", "foo",
+			proto.Int(11),
+		)
 		s.CheckGet(t, "foo", "11")
 	}
 
 	// Existing key, not an integer
 	{
 		s.Set("foo", "noint")
-		_, err := redis.Int(c.Do("DECR", "foo"))
-		assert(t, err != nil, "do DECR error")
+		mustDo(t, c,
+			"DECR", "foo",
+			proto.Error(msgInvalidInt),
+		)
 	}
 
 	// New key
 	{
-		v, err := redis.Int(c.Do("DECR", "bar"))
-		ok(t, err)
-		equals(t, -1, v)
+		mustDo(t, c,
+			"DECR", "bar",
+			proto.Int(-1),
+		)
 		s.CheckGet(t, "bar", "-1")
 	}
 
 	// Wrong type of existing key
 	{
 		s.HSet("wrong", "aap", "noot")
-		_, err := redis.Int(c.Do("DECR", "wrong"))
-		assert(t, err != nil, "do DECR error")
+		mustDo(t, c,
+			"DECR", "wrong",
+			proto.Error(msgWrongType),
+		)
 	}
 
 	// Wrong usage
 	{
-		_, err := redis.Int(c.Do("DECR"))
-		assert(t, err != nil, "do DECR error")
-		_, err = redis.Int(c.Do("DECR", "new", "key"))
-		assert(t, err != nil, "do DECR error")
+		mustDo(t, c,
+			"DECR",
+			proto.Error(errWrongNumber("decr")),
+		)
+		mustDo(t, c,
+			"DECR", "new", "key",
+			proto.Error(errWrongNumber("decr")),
+		)
 	}
 
 	// Direct one works
@@ -637,23 +720,25 @@ func TestGetSet(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	// Existing key
 	{
 		s.Set("foo", "bar")
-		v, err := redis.String(c.Do("GETSET", "foo", "baz"))
-		ok(t, err)
-		equals(t, "bar", v)
+		mustDo(t, c,
+			"GETSET", "foo", "baz",
+			proto.String("bar"),
+		)
 		s.CheckGet(t, "foo", "baz")
 	}
 
 	// New key
 	{
-		v, err := c.Do("GETSET", "bar", "bak")
-		ok(t, err)
-		equals(t, nil, v)
+		mustNil(t, c,
+			"GETSET", "bar", "bak",
+		)
 		s.CheckGet(t, "bar", "bak")
 	}
 
@@ -661,9 +746,10 @@ func TestGetSet(t *testing.T) {
 	{
 		s.Set("one", "two")
 		s.SetTTL("one", time.Second*1234)
-		v, err := redis.String(c.Do("GETSET", "one", "three"))
-		ok(t, err)
-		equals(t, "two", v)
+		mustDo(t, c,
+			"GETSET", "one", "three",
+			proto.String("two"),
+		)
 		s.CheckGet(t, "bar", "bak")
 		equals(t, time.Duration(0), s.TTL("one"))
 	}
@@ -671,16 +757,22 @@ func TestGetSet(t *testing.T) {
 	// Wrong type of existing key
 	{
 		s.HSet("wrong", "aap", "noot")
-		_, err := redis.Int(c.Do("GETSET", "wrong", "key"))
-		assert(t, err != nil, "do GETSET error")
+		mustDo(t, c,
+			"GETSET", "wrong", "key",
+			proto.Error(msgWrongType),
+		)
 	}
 
 	// Wrong usage
 	{
-		_, err := redis.Int(c.Do("GETSET"))
-		assert(t, err != nil, "do GETSET error")
-		_, err = redis.Int(c.Do("GETSET", "spurious", "arguments", "here"))
-		assert(t, err != nil, "do GETSET error")
+		mustDo(t, c,
+			"GETSET",
+			proto.Error(errWrongNumber("getset")),
+		)
+		mustDo(t, c,
+			"GETSET", "spurious", "arguments", "here",
+			proto.Error(errWrongNumber("getset")),
+		)
 	}
 }
 
@@ -688,37 +780,45 @@ func TestStrlen(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	// Existing key
 	{
 		s.Set("foo", "bar!")
-		v, err := redis.Int(c.Do("STRLEN", "foo"))
-		ok(t, err)
-		equals(t, 4, v)
+		mustDo(t, c,
+			"STRLEN", "foo",
+			proto.Int(4),
+		)
 	}
 
 	// New key
 	{
-		v, err := redis.Int(c.Do("STRLEN", "nosuch"))
-		ok(t, err)
-		equals(t, 0, v)
+		must0(t, c,
+			"STRLEN", "nosuch",
+		)
 	}
 
 	// Wrong type of existing key
 	{
 		s.HSet("wrong", "aap", "noot")
-		_, err := redis.Int(c.Do("STRLEN", "wrong"))
-		assert(t, err != nil, "do STRLEN error")
+		mustDo(t, c,
+			"STRLEN", "wrong",
+			proto.Error(msgWrongType),
+		)
 	}
 
 	// Wrong usage
 	{
-		_, err := redis.Int(c.Do("STRLEN"))
-		assert(t, err != nil, "do STRLEN error")
-		_, err = redis.Int(c.Do("STRLEN", "spurious", "arguments"))
-		assert(t, err != nil, "do STRLEN error")
+		mustDo(t, c,
+			"STRLEN",
+			proto.Error(errWrongNumber("strlen")),
+		)
+		mustDo(t, c,
+			"STRLEN", "spurious", "arguments",
+			proto.Error(errWrongNumber("strlen")),
+		)
 	}
 }
 
@@ -726,39 +826,48 @@ func TestAppend(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	// Existing key
 	{
 		s.Set("foo", "bar!")
-		v, err := redis.Int(c.Do("APPEND", "foo", "morebar"))
-		ok(t, err)
-		equals(t, 11, v)
+		mustDo(t, c,
+			"APPEND", "foo", "morebar",
+			proto.Int(11),
+		)
 	}
 
 	// New key
-	{
-		v, err := redis.Int(c.Do("APPEND", "bar", "was empty"))
-		ok(t, err)
-		equals(t, 9, v)
-	}
+	mustDo(t, c,
+		"APPEND", "bar", "was empty",
+		proto.Int(9),
+	)
 
 	// Wrong type of existing key
 	{
 		s.HSet("wrong", "aap", "noot")
-		_, err := redis.Int(c.Do("APPEND", "wrong", "type"))
-		assert(t, err != nil, "do APPEND error")
+		mustDo(t, c,
+			"APPEND", "wrong", "type",
+			proto.Error(msgWrongType),
+		)
 	}
 
 	// Wrong usage
 	{
-		_, err := redis.Int(c.Do("APPEND"))
-		assert(t, err != nil, "do APPEND error")
-		_, err = redis.Int(c.Do("APPEND", "missing"))
-		assert(t, err != nil, "do APPEND error")
-		_, err = redis.Int(c.Do("APPEND", "spurious", "arguments", "!"))
-		assert(t, err != nil, "do APPEND error")
+		mustDo(t, c,
+			"APPEND",
+			proto.Error(errWrongNumber("append")),
+		)
+		mustDo(t, c,
+			"APPEND", "missing",
+			proto.Error(errWrongNumber("append")),
+		)
+		mustDo(t, c,
+			"APPEND", "spurious", "arguments", "!",
+			proto.Error(errWrongNumber("append")),
+		)
 	}
 }
 
@@ -766,16 +875,18 @@ func TestGetrange(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	{
 		s.Set("foo", "abcdefg")
 		test := func(s, e int, res string) {
 			t.Helper()
-			v, err := redis.String(c.Do("GETRANGE", "foo", s, e))
-			ok(t, err)
-			equals(t, res, v)
+			mustDo(t, c,
+				"GETRANGE", "foo", strconv.Itoa(s), strconv.Itoa(e),
+				proto.String(res),
+			)
 		}
 		test(0, 0, "a")
 		test(0, 3, "abcd")
@@ -791,31 +902,42 @@ func TestGetrange(t *testing.T) {
 	}
 
 	// New key
-	{
-		v, err := redis.String(c.Do("GETRANGE", "bar", 0, 4))
-		ok(t, err)
-		equals(t, "", v)
-	}
+	mustDo(t, c,
+		"GETRANGE", "bar", "0", "4",
+		proto.String(""),
+	)
 
 	// Wrong type of existing key
 	{
 		s.HSet("wrong", "aap", "noot")
-		_, err := redis.Int(c.Do("GETRANGE", "wrong", 0, 0))
-		assert(t, err != nil, "do APPEND error")
+		mustDo(t, c,
+			"GETRANGE", "wrong", "0", "0",
+			proto.Error(msgWrongType),
+		)
 	}
 
 	// Wrong usage
 	{
-		_, err := redis.Int(c.Do("GETRANGE"))
-		assert(t, err != nil, "do GETRANGE error")
-		_, err = redis.Int(c.Do("GETRANGE", "missing"))
-		assert(t, err != nil, "do GETRANGE error")
-		_, err = redis.Int(c.Do("GETRANGE", "many", "spurious", "arguments", "!"))
-		assert(t, err != nil, "do GETRANGE error")
-		_, err = redis.Int(c.Do("GETRANGE", "many", "noint", 12))
-		assert(t, err != nil, "do GETRANGE error")
-		_, err = redis.Int(c.Do("GETRANGE", "many", 12, "noint"))
-		assert(t, err != nil, "do GETRANGE error")
+		mustDo(t, c,
+			"GETRANGE",
+			proto.Error(errWrongNumber("getrange")),
+		)
+		mustDo(t, c,
+			"GETRANGE", "missing",
+			proto.Error(errWrongNumber("getrange")),
+		)
+		mustDo(t, c,
+			"GETRANGE", "many", "spurious", "arguments", "!",
+			proto.Error(errWrongNumber("getrange")),
+		)
+		mustDo(t, c,
+			"GETRANGE", "many", "noint", "12",
+			proto.Error(msgInvalidInt),
+		)
+		mustDo(t, c,
+			"GETRANGE", "many", "12", "noint",
+			proto.Error(msgInvalidInt),
+		)
 	}
 }
 
@@ -823,46 +945,63 @@ func TestSetrange(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	// Simple case
 	{
 		s.Set("foo", "abcdefg")
-		v, err := redis.Int(c.Do("SETRANGE", "foo", 1, "bar"))
-		ok(t, err)
-		equals(t, 7, v)
+		mustDo(t, c,
+			"SETRANGE", "foo", "1", "bar",
+			proto.Int(7),
+		)
 		s.CheckGet(t, "foo", "abarefg")
 	}
 	// Non existing key
 	{
-		v, err := redis.Int(c.Do("SETRANGE", "nosuch", 3, "bar"))
-		ok(t, err)
-		equals(t, 6, v)
+		mustDo(t, c,
+			"SETRANGE", "nosuch", "3", "bar",
+			proto.Int(6),
+		)
 		s.CheckGet(t, "nosuch", "\x00\x00\x00bar")
 	}
 
 	// Wrong type of existing key
 	{
 		s.HSet("wrong", "aap", "noot")
-		_, err := redis.Int(c.Do("SETRANGE", "wrong", 0, "aap"))
-		assert(t, err != nil, "do SETRANGE error")
+		mustDo(t, c,
+			"SETRANGE", "wrong", "0", "aap",
+			proto.Error(msgWrongType),
+		)
 	}
 
 	// Wrong usage
 	{
-		_, err := redis.Int(c.Do("SETRANGE"))
-		assert(t, err != nil, "do SETRANGE error")
-		_, err = redis.Int(c.Do("SETRANGE", "missing"))
-		assert(t, err != nil, "do SETRANGE error")
-		_, err = redis.Int(c.Do("SETRANGE", "missing", 1))
-		assert(t, err != nil, "do SETRANGE error")
-		_, err = redis.Int(c.Do("SETRANGE", "key", "noint", ""))
-		assert(t, err != nil, "do SETRANGE error")
-		_, err = redis.Int(c.Do("SETRANGE", "key", -1, ""))
-		assert(t, err != nil, "do SETRANGE error")
-		_, err = redis.Int(c.Do("SETRANGE", "many", 12, "keys", "here"))
-		assert(t, err != nil, "do SETRANGE error")
+		mustDo(t, c,
+			"SETRANGE",
+			proto.Error(errWrongNumber("setrange")),
+		)
+		mustDo(t, c,
+			"SETRANGE", "missing",
+			proto.Error(errWrongNumber("setrange")),
+		)
+		mustDo(t, c,
+			"SETRANGE", "missing", "1",
+			proto.Error(errWrongNumber("setrange")),
+		)
+		mustDo(t, c,
+			"SETRANGE", "key", "noint", "",
+			proto.Error(msgInvalidInt),
+		)
+		mustDo(t, c,
+			"SETRANGE", "key", "-1", "",
+			proto.Error("ERR offset is out of range"),
+		)
+		mustDo(t, c,
+			"SETRANGE", "many", "12", "keys", "here",
+			proto.Error(errWrongNumber("setrange")),
+		)
 	}
 }
 
@@ -870,26 +1009,27 @@ func TestBitcount(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	{
 		s.Set("countme", "a") // 'a' is 0x1100001
-		v, err := redis.Int(c.Do("BITCOUNT", "countme"))
-		ok(t, err)
-		equals(t, 3, v)
+		mustDo(t, c,
+			"BITCOUNT", "countme",
+			proto.Int(3),
+		)
 
 		s.Set("countme", "aaaaa") // 'a' is 0x1100001
-		v, err = redis.Int(c.Do("BITCOUNT", "countme"))
-		ok(t, err)
-		equals(t, 3*5, v)
+		mustDo(t, c,
+			"BITCOUNT", "countme",
+			proto.Int(3*5),
+		)
 	}
 	// Non-existing
-	{
-		v, err := redis.Int(c.Do("BITCOUNT", "nosuch"))
-		ok(t, err)
-		equals(t, 0, v)
-	}
+	must0(t, c,
+		"BITCOUNT", "nosuch",
+	)
 
 	{
 		// a: 0x1100001 - 3
@@ -899,9 +1039,10 @@ func TestBitcount(t *testing.T) {
 		s.Set("foo", "abcd")
 		test := func(s, e, res int) {
 			t.Helper()
-			v, err := redis.Int(c.Do("BITCOUNT", "foo", s, e))
-			ok(t, err)
-			equals(t, res, v)
+			mustDo(t, c,
+				"BITCOUNT", "foo", strconv.Itoa(s), strconv.Itoa(e),
+				proto.Int(res),
+			)
 		}
 		test(0, 0, 3)  // "a"
 		test(0, 3, 13) // "abcd"
@@ -911,22 +1052,30 @@ func TestBitcount(t *testing.T) {
 	// Wrong type of existing key
 	{
 		s.HSet("wrong", "aap", "noot")
-		_, err := redis.Int(c.Do("BITCOUNT", "wrong"))
-		// ok(t, err)
-		// equals(t, 0, v)
-		assert(t, err != nil, "do BITCOUNT error")
+		mustDo(t, c,
+			"BITCOUNT", "wrong",
+			proto.Error(msgWrongType),
+		)
 	}
 
 	// Wrong usage
 	{
-		_, err := redis.Int(c.Do("BITCOUNT"))
-		assert(t, err != nil, "do BITCOUNT error")
-		// _, err = redis.Int(c.Do("BITCOUNT", "many", "spurious", "arguments", "!"))
-		// assert(t, err != nil, "do BITCOUNT error")
-		_, err = redis.Int(c.Do("BITCOUNT", "many", "noint", 12))
-		assert(t, err != nil, "do BITCOUNT error")
-		_, err = redis.Int(c.Do("BITCOUNT", "many", 12, "noint"))
-		assert(t, err != nil, "do BITCOUNT error")
+		mustDo(t, c,
+			"BITCOUNT",
+			proto.Error(errWrongNumber("bitcount")),
+		)
+		mustDo(t, c,
+			"BITCOUNT", "many", "spurious", "arguments", "!",
+			proto.Error(msgInvalidInt),
+		)
+		mustDo(t, c,
+			"BITCOUNT", "many", "noint", "12",
+			proto.Error(msgInvalidInt),
+		)
+		mustDo(t, c,
+			"BITCOUNT", "many", "12", "noint",
+			proto.Error(msgInvalidInt),
+		)
 	}
 }
 
@@ -934,8 +1083,9 @@ func TestBitop(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	{
 		and := func(a, b byte) byte { return a & b }
@@ -949,18 +1099,20 @@ func TestBitop(t *testing.T) {
 	{
 		s.Set("a", "a") // 'a' is 0x1100001
 		s.Set("b", "b") // 'b' is 0x1100010
-		v, err := redis.Int(c.Do("BITOP", "AND", "bitand", "a", "b"))
-		ok(t, err)
-		equals(t, 1, v) // Length of the longest key
+		mustDo(t, c,
+			"BITOP", "AND", "bitand", "a", "b",
+			proto.Int(1), // Length of the longest key
+		)
 		s.CheckGet(t, "bitand", "`")
 	}
 	// Multi char AND
 	{
 		s.Set("a", "aa")   // 'a' is 0x1100001
 		s.Set("b", "bbbb") // 'b' is 0x1100010
-		v, err := redis.Int(c.Do("BITOP", "AND", "bitand", "a", "b"))
-		ok(t, err)
-		equals(t, 4, v) // Length of the longest key
+		mustDo(t, c,
+			"BITOP", "AND", "bitand", "a", "b",
+			proto.Int(4), // Length of the longest key
+		)
 		s.CheckGet(t, "bitand", "``\000\000")
 	}
 
@@ -968,9 +1120,10 @@ func TestBitop(t *testing.T) {
 	{
 		s.Set("a", "aa")   // 'a' is 0x1100001
 		s.Set("b", "bbbb") // 'b' is 0x1100010
-		v, err := redis.Int(c.Do("BITOP", "OR", "bitor", "a", "b"))
-		ok(t, err)
-		equals(t, 4, v) // Length of the longest key
+		mustDo(t, c,
+			"BITOP", "OR", "bitor", "a", "b",
+			proto.Int(4),
+		)
 		s.CheckGet(t, "bitor", "ccbb")
 	}
 
@@ -978,49 +1131,64 @@ func TestBitop(t *testing.T) {
 	{
 		s.Set("a", "aa")   // 'a' is 0x1100001
 		s.Set("b", "bbbb") // 'b' is 0x1100010
-		v, err := redis.Int(c.Do("BITOP", "XOR", "bitxor", "a", "b"))
-		ok(t, err)
-		equals(t, 4, v) // Length of the longest key
+		mustDo(t, c,
+			"BITOP", "XOR", "bitxor", "a", "b",
+			proto.Int(4),
+		)
 		s.CheckGet(t, "bitxor", "\x03\x03bb")
 	}
 
 	// Guess who's NOT like the other ops?
 	{
 		s.Set("a", "aa") // 'a' is 0x1100001
-		v, err := redis.Int(c.Do("BITOP", "NOT", "not", "a"))
-		ok(t, err)
-		equals(t, 2, v) // Length of the key
+		mustDo(t, c,
+			"BITOP", "NOT", "not", "a",
+			proto.Int(2),
+		)
 		s.CheckGet(t, "not", "\x9e\x9e")
 	}
 
 	// Single argument. Works, just an roundabout copy.
 	{
 		s.Set("a", "a") // 'a' is 0x1100001
-		v, err := redis.Int(c.Do("BITOP", "AND", "copy", "a"))
-		ok(t, err)
-		equals(t, 1, v) // Length of the longest key
+		mustDo(t, c,
+			"BITOP", "AND", "copy", "a",
+			proto.Int(1),
+		)
 		s.CheckGet(t, "copy", "a")
 	}
 
 	// Wrong type of existing key
 	{
 		s.HSet("wrong", "aap", "noot")
-		_, err := redis.Int(c.Do("BITOP", "AND", "wrong"))
-		assert(t, err != nil, "do AND error")
+		mustDo(t, c,
+			"BITOP", "AND", "wrong",
+			proto.Error(errWrongNumber("bitop")),
+		)
 	}
 
 	// Wrong usage
 	{
-		_, err := redis.Int(c.Do("BITOP"))
-		assert(t, err != nil, "do BITOP error")
-		_, err = redis.Int(c.Do("BITOP", "AND"))
-		assert(t, err != nil, "do BITOP error")
-		_, err = redis.Int(c.Do("BITOP", "WHAT"))
-		assert(t, err != nil, "do BITOP error")
-		_, err = redis.Int(c.Do("BITOP", "NOT"))
-		assert(t, err != nil, "do BITOP error")
-		_, err = redis.Int(c.Do("BITOP", "NOT", "foo", "bar", "baz"))
-		assert(t, err != nil, "do BITOP error")
+		mustDo(t, c,
+			"BITOP",
+			proto.Error(errWrongNumber("bitop")),
+		)
+		mustDo(t, c,
+			"BITOP", "AND",
+			proto.Error(errWrongNumber("bitop")),
+		)
+		mustDo(t, c,
+			"BITOP", "WHAT",
+			proto.Error(errWrongNumber("bitop")),
+		)
+		mustDo(t, c,
+			"BITOP", "NOT",
+			proto.Error(errWrongNumber("bitop")),
+		)
+		mustDo(t, c,
+			"BITOP", "NOT", "foo", "bar", "baz",
+			proto.Error("ERR BITOP NOT must be called with a single source key."),
+		)
 	}
 }
 
@@ -1028,113 +1196,137 @@ func TestBitpos(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	{
 		s.Set("findme", "\xff\xf0\x00")
-		v, err := redis.Int(c.Do("BITPOS", "findme", 0))
-		ok(t, err)
-		equals(t, 12, v)
-		v, err = redis.Int(c.Do("BITPOS", "findme", 0, 1))
-		ok(t, err)
-		equals(t, 12, v)
-		v, err = redis.Int(c.Do("BITPOS", "findme", 0, 1, 1))
-		ok(t, err)
-		equals(t, 12, v)
+		mustDo(t, c,
+			"BITPOS", "findme", "0",
+			proto.Int(12),
+		)
+		mustDo(t, c,
+			"BITPOS", "findme", "0", "1",
+			proto.Int(12),
+		)
+		mustDo(t, c,
+			"BITPOS", "findme", "0", "1", "1",
+			proto.Int(12),
+		)
 
-		v, err = redis.Int(c.Do("BITPOS", "findme", 1))
-		ok(t, err)
-		equals(t, 0, v)
-		v, err = redis.Int(c.Do("BITPOS", "findme", 1, 1))
-		ok(t, err)
-		equals(t, 8, v)
-		v, err = redis.Int(c.Do("BITPOS", "findme", 1, 1, 2))
-		ok(t, err)
-		equals(t, 8, v)
+		must0(t, c,
+			"BITPOS", "findme", "1",
+		)
+		mustDo(t, c,
+			"BITPOS", "findme", "1", "1",
+			proto.Int(8),
+		)
+		mustDo(t, c,
+			"BITPOS", "findme", "1", "1", "2",
+			proto.Int(8),
+		)
 
-		v, err = redis.Int(c.Do("BITPOS", "findme", 1, 10000))
-		ok(t, err)
-		equals(t, -1, v)
+		mustDo(t, c,
+			"BITPOS", "findme", "1", "10000",
+			proto.Int(-1),
+		)
 	}
 
 	// Only zeros.
 	{
 		s.Set("zero", "\x00\x00")
-		v, err := redis.Int(c.Do("BITPOS", "zero", 1))
-		ok(t, err)
-		equals(t, -1, v)
-		v, err = redis.Int(c.Do("BITPOS", "zero", 0))
-		ok(t, err)
-		equals(t, 0, v)
+		mustDo(t, c,
+			"BITPOS", "zero", "1",
+			proto.Int(-1),
+		)
+		must0(t, c,
+			"BITPOS", "zero", "0",
+		)
 
 		// -end is ok
-		v, err = redis.Int(c.Do("BITPOS", "zero", 0, 0, -100))
-		ok(t, err)
-		equals(t, -1, v)
+		mustDo(t, c,
+			"BITPOS", "zero", "0", "0", "-100",
+			proto.Int(-1),
+		)
 	}
 
 	// Only ones.
 	{
 		s.Set("one", "\xff\xff")
-		v, err := redis.Int(c.Do("BITPOS", "one", 1))
-		ok(t, err)
-		equals(t, 0, v)
-		v, err = redis.Int(c.Do("BITPOS", "one", 1, 1))
-		ok(t, err)
-		equals(t, 8, v)
-		v, err = redis.Int(c.Do("BITPOS", "one", 1, 2))
-		ok(t, err)
-		equals(t, -1, v)
-		v, err = redis.Int(c.Do("BITPOS", "one", 0))
-		ok(t, err)
-		equals(t, 16, v) // Special case
-		v, err = redis.Int(c.Do("BITPOS", "one", 0, 1))
-		ok(t, err)
-		equals(t, 16, v) // Special case
-		v, err = redis.Int(c.Do("BITPOS", "one", 0, 0, 1))
-		ok(t, err)
-		equals(t, -1, v) // Counter the special case
+		mustDo(t, c,
+			"BITPOS", "one", "1",
+			proto.Int(0),
+		)
+		mustDo(t, c,
+			"BITPOS", "one", "1", "1",
+			proto.Int(8),
+		)
+		mustDo(t, c,
+			"BITPOS", "one", "1", "2",
+			proto.Int(-1),
+		)
+		mustDo(t, c,
+			"BITPOS", "one", "0",
+			proto.Int(16), // Special case
+		)
+		mustDo(t, c,
+			"BITPOS", "one", "0", "1",
+			proto.Int(16), // Special case
+		)
+		mustDo(t, c,
+			"BITPOS", "one", "0", "0", "1",
+			proto.Int(-1), // Counter the special case
+		)
 	}
 
 	// Non-existing
 	{
-		v, err := redis.Int(c.Do("BITPOS", "nosuch", 1))
-		ok(t, err)
-		equals(t, -1, v)
-		v, err = redis.Int(c.Do("BITPOS", "nosuch", 0))
-		ok(t, err)
-		equals(t, 0, v) // that makes no sense.
+		mustDo(t, c,
+			"BITPOS", "nosuch", "1",
+			proto.Int(-1),
+		)
+		mustDo(t, c,
+			"BITPOS", "nosuch", "0",
+			proto.Int(0), // that makes no sense.
+		)
 	}
 
 	// Empty string
 	{
 		s.Set("empty", "")
-		v, err := redis.Int(c.Do("BITPOS", "empty", 1))
-		ok(t, err)
-		equals(t, -1, v)
-		v, err = redis.Int(c.Do("BITPOS", "empty", 0))
-		ok(t, err)
-		equals(t, 0, v)
+		mustDo(t, c,
+			"BITPOS", "empty", "1",
+			proto.Int(-1),
+		)
+		must0(t, c,
+			"BITPOS", "empty", "0",
+		)
 	}
 
 	// Wrong type of existing key
 	{
 		s.HSet("wrong", "aap", "noot")
-		_, err := redis.Int(c.Do("BITPOS", "wrong", 1))
-		assert(t, err != nil, "do BITPOS error")
+		mustDo(t, c,
+			"BITPOS", "wrong", "1",
+			proto.Error(msgWrongType),
+		)
 	}
 
 	// Wrong usage
 	{
-		_, err := redis.Int(c.Do("BITPOS"))
-		assert(t, err != nil, "do BITPOS error")
-		_, err = redis.Int(c.Do("BITPOS", "many", "spurious", "arguments", "!"))
-		assert(t, err != nil, "do BITPOS error")
-		_, err = redis.Int(c.Do("BITPOS", "many", "noint"))
-		assert(t, err != nil, "do BITPOS error")
-		_, err = redis.Int(c.Do("BITPOS", "many"))
-		assert(t, err != nil, "do BITPOS error")
+		mustDo(t, c,
+			"BITPOS",
+			proto.Error(errWrongNumber("bitpos")),
+		)
+		mustDo(t, c,
+			"BITPOS", "many", "noint",
+			proto.Error(msgInvalidInt),
+		)
+		mustDo(t, c,
+			"BITPOS", "many",
+			proto.Error(errWrongNumber("bitpos")),
+		)
 	}
 }
 
@@ -1142,47 +1334,56 @@ func TestGetbit(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	{
 		s.Set("findme", "\x08")
-		v, err := redis.Int(c.Do("GETBIT", "findme", 0))
-		ok(t, err)
-		equals(t, 0, v)
-		v, err = redis.Int(c.Do("GETBIT", "findme", 4))
-		ok(t, err)
-		equals(t, 1, v)
-		v, err = redis.Int(c.Do("GETBIT", "findme", 5))
-		ok(t, err)
-		equals(t, 0, v)
+		must0(t, c,
+			"GETBIT", "findme", "0",
+		)
+		must1(t, c,
+			"GETBIT", "findme", "4",
+		)
+		must0(t, c,
+			"GETBIT", "findme", "5",
+		)
 	}
 
 	// Non-existing
 	{
-		v, err := redis.Int(c.Do("GETBIT", "nosuch", 1))
-		ok(t, err)
-		equals(t, 0, v)
-		v, err = redis.Int(c.Do("GETBIT", "nosuch", 1000))
-		ok(t, err)
-		equals(t, 0, v)
+		must0(t, c,
+			"GETBIT", "nosuch", "1",
+		)
+		must0(t, c,
+			"GETBIT", "nosuch", "1000",
+		)
 	}
 
 	// Wrong type of existing key
 	{
 		s.HSet("wrong", "aap", "noot")
-		_, err := redis.Int(c.Do("GETBIT", "wrong", 1))
-		assert(t, err != nil, "do GETBIT error")
+		mustDo(t, c,
+			"GETBIT", "wrong", "1",
+			proto.Error(msgWrongType),
+		)
 	}
 
 	// Wrong usage
 	{
-		_, err := redis.Int(c.Do("GETBIT", "foo"))
-		assert(t, err != nil, "do GETBIT error")
-		_, err = redis.Int(c.Do("GETBIT", "spurious", "arguments", "!"))
-		assert(t, err != nil, "do GETBIT error")
-		_, err = redis.Int(c.Do("GETBIT", "many", "noint"))
-		assert(t, err != nil, "do GETBIT error")
+		mustDo(t, c,
+			"GETBIT", "foo",
+			proto.Error(errWrongNumber("getbit")),
+		)
+		mustDo(t, c,
+			"GETBIT", "spurious", "arguments", "!",
+			proto.Error(errWrongNumber("getbit")),
+		)
+		mustDo(t, c,
+			"GETBIT", "many", "noint",
+			proto.Error("ERR bit offset is not an integer or out of range"),
+		)
 	}
 }
 
@@ -1190,64 +1391,79 @@ func TestSetbit(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	{
 		s.Set("findme", "\x08")
-		v, err := redis.Int(c.Do("SETBIT", "findme", 4, 0))
-		ok(t, err)
-		equals(t, 1, v)
+		must1(t, c,
+			"SETBIT", "findme", "4", "0",
+		)
 		s.CheckGet(t, "findme", "\x00")
 
-		v, err = redis.Int(c.Do("SETBIT", "findme", 4, 1))
-		ok(t, err)
-		equals(t, 0, v)
+		must0(t, c,
+			"SETBIT", "findme", "4", "1",
+		)
 		s.CheckGet(t, "findme", "\x08")
 	}
 
 	// Non-existing
 	{
-		v, err := redis.Int(c.Do("SETBIT", "nosuch", 0, 1))
-		ok(t, err)
-		equals(t, 0, v)
+		must0(t, c,
+			"SETBIT", "nosuch", "0", "1",
+		)
 		s.CheckGet(t, "nosuch", "\x80")
 	}
 
 	// Too short
 	{
 		s.Set("short", "\x00\x00")
-		v, err := redis.Int(c.Do("SETBIT", "short", 24, 0))
-		ok(t, err)
-		equals(t, 0, v)
+		must0(t, c,
+			"SETBIT", "short", "24", "0",
+		)
 		s.CheckGet(t, "short", "\x00\x00\x00\x00")
-		v, err = redis.Int(c.Do("SETBIT", "short", 32, 1))
-		ok(t, err)
-		equals(t, 0, v)
+		must0(t, c,
+			"SETBIT", "short", "32", "1",
+		)
 		s.CheckGet(t, "short", "\x00\x00\x00\x00\x80")
 	}
 
 	// Wrong type of existing key
 	{
 		s.HSet("wrong", "aap", "noot")
-		_, err := redis.Int(c.Do("SETBIT", "wrong", 0, 1))
-		assert(t, err != nil, "do SETBIT error")
+		mustDo(t, c,
+			"SETBIT", "wrong", "0", "1",
+			proto.Error(msgWrongType),
+		)
 	}
 
 	// Wrong usage
 	{
-		_, err := redis.Int(c.Do("SETBIT", "foo"))
-		assert(t, err != nil, "do SETBIT error")
-		_, err = redis.Int(c.Do("SETBIT", "spurious", "arguments", "!"))
-		assert(t, err != nil, "do SETBIT error")
-		_, err = redis.Int(c.Do("SETBIT", "many", "noint", 1))
-		assert(t, err != nil, "do SETBIT error")
-		_, err = redis.Int(c.Do("SETBIT", "many", 1, "noint"))
-		assert(t, err != nil, "do SETBIT error")
-		_, err = redis.Int(c.Do("SETBIT", "many", -3, 0))
-		assert(t, err != nil, "do SETBIT error")
-		_, err = redis.Int(c.Do("SETBIT", "many", 3, 2))
-		assert(t, err != nil, "do SETBIT error")
+		mustDo(t, c,
+			"SETBIT", "foo",
+			proto.Error(errWrongNumber("setbit")),
+		)
+		mustDo(t, c,
+			"SETBIT", "spurious", "arguments", "!",
+			proto.Error("ERR bit offset is not an integer or out of range"),
+		)
+		mustDo(t, c,
+			"SETBIT", "many", "noint", "1",
+			proto.Error("ERR bit offset is not an integer or out of range"),
+		)
+		mustDo(t, c,
+			"SETBIT", "many", "1", "noint",
+			proto.Error("ERR bit is not an integer or out of range"),
+		)
+		mustDo(t, c,
+			"SETBIT", "many", "-3", "0",
+			proto.Error("ERR bit offset is not an integer or out of range"),
+		)
+		mustDo(t, c,
+			"SETBIT", "many", "3", "2",
+			proto.Error("ERR bit is not an integer or out of range"),
+		)
 	}
 }
 
@@ -1255,22 +1471,23 @@ func TestMsetnx(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
-	c, err := redis.Dial("tcp", s.Addr())
+	c, err := proto.Dial(s.Addr())
 	ok(t, err)
+	defer c.Close()
 
 	{
-		v, err := redis.Int(c.Do("MSETNX", "aap", "noot", "mies", "vuur"))
-		ok(t, err)
-		equals(t, 1, v)
+		must1(t, c,
+			"MSETNX", "aap", "noot", "mies", "vuur",
+		)
 		s.CheckGet(t, "aap", "noot")
 		s.CheckGet(t, "mies", "vuur")
 	}
 
 	// A key exists.
 	{
-		v, err := redis.Int(c.Do("MSETNX", "noaap", "noot", "mies", "vuur!"))
-		ok(t, err)
-		equals(t, 0, v)
+		must0(t, c,
+			"MSETNX", "noaap", "noot", "mies", "vuur!",
+		)
 		equals(t, false, s.Exists("noaap"))
 		s.CheckGet(t, "aap", "noot")
 		s.CheckGet(t, "mies", "vuur")
@@ -1279,19 +1496,25 @@ func TestMsetnx(t *testing.T) {
 	// Other type of existing key
 	{
 		s.HSet("one", "two", "three")
-		v, err := redis.Int(c.Do("MSETNX", "one", "two", "three", "four!"))
-		ok(t, err)
-		equals(t, 0, v)
+		must0(t, c,
+			"MSETNX", "one", "two", "three", "four!",
+		)
 		equals(t, false, s.Exists("three"))
 	}
 
 	// Wrong usage
 	{
-		_, err := redis.Int(c.Do("MSETNX", "foo"))
-		assert(t, err != nil, "do MSETNX error")
-		_, err = redis.Int(c.Do("MSETNX", "odd", "arguments", "!"))
-		assert(t, err != nil, "do MSETNX error")
-		_, err = redis.Int(c.Do("MSETNX"))
-		assert(t, err != nil, "do MSETNX error")
+		mustDo(t, c,
+			"MSETNX", "foo",
+			proto.Error(errWrongNumber("msetnx")),
+		)
+		mustDo(t, c,
+			"MSETNX", "odd", "arguments", "!",
+			proto.Error("ERR wrong number of arguments for MSET"),
+		)
+		mustDo(t, c,
+			"MSETNX",
+			proto.Error(errWrongNumber("msetnx")),
+		)
 	}
 }
