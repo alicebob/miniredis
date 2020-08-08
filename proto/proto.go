@@ -88,6 +88,26 @@ func ReadString(b string) (string, error) {
 	}
 }
 
+func readInline(b string) (string, error) {
+	if len(b) < 3 {
+		return "", ErrUnexpected
+	}
+	return b[1 : len(b)-2], nil
+}
+
+func ReadError(b string) (string, error) {
+	if len(b) < 1 {
+		return "", ErrUnexpected
+	}
+
+	switch b[0] {
+	default:
+		return "", ErrUnexpected
+	case '-':
+		return readInline(b)
+	}
+}
+
 func ReadStrings(b string) ([]string, error) {
 	elems, err := ReadArray(b)
 	if err != nil {
@@ -172,4 +192,46 @@ func Write(w io.Writer, cmd []string) error {
 		}
 	}
 	return nil
+}
+
+// Parse into interfaces. `b` must contain exactly a single command (which can be nested).
+func Parse(b string) (interface{}, error) {
+	if len(b) < 1 {
+		return nil, ErrUnexpected
+	}
+
+	switch b[0] {
+	default:
+		return "", ErrProtocol
+	case '+':
+		return readInline(b)
+	case '-':
+		e, err := readInline(b)
+		if err != nil {
+			return nil, err
+		}
+		return errors.New(e), nil
+	case ':':
+		e, err := readInline(b)
+		if err != nil {
+			return nil, err
+		}
+		return strconv.Atoi(e)
+	case '$':
+		return ReadString(b)
+	case '*':
+		elems, err := ReadArray(b)
+		if err != nil {
+			return nil, err
+		}
+		var res []interface{}
+		for _, elem := range elems {
+			e, err := Parse(elem)
+			if err != nil {
+				return nil, err
+			}
+			res = append(res, e)
+		}
+		return res, nil
+	}
 }

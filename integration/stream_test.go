@@ -7,211 +7,211 @@ import (
 )
 
 func TestStream(t *testing.T) {
-	testCommands(t,
-		succ("XADD",
+	testRaw(t, func(c *client) {
+		c.Do("XADD",
 			"planets",
 			"0-1",
 			"name", "Mercury",
-		),
-		succLoosely("XADD",
+		)
+		c.DoLoosely("XADD",
 			"planets",
 			"*",
 			"name", "Venus",
-		),
-		succ("XADD",
+		)
+		c.Do("XADD",
 			"planets",
 			"18446744073709551000-0",
 			"name", "Earth",
-		),
-		fail("XADD",
+		)
+		c.Do("XADD",
 			"planets",
 			"18446744073709551000-0", // <-- duplicate
 			"name", "Earth",
-		),
-		succ("XLEN", "planets"),
-		succ("RENAME", "planets", "planets2"),
-		succ("DEL", "planets2"),
-		succ("XLEN", "planets"),
+		)
+		c.Do("XLEN", "planets")
+		c.Do("RENAME", "planets", "planets2")
+		c.Do("DEL", "planets2")
+		c.Do("XLEN", "planets")
 
-		fail("XADD",
+		c.Do("XADD",
 			"planets",
 			"1000",
 			"name", "Mercury",
 			"ignored", // <-- not an even number of keys
-		),
-		fail("XADD",
+		)
+		c.Do("XADD",
 			"newplanets",
 			"0", // <-- invalid key
 			"foo", "bar",
-		),
-		fail("XADD", "newplanets", "123-123"), // no args
-		fail("XADD", "newplanets", "123-bar", "foo", "bar"),
-		fail("XADD", "newplanets", "bar-123", "foo", "bar"),
-		fail("XADD", "newplanets", "123-123-123", "foo", "bar"),
-		succ("SET", "str", "I am a string"),
-		// fail("XADD", "str", "1000", "foo", "bar"),
-		// fail("XADD", "str", "invalid-key", "foo", "bar"),
+		)
+		c.Do("XADD", "newplanets", "123-123") // no args
+		c.Do("XADD", "newplanets", "123-bar", "foo", "bar")
+		c.Do("XADD", "newplanets", "bar-123", "foo", "bar")
+		c.Do("XADD", "newplanets", "123-123-123", "foo", "bar")
+		c.Do("SET", "str", "I am a string")
+		// c.Do("XADD", "str", "1000", "foo", "bar")
+		// c.Do("XADD", "str", "invalid-key", "foo", "bar")
 
-		fail("XADD", "planets"),
-		fail("XADD"),
-	)
+		c.Do("XADD", "planets")
+		c.Do("XADD")
+	})
 
-	testCommands(t,
-		succ("XADD", "planets", "MAXLEN", "4", "456-1", "name", "Mercury"),
-		succ("XADD", "planets", "MAXLEN", "4", "456-2", "name", "Mercury"),
-		succ("XADD", "planets", "MAXLEN", "4", "456-3", "name", "Mercury"),
-		succ("XADD", "planets", "MAXLEN", "4", "456-4", "name", "Mercury"),
-		succ("XADD", "planets", "MAXLEN", "4", "456-5", "name", "Mercury"),
-		succ("XADD", "planets", "MAXLEN", "4", "456-6", "name", "Mercury"),
-		succ("XLEN", "planets"),
-		succ("XADD", "planets", "MAXLEN", "~", "4", "456-7", "name", "Mercury"),
+	testRaw(t, func(c *client) {
+		c.Do("XADD", "planets", "MAXLEN", "4", "456-1", "name", "Mercury")
+		c.Do("XADD", "planets", "MAXLEN", "4", "456-2", "name", "Mercury")
+		c.Do("XADD", "planets", "MAXLEN", "4", "456-3", "name", "Mercury")
+		c.Do("XADD", "planets", "MAXLEN", "4", "456-4", "name", "Mercury")
+		c.Do("XADD", "planets", "MAXLEN", "4", "456-5", "name", "Mercury")
+		c.Do("XADD", "planets", "MAXLEN", "4", "456-6", "name", "Mercury")
+		c.Do("XLEN", "planets")
+		c.Do("XADD", "planets", "MAXLEN", "~", "4", "456-7", "name", "Mercury")
 
-		fail("XADD", "planets", "MAXLEN", "!", "4", "*", "name", "Mercury"),
-		fail("XADD", "planets", "MAXLEN", " ~", "4", "*", "name", "Mercury"),
-		fail("XADD", "planets", "MAXLEN", "-4", "*", "name", "Mercury"),
-		fail("XADD", "planets", "MAXLEN", "", "*", "name", "Mercury"),
-		fail("XADD", "planets", "MAXLEN", "!", "four", "*", "name", "Mercury"),
-		fail("XADD", "planets", "MAXLEN", "~", "four"),
-		fail("XADD", "planets", "MAXLEN", "~"),
-		fail("XADD", "planets", "MAXLEN"),
+		c.Do("XADD", "planets", "MAXLEN", "!", "4", "*", "name", "Mercury")
+		c.Do("XADD", "planets", "MAXLEN", " ~", "4", "*", "name", "Mercury")
+		c.Do("XADD", "planets", "MAXLEN", "-4", "*", "name", "Mercury")
+		c.Do("XADD", "planets", "MAXLEN", "", "*", "name", "Mercury")
+		c.Do("XADD", "planets", "MAXLEN", "!", "four", "*", "name", "Mercury")
+		c.Do("XADD", "planets", "MAXLEN", "~", "four")
+		c.Do("XADD", "planets", "MAXLEN", "~")
+		c.Do("XADD", "planets", "MAXLEN")
 
-		succ("XADD", "planets", "MAXLEN", "0", "456-8", "name", "Mercury"),
-		succ("XLEN", "planets"),
+		c.Do("XADD", "planets", "MAXLEN", "0", "456-8", "name", "Mercury")
+		c.Do("XLEN", "planets")
 
-		succ("SET", "str", "I am a string"),
-		fail("XADD", "str", "MAXLEN", "four", "*", "foo", "bar"),
-	)
+		c.Do("SET", "str", "I am a string")
+		c.Do("XADD", "str", "MAXLEN", "four", "*", "foo", "bar")
+	})
 
-	testCommands(t,
-		succ("MULTI"),
-		succ("XADD", "planets", "0-1", "name", "Mercury"),
-		succ("EXEC"),
+	testRaw(t, func(c *client) {
+		c.Do("MULTI")
+		c.Do("XADD", "planets", "0-1", "name", "Mercury")
+		c.Do("EXEC")
 
-		succ("MULTI"),
-		fail("XADD", "newplanets", "123-123"), // no args
-		fail("EXEC"),
+		c.Do("MULTI")
+		c.Do("XADD", "newplanets", "123-123") // no args
+		c.Do("EXEC")
 
-		succ("MULTI"),
-		succ("XADD", "planets", "foo-bar", "name", "Mercury"),
-		succ("EXEC"),
+		c.Do("MULTI")
+		c.Do("XADD", "planets", "foo-bar", "name", "Mercury")
+		c.Do("EXEC")
 
-		succ("MULTI"),
-		succ("XADD", "planets", "MAXLEN", "four", "*", "name", "Mercury"),
-		succ("EXEC"),
-	)
+		c.Do("MULTI")
+		c.Do("XADD", "planets", "MAXLEN", "four", "*", "name", "Mercury")
+		c.Do("EXEC")
+	})
 }
 
 func TestStreamRange(t *testing.T) {
-	testCommands(t,
-		succ("XADD",
+	testRaw(t, func(c *client) {
+		c.Do("XADD",
 			"ordplanets",
 			"0-1",
 			"name", "Mercury",
 			"greek-god", "Hermes",
-		),
-		succ("XADD",
+		)
+		c.Do("XADD",
 			"ordplanets",
 			"1-0",
 			"name", "Venus",
 			"greek-god", "Aphrodite",
-		),
-		succ("XADD",
+		)
+		c.Do("XADD",
 			"ordplanets",
 			"2-1",
 			"greek-god", "",
 			"name", "Earth",
-		),
-		succ("XADD",
+		)
+		c.Do("XADD",
 			"ordplanets",
 			"3-0",
 			"name", "Mars",
 			"greek-god", "Ares",
-		),
-		succ("XADD",
+		)
+		c.Do("XADD",
 			"ordplanets",
 			"4-1",
 			"greek-god", "Dias",
 			"name", "Jupiter",
-		),
-		succ("XRANGE", "ordplanets", "-", "+"),
-		succ("XRANGE", "ordplanets", "+", "-"),
-		succ("XRANGE", "ordplanets", "-", "99"),
-		succ("XRANGE", "ordplanets", "0", "4"),
-		succ("XRANGE", "ordplanets", "2", "2"),
-		succ("XRANGE", "ordplanets", "2-0", "2-1"),
-		succ("XRANGE", "ordplanets", "2-1", "2-1"),
-		succ("XRANGE", "ordplanets", "2-1", "2-2"),
-		succ("XRANGE", "ordplanets", "0", "1-0"),
-		succ("XRANGE", "ordplanets", "0", "1-99"),
-		succ("XRANGE", "ordplanets", "0", "2", "COUNT", "1"),
-		succ("XRANGE", "ordplanets", "1-42", "3-42", "COUNT", "1"),
+		)
+		c.Do("XRANGE", "ordplanets", "-", "+")
+		c.Do("XRANGE", "ordplanets", "+", "-")
+		c.Do("XRANGE", "ordplanets", "-", "99")
+		c.Do("XRANGE", "ordplanets", "0", "4")
+		c.Do("XRANGE", "ordplanets", "2", "2")
+		c.Do("XRANGE", "ordplanets", "2-0", "2-1")
+		c.Do("XRANGE", "ordplanets", "2-1", "2-1")
+		c.Do("XRANGE", "ordplanets", "2-1", "2-2")
+		c.Do("XRANGE", "ordplanets", "0", "1-0")
+		c.Do("XRANGE", "ordplanets", "0", "1-99")
+		c.Do("XRANGE", "ordplanets", "0", "2", "COUNT", "1")
+		c.Do("XRANGE", "ordplanets", "1-42", "3-42", "COUNT", "1")
 
-		succ("XREVRANGE", "ordplanets", "+", "-"),
-		succ("XREVRANGE", "ordplanets", "-", "+"),
-		succ("XREVRANGE", "ordplanets", "4", "0"),
-		succ("XREVRANGE", "ordplanets", "2", "2"),
-		succ("XREVRANGE", "ordplanets", "2-1", "2-0"),
-		succ("XREVRANGE", "ordplanets", "2-1", "2-1"),
-		succ("XREVRANGE", "ordplanets", "2-2", "2-1"),
-		succ("XREVRANGE", "ordplanets", "1-0", "0"),
-		succ("XREVRANGE", "ordplanets", "3-42", "1-0", "COUNT", "2"),
-		succ("DEL", "ordplanets"),
+		c.Do("XREVRANGE", "ordplanets", "+", "-")
+		c.Do("XREVRANGE", "ordplanets", "-", "+")
+		c.Do("XREVRANGE", "ordplanets", "4", "0")
+		c.Do("XREVRANGE", "ordplanets", "2", "2")
+		c.Do("XREVRANGE", "ordplanets", "2-1", "2-0")
+		c.Do("XREVRANGE", "ordplanets", "2-1", "2-1")
+		c.Do("XREVRANGE", "ordplanets", "2-2", "2-1")
+		c.Do("XREVRANGE", "ordplanets", "1-0", "0")
+		c.Do("XREVRANGE", "ordplanets", "3-42", "1-0", "COUNT", "2")
+		c.Do("DEL", "ordplanets")
 
 		// failure cases
-		fail("XRANGE"),
-		fail("XRANGE", "foo"),
-		fail("XRANGE", "foo", 1),
-		fail("XRANGE", "foo", 2, 3, "toomany"),
-		fail("XRANGE", "foo", 2, 3, "COUNT", "noint"),
-		fail("XRANGE", "foo", 2, 3, "COUNT", 1, "toomany"),
-		fail("XRANGE", "foo", "-", "noint"),
-		succ("SET", "str", "I am a string"),
-		fail("XRANGE", "str", "-", "+"),
-	)
+		c.Do("XRANGE")
+		c.Do("XRANGE", "foo")
+		c.Do("XRANGE", "foo", "1")
+		c.Do("XRANGE", "foo", "2", "3", "toomany")
+		c.Do("XRANGE", "foo", "2", "3", "COUNT", "noint")
+		c.Do("XRANGE", "foo", "2", "3", "COUNT", "1", "toomany")
+		c.Do("XRANGE", "foo", "-", "noint")
+		c.Do("SET", "str", "I am a string")
+		c.Do("XRANGE", "str", "-", "+")
+	})
 
-	testCommands(t,
-		succ("MULTI"),
-		succ("XADD",
+	testRaw(t, func(c *client) {
+		c.Do("MULTI")
+		c.Do("XADD",
 			"ordplanets",
 			"0-1",
 			"name", "Mercury",
 			"greek-god", "Hermes",
-		),
-		succ("XLEN", "ordplanets"),
-		succ("XRANGE", "ordplanets", "+", "-"),
-		succ("XRANGE", "ordplanets", "+", "-", "COUNT", "FOOBAR"),
-		succ("EXEC"),
-		succ("XLEN", "ordplanets"),
+		)
+		c.Do("XLEN", "ordplanets")
+		c.Do("XRANGE", "ordplanets", "+", "-")
+		c.Do("XRANGE", "ordplanets", "+", "-", "COUNT", "FOOBAR")
+		c.Do("EXEC")
+		c.Do("XLEN", "ordplanets")
 
-		succ("MULTI"),
-		succ("XRANGE", "ordplanets", "+", "foo"),
-		succ("EXEC"),
+		c.Do("MULTI")
+		c.Do("XRANGE", "ordplanets", "+", "foo")
+		c.Do("EXEC")
 
-		succ("MULTI"),
-		fail("XRANGE", "ordplanets", "+"),
-		fail("EXEC"),
+		c.Do("MULTI")
+		c.Do("XRANGE", "ordplanets", "+")
+		c.Do("EXEC")
 
-		succ("MULTI"),
-		succ("XADD", "ordplanets", "123123-123", "name", "Mercury"),
-		succ("XADD", "ordplanets", "invalid", "name", "Mercury"),
-		succ("EXEC"),
-		succ("XLEN", "ordplanets"),
-	)
+		c.Do("MULTI")
+		c.Do("XADD", "ordplanets", "123123-123", "name", "Mercury")
+		c.Do("XADD", "ordplanets", "invalid", "name", "Mercury")
+		c.Do("EXEC")
+		c.Do("XLEN", "ordplanets")
+	})
 }
 
 func TestStreamGroup(t *testing.T) {
-	testCommands(t,
-		failLoosely("XGROUP", "CREATE", "planets", "processing", "$"),
-		succ("XGROUP", "CREATE", "planets", "processing", "$", "MKSTREAM"),
-		succNoResultCheck("XINFO", "STREAM", "planets"),
-		failLoosely("XINFO", "STREAMMM"),
-		failLoosely("XINFO", "STREAM", "foo"),
-		failLoosely("XINFO"),
-		succ("XADD", "planets", "0-1", "name", "Mercury"),
-		succ("XLEN", "planets"),
-		succ("XREADGROUP", "GROUP", "processing", "alice", "STREAMS", "planets", ">"),
-		succ("XREADGROUP", "GROUP", "processing", "alice", "STREAMS", "planets", ">"),
-		succ("XACK", "planets", "processing", "0-1"),
-		succ("XDEL", "planets", "0-1"),
-	)
+	testRaw(t, func(c *client) {
+		c.DoLoosely("XGROUP", "CREATE", "planets", "processing", "$")
+		c.Do("XGROUP", "CREATE", "planets", "processing", "$", "MKSTREAM")
+		// succNoResultCheck("XINFO", "STREAM", "planets"),
+		c.DoLoosely("XINFO", "STREAMMM")
+		c.DoLoosely("XINFO", "STREAM", "foo")
+		c.DoLoosely("XINFO")
+		c.Do("XADD", "planets", "0-1", "name", "Mercury")
+		c.Do("XLEN", "planets")
+		c.Do("XREADGROUP", "GROUP", "processing", "alice", "STREAMS", "planets", ">")
+		c.Do("XREADGROUP", "GROUP", "processing", "alice", "STREAMS", "planets", ">")
+		c.Do("XACK", "planets", "processing", "0-1")
+		c.Do("XDEL", "planets", "0-1")
+	})
 }

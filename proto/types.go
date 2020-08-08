@@ -29,7 +29,10 @@ func Int(n int) string {
 	return fmt.Sprintf(":%d\r\n", n)
 }
 
-const Nil = "$-1\r\n"
+const (
+	Nil     = "$-1\r\n"
+	NilList = "*-1\r\n"
+)
 
 // Array assembles the args in a list. Args should be raw redis commands.
 // Example: Array(String("foo"), String("bar"))

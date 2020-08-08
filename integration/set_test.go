@@ -9,308 +9,305 @@ import (
 )
 
 func TestSet(t *testing.T) {
-	testCommands(t,
-		succ("SADD", "s", "aap", "noot", "mies"),
-		succ("SADD", "s", "vuur", "noot"),
-		succ("TYPE", "s"),
-		succ("EXISTS", "s"),
-		succ("SCARD", "s"),
-		succSorted("SMEMBERS", "s"),
-		succSorted("SMEMBERS", "nosuch"),
-		succ("SISMEMBER", "s", "aap"),
-		succ("SISMEMBER", "s", "nosuch"),
+	testRaw(t, func(c *client) {
+		c.Do("SADD", "s", "aap", "noot", "mies")
+		c.Do("SADD", "s", "vuur", "noot")
+		c.Do("TYPE", "s")
+		c.Do("EXISTS", "s")
+		c.Do("SCARD", "s")
+		c.DoSorted("SMEMBERS", "s")
+		c.DoSorted("SMEMBERS", "nosuch")
+		c.Do("SISMEMBER", "s", "aap")
+		c.Do("SISMEMBER", "s", "nosuch")
 
-		succ("SCARD", "nosuch"),
-		succ("SISMEMBER", "nosuch", "nosuch"),
+		c.Do("SCARD", "nosuch")
+		c.Do("SISMEMBER", "nosuch", "nosuch")
 
 		// failure cases
-		fail("SADD"),
-		fail("SADD", "s"),
-		fail("SMEMBERS"),
-		fail("SMEMBERS", "too", "many"),
-		fail("SCARD"),
-		fail("SCARD", "too", "many"),
-		fail("SISMEMBER"),
-		fail("SISMEMBER", "few"),
-		fail("SISMEMBER", "too", "many", "arguments"),
+		c.Do("SADD")
+		c.Do("SADD", "s")
+		c.Do("SMEMBERS")
+		c.Do("SMEMBERS", "too", "many")
+		c.Do("SCARD")
+		c.Do("SCARD", "too", "many")
+		c.Do("SISMEMBER")
+		c.Do("SISMEMBER", "few")
+		c.Do("SISMEMBER", "too", "many", "arguments")
 		// Wrong type
-		succ("SET", "str", "I am a string"),
-		fail("SADD", "str", "noot", "mies"),
-		fail("SMEMBERS", "str"),
-		fail("SISMEMBER", "str", "noot"),
-		fail("SCARD", "str"),
-	)
+		c.Do("SET", "str", "I am a string")
+		c.Do("SADD", "str", "noot", "mies")
+		c.Do("SMEMBERS", "str")
+		c.Do("SISMEMBER", "str", "noot")
+		c.Do("SCARD", "str")
+	})
 }
 
 func TestSetMove(t *testing.T) {
 	// Move a set around
-	testCommands(t,
-		succ("SADD", "s", "aap", "noot", "mies"),
-		succ("RENAME", "s", "others"),
-		succSorted("SMEMBERS", "s"),
-		succSorted("SMEMBERS", "others"),
-		succ("MOVE", "others", 2),
-		succSorted("SMEMBERS", "others"),
-		succ("SELECT", 2),
-		succSorted("SMEMBERS", "others"),
-	)
+	testRaw(t, func(c *client) {
+		c.Do("SADD", "s", "aap", "noot", "mies")
+		c.Do("RENAME", "s", "others")
+		c.DoSorted("SMEMBERS", "s")
+		c.DoSorted("SMEMBERS", "others")
+		c.Do("MOVE", "others", "2")
+		c.DoSorted("SMEMBERS", "others")
+		c.Do("SELECT", "2")
+		c.DoSorted("SMEMBERS", "others")
+	})
 }
 
 func TestSetDel(t *testing.T) {
-	testCommands(t,
-		succ("SADD", "s", "aap", "noot", "mies"),
-		succ("SREM", "s", "noot", "nosuch"),
-		succ("SCARD", "s"),
-		succSorted("SMEMBERS", "s"),
+	testRaw(t, func(c *client) {
+		c.Do("SADD", "s", "aap", "noot", "mies")
+		c.Do("SREM", "s", "noot", "nosuch")
+		c.Do("SCARD", "s")
+		c.DoSorted("SMEMBERS", "s")
 
 		// failure cases
-		fail("SREM"),
-		fail("SREM", "s"),
+		c.Do("SREM")
+		c.Do("SREM", "s")
 		// Wrong type
-		succ("SET", "str", "I am a string"),
-		fail("SREM", "str", "noot"),
-	)
+		c.Do("SET", "str", "I am a string")
+		c.Do("SREM", "str", "noot")
+	})
 }
 
 func TestSetSMove(t *testing.T) {
-	testCommands(t,
-		succ("SADD", "s", "aap", "noot", "mies"),
-		succ("SMOVE", "s", "s2", "aap"),
-		succ("SCARD", "s"),
-		succ("SCARD", "s2"),
-		succ("SMOVE", "s", "s2", "nosuch"),
-		succ("SCARD", "s"),
-		succ("SCARD", "s2"),
-		succ("SMOVE", "s", "nosuch", "noot"),
-		succ("SCARD", "s"),
-		succ("SCARD", "s2"),
+	testRaw(t, func(c *client) {
+		c.Do("SADD", "s", "aap", "noot", "mies")
+		c.Do("SMOVE", "s", "s2", "aap")
+		c.Do("SCARD", "s")
+		c.Do("SCARD", "s2")
+		c.Do("SMOVE", "s", "s2", "nosuch")
+		c.Do("SCARD", "s")
+		c.Do("SCARD", "s2")
+		c.Do("SMOVE", "s", "nosuch", "noot")
+		c.Do("SCARD", "s")
+		c.Do("SCARD", "s2")
 
-		succ("SMOVE", "s", "s2", "mies"),
-		succ("SCARD", "s"),
-		succ("EXISTS", "s"),
-		succ("SCARD", "s2"),
-		succ("EXISTS", "s2"),
+		c.Do("SMOVE", "s", "s2", "mies")
+		c.Do("SCARD", "s")
+		c.Do("EXISTS", "s")
+		c.Do("SCARD", "s2")
+		c.Do("EXISTS", "s2")
 
-		succ("SMOVE", "s2", "s2", "mies"),
+		c.Do("SMOVE", "s2", "s2", "mies")
 
-		succ("SADD", "s5", "aap"),
-		succ("SADD", "s6", "aap"),
-		succ("SMOVE", "s5", "s6", "aap"),
+		c.Do("SADD", "s5", "aap")
+		c.Do("SADD", "s6", "aap")
+		c.Do("SMOVE", "s5", "s6", "aap")
 
 		// failure cases
-		fail("SMOVE"),
-		fail("SMOVE", "s"),
-		fail("SMOVE", "s", "s2"),
-		fail("SMOVE", "s", "s2", "too", "many"),
+		c.Do("SMOVE")
+		c.Do("SMOVE", "s")
+		c.Do("SMOVE", "s", "s2")
+		c.Do("SMOVE", "s", "s2", "too", "many")
 		// Wrong type
-		succ("SET", "str", "I am a string"),
-		fail("SMOVE", "str", "s2", "noot"),
-		fail("SMOVE", "s2", "str", "noot"),
-	)
+		c.Do("SET", "str", "I am a string")
+		c.Do("SMOVE", "str", "s2", "noot")
+		c.Do("SMOVE", "s2", "str", "noot")
+	})
 }
 
 func TestSetSpop(t *testing.T) {
-	testCommands(t,
+	testRaw(t, func(c *client) {
 		// Without count argument
-		succ("SADD", "s", "aap"),
-		succ("SPOP", "s"),
-		succ("EXISTS", "s"),
+		c.Do("SADD", "s", "aap")
+		c.Do("SPOP", "s")
+		c.Do("EXISTS", "s")
 
-		succ("SPOP", "nosuch"),
+		c.Do("SPOP", "nosuch")
 
-		succ("SADD", "s", "aap"),
-		succ("SADD", "s", "noot"),
-		succ("SADD", "s", "mies"),
-		succ("SADD", "s", "noot"),
-		succ("SCARD", "s"),
-		succLoosely("SMEMBERS", "s"),
+		c.Do("SADD", "s", "aap")
+		c.Do("SADD", "s", "noot")
+		c.Do("SADD", "s", "mies")
+		c.Do("SADD", "s", "noot")
+		c.Do("SCARD", "s")
+		c.DoLoosely("SMEMBERS", "s")
 
 		// failure cases
-		fail("SPOP"),
-		succ("SADD", "s", "aap"),
-		fail("SPOP", "s", "s2"),
-		fail("SPOP", "nosuch", "s2"),
+		c.Do("SPOP")
+		c.Do("SADD", "s", "aap")
+		c.Do("SPOP", "s", "s2")
+		c.Do("SPOP", "nosuch", "s2")
 		// Wrong type
-		succ("SET", "str", "I am a string"),
-		fail("SPOP", "str"),
-	)
+		c.Do("SET", "str", "I am a string")
+		c.Do("SPOP", "str")
+	})
 
-	testCommands(t,
+	testRaw(t, func(c *client) {
 		// With count argument
-		succ("SADD", "s", "aap"),
-		succ("SADD", "s", "noot"),
-		succ("SADD", "s", "mies"),
-		succ("SADD", "s", "vuur"),
-		succLoosely("SPOP", "s", 2),
-		succ("EXISTS", "s"),
-		succ("SCARD", "s"),
+		c.Do("SADD", "s", "aap")
+		c.Do("SADD", "s", "noot")
+		c.Do("SADD", "s", "mies")
+		c.Do("SADD", "s", "vuur")
+		c.DoLoosely("SPOP", "s", "2")
+		c.Do("EXISTS", "s")
+		c.Do("SCARD", "s")
 
-		succLoosely("SPOP", "s", 200),
-		succ("SPOP", "s", 1),
-		succ("SCARD", "s"),
+		c.DoLoosely("SPOP", "s", "200")
+		c.Do("SPOP", "s", "1")
+		c.Do("SCARD", "s")
 
-		succ("SPOP", "nosuch", 1),
-		succ("SPOP", "nosuch", 0),
+		c.Do("SPOP", "nosuch", "1")
+		c.Do("SPOP", "nosuch", "0")
 
 		// failure cases
-		fail("SPOP", "foo", "one"),
-		fail("SPOP", "foo", -4),
-	)
+		c.Do("SPOP", "foo", "one")
+		c.Do("SPOP", "foo", "-4")
+	})
 }
 
 func TestSetSrandmember(t *testing.T) {
-	testCommands(t,
+	testRaw(t, func(c *client) {
 		// Set with a single member...
-		succ("SADD", "s", "aap"),
-		succ("SRANDMEMBER", "s"),
-		succ("SRANDMEMBER", "s", 1),
-		succ("SRANDMEMBER", "s", 5),
-		succ("SRANDMEMBER", "s", -1),
-		succ("SRANDMEMBER", "s", -5),
+		c.Do("SADD", "s", "aap")
+		c.Do("SRANDMEMBER", "s")
+		c.Do("SRANDMEMBER", "s", "1")
+		c.Do("SRANDMEMBER", "s", "5")
+		c.Do("SRANDMEMBER", "s", "-1")
+		c.Do("SRANDMEMBER", "s", "-5")
 
-		succ("SRANDMEMBER", "s", 0),
-		succ("SPOP", "nosuch"),
+		c.Do("SRANDMEMBER", "s", "0")
+		c.Do("SPOP", "nosuch")
 
 		// failure cases
-		fail("SRANDMEMBER"),
-		fail("SRANDMEMBER", "s", "noint"),
-		fail("SRANDMEMBER", "s", 1, "toomany"),
+		c.Do("SRANDMEMBER")
+		c.Do("SRANDMEMBER", "s", "noint")
+		c.Do("SRANDMEMBER", "s", "1", "toomany")
 		// Wrong type
-		succ("SET", "str", "I am a string"),
-		fail("SRANDMEMBER", "str"),
-	)
+		c.Do("SET", "str", "I am a string")
+		c.Do("SRANDMEMBER", "str")
+	})
 }
 
 func TestSetSdiff(t *testing.T) {
-	testCommands(t,
-		succ("SDIFF", "s1", "aap", "noot", "mies"),
-		succ("SDIFF", "s2", "noot", "mies", "vuur"),
-		succ("SDIFF", "s3", "mies", "wim"),
-		succ("SDIFF", "s1"),
-		succ("SDIFF", "s1", "s2"),
-		succ("SDIFF", "s1", "s2", "s3"),
-		succ("SDIFF", "nosuch"),
-		succ("SDIFF", "s1", "nosuch", "s2", "nosuch", "s3"),
-		succ("SDIFF", "s1", "s1"),
+	testRaw(t, func(c *client) {
+		c.Do("SDIFF", "s1", "aap", "noot", "mies")
+		c.Do("SDIFF", "s2", "noot", "mies", "vuur")
+		c.Do("SDIFF", "s3", "mies", "wim")
+		c.Do("SDIFF", "s1")
+		c.Do("SDIFF", "s1", "s2")
+		c.Do("SDIFF", "s1", "s2", "s3")
+		c.Do("SDIFF", "nosuch")
+		c.Do("SDIFF", "s1", "nosuch", "s2", "nosuch", "s3")
+		c.Do("SDIFF", "s1", "s1")
 
-		succ("SDIFFSTORE", "res", "s3", "nosuch", "s1"),
-		succ("SMEMBERS", "res"),
+		c.Do("SDIFFSTORE", "res", "s3", "nosuch", "s1")
+		c.Do("SMEMBERS", "res")
 
 		// failure cases
-		fail("SDIFF"),
-		fail("SDIFFSTORE"),
-		fail("SDIFFSTORE", "key"),
+		c.Do("SDIFF")
+		c.Do("SDIFFSTORE")
+		c.Do("SDIFFSTORE", "key")
 		// Wrong type
-		succ("SET", "str", "I am a string"),
-		fail("SDIFF", "s1", "str"),
-		fail("SDIFF", "nosuch", "str"),
-		fail("SDIFF", "str", "s1"),
-		fail("SDIFFSTORE", "res", "str", "s1"),
-		fail("SDIFFSTORE", "res", "s1", "str"),
-	)
+		c.Do("SET", "str", "I am a string")
+		c.Do("SDIFF", "s1", "str")
+		c.Do("SDIFF", "nosuch", "str")
+		c.Do("SDIFF", "str", "s1")
+		c.Do("SDIFFSTORE", "res", "str", "s1")
+		c.Do("SDIFFSTORE", "res", "s1", "str")
+	})
 }
 
 func TestSetSinter(t *testing.T) {
-	testCommands(t,
-		succ("SADD", "s1", "aap", "noot", "mies"),
-		succ("SADD", "s2", "noot", "mies", "vuur"),
-		succ("SADD", "s3", "mies", "wim"),
-		succSorted("SINTER", "s1"),
-		succSorted("SINTER", "s1", "s2"),
-		succSorted("SINTER", "s1", "s2", "s3"),
-		succ("SINTER", "nosuch"),
-		succ("SINTER", "s1", "nosuch", "s2", "nosuch", "s3"),
-		succSorted("SINTER", "s1", "s1"),
+	testRaw(t, func(c *client) {
+		c.Do("SADD", "s1", "aap", "noot", "mies")
+		c.Do("SADD", "s2", "noot", "mies", "vuur")
+		c.Do("SADD", "s3", "mies", "wim")
+		c.DoSorted("SINTER", "s1")
+		c.DoSorted("SINTER", "s1", "s2")
+		c.DoSorted("SINTER", "s1", "s2", "s3")
+		c.Do("SINTER", "nosuch")
+		c.Do("SINTER", "s1", "nosuch", "s2", "nosuch", "s3")
+		c.DoSorted("SINTER", "s1", "s1")
 
-		succ("SINTERSTORE", "res", "s3", "nosuch", "s1"),
-		succ("SMEMBERS", "res"),
+		c.Do("SINTERSTORE", "res", "s3", "nosuch", "s1")
+		c.Do("SMEMBERS", "res")
 
 		// failure cases
-		fail("SINTER"),
-		fail("SINTERSTORE"),
-		fail("SINTERSTORE", "key"),
+		c.Do("SINTER")
+		c.Do("SINTERSTORE")
+		c.Do("SINTERSTORE", "key")
 		// Wrong type
-		succ("SET", "str", "I am a string"),
-		fail("SINTER", "s1", "str"),
-		succ("SINTER", "nosuch", "str"), // SINTER succeeds if an input type is wrong as long as the preceding inputs result in an empty set
-		fail("SINTER", "str", "nosuch"),
-		fail("SINTER", "str", "s1"),
-		fail("SINTERSTORE", "res", "str", "s1"),
-		fail("SINTERSTORE", "res", "s1", "str"),
-	)
+		c.Do("SET", "str", "I am a string")
+		c.Do("SINTER", "s1", "str")
+		c.Do("SINTER", "nosuch", "str") // SINTER succeeds if an input type is wrong as long as the preceding inputs result in an empty set
+		c.Do("SINTER", "str", "nosuch")
+		c.Do("SINTER", "str", "s1")
+		c.Do("SINTERSTORE", "res", "str", "s1")
+		c.Do("SINTERSTORE", "res", "s1", "str")
+	})
 }
 
 func TestSetSunion(t *testing.T) {
-	testCommands(t,
-		succ("SUNION", "s1", "aap", "noot", "mies"),
-		succ("SUNION", "s2", "noot", "mies", "vuur"),
-		succ("SUNION", "s3", "mies", "wim"),
-		succ("SUNION", "s1"),
-		succ("SUNION", "s1", "s2"),
-		succ("SUNION", "s1", "s2", "s3"),
-		succ("SUNION", "nosuch"),
-		succ("SUNION", "s1", "nosuch", "s2", "nosuch", "s3"),
-		succ("SUNION", "s1", "s1"),
+	testRaw(t, func(c *client) {
+		c.Do("SUNION", "s1", "aap", "noot", "mies")
+		c.Do("SUNION", "s2", "noot", "mies", "vuur")
+		c.Do("SUNION", "s3", "mies", "wim")
+		c.Do("SUNION", "s1")
+		c.Do("SUNION", "s1", "s2")
+		c.Do("SUNION", "s1", "s2", "s3")
+		c.Do("SUNION", "nosuch")
+		c.Do("SUNION", "s1", "nosuch", "s2", "nosuch", "s3")
+		c.Do("SUNION", "s1", "s1")
 
-		succ("SUNIONSTORE", "res", "s3", "nosuch", "s1"),
-		succ("SMEMBERS", "res"),
+		c.Do("SUNIONSTORE", "res", "s3", "nosuch", "s1")
+		c.Do("SMEMBERS", "res")
 
 		// failure cases
-		fail("SUNION"),
-		fail("SUNIONSTORE"),
-		fail("SUNIONSTORE", "key"),
+		c.Do("SUNION")
+		c.Do("SUNIONSTORE")
+		c.Do("SUNIONSTORE", "key")
 		// Wrong type
-		succ("SET", "str", "I am a string"),
-		fail("SUNION", "s1", "str"),
-		fail("SUNION", "nosuch", "str"),
-		fail("SUNION", "str", "s1"),
-		fail("SUNIONSTORE", "res", "str", "s1"),
-		fail("SUNIONSTORE", "res", "s1", "str"),
-	)
+		c.Do("SET", "str", "I am a string")
+		c.Do("SUNION", "s1", "str")
+		c.Do("SUNION", "nosuch", "str")
+		c.Do("SUNION", "str", "s1")
+		c.Do("SUNIONSTORE", "res", "str", "s1")
+		c.Do("SUNIONSTORE", "res", "s1", "str")
+	})
 }
 
 func TestSscan(t *testing.T) {
-	testCommands(t,
+	testRaw(t, func(c *client) {
 		// No set yet
-		succ("SSCAN", "set", 0),
+		c.Do("SSCAN", "set", "0")
 
-		succ("SADD", "set", "key1"),
-		succ("SSCAN", "set", 0),
-		succ("SSCAN", "set", 0, "COUNT", 12),
-		succ("SSCAN", "set", 0, "cOuNt", 12),
+		c.Do("SADD", "set", "key1")
+		c.Do("SSCAN", "set", "0")
+		c.Do("SSCAN", "set", "0", "COUNT", "12")
+		c.Do("SSCAN", "set", "0", "cOuNt", "12")
 
-		succ("SADD", "set", "anotherkey"),
-		succ("SSCAN", "set", 0, "MATCH", "anoth*"),
-		succ("SSCAN", "set", 0, "MATCH", "anoth*", "COUNT", 100),
-		succ("SSCAN", "set", 0, "COUNT", 100, "MATCH", "anoth*"),
+		c.Do("SADD", "set", "anotherkey")
+		c.Do("SSCAN", "set", "0", "MATCH", "anoth*")
+		c.Do("SSCAN", "set", "0", "MATCH", "anoth*", "COUNT", "100")
+		c.Do("SSCAN", "set", "0", "COUNT", "100", "MATCH", "anoth*")
 
 		// Can't really test multiple keys.
-		// succ("SET", "key2", "value2"),
-		// succ("SCAN", 0),
+		// c.Do("SET", "key2", "value2")
+		// c.Do("SCAN", "0")
 
 		// Error cases
-		fail("SSCAN"),
-		fail("SSCAN", "noint"),
-		fail("SSCAN", "set", 0, "COUNT", "noint"),
-		fail("SSCAN", "set", 0, "COUNT"),
-		fail("SSCAN", "set", 0, "MATCH"),
-		fail("SSCAN", "set", 0, "garbage"),
-		fail("SSCAN", "set", 0, "COUNT", 12, "MATCH", "foo", "garbage"),
-		succ("SET", "str", "1"),
-		fail("SSCAN", "str", 0),
-	)
+		c.Do("SSCAN")
+		c.Do("SSCAN", "noint")
+		c.Do("SSCAN", "set", "0", "COUNT", "noint")
+		c.Do("SSCAN", "set", "0", "COUNT")
+		c.Do("SSCAN", "set", "0", "MATCH")
+		c.Do("SSCAN", "set", "0", "garbage")
+		c.Do("SSCAN", "set", "0", "COUNT", "12", "MATCH", "foo", "garbage")
+		c.Do("SET", "str", "1")
+		c.Do("SSCAN", "str", "0")
+	})
 }
 
 func TestSetNoAuth(t *testing.T) {
-	testAuthCommands(t,
+	testAuth(t,
 		"supersecret",
-		failWith(
-			"NOAUTH Authentication required.",
-			"SET", "foo", "bar",
-		),
-		succ("AUTH", "supersecret"),
-		succ(
-			"SET", "foo", "bar",
-		),
+		func(c *client) {
+			c.Do("SET", "foo", "bar")
+			c.Do("AUTH", "supersecret")
+			c.Do("SET", "foo", "bar")
+		},
 	)
 }

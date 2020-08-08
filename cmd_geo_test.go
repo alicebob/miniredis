@@ -70,7 +70,7 @@ func TestGeopos(t *testing.T) {
 	t.Run("no location", func(t *testing.T) {
 		mustDo(t, c,
 			"GEOPOS", "Sicily", "Corleone",
-			proto.Array(proto.Nil),
+			proto.Array(proto.NilList),
 		)
 	})
 

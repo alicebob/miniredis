@@ -14,17 +14,26 @@ func commandsCluster(m *Miniredis) {
 }
 
 func (m *Miniredis) cmdCluster(c *server.Peer, cmd string, args []string) {
-	if len(args) == 1 && strings.ToUpper(args[0]) == "SLOTS" {
-		m.cmdClusterSlots(c, cmd, args)
-	} else if len(args) == 2 && strings.ToUpper(args[0]) == "KEYSLOT" {
-		m.cmdClusterKeySlot(c, cmd, args)
-	} else if len(args) == 1 && strings.ToUpper(args[0]) == "NODES" {
-		m.cmdClusterNodes(c, cmd, args)
-	} else {
-		j := strings.Join(args, " ")
-		err := fmt.Sprintf("ERR 'CLUSTER %s' not supported", j)
+	if !m.handleAuth(c) {
+		return
+	}
+
+	if len(args) < 1 {
 		setDirty(c)
-		c.WriteError(err)
+		c.WriteError(errWrongNumber(cmd))
+		return
+	}
+	switch strings.ToUpper(args[0]) {
+	case "SLOTS":
+		m.cmdClusterSlots(c, cmd, args)
+	case "KEYSLOT":
+		m.cmdClusterKeySlot(c, cmd, args)
+	case "NODES":
+		m.cmdClusterNodes(c, cmd, args)
+	default:
+		setDirty(c)
+		c.WriteError(fmt.Sprintf("ERR 'CLUSTER %s' not supported", strings.Join(args, " ")))
+		return
 	}
 }
 
@@ -55,4 +64,3 @@ func (m *Miniredis) cmdClusterNodes(c *server.Peer, cmd string, args []string) {
 		c.WriteBulk("e7d1eecce10fd6bb5eb35b9f99a514335d9ba9ca 127.0.0.1:7000@7000 myself,master - 0 0 1 connected 0-16383")
 	})
 }
-

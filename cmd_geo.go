@@ -165,7 +165,7 @@ func (m *Miniredis) cmdGeopos(c *server.Peer, cmd string, args []string) {
 		c.WriteLen(len(args))
 		for _, l := range args {
 			if !db.ssetExists(key, l) {
-				c.WriteNull()
+				c.WriteLen(-1)
 				continue
 			}
 			score := db.ssetScore(key, l)

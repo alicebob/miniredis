@@ -1018,7 +1018,7 @@ func TestBrpopTimeout(t *testing.T) {
 	got := goStrings(t, s, "BRPOP", "l1", "1")
 	select {
 	case have := <-got:
-		equals(t, proto.Nil, have)
+		equals(t, proto.NilList, have)
 	case <-time.After(1500 * time.Millisecond):
 		t.Error("BRPOP took too long")
 	}
@@ -1049,7 +1049,7 @@ func TestBrpopTx(t *testing.T) {
 		mustDo(t, c,
 			"EXEC",
 			proto.Array(
-				proto.Nil,
+				proto.NilList,
 				proto.Inline("OK"),
 			),
 		)
@@ -1222,7 +1222,7 @@ func TestBrpoplpushTimeout(t *testing.T) {
 	got := goStrings(t, s, "BRPOPLPUSH", "l1", "l2", "1")
 	select {
 	case have := <-got:
-		equals(t, proto.Nil, have)
+		equals(t, proto.NilList, have)
 	case <-time.After(1500 * time.Millisecond):
 		t.Error("BRPOPLPUSH took too long")
 	}

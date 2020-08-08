@@ -110,7 +110,7 @@ func (m *Miniredis) cmdBXpop(c *server.Peer, cmd string, args []string, lr leftr
 		},
 		func(c *server.Peer) {
 			// timeout
-			c.WriteNull()
+			c.WriteLen(-1)
 		},
 	)
 }
@@ -132,7 +132,7 @@ func (m *Miniredis) cmdLindex(c *server.Peer, cmd string, args []string) {
 	key, offsets := args[0], args[1]
 
 	offset, err := strconv.Atoi(offsets)
-	if err != nil {
+	if err != nil || offsets == "-0" {
 		setDirty(c)
 		c.WriteError(msgInvalidInt)
 		return
@@ -721,7 +721,7 @@ func (m *Miniredis) cmdBrpoplpush(c *server.Peer, cmd string, args []string) {
 		},
 		func(c *server.Peer) {
 			// timeout
-			c.WriteNull()
+			c.WriteLen(-1)
 		},
 	)
 }
