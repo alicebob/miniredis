@@ -1,4 +1,5 @@
 language: go
+os: linux
 
 before_script:
   - (cd ./integration && ./get_redis.sh)
@@ -6,8 +7,6 @@ before_script:
 install: go get -t
 
 script: make test testrace int
-
-sudo: false
 
 go:
   - "1.14"
