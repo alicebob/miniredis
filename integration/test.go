@@ -15,19 +15,13 @@ import (
 	"github.com/alicebob/miniredis/v2/proto"
 )
 
-// ok fails the test if an err is not nil.
-func ok(tb testing.TB, err error) {
-	tb.Helper()
-	if err != nil {
-		tb.Fatalf("unexpected error: %s", err.Error())
-	}
-}
-
 func testRaw(t *testing.T, cb func(*client)) {
 	t.Helper()
 
 	sMini, err := miniredis.Run()
-	ok(t, err)
+	if err != nil {
+		t.Fatalf("unexpected miniredis error: %s", err.Error())
+	}
 	defer sMini.Close()
 
 	sReal, sRealAddr := Redis()
@@ -43,7 +37,9 @@ func testRaw2(t *testing.T, cb func(*client, *client)) {
 	t.Helper()
 
 	sMini, err := miniredis.Run()
-	ok(t, err)
+	if err != nil {
+		t.Fatalf("unexpected miniredis error: %s", err.Error())
+	}
 	defer sMini.Close()
 
 	sReal, sRealAddr := Redis()
@@ -60,7 +56,9 @@ func testMulti(t *testing.T, cbs ...func(*client)) {
 	t.Helper()
 
 	sMini, err := miniredis.Run()
-	ok(t, err)
+	if err != nil {
+		t.Fatalf("unexpected miniredis error: %s", err.Error())
+	}
 	defer sMini.Close()
 
 	sReal, sRealAddr := Redis()
@@ -83,7 +81,9 @@ func testAuth(t *testing.T, passwd string, cb func(*client)) {
 	t.Helper()
 
 	sMini, err := miniredis.Run()
-	ok(t, err)
+	if err != nil {
+		t.Fatalf("unexpected miniredis error: %s", err.Error())
+	}
 	defer sMini.Close()
 	sMini.RequireAuth(passwd)
 
@@ -100,7 +100,9 @@ func testUserAuth(t *testing.T, users map[string]string, cb func(*client)) {
 	t.Helper()
 
 	sMini, err := miniredis.Run()
-	ok(t, err)
+	if err != nil {
+		t.Fatalf("unexpected miniredis error: %s", err.Error())
+	}
 	defer sMini.Close()
 	for user, pass := range users {
 		sMini.RequireUserAuth(user, pass)
@@ -119,7 +121,9 @@ func testCluster(t *testing.T, cb func(*client)) {
 	t.Helper()
 
 	sMini, err := miniredis.Run()
-	ok(t, err)
+	if err != nil {
+		t.Fatalf("unexpected miniredis error: %s", err.Error())
+	}
 	defer sMini.Close()
 
 	sReal, sRealAddr := RedisCluster()
@@ -135,7 +139,9 @@ func testTLS(t *testing.T, cb func(*client)) {
 	t.Helper()
 
 	sMini := miniredis.NewMiniRedis()
-	ok(t, sMini.StartTLS(testServerTLS(t)))
+	if err := sMini.StartTLS(testServerTLS(t)); err != nil {
+		t.Fatalf("unexpected miniredis error: %s", err.Error())
+	}
 	defer sMini.Close()
 
 	sReal, sRealAddr := RedisTLS()
@@ -220,10 +226,14 @@ func newClient(t *testing.T, realAddr string, mini *miniredis.Miniredis) *client
 	t.Helper()
 
 	cReal, err := proto.Dial(realAddr)
-	ok(t, err)
+	if err != nil {
+		t.Fatalf("realredis: %s", err.Error())
+	}
 
 	cMini, err := proto.Dial(mini.Addr())
-	ok(t, err)
+	if err != nil {
+		t.Fatalf("miniredis: %s", err.Error())
+	}
 
 	return &client{
 		t:         t,
@@ -242,13 +252,17 @@ func newClientTLS(t *testing.T, realAddr string, mini *miniredis.Miniredis) *cli
 		realAddr,
 		cfg,
 	)
-	ok(t, err)
+	if err != nil {
+		t.Fatalf("realredis: %s", err.Error())
+	}
 
 	cMini, err := proto.DialTLS(
 		mini.Addr(),
 		cfg,
 	)
-	ok(t, err)
+	if err != nil {
+		t.Fatalf("miniredis: %s", err.Error())
+	}
 
 	return &client{
 		t:         t,
