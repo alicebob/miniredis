@@ -1,5 +1,12 @@
 ## Changelog
 
+### v2.13.2
+
+- Use SAN instead of CN in self signed cert for testing (thanks @johejo)
+- Travis CI now tests against the most recent two versions of Go (thanks @johejo)
+- changed unit and integration tests to compare raw payloads, not parsed payloads
+- remove "redigo" dependency
+
 ### v2.13.1
 
 - added HSTRLEN
@@ -16,7 +23,7 @@
 - Lua json update (thanks @gsmith85)
 - CLUSTER commands (thanks @kratisto)
 - fix TOUCH
-- fix a shutdown race conditionv
+- fix a shutdown race condition
 
 ### v2.11.4
 
@@ -34,7 +41,7 @@
 
 ### v2.11.1
 
-- globals protection for LUA code (thanks @vk-outreach)
+- globals protection for Lua code (thanks @vk-outreach)
 - HSET update (thanks @carlgreen)
 - fix BLPOP block on shutdown (thanks @Asalle)
 
