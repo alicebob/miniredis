@@ -297,20 +297,19 @@ func (m *Miniredis) cmdXgroupCreate(c *server.Peer, cmd string, args []string) {
 // XINFO
 func (m *Miniredis) cmdXinfo(c *server.Peer, cmd string, args []string) {
 	if len(args) == 2 && strings.ToUpper(args[0]) == "STREAM" {
-		m.cmdXinfoStream(c, cmd, args)
-	} else {
-		j := strings.Join(args, " ")
-		err := fmt.Sprintf("'XINFO %s' not supported", j)
-		setDirty(c)
-		c.WriteError(err)
+		m.cmdXinfoStream(c, args[1])
+		return
 	}
+
+	j := strings.Join(args, " ")
+	err := fmt.Sprintf("'XINFO %s' not supported", j)
+	setDirty(c)
+	c.WriteError(err)
 }
 
 // XINFO STREAM
 // Produces only part of full command output
-func (m *Miniredis) cmdXinfoStream(c *server.Peer, cmd string, args []string) {
-	stream := args[1]
-
+func (m *Miniredis) cmdXinfoStream(c *server.Peer, stream string) {
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
@@ -320,7 +319,7 @@ func (m *Miniredis) cmdXinfoStream(c *server.Peer, cmd string, args []string) {
 			return
 		}
 
-		c.WriteLen(2)
+		c.WriteMapLen(1)
 		c.WriteBulk("length")
 		c.WriteInt(streamLen)
 	})

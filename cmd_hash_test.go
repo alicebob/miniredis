@@ -240,6 +240,22 @@ func TestHashGetall(t *testing.T) {
 	mustDo(t, c, "HGETALL", "foo",
 		proto.Error(msgWrongType),
 	)
+
+	useRESP3(t, c)
+	t.Run("RESP3", func(t *testing.T) {
+		mustDo(t, c,
+			"HGETALL", "wim",
+			proto.StringMap(
+				"gijs", "lam",
+				"kees", "bok",
+				"teun", "vuur",
+				"zus", "jet",
+			),
+		)
+		mustDo(t, c, "HGETALL", "nosuch",
+			proto.StringMap(),
+		)
+	})
 }
 
 func TestHashKeys(t *testing.T) {

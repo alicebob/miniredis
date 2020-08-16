@@ -92,6 +92,13 @@ func TestSadd(t *testing.T) {
 			proto.Error(errWrongNumber("smembers")),
 		)
 	})
+
+	useRESP3(t, c)
+	t.Run("RESP3", func(t *testing.T) {
+		mustDo(t, c, "SMEMBERS", "resp", proto.Set())
+		mustDo(t, c, "SADD", "resp", "aap", proto.Int(1))
+		mustDo(t, c, "SMEMBERS", "resp", proto.StringSet("aap"))
+	})
 }
 
 // Test SISMEMBER
@@ -397,6 +404,19 @@ func TestSrandmember(t *testing.T) {
 		mustDo(t, c,
 			"SRANDMEMBER", "str",
 			proto.Error(msgWrongType),
+		)
+	})
+
+	useRESP3(t, c)
+	t.Run("RESP3", func(t *testing.T) {
+		s.SetAdd("q", "aap")
+		mustDo(t, c,
+			"SRANDMEMBER", "q",
+			proto.String("aap"),
+		)
+		mustDo(t, c,
+			"SRANDMEMBER", "q", "1",
+			proto.StringSet("aap"),
 		)
 	})
 }

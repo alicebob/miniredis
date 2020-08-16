@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"crypto/tls"
 	"fmt"
+	"math"
 	"net"
 	"strings"
 	"sync"
@@ -232,6 +233,7 @@ func (s *Server) TotalConnections() int {
 type Peer struct {
 	w            *bufio.Writer
 	closed       bool
+	Resp3        bool
 	Ctx          interface{} // anything goes, server won't touch this
 	onDisconnect []func()    // list of callbacks
 	mu           sync.Mutex  // for Block()
@@ -267,7 +269,7 @@ func (c *Peer) OnDisconnect(f func()) {
 func (c *Peer) Block(f func(*Writer)) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	f(&Writer{c.w})
+	f(&Writer{c.w, c.Resp3})
 }
 
 // WriteError writes a redis 'Error'
@@ -310,10 +312,38 @@ func (c *Peer) WriteLen(n int) {
 	})
 }
 
-// WriteInt writes an integer
-func (c *Peer) WriteInt(i int) {
+// WriteMapLen starts a map with the given length (number of keys)
+func (c *Peer) WriteMapLen(n int) {
 	c.Block(func(w *Writer) {
-		w.WriteInt(i)
+		w.WriteMapLen(n)
+	})
+}
+
+// WriteSetLen starts a set with the given length (number of elements)
+func (c *Peer) WriteSetLen(n int) {
+	c.Block(func(w *Writer) {
+		w.WriteSetLen(n)
+	})
+}
+
+// WritePushLen starts a push-data array with the given length
+func (c *Peer) WritePushLen(n int) {
+	c.Block(func(w *Writer) {
+		w.WritePushLen(n)
+	})
+}
+
+// WriteInt writes an integer
+func (c *Peer) WriteInt(n int) {
+	c.Block(func(w *Writer) {
+		w.WriteInt(n)
+	})
+}
+
+// WriteFloat writes a float
+func (c *Peer) WriteFloat(n float64) {
+	c.Block(func(w *Writer) {
+		w.WriteFloat(n)
 	})
 }
 
@@ -335,7 +365,8 @@ func toInline(s string) string {
 
 // A Writer is given to the callback in Block()
 type Writer struct {
-	w *bufio.Writer
+	w     *bufio.Writer
+	resp3 bool
 }
 
 // WriteError writes a redis 'Error'
@@ -347,18 +378,55 @@ func (w *Writer) WriteLen(n int) {
 	fmt.Fprintf(w.w, "*%d\r\n", n)
 }
 
+func (w *Writer) WriteMapLen(n int) {
+	if w.resp3 {
+		fmt.Fprintf(w.w, "%%%d\r\n", n)
+		return
+	}
+	w.WriteLen(n * 2)
+}
+
+func (w *Writer) WriteSetLen(n int) {
+	if w.resp3 {
+		fmt.Fprintf(w.w, "~%d\r\n", n)
+		return
+	}
+	w.WriteLen(n)
+}
+
+func (w *Writer) WritePushLen(n int) {
+	if w.resp3 {
+		fmt.Fprintf(w.w, ">%d\r\n", n)
+		return
+	}
+	w.WriteLen(n)
+}
+
 // WriteBulk writes a bulk string
 func (w *Writer) WriteBulk(s string) {
 	fmt.Fprintf(w.w, "$%d\r\n%s\r\n", len(s), s)
 }
 
 // WriteInt writes an integer
-func (w *Writer) WriteInt(i int) {
-	fmt.Fprintf(w.w, ":%d\r\n", i)
+func (w *Writer) WriteInt(n int) {
+	fmt.Fprintf(w.w, ":%d\r\n", n)
+}
+
+// WriteFloat writes a float
+func (w *Writer) WriteFloat(n float64) {
+	if w.resp3 {
+		fmt.Fprintf(w.w, ",%s\r\n", formatFloat(n))
+		return
+	}
+	w.WriteBulk(formatFloat(n))
 }
 
 // WriteNull writes a redis Null element
 func (w *Writer) WriteNull() {
+	if w.resp3 {
+		fmt.Fprint(w.w, "_\r\n")
+		return
+	}
 	fmt.Fprintf(w.w, "$-1\r\n")
 }
 
@@ -374,4 +442,31 @@ func (w *Writer) WriteRaw(s string) {
 
 func (w *Writer) Flush() {
 	w.w.Flush()
+}
+
+// formatFloat formats a float the way redis does (sort-of)
+func formatFloat(v float64) string {
+	if math.IsInf(v, 1) {
+		return "inf"
+	}
+	if math.IsInf(v, -1) {
+		return "-inf"
+	}
+	return stripZeros(fmt.Sprintf("%.12f", v))
+}
+
+func stripZeros(sv string) string {
+	for strings.Contains(sv, ".") {
+		if sv[len(sv)-1] != '0' {
+			break
+		}
+		// Remove trailing 0s.
+		sv = sv[:len(sv)-1]
+		// Ends with a '.'.
+		if sv[len(sv)-1] == '.' {
+			sv = sv[:len(sv)-1]
+			break
+		}
+	}
+	return sv
 }

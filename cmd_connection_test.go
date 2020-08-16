@@ -277,3 +277,62 @@ func TestSetError(t *testing.T) {
 		proto.Inline("PONG"),
 	)
 }
+
+func TestHello(t *testing.T) {
+	t.Run("default user", func(t *testing.T) {
+		s, err := Run()
+		ok(t, err)
+		defer s.Close()
+		c, err := proto.Dial(s.Addr())
+		ok(t, err)
+		defer c.Close()
+
+		payl := proto.Map(
+			proto.String("server"), proto.String("miniredis"),
+			proto.String("version"), proto.String("6.0.5"),
+			proto.String("proto"), proto.Int(3),
+			proto.String("id"), proto.Int(42),
+			proto.String("mode"), proto.String("standalone"),
+			proto.String("role"), proto.String("master"),
+			proto.String("modules"), proto.Array(),
+		)
+
+		mustDo(t, c,
+			"HELLO", "3", "AUTH", "default", "secret",
+			payl,
+		)
+
+		s.RequireAuth("secret")
+		mustDo(t, c,
+			"HELLO", "3", "AUTH", "default", "secret",
+			payl,
+		)
+		mustDo(t, c,
+			"HELLO", "3", "AUTH", "default", "secret", "SETNAME", "santa",
+			payl,
+		)
+		mustDo(t, c,
+			"HELLO", "3", "SETNAME", "santa",
+			payl,
+		)
+
+		t.Run("errors", func(t *testing.T) {
+			mustDo(t, c,
+				"HELLO",
+				proto.Error(errWrongNumber("HELLO")),
+			)
+			mustDo(t, c,
+				"HELLO", "foo",
+				proto.Error("NOPROTO unsupported protocol version"),
+			)
+			mustDo(t, c,
+				"HELLO", "3", "AUTH", "foo",
+				proto.Error("ERR Syntax error in HELLO option 'AUTH'"),
+			)
+			mustDo(t, c,
+				"HELLO", "3", "AUTH", "foo", "bar", "SETNAME",
+				proto.Error("ERR Syntax error in HELLO option 'SETNAME'"),
+			)
+		})
+	})
+}

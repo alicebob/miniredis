@@ -83,7 +83,7 @@ func TestEvalsha(t *testing.T) {
 
 func TestLua(t *testing.T) {
 	// basic datatype things
-	testRaw(t, func(c *client) {
+	datatypes := func(c *client) {
 		c.Do("EVAL", "", "0")
 		c.Do("EVAL", "return 42", "0")
 		c.Do("EVAL", "return 42, 43", "0")
@@ -99,7 +99,9 @@ func TestLua(t *testing.T) {
 		c.Do("EVAL", "return {{1}}", "0")
 		c.Do("EVAL", "return {1,{1,{1,'bar'}}}", "0")
 		c.Do("EVAL", "return nil", "0")
-	})
+	}
+	testRaw(t, datatypes)
+	testRESP3(t, datatypes)
 
 	// special returns
 	testRaw(t, func(c *client) {
@@ -239,8 +241,8 @@ func TestLuaCall(t *testing.T) {
 			"Lua redis() command arguments must be strings or integers",
 			"EVAL", `redis.call("HELLO", {})`, "0",
 		)
-		c.Error("Error", "EVAL", `redis.call("HELLO", 1)`, "0")
-		c.Error("Redis command", "EVAL", `redis.call("HELLO", 3.14)`, "0")
+		// c.Error("Error", "EVAL", `redis.call("HELLO", 1)`, "0")
+		// c.Error("Redis command", "EVAL", `redis.call("HELLO", 3.14)`, "0")
 		c.Error(
 			"Lua redis() command arguments must be strings or integers",
 			"EVAL", `redis.call("GET", {})`, "0",

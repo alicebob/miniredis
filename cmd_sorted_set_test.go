@@ -272,6 +272,14 @@ func TestSortedSetAdd(t *testing.T) {
 			proto.Error("ERR INCR option supports a single increment-element pair"),
 		)
 	})
+
+	useRESP3(t, c)
+	t.Run("RESP3", func(t *testing.T) {
+		mustDo(t, c,
+			"ZADD", "foo", "INCR", "1.2", "bar",
+			proto.Float(1.2),
+		)
+	})
 }
 
 // Test ZRANGE and ZREVRANGE

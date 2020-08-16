@@ -19,7 +19,18 @@ func TestTypes(t *testing.T) {
 
 	test(Error("ERR wrong"), "-ERR wrong\r\n")
 
-	test(Array(Inline("hi"), Inline("ho")), "*2\r\n+hi\r\n+ho\r\n")
+	test(Int(42), ":42\r\n")
 
+	test(Float(42.42), ",42.42\r\n")
+
+	test(Array(Inline("hi"), Inline("ho")), "*2\r\n+hi\r\n+ho\r\n")
 	test(Strings("hi", "ho"), "*2\r\n$2\r\nhi\r\n$2\r\nho\r\n")
+
+	test(Push(Inline("hi"), Inline("ho")), ">2\r\n+hi\r\n+ho\r\n")
+
+	test(Map(String("hi"), String("ho")), "%1\r\n$2\r\nhi\r\n$2\r\nho\r\n")
+	test(StringMap("hi", "ho"), "%1\r\n$2\r\nhi\r\n$2\r\nho\r\n")
+
+	test(Set(String("hi"), String("ho")), "~2\r\n$2\r\nhi\r\n$2\r\nho\r\n")
+	test(StringSet("hi", "ho"), "~2\r\n$2\r\nhi\r\n$2\r\nho\r\n")
 }

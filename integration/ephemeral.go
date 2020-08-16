@@ -36,9 +36,9 @@ func RedisAuth(passwd string) (*ephemeral, string) {
 // RedisUserAuth starts a memory-only redis on a random port. The redis has
 // ACL rules enabled. See Redis()
 func RedisUserAuth(users map[string]string) (*ephemeral, string) {
-	acls := "user default off\n"
+	acls := "user default on -@all +hello\n"
 	for user, pass := range users {
-		acls += fmt.Sprintf("user %s on >%s ~* +@all\n", user, pass)
+		acls += fmt.Sprintf("user %s on +@all ~* >%s\n", user, pass)
 	}
 	return runRedis(acls)
 }

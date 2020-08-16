@@ -136,7 +136,7 @@ outer:
 					return
 				}
 				newScore := db.ssetIncrby(key, member, delta)
-				c.WriteBulk(formatFloat(newScore))
+				c.WriteFloat(newScore)
 			}
 			return
 		}
@@ -274,7 +274,7 @@ func (m *Miniredis) cmdZincrby(c *server.Peer, cmd string, args []string) {
 			return
 		}
 		newScore := db.ssetIncrby(key, member, delta)
-		c.WriteBulk(formatFloat(newScore))
+		c.WriteFloat(newScore)
 	})
 }
 
@@ -529,7 +529,7 @@ func (m *Miniredis) makeCmdZrange(reverse bool) server.Cmd {
 			for _, el := range members[rs:re] {
 				c.WriteBulk(el)
 				if withScores {
-					c.WriteBulk(formatFloat(db.ssetScore(key, el)))
+					c.WriteFloat(db.ssetScore(key, el))
 				}
 			}
 		})
@@ -767,7 +767,7 @@ func (m *Miniredis) makeCmdZrangebyscore(reverse bool) server.Cmd {
 			for _, el := range members {
 				c.WriteBulk(el.member)
 				if withScores {
-					c.WriteBulk(formatFloat(el.score))
+					c.WriteFloat(el.score)
 				}
 			}
 		})
@@ -1045,7 +1045,7 @@ func (m *Miniredis) cmdZscore(c *server.Peer, cmd string, args []string) {
 			return
 		}
 
-		c.WriteBulk(formatFloat(db.ssetScore(key, member)))
+		c.WriteFloat(db.ssetScore(key, member))
 	})
 }
 
@@ -1394,7 +1394,7 @@ func (m *Miniredis) cmdZscan(c *server.Peer, cmd string, args []string) {
 		c.WriteLen(len(members) * 2)
 		for _, k := range members {
 			c.WriteBulk(k)
-			c.WriteBulk(formatFloat(db.ssetScore(key, k)))
+			c.WriteFloat(db.ssetScore(key, k))
 		}
 	})
 }
@@ -1456,7 +1456,7 @@ func (m *Miniredis) cmdZpopmax(reverse bool) server.Cmd {
 			for _, el := range members[rs:re] {
 				c.WriteBulk(el)
 				if withScores {
-					c.WriteBulk(formatFloat(db.ssetScore(key, el)))
+					c.WriteFloat(db.ssetScore(key, el))
 				}
 				db.ssetRem(key, el)
 			}

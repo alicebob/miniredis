@@ -70,6 +70,14 @@ func TestStream(t *testing.T) {
 			Values: []string{"name", "baz"},
 		}, stream[1])
 	})
+
+	useRESP3(t, c)
+	t.Run("resp3", func(t *testing.T) {
+		mustDo(t, c,
+			"XINFO", "STREAM", "s",
+			proto.Map(proto.String("length"), proto.Int(1)),
+		)
+	})
 }
 
 // Test XADD

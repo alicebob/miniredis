@@ -104,3 +104,7 @@ func mustContain(tb testing.TB, c *proto.Client, args ...string) {
 		tb.Errorf("expected %q in %q", want, res)
 	}
 }
+
+func useRESP3(t *testing.T, c *proto.Client) {
+	mustContain(t, c, "HELLO", "3", "miniredis")
+}
