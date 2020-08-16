@@ -9,168 +9,168 @@ import (
 )
 
 func TestTx(t *testing.T) {
-	testCommands(t,
-		succ("MULTI"),
-		succ("SET", "AAP", 1),
-		succ("GET", "AAP"),
-		succ("EXEC"),
-		succ("GET", "AAP"),
-	)
+	testRaw(t, func(c *client) {
+		c.Do("MULTI")
+		c.Do("SET", "AAP", "1")
+		c.Do("GET", "AAP")
+		c.Do("EXEC")
+		c.Do("GET", "AAP")
+	})
 
 	// err: Double MULTI
-	testCommands(t,
-		succ("MULTI"),
-		fail("MULTI"),
-	)
+	testRaw(t, func(c *client) {
+		c.Do("MULTI")
+		c.Do("MULTI")
+	})
 
 	// err: No MULTI
-	testCommands(t,
-		fail("EXEC"),
-	)
+	testRaw(t, func(c *client) {
+		c.Do("EXEC")
+	})
 
 	// Errors in the MULTI sequence
-	testCommands(t,
-		succ("MULTI"),
-		succ("SET", "foo", "bar"),
-		fail("SET", "foo"),
-		succ("SET", "foo", "bar"),
-		fail("EXEC"),
-	)
+	testRaw(t, func(c *client) {
+		c.Do("MULTI")
+		c.Do("SET", "foo", "bar")
+		c.Do("SET", "foo")
+		c.Do("SET", "foo", "bar")
+		c.Do("EXEC")
+	})
 
 	// Simple WATCH
-	testCommands(t,
-		succ("SET", "foo", "bar"),
-		succ("WATCH", "foo"),
-		succ("MULTI"),
-		succ("GET", "foo"),
-		succ("EXEC"),
-	)
+	testRaw(t, func(c *client) {
+		c.Do("SET", "foo", "bar")
+		c.Do("WATCH", "foo")
+		c.Do("MULTI")
+		c.Do("GET", "foo")
+		c.Do("EXEC")
+	})
 
 	// Simple UNWATCH
-	testCommands(t,
-		succ("SET", "foo", "bar"),
-		succ("WATCH", "foo"),
-		succ("UNWATCH"),
-		succ("MULTI"),
-		succ("GET", "foo"),
-		succ("EXEC"),
-	)
+	testRaw(t, func(c *client) {
+		c.Do("SET", "foo", "bar")
+		c.Do("WATCH", "foo")
+		c.Do("UNWATCH")
+		c.Do("MULTI")
+		c.Do("GET", "foo")
+		c.Do("EXEC")
+	})
 
 	// UNWATCH in a MULTI. Yep. Weird.
-	testCommands(t,
-		succ("WATCH", "foo"),
-		succ("MULTI"),
-		succ("UNWATCH"), // Valid. Somehow.
-		succ("EXEC"),
-	)
+	testRaw(t, func(c *client) {
+		c.Do("WATCH", "foo")
+		c.Do("MULTI")
+		c.Do("UNWATCH") // Valid. Somehow.
+		c.Do("EXEC")
+	})
 
 	// Test whether all these commands support transactions.
-	testCommands(t,
-		succ("MULTI"),
-		succ("GET", "str"),
-		succ("SET", "str", "bar"),
-		succ("SETNX", "str", "bar"),
-		succ("GETSET", "str", "bar"),
-		succ("MGET", "str", "bar"),
-		succ("MSET", "str", "bar"),
-		succ("MSETNX", "str", "bar"),
-		succ("SETEX", "str", 12, "newv"),
-		succ("PSETEX", "str", 12, "newv"),
-		succ("STRLEN", "str"),
-		succ("APPEND", "str", "more"),
-		succ("GETRANGE", "str", 0, 2),
-		succ("SETRANGE", "str", 0, "B"),
-		succ("EXEC"),
-		succ("GET", "str"),
-	)
+	testRaw(t, func(c *client) {
+		c.Do("MULTI")
+		c.Do("GET", "str")
+		c.Do("SET", "str", "bar")
+		c.Do("SETNX", "str", "bar")
+		c.Do("GETSET", "str", "bar")
+		c.Do("MGET", "str", "bar")
+		c.Do("MSET", "str", "bar")
+		c.Do("MSETNX", "str", "bar")
+		c.Do("SETEX", "str", "12", "newv")
+		c.Do("PSETEX", "str", "12", "newv")
+		c.Do("STRLEN", "str")
+		c.Do("APPEND", "str", "more")
+		c.Do("GETRANGE", "str", "0", "2")
+		c.Do("SETRANGE", "str", "0", "B")
+		c.Do("EXEC")
+		c.Do("GET", "str")
+	})
 
-	testCommands(t,
-		succ("MULTI"),
-		succ("SET", "bits", "\xff\x00"),
-		succ("BITCOUNT", "bits"),
-		succ("BITOP", "OR", "bits", "bits", "nosuch"),
-		succ("BITPOS", "bits", 1),
-		succ("GETBIT", "bits", 12),
-		succ("SETBIT", "bits", 12, 1),
-		succ("EXEC"),
-		succ("GET", "bits"),
-	)
+	testRaw(t, func(c *client) {
+		c.Do("MULTI")
+		c.Do("SET", "bits", "\xff\x00")
+		c.Do("BITCOUNT", "bits")
+		c.Do("BITOP", "OR", "bits", "bits", "nosuch")
+		c.Do("BITPOS", "bits", "1")
+		c.Do("GETBIT", "bits", "12")
+		c.Do("SETBIT", "bits", "12", "1")
+		c.Do("EXEC")
+		c.Do("GET", "bits")
+	})
 
-	testCommands(t,
-		succ("MULTI"),
-		succ("INCR", "number"),
-		succ("INCRBY", "number", 12),
-		succ("INCRBYFLOAT", "number", 12.2),
-		succ("DECR", "number"),
-		succ("GET", "number"),
-		succ("DECRBY", "number", 2),
-		succ("GET", "number"),
-	)
+	testRaw(t, func(c *client) {
+		c.Do("MULTI")
+		c.Do("INCR", "number")
+		c.Do("INCRBY", "number", "12")
+		c.Do("INCRBYFLOAT", "number", "12.2")
+		c.Do("DECR", "number")
+		c.Do("GET", "number")
+		c.Do("DECRBY", "number", "2")
+		c.Do("GET", "number")
+	})
 
-	testCommands(t,
-		succ("MULTI"),
-		succ("HSET", "hash", "foo", "bar"),
-		succ("HDEL", "hash", "foo"),
-		succ("HEXISTS", "hash", "foo"),
-		succ("HSET", "hash", "foo", "bar22"),
-		succ("HSETNX", "hash", "foo", "bar22"),
-		succ("HGET", "hash", "foo"),
-		succ("HMGET", "hash", "foo", "baz"),
-		succ("HLEN", "hash"),
-		succ("HGETALL", "hash"),
-		succ("HKEYS", "hash"),
-		succ("HVALS", "hash"),
-	)
+	testRaw(t, func(c *client) {
+		c.Do("MULTI")
+		c.Do("HSET", "hash", "foo", "bar")
+		c.Do("HDEL", "hash", "foo")
+		c.Do("HEXISTS", "hash", "foo")
+		c.Do("HSET", "hash", "foo", "bar22")
+		c.Do("HSETNX", "hash", "foo", "bar22")
+		c.Do("HGET", "hash", "foo")
+		c.Do("HMGET", "hash", "foo", "baz")
+		c.Do("HLEN", "hash")
+		c.Do("HGETALL", "hash")
+		c.Do("HKEYS", "hash")
+		c.Do("HVALS", "hash")
+	})
 
-	testCommands(t,
-		succ("MULTI"),
-		succ("SET", "key", "foo"),
-		succ("TYPE", "key"),
-		succ("EXPIRE", "key", 12),
-		succ("TTL", "key"),
-		succ("PEXPIRE", "key", 12),
-		succ("PTTL", "key"),
-		succ("PERSIST", "key"),
-		succ("DEL", "key"),
-		succ("TYPE", "key"),
-		succ("EXEC"),
-	)
+	testRaw(t, func(c *client) {
+		c.Do("MULTI")
+		c.Do("SET", "key", "foo")
+		c.Do("TYPE", "key")
+		c.Do("EXPIRE", "key", "12")
+		c.Do("TTL", "key")
+		c.Do("PEXPIRE", "key", "12")
+		c.Do("PTTL", "key")
+		c.Do("PERSIST", "key")
+		c.Do("DEL", "key")
+		c.Do("TYPE", "key")
+		c.Do("EXEC")
+	})
 
 	// BITOP OPs are checked after the transaction.
-	testCommands(t,
-		succ("MULTI"),
-		succ("BITOP", "BROKEN", "str", ""),
-		succ("EXEC"),
-	)
+	testRaw(t, func(c *client) {
+		c.Do("MULTI")
+		c.Do("BITOP", "BROKEN", "str", "")
+		c.Do("EXEC")
+	})
 
 	// fail on invalid command
-	testCommands(t,
-		succ("MULTI"),
-		fail("GET"),
-		fail("EXEC"),
-	)
+	testRaw(t, func(c *client) {
+		c.Do("MULTI")
+		c.Do("GET")
+		c.Do("EXEC")
+	})
 
 	/* FIXME
-	// fail on unknown command
-	testCommands(t,
-		succ("MULTI"),
-		fail("NOSUCH"),
-		fail("EXEC"),
-	)
+		// fail on unknown command
+	testRaw(t, func(c *client) {
+			c.Do("MULTI")
+			c.Do("NOSUCH")
+			c.Do("EXEC")
+	})
 	*/
 
 	// failed EXEC cleaned up the tx
-	testCommands(t,
-		succ("MULTI"),
-		fail("GET"),
-		fail("EXEC"),
-		succ("MULTI"),
-	)
+	testRaw(t, func(c *client) {
+		c.Do("MULTI")
+		c.Do("GET")
+		c.Do("EXEC")
+		c.Do("MULTI")
+	})
 
-	testClients2(t, func(c1, c2 chan<- command) {
-		c1 <- succ("WATCH", "foo")
-		c1 <- succ("MULTI")
-		c2 <- succ("SET", "foo", "12")
-		c1 <- succ("EXEC") // nil
+	testRaw2(t, func(c1, c2 *client) {
+		c1.Do("WATCH", "foo")
+		c1.Do("MULTI")
+		c2.Do("SET", "foo", "12")
+		c2.Do("EXEC") // nil
 	})
 }

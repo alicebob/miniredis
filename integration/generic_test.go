@@ -6,299 +6,295 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/alicebob/miniredis/v2"
 )
 
 func TestKeys(t *testing.T) {
-	testCommands(t,
-		succ("SET", "one", "1"),
-		succ("SET", "two", "2"),
-		succ("SET", "three", "3"),
-		succ("SET", "four", "4"),
-		succSorted("KEYS", `*o*`),
-		succSorted("KEYS", `t??`),
-		succSorted("KEYS", `t?*`),
-		succSorted("KEYS", `*`),
-		succSorted("KEYS", `t*`),
-		succSorted("KEYS", `t\*`),
-		succSorted("KEYS", `[tf]*`),
+	testRaw(t, func(c *client) {
+		c.Do("SET", "one", "1")
+		c.Do("SET", "two", "2")
+		c.Do("SET", "three", "3")
+		c.Do("SET", "four", "4")
+		c.DoSorted("KEYS", `*o*`)
+		c.DoSorted("KEYS", `t??`)
+		c.DoSorted("KEYS", `t?*`)
+		c.DoSorted("KEYS", `*`)
+		c.DoSorted("KEYS", `t*`)
+		c.DoSorted("KEYS", `t\*`)
+		c.DoSorted("KEYS", `[tf]*`)
 
 		// zero length key
-		succ("SET", "", "nothing"),
-		succ("GET", ""),
+		c.Do("SET", "", "nothing")
+		c.Do("GET", "")
 
 		// Simple failure cases
-		fail("KEYS"),
-		fail("KEYS", "foo", "bar"),
-	)
+		c.Do("KEYS")
+		c.Do("KEYS", "foo", "bar")
+	})
 
-	testCommands(t,
-		succ("SET", "[one]", "1"),
-		succ("SET", "two", "2"),
-		succSorted("KEYS", `[\[o]*`),
-		succSorted("KEYS", `\[*`),
-		succSorted("KEYS", `*o*`),
-		succSorted("KEYS", `[]*`), // nothing
-	)
+	testRaw(t, func(c *client) {
+		c.Do("SET", "[one]", "1")
+		c.Do("SET", "two", "2")
+		c.DoSorted("KEYS", `[\[o]*`)
+		c.DoSorted("KEYS", `\[*`)
+		c.DoSorted("KEYS", `*o*`)
+		c.DoSorted("KEYS", `[]*`) // nothing
+	})
 }
 
 func TestRandom(t *testing.T) {
-	testCommands(t,
-		succ("RANDOMKEY"),
+	testRaw(t, func(c *client) {
+		c.Do("RANDOMKEY")
 		// A random key from a DB with a single key. We can test that.
-		succ("SET", "one", "1"),
-		succ("RANDOMKEY"),
+		c.Do("SET", "one", "1")
+		c.Do("RANDOMKEY")
 
 		// Simple failure cases
-		fail("RANDOMKEY", "bar"),
-	)
+		c.Do("RANDOMKEY", "bar")
+	})
 }
 
 func TestUnknownCommand(t *testing.T) {
-	testCommands(t,
-		fail("nosuch"),
-		fail("noSUCH"),
-		fail("noSUCH", 1, 2, 3),
-	)
+	testRaw(t, func(c *client) {
+		c.Do("nosuch")
+		c.Do("noSUCH")
+		c.Do("noSUCH", "1", "2", "3")
+	})
 }
 
 func TestQuit(t *testing.T) {
-	testCommands(t,
-		succ("QUIT"),
-	)
+	testRaw(t, func(c *client) {
+		c.Do("QUIT")
+	})
 }
 
 func TestExists(t *testing.T) {
-	testCommands(t,
-		succ("SET", "a", "3"),
-		succ("HSET", "b", "c", "d"),
-		succ("EXISTS", "a", "b"),
-		succ("EXISTS", "a", "b", "q"),
-		succ("EXISTS", "a", "b", "b", "b", "a", "q"),
+	testRaw(t, func(c *client) {
+		c.Do("SET", "a", "3")
+		c.Do("HSET", "b", "c", "d")
+		c.Do("EXISTS", "a", "b")
+		c.Do("EXISTS", "a", "b", "q")
+		c.Do("EXISTS", "a", "b", "b", "b", "a", "q")
 
 		// Error cases
-		fail("EXISTS"),
-	)
+		c.Do("EXISTS")
+	})
 }
 
 func TestRename(t *testing.T) {
-	testCommands(t,
+	testRaw(t, func(c *client) {
 		// No 'a' key
-		fail("RENAME", "a", "b"),
+		c.Do("RENAME", "a", "b")
 
 		// Move a key with the TTL.
-		succ("SET", "a", "3"),
-		succ("EXPIRE", "a", "123"),
-		succ("SET", "b", "12"),
-		succ("RENAME", "a", "b"),
-		succ("EXISTS", "a"),
-		succ("GET", "a"),
-		succ("TYPE", "a"),
-		succ("TTL", "a"),
-		succ("EXISTS", "b"),
-		succ("GET", "b"),
-		succ("TYPE", "b"),
-		succ("TTL", "b"),
+		c.Do("SET", "a", "3")
+		c.Do("EXPIRE", "a", "123")
+		c.Do("SET", "b", "12")
+		c.Do("RENAME", "a", "b")
+		c.Do("EXISTS", "a")
+		c.Do("GET", "a")
+		c.Do("TYPE", "a")
+		c.Do("TTL", "a")
+		c.Do("EXISTS", "b")
+		c.Do("GET", "b")
+		c.Do("TYPE", "b")
+		c.Do("TTL", "b")
 
 		// move a key without TTL
-		succ("SET", "nottl", "3"),
-		succ("RENAME", "nottl", "stillnottl"),
-		succ("TTL", "nottl"),
-		succ("TTL", "stillnottl"),
+		c.Do("SET", "nottl", "3")
+		c.Do("RENAME", "nottl", "stillnottl")
+		c.Do("TTL", "nottl")
+		c.Do("TTL", "stillnottl")
 
 		// Error cases
-		fail("RENAME"),
-		fail("RENAME", "a"),
-		fail("RENAME", "a", "b", "toomany"),
-	)
+		c.Do("RENAME")
+		c.Do("RENAME", "a")
+		c.Do("RENAME", "a", "b", "toomany")
+	})
 }
 
 func TestRenamenx(t *testing.T) {
-	testCommands(t,
+	testRaw(t, func(c *client) {
 		// No 'a' key
-		fail("RENAMENX", "a", "b"),
+		c.Do("RENAMENX", "a", "b")
 
-		succ("SET", "a", "value"),
-		succ("SET", "str", "value"),
-		succ("RENAMENX", "a", "str"),
-		succ("EXISTS", "a"),
-		succ("EXISTS", "str"),
-		succ("GET", "a"),
-		succ("GET", "str"),
+		c.Do("SET", "a", "value")
+		c.Do("SET", "str", "value")
+		c.Do("RENAMENX", "a", "str")
+		c.Do("EXISTS", "a")
+		c.Do("EXISTS", "str")
+		c.Do("GET", "a")
+		c.Do("GET", "str")
 
-		succ("RENAMENX", "a", "nosuch"),
-		succ("EXISTS", "a"),
-		succ("EXISTS", "nosuch"),
+		c.Do("RENAMENX", "a", "nosuch")
+		c.Do("EXISTS", "a")
+		c.Do("EXISTS", "nosuch")
 
 		// Error cases
-		fail("RENAMENX"),
-		fail("RENAMENX", "a"),
-		fail("RENAMENX", "a", "b", "toomany"),
-	)
+		c.Do("RENAMENX")
+		c.Do("RENAMENX", "a")
+		c.Do("RENAMENX", "a", "b", "toomany")
+	})
 }
 
 func TestScan(t *testing.T) {
-	testCommands(t,
+	testRaw(t, func(c *client) {
 		// No keys yet
-		succ("SCAN", 0),
+		c.Do("SCAN", "0")
 
-		succ("SET", "key", "value"),
-		succ("SCAN", 0),
-		succ("SCAN", 0, "COUNT", 12),
-		succ("SCAN", 0, "cOuNt", 12),
+		c.Do("SET", "key", "value")
+		c.Do("SCAN", "0")
+		c.Do("SCAN", "0", "COUNT", "12")
+		c.Do("SCAN", "0", "cOuNt", "12")
 
-		succ("SET", "anotherkey", "value"),
-		succ("SCAN", 0, "MATCH", "anoth*"),
-		succ("SCAN", 0, "MATCH", "anoth*", "COUNT", 100),
-		succ("SCAN", 0, "COUNT", 100, "MATCH", "anoth*"),
+		c.Do("SET", "anotherkey", "value")
+		c.Do("SCAN", "0", "MATCH", "anoth*")
+		c.Do("SCAN", "0", "MATCH", "anoth*", "COUNT", "100")
+		c.Do("SCAN", "0", "COUNT", "100", "MATCH", "anoth*")
 
 		// Can't really test multiple keys.
-		// succ("SET", "key2", "value2"),
-		// succ("SCAN", 0),
+		// c.Do("SET", "key2", "value2")
+		// c.Do("SCAN", "0")
 
 		// Error cases
-		fail("SCAN"),
-		fail("SCAN", "noint"),
-		fail("SCAN", 0, "COUNT", "noint"),
-		fail("SCAN", 0, "COUNT"),
-		fail("SCAN", 0, "MATCH"),
-		fail("SCAN", 0, "garbage"),
-		fail("SCAN", 0, "COUNT", 12, "MATCH", "foo", "garbage"),
-	)
+		c.Do("SCAN")
+		c.Do("SCAN", "noint")
+		c.Do("SCAN", "0", "COUNT", "noint")
+		c.Do("SCAN", "0", "COUNT")
+		c.Do("SCAN", "0", "MATCH")
+		c.Do("SCAN", "0", "garbage")
+		c.Do("SCAN", "0", "COUNT", "12", "MATCH", "foo", "garbage")
+	})
 }
 
 func TestFastForward(t *testing.T) {
-	testMultiCommands(t,
-		func(r chan<- command, m *miniredis.Miniredis) {
-			r <- succ("SET", "key1", "value")
-			r <- succ("SET", "key", "value", "PX", 100)
-			r <- succSorted("KEYS", "*")
-			time.Sleep(200 * time.Millisecond)
-			m.FastForward(200 * time.Millisecond)
-			r <- succSorted("KEYS", "*")
-		},
-	)
+	testRaw(t, func(c *client) {
+		c.Do("SET", "key1", "value")
+		c.Do("SET", "key", "value", "PX", "100")
+		c.DoSorted("KEYS", "*")
+		time.Sleep(200 * time.Millisecond)
+		c.miniredis.FastForward(200 * time.Millisecond)
+		c.DoSorted("KEYS", "*")
+	})
 
-	testCommands(t,
-		fail("SET", "key1", "value", "PX", -100),
-		fail("SET", "key2", "value", "EX", -100),
-		fail("SET", "key3", "value", "EX", 0),
-		succSorted("KEYS", "*"),
+	testRaw(t, func(c *client) {
+		c.Do("SET", "key1", "value", "PX", "-100")
+		c.Do("SET", "key2", "value", "EX", "-100")
+		c.Do("SET", "key3", "value", "EX", "0")
+		c.DoSorted("KEYS", "*")
 
-		succ("SET", "key4", "value"),
-		succSorted("KEYS", "*"),
-		succ("EXPIRE", "key4", -100),
-		succSorted("KEYS", "*"),
+		c.Do("SET", "key4", "value")
+		c.DoSorted("KEYS", "*")
+		c.Do("EXPIRE", "key4", "-100")
+		c.DoSorted("KEYS", "*")
 
-		succ("SET", "key4", "value"),
-		succSorted("KEYS", "*"),
-		succ("EXPIRE", "key4", 0),
-		succSorted("KEYS", "*"),
-	)
+		c.Do("SET", "key4", "value")
+		c.DoSorted("KEYS", "*")
+		c.Do("EXPIRE", "key4", "0")
+		c.DoSorted("KEYS", "*")
+	})
 }
 
 func TestProto(t *testing.T) {
-	testCommands(t,
-		succ("ECHO", strings.Repeat("X", 1<<24)),
-	)
+	testRaw(t, func(c *client) {
+		c.Do("ECHO", strings.Repeat("X", 1<<24))
+	})
 }
 
 func TestSwapdb(t *testing.T) {
-	testCommands(t,
-		succ("SET", "key1", "val1"),
-		succ("SWAPDB", "0", "1"),
-		succ("SELECT", "1"),
-		succ("GET", "key1"),
+	testRaw(t, func(c *client) {
+		c.Do("SET", "key1", "val1")
+		c.Do("SWAPDB", "0", "1")
+		c.Do("SELECT", "1")
+		c.Do("GET", "key1")
 
-		succ("SWAPDB", "1", "1"),
-		succ("GET", "key1"),
+		c.Do("SWAPDB", "1", "1")
+		c.Do("GET", "key1")
 
-		fail("SWAPDB"),
-		fail("SWAPDB", 1),
-		fail("SWAPDB", 1, 2, 3),
-		fail("SWAPDB", "foo", 2),
-		fail("SWAPDB", 1, "bar"),
-		fail("SWAPDB", "foo", "bar"),
-		fail("SWAPDB", -1, 2),
-		fail("SWAPDB", 1, -2),
-		// fail("SWAPDB", 1, 1000), // miniredis has no upperlimit
-	)
+		c.Do("SWAPDB")
+		c.Do("SWAPDB", "1")
+		c.Do("SWAPDB", "1", "2", "3")
+		c.Do("SWAPDB", "foo", "2")
+		c.Do("SWAPDB", "1", "bar")
+		c.Do("SWAPDB", "foo", "bar")
+		c.Do("SWAPDB", "-1", "2")
+		c.Do("SWAPDB", "1", "-2")
+		// c.Do("SWAPDB", "1", "1000") // miniredis has no upperlimit
+	})
 
 	// SWAPDB with transactions
-	testClients2(t, func(r1, r2 chan<- command) {
-		r1 <- succ("SET", "foo", "foooooo")
+	testRaw2(t, func(c1, c2 *client) {
+		c1.Do("SET", "foo", "foooooo")
 
-		r1 <- succ("MULTI")
-		r1 <- succ("SWAPDB", 0, 2)
-		r1 <- succ("GET", "foo")
-		r2 <- succ("GET", "foo")
+		c1.Do("MULTI")
+		c1.Do("SWAPDB", "0", "2")
+		c1.Do("GET", "foo")
+		c2.Do("GET", "foo")
 
-		r1 <- succ("EXEC")
-		r1 <- succ("GET", "foo")
-		r2 <- succ("GET", "foo")
+		c1.Do("EXEC")
+		c1.Do("GET", "foo")
+		c2.Do("GET", "foo")
 	})
 }
 
 func TestDel(t *testing.T) {
-	testCommands(t,
-		succ("SET", "one", "1"),
-		succ("SET", "two", "2"),
-		succ("SET", "three", "3"),
-		succ("SET", "four", "4"),
-		succ("DEL", "one"),
-		succSorted("KEYS", "*"),
+	testRaw(t, func(c *client) {
+		c.Do("SET", "one", "1")
+		c.Do("SET", "two", "2")
+		c.Do("SET", "three", "3")
+		c.Do("SET", "four", "4")
+		c.Do("DEL", "one")
+		c.DoSorted("KEYS", "*")
 
-		succ("DEL", "twoooo"),
-		succSorted("KEYS", "*"),
+		c.Do("DEL", "twoooo")
+		c.DoSorted("KEYS", "*")
 
-		succ("DEL", "two", "four"),
-		succSorted("KEYS", "*"),
+		c.Do("DEL", "two", "four")
+		c.DoSorted("KEYS", "*")
 
-		fail("DEL"),
-		succSorted("KEYS", "*"),
-	)
+		c.Do("DEL")
+		c.DoSorted("KEYS", "*")
+	})
 }
 
 func TestUnlink(t *testing.T) {
-	testCommands(t,
-		succ("SET", "one", "1"),
-		succ("SET", "two", "2"),
-		succ("SET", "three", "3"),
-		succ("SET", "four", "4"),
-		succ("UNLINK", "one"),
-		succSorted("KEYS", "*"),
+	testRaw(t, func(c *client) {
+		c.Do("SET", "one", "1")
+		c.Do("SET", "two", "2")
+		c.Do("SET", "three", "3")
+		c.Do("SET", "four", "4")
+		c.Do("UNLINK", "one")
+		c.DoSorted("KEYS", "*")
 
-		succ("UNLINK", "twoooo"),
-		succSorted("KEYS", "*"),
+		c.Do("UNLINK", "twoooo")
+		c.DoSorted("KEYS", "*")
 
-		succ("UNLINK", "two", "four"),
-		succSorted("KEYS", "*"),
+		c.Do("UNLINK", "two", "four")
+		c.DoSorted("KEYS", "*")
 
-		fail("UNLINK"),
-		succSorted("KEYS", "*"),
-	)
+		c.Do("UNLINK")
+		c.DoSorted("KEYS", "*")
+	})
 }
 
 func TestTouch(t *testing.T) {
-	testCommands(t,
-		succ("SET", "a", "some value"),
-		succ("TOUCH", "a"),
-		succ("GET", "a"),
-		succ("TTL", "a"),
+	testRaw(t, func(c *client) {
+		c.Do("SET", "a", "some value")
+		c.Do("TOUCH", "a")
+		c.Do("GET", "a")
+		c.Do("TTL", "a")
 
-		succ("TOUCH", "a", "foobar", "a"),
+		c.Do("TOUCH", "a", "foobar", "a")
 
-		fail("TOUCH"),
-	)
+		c.Do("TOUCH")
+	})
 }
 
 func TestPersist(t *testing.T) {
-	testCommands(t,
-		succ("SET", "foo", "bar"),
-		succ("EXPIRE", "foo", 12),
-		succ("TTL", "foo"),
-		succ("PERSIST", "foo"),
-		succ("TTL", "foo"),
-	)
+	testRaw(t, func(c *client) {
+		c.Do("SET", "foo", "bar")
+		c.Do("EXPIRE", "foo", "12")
+		c.Do("TTL", "foo")
+		c.Do("PERSIST", "foo")
+		c.Do("TTL", "foo")
+	})
 }

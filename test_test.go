@@ -67,6 +67,12 @@ func mustNil(tb testing.TB, c *proto.Client, args ...string) {
 	mustDo(tb, c, append(args, proto.Nil)...)
 }
 
+// mustNilList is a mustDo() which expects a list nil (-1) response
+func mustNilList(tb testing.TB, c *proto.Client, args ...string) {
+	tb.Helper()
+	mustDo(tb, c, append(args, proto.NilList)...)
+}
+
 // must0 is a mustDo() which expects a `0` response
 func must0(tb testing.TB, c *proto.Client, args ...string) {
 	tb.Helper()

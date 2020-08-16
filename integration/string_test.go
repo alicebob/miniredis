@@ -3,539 +3,530 @@
 package main
 
 import (
+	"strconv"
 	"testing"
 )
 
 func TestString(t *testing.T) {
-	testCommands(t,
-		succ("SET", "foo", "bar"),
-		succ("GET", "foo"),
-		succ("SET", "foo", "bar\bbaz"),
-		succ("GET", "foo"),
-		succ("SET", "foo", "bar", "EX", 100),
-		fail("SET", "foo", "bar", "EX", "noint"),
-		succ("SET", "utf8", "❆❅❄☃"),
+	testRaw(t, func(c *client) {
+		c.Do("SET", "foo", "bar")
+		c.Do("GET", "foo")
+		c.Do("SET", "foo", "bar\bbaz")
+		c.Do("GET", "foo")
+		c.Do("SET", "foo", "bar", "EX", "100")
+		c.Do("SET", "foo", "bar", "EX", "noint")
+		c.Do("SET", "utf8", "❆❅❄☃")
 
 		// Failure cases
-		fail("SET"),
-		fail("SET", "foo"),
-		fail("SET", "foo", "bar", "baz"),
-		fail("GET"),
-		fail("GET", "too", "many"),
-		fail("SET", "foo", "bar", "EX", 0),
-		fail("SET", "foo", "bar", "EX", -100),
+		c.Do("SET")
+		c.Do("SET", "foo")
+		c.Do("SET", "foo", "bar", "baz")
+		c.Do("GET")
+		c.Do("GET", "too", "many")
+		c.Do("SET", "foo", "bar", "EX", "0")
+		c.Do("SET", "foo", "bar", "EX", "-100")
 		// Wrong type
-		succ("HSET", "hash", "key", "value"),
-		fail("GET", "hash"),
-	)
+		c.Do("HSET", "hash", "key", "value")
+		c.Do("GET", "hash")
+	})
 }
 
 func TestStringGetSet(t *testing.T) {
-	testCommands(t,
-		succ("SET", "foo", "bar"),
-		succ("GETSET", "foo", "new"),
-		succ("GET", "foo"),
-		succ("GET", "new"),
-		succ("GETSET", "nosuch", "new"),
-		succ("GET", "nosuch"),
+	testRaw(t, func(c *client) {
+		c.Do("SET", "foo", "bar")
+		c.Do("GETSET", "foo", "new")
+		c.Do("GET", "foo")
+		c.Do("GET", "new")
+		c.Do("GETSET", "nosuch", "new")
+		c.Do("GET", "nosuch")
 
 		// Failure cases
-		fail("GETSET"),
-		fail("GETSET", "foo"),
-		fail("GETSET", "foo", "bar", "baz"),
+		c.Do("GETSET")
+		c.Do("GETSET", "foo")
+		c.Do("GETSET", "foo", "bar", "baz")
 		// Wrong type
-		succ("HSET", "hash", "key", "value"),
-		fail("GETSET", "hash", "new"),
-	)
+		c.Do("HSET", "hash", "key", "value")
+		c.Do("GETSET", "hash", "new")
+	})
 }
 
 func TestStringMget(t *testing.T) {
-	testCommands(t,
-		succ("SET", "foo", "bar"),
-		succ("SET", "foo2", "bar"),
-		succ("MGET", "foo"),
-		succ("MGET", "foo", "foo2"),
-		succ("MGET", "nosuch", "neither"),
-		succ("MGET", "nosuch", "neither", "foo"),
+	testRaw(t, func(c *client) {
+		c.Do("SET", "foo", "bar")
+		c.Do("SET", "foo2", "bar")
+		c.Do("MGET", "foo")
+		c.Do("MGET", "foo", "foo2")
+		c.Do("MGET", "nosuch", "neither")
+		c.Do("MGET", "nosuch", "neither", "foo")
 
 		// Failure cases
-		fail("MGET"),
+		c.Do("MGET")
 		// Wrong type
-		succ("HSET", "hash", "key", "value"),
-		succ("MGET", "hash"), // not an error.
-	)
+		c.Do("HSET", "hash", "key", "value")
+		c.Do("MGET", "hash") // not an error.
+	})
 }
 
 func TestStringSetnx(t *testing.T) {
-	testCommands(t,
-		succ("SETNX", "foo", "bar"),
-		succ("GET", "foo"),
-		succ("SETNX", "foo", "bar2"),
-		succ("GET", "foo"),
+	testRaw(t, func(c *client) {
+		c.Do("SETNX", "foo", "bar")
+		c.Do("GET", "foo")
+		c.Do("SETNX", "foo", "bar2")
+		c.Do("GET", "foo")
 
 		// Failure cases
-		fail("SETNX"),
-		fail("SETNX", "foo"),
-		fail("SETNX", "foo", "bar", "baz"),
+		c.Do("SETNX")
+		c.Do("SETNX", "foo")
+		c.Do("SETNX", "foo", "bar", "baz")
 		// Wrong type
-		succ("HSET", "hash", "key", "value"),
-		succ("SETNX", "hash", "value"),
-	)
+		c.Do("HSET", "hash", "key", "value")
+		c.Do("SETNX", "hash", "value")
+	})
 }
 
 func TestExpire(t *testing.T) {
-	testCommands(t,
-		succ("SET", "foo", "bar"),
-		succ("EXPIRE", "foo", 12),
-		succ("TTL", "foo"),
-		succ("TTL", "nosuch"),
-		succ("SET", "foo", "bar"),
-		succ("PEXPIRE", "foo", 999999),
-		succ("EXPIREAT", "foo", 2234567890),
-		succ("PEXPIREAT", "foo", 2234567890000),
-		// succ("PTTL", "foo"),
-		succ("PTTL", "nosuch"),
+	testRaw(t, func(c *client) {
+		c.Do("SET", "foo", "bar")
+		c.Do("EXPIRE", "foo", "12")
+		c.Do("TTL", "foo")
+		c.Do("TTL", "nosuch")
+		c.Do("SET", "foo", "bar")
+		c.Do("PEXPIRE", "foo", "999999")
+		c.Do("EXPIREAT", "foo", "2234567890")
+		c.Do("PEXPIREAT", "foo", "2234567890000")
+		// c.Do("PTTL", "foo")
+		c.Do("PTTL", "nosuch")
 
-		succ("SET", "foo", "bar"),
-		succ("EXPIRE", "foo", 0),
-		succ("EXISTS", "foo"),
-		succ("SET", "foo", "bar"),
-		succ("EXPIRE", "foo", -12),
-		succ("EXISTS", "foo"),
+		c.Do("SET", "foo", "bar")
+		c.Do("EXPIRE", "foo", "0")
+		c.Do("EXISTS", "foo")
+		c.Do("SET", "foo", "bar")
+		c.Do("EXPIRE", "foo", "-12")
+		c.Do("EXISTS", "foo")
 
-		fail("EXPIRE"),
-		fail("EXPIRE", "foo"),
-		fail("EXPIRE", "foo", "noint"),
-		fail("EXPIRE", "foo", 12, "toomany"),
-		fail("EXPIREAT"),
-		fail("TTL"),
-		fail("TTL", "too", "many"),
-		fail("PEXPIRE"),
-		fail("PEXPIRE", "foo"),
-		fail("PEXPIRE", "foo", "noint"),
-		fail("PEXPIRE", "foo", 12, "toomany"),
-		fail("PEXPIREAT"),
-		fail("PTTL"),
-		fail("PTTL", "too", "many"),
-	)
+		c.Do("EXPIRE")
+		c.Do("EXPIRE", "foo")
+		c.Do("EXPIRE", "foo", "noint")
+		c.Do("EXPIRE", "foo", "12", "toomany")
+		c.Do("EXPIREAT")
+		c.Do("TTL")
+		c.Do("TTL", "too", "many")
+		c.Do("PEXPIRE")
+		c.Do("PEXPIRE", "foo")
+		c.Do("PEXPIRE", "foo", "noint")
+		c.Do("PEXPIRE", "foo", "12", "toomany")
+		c.Do("PEXPIREAT")
+		c.Do("PTTL")
+		c.Do("PTTL", "too", "many")
+	})
 }
 
 func TestMset(t *testing.T) {
-	testCommands(t,
-		succ("MSET", "foo", "bar"),
-		succ("MSET", "foo", "bar", "baz", "?"),
-		succ("MSET", "foo", "bar", "foo", "baz"), // double key
-		succ("GET", "foo"),
+	testRaw(t, func(c *client) {
+		c.Do("MSET", "foo", "bar")
+		c.Do("MSET", "foo", "bar", "baz", "?")
+		c.Do("MSET", "foo", "bar", "foo", "baz") // double key
+		c.Do("GET", "foo")
 		// Error cases
-		fail("MSET"),
-		fail("MSET", "foo"),
-		fail("MSET", "foo", "bar", "baz"),
+		c.Do("MSET")
+		c.Do("MSET", "foo")
+		c.Do("MSET", "foo", "bar", "baz")
 
-		succ("MSETNX", "foo", "bar", "aap", "noot"),
-		succ("MSETNX", "one", "two", "three", "four"),
-		succ("MSETNX", "11", "12", "11", "14"), // double key
-		succ("GET", "11"),
+		c.Do("MSETNX", "foo", "bar", "aap", "noot")
+		c.Do("MSETNX", "one", "two", "three", "four")
+		c.Do("MSETNX", "11", "12", "11", "14") // double key
+		c.Do("GET", "11")
 
 		// Wrong type of key doesn't matter
-		succ("HSET", "aap", "noot", "mies"),
-		succ("MSET", "aap", "again", "eight", "nine"),
-		succ("MSETNX", "aap", "again", "eight", "nine"),
+		c.Do("HSET", "aap", "noot", "mies")
+		c.Do("MSET", "aap", "again", "eight", "nine")
+		c.Do("MSETNX", "aap", "again", "eight", "nine")
 
 		// Error cases
-		fail("MSETNX"),
-		fail("MSETNX", "one"),
-		fail("MSETNX", "one", "two", "three"),
-	)
+		c.Do("MSETNX")
+		c.Do("MSETNX", "one")
+		c.Do("MSETNX", "one", "two", "three")
+	})
 }
 
 func TestSetx(t *testing.T) {
-	testCommands(t,
-		succ("SETEX", "foo", 12, "bar"),
-		succ("GET", "foo"),
-		succ("TTL", "foo"),
-		fail("SETEX", "foo"),
-		fail("SETEX", "foo", "noint", "bar"),
-		fail("SETEX", "foo", 12),
-		fail("SETEX", "foo", 12, "bar", "toomany"),
-		fail("SETEX", "foo", 0),
-		fail("SETEX", "foo", -12),
+	testRaw(t, func(c *client) {
+		c.Do("SETEX", "foo", "12", "bar")
+		c.Do("GET", "foo")
+		c.Do("TTL", "foo")
+		c.Do("SETEX", "foo")
+		c.Do("SETEX", "foo", "noint", "bar")
+		c.Do("SETEX", "foo", "12")
+		c.Do("SETEX", "foo", "12", "bar", "toomany")
+		c.Do("SETEX", "foo", "0")
+		c.Do("SETEX", "foo", "-12")
 
-		succ("PSETEX", "foo", 12, "bar"),
-		succ("GET", "foo"),
-		// succ("PTTL", "foo"), // counts down too quickly to compare
-		fail("PSETEX", "foo"),
-		fail("PSETEX", "foo", "noint", "bar"),
-		fail("PSETEX", "foo", 12),
-		fail("PSETEX", "foo", 12, "bar", "toomany"),
-		fail("PSETEX", "foo", 0),
-		fail("PSETEX", "foo", -12),
-	)
+		c.Do("PSETEX", "foo", "12", "bar")
+		c.Do("GET", "foo")
+		// c.Do("PTTL", "foo") // counts down too quickly to compare
+		c.Do("PSETEX", "foo")
+		c.Do("PSETEX", "foo", "noint", "bar")
+		c.Do("PSETEX", "foo", "12")
+		c.Do("PSETEX", "foo", "12", "bar", "toomany")
+		c.Do("PSETEX", "foo", "0")
+		c.Do("PSETEX", "foo", "-12")
+	})
 }
 
 func TestGetrange(t *testing.T) {
-	testCommands(t,
-		succ("SET", "foo", "The quick brown fox jumps over the lazy dog"),
-		succ("GETRANGE", "foo", 0, 100),
-		succ("GETRANGE", "foo", 0, 0),
-		succ("GETRANGE", "foo", 0, -4),
-		succ("GETRANGE", "foo", 0, -400),
-		succ("GETRANGE", "foo", -4, -4),
-		succ("GETRANGE", "foo", 4, 2),
-		fail("GETRANGE", "foo", "aap", 2),
-		fail("GETRANGE", "foo", 4, "aap"),
-		fail("GETRANGE", "foo", 4, 2, "aap"),
-		fail("GETRANGE", "foo"),
-		succ("HSET", "aap", "noot", "mies"),
-		fail("GETRANGE", "aap", 4, 2),
-	)
+	testRaw(t, func(c *client) {
+		c.Do("SET", "foo", "The quick brown fox jumps over the lazy dog")
+		c.Do("GETRANGE", "foo", "0", "100")
+		c.Do("GETRANGE", "foo", "0", "0")
+		c.Do("GETRANGE", "foo", "0", "-4")
+		c.Do("GETRANGE", "foo", "0", "-400")
+		c.Do("GETRANGE", "foo", "-4", "-4")
+		c.Do("GETRANGE", "foo", "4", "2")
+		c.Do("GETRANGE", "foo", "aap", "2")
+		c.Do("GETRANGE", "foo", "4", "aap")
+		c.Do("GETRANGE", "foo", "4", "2", "aap")
+		c.Do("GETRANGE", "foo")
+		c.Do("HSET", "aap", "noot", "mies")
+		c.Do("GETRANGE", "aap", "4", "2")
+	})
 }
 
 func TestStrlen(t *testing.T) {
-	testCommands(t,
-		succ("SET", "str", "The quick brown fox jumps over the lazy dog"),
-		succ("STRLEN", "str"),
+	testRaw(t, func(c *client) {
+		c.Do("SET", "str", "The quick brown fox jumps over the lazy dog")
+		c.Do("STRLEN", "str")
 		// failure cases
-		fail("STRLEN"),
-		fail("STRLEN", "str", "bar"),
-		succ("HSET", "hash", "key", "value"),
-		fail("STRLEN", "hash"),
-	)
+		c.Do("STRLEN")
+		c.Do("STRLEN", "str", "bar")
+		c.Do("HSET", "hash", "key", "value")
+		c.Do("STRLEN", "hash")
+	})
 }
 
 func TestSetrange(t *testing.T) {
-	testCommands(t,
-		succ("SET", "foo", "The quick brown fox jumps over the lazy dog"),
-		succ("SETRANGE", "foo", 0, "aap"),
-		succ("GET", "foo"),
-		succ("SETRANGE", "foo", 10, "noot"),
-		succ("GET", "foo"),
-		succ("SETRANGE", "foo", 40, "overtheedge"),
-		succ("GET", "foo"),
-		succ("SETRANGE", "foo", 400, "oh, hey there"),
-		succ("GET", "foo"),
+	testRaw(t, func(c *client) {
+		c.Do("SET", "foo", "The quick brown fox jumps over the lazy dog")
+		c.Do("SETRANGE", "foo", "0", "aap")
+		c.Do("GET", "foo")
+		c.Do("SETRANGE", "foo", "10", "noot")
+		c.Do("GET", "foo")
+		c.Do("SETRANGE", "foo", "40", "overtheedge")
+		c.Do("GET", "foo")
+		c.Do("SETRANGE", "foo", "400", "oh, hey there")
+		c.Do("GET", "foo")
 		// Non existing key
-		succ("SETRANGE", "nosuch", 2, "aap"),
-		succ("GET", "nosuch"),
+		c.Do("SETRANGE", "nosuch", "2", "aap")
+		c.Do("GET", "nosuch")
 
 		// Error cases
-		fail("SETRANGE", "foo"),
-		fail("SETRANGE", "foo", 1),
-		fail("SETRANGE", "foo", "aap", "bar"),
-		fail("SETRANGE", "foo", "noint", "bar"),
-		fail("SETRANGE", "foo", -1, "bar"),
-		succ("HSET", "aap", "noot", "mies"),
-		fail("SETRANGE", "aap", 4, "bar"),
-	)
+		c.Do("SETRANGE", "foo")
+		c.Do("SETRANGE", "foo", "1")
+		c.Do("SETRANGE", "foo", "aap", "bar")
+		c.Do("SETRANGE", "foo", "noint", "bar")
+		c.Do("SETRANGE", "foo", "-1", "bar")
+		c.Do("HSET", "aap", "noot", "mies")
+		c.Do("SETRANGE", "aap", "4", "bar")
+	})
 }
 
 func TestIncrAndFriends(t *testing.T) {
-	testCommands(t,
-		succ("INCR", "aap"),
-		succ("INCR", "aap"),
-		succ("INCR", "aap"),
-		succ("GET", "aap"),
-		succ("DECR", "aap"),
-		succ("DECR", "noot"),
-		succ("DECR", "noot"),
-		succ("GET", "noot"),
-		succ("INCRBY", "noot", 100),
-		succ("INCRBY", "noot", 200),
-		succ("INCRBY", "noot", 300),
-		succ("GET", "noot"),
-		succ("DECRBY", "noot", 100),
-		succ("DECRBY", "noot", 200),
-		succ("DECRBY", "noot", 300),
-		succ("DECRBY", "noot", 400),
-		succ("GET", "noot"),
-		succ("INCRBYFLOAT", "zus", 1.23),
-		succ("INCRBYFLOAT", "zus", 3.1456),
-		succ("INCRBYFLOAT", "zus", 987.65432),
-		succ("GET", "zus"),
-		succ("INCRBYFLOAT", "whole", 300),
-		succ("INCRBYFLOAT", "whole", 300),
-		succ("INCRBYFLOAT", "whole", 300),
-		succ("GET", "whole"),
-		succ("INCRBYFLOAT", "big", 12345e10),
-		succ("GET", "big"),
+	testRaw(t, func(c *client) {
+		c.Do("INCR", "aap")
+		c.Do("INCR", "aap")
+		c.Do("INCR", "aap")
+		c.Do("GET", "aap")
+		c.Do("DECR", "aap")
+		c.Do("DECR", "noot")
+		c.Do("DECR", "noot")
+		c.Do("GET", "noot")
+		c.Do("INCRBY", "noot", "100")
+		c.Do("INCRBY", "noot", "200")
+		c.Do("INCRBY", "noot", "300")
+		c.Do("GET", "noot")
+		c.Do("DECRBY", "noot", "100")
+		c.Do("DECRBY", "noot", "200")
+		c.Do("DECRBY", "noot", "300")
+		c.Do("DECRBY", "noot", "400")
+		c.Do("GET", "noot")
+		c.Do("INCRBYFLOAT", "zus", "1.23")
+		c.Do("INCRBYFLOAT", "zus", "3.1456")
+		c.Do("INCRBYFLOAT", "zus", "987.65432")
+		c.Do("GET", "zus")
+		c.Do("INCRBYFLOAT", "whole", "300")
+		c.Do("INCRBYFLOAT", "whole", "300")
+		c.Do("INCRBYFLOAT", "whole", "300")
+		c.Do("GET", "whole")
+		c.Do("INCRBYFLOAT", "big", "12345e10")
+		c.Do("GET", "big")
 
 		// Floats are not ints.
-		succ("SET", "float", 1.23),
-		fail("INCR", "float"),
-		fail("INCRBY", "float", 12),
-		fail("DECR", "float"),
-		fail("DECRBY", "float", 12),
-		succ("SET", "str", "I'm a string"),
-		fail("INCRBYFLOAT", "str", 123.5),
+		c.Do("SET", "float", "1.23")
+		c.Do("INCR", "float")
+		c.Do("INCRBY", "float", "12")
+		c.Do("DECR", "float")
+		c.Do("DECRBY", "float", "12")
+		c.Do("SET", "str", "I'm a string")
+		c.Do("INCRBYFLOAT", "str", "123.5")
 
 		// Error cases
-		succ("HSET", "mies", "noot", "mies"),
-		fail("INCR", "mies"),
-		fail("INCRBY", "mies", 1),
-		fail("INCRBY", "mies", "foo"),
-		fail("DECR", "mies"),
-		fail("DECRBY", "mies", 1),
-		fail("INCRBYFLOAT", "mies", 1),
-		fail("INCRBYFLOAT", "int", "foo"),
+		c.Do("HSET", "mies", "noot", "mies")
+		c.Do("INCR", "mies")
+		c.Do("INCRBY", "mies", "1")
+		c.Do("INCRBY", "mies", "foo")
+		c.Do("DECR", "mies")
+		c.Do("DECRBY", "mies", "1")
+		c.Do("INCRBYFLOAT", "mies", "1")
+		c.Do("INCRBYFLOAT", "int", "foo")
 
-		fail("INCR", "int", "err"),
-		fail("INCRBY", "int"),
-		fail("DECR", "int", "err"),
-		fail("DECRBY", "int"),
-		fail("INCRBYFLOAT", "int"),
+		c.Do("INCR", "int", "err")
+		c.Do("INCRBY", "int")
+		c.Do("DECR", "int", "err")
+		c.Do("DECRBY", "int")
+		c.Do("INCRBYFLOAT", "int")
 
 		// Rounding
-		succ("INCRBYFLOAT", "zero", 12.3),
-		succ("INCRBYFLOAT", "zero", -13.1),
+		c.Do("INCRBYFLOAT", "zero", "12.3")
+		c.Do("INCRBYFLOAT", "zero", "-13.1")
 
 		// E
-		succ("INCRBYFLOAT", "one", "12e12"),
-		// succ("INCRBYFLOAT", "one", "12e34"), // FIXME
-		fail("INCRBYFLOAT", "one", "12e34.1"),
-		// succ("INCRBYFLOAT", "one", "0x12e12"), // FIXME
-		// succ("INCRBYFLOAT", "one", "012e12"), // FIXME
-		succ("INCRBYFLOAT", "two", "012"),
-		fail("INCRBYFLOAT", "one", "0b12e12"),
-	)
+		c.Do("INCRBYFLOAT", "one", "12e12")
+		// c.Do("INCRBYFLOAT", "one", "12e34") // FIXME
+		c.Do("INCRBYFLOAT", "one", "12e34.1")
+		// c.Do("INCRBYFLOAT", "one", "0x12e12") // FIXME
+		// c.Do("INCRBYFLOAT", "one", "012e12") // FIXME
+		c.Do("INCRBYFLOAT", "two", "012")
+		c.Do("INCRBYFLOAT", "one", "0b12e12")
+	})
 }
 
 func TestBitcount(t *testing.T) {
-	testCommands(t,
-		succ("SET", "str", "The quick brown fox jumps over the lazy dog"),
-		succ("SET", "utf8", "❆❅❄☃"),
-		succ("BITCOUNT", "str"),
-		succ("BITCOUNT", "utf8"),
-		succ("BITCOUNT", "str", 0, 0),
-		succ("BITCOUNT", "str", 1, 2),
-		succ("BITCOUNT", "str", 1, -200),
-		succ("BITCOUNT", "str", -2, -1),
-		succ("BITCOUNT", "str", -2, -12),
-		succ("BITCOUNT", "utf8", 0, 0),
+	testRaw(t, func(c *client) {
+		c.Do("SET", "str", "The quick brown fox jumps over the lazy dog")
+		c.Do("SET", "utf8", "❆❅❄☃")
+		c.Do("BITCOUNT", "str")
+		c.Do("BITCOUNT", "utf8")
+		c.Do("BITCOUNT", "str", "0", "0")
+		c.Do("BITCOUNT", "str", "1", "2")
+		c.Do("BITCOUNT", "str", "1", "-200")
+		c.Do("BITCOUNT", "str", "-2", "-1")
+		c.Do("BITCOUNT", "str", "-2", "-12")
+		c.Do("BITCOUNT", "utf8", "0", "0")
 
-		fail("BITCOUNT"),
-		succ("BITCOUNT", "wrong", "arguments"),
-		fail("BITCOUNT", "str", 4, 2, 2, 2, 2),
-		fail("BITCOUNT", "str", "foo", 2),
-		succ("HSET", "aap", "noot", "mies"),
-		fail("BITCOUNT", "aap", 4, 2),
-	)
+		c.Do("BITCOUNT")
+		c.Do("BITCOUNT", "wrong", "arguments")
+		c.Do("BITCOUNT", "str", "4", "2", "2", "2", "2")
+		c.Do("BITCOUNT", "str", "foo", "2")
+		c.Do("HSET", "aap", "noot", "mies")
+		c.Do("BITCOUNT", "aap", "4", "2")
+	})
 }
 
 func TestBitop(t *testing.T) {
-	testCommands(t,
-		succ("SET", "a", "foo"),
-		succ("SET", "b", "aap"),
-		succ("SET", "c", "noot"),
-		succ("SET", "d", "mies"),
-		succ("SET", "e", "❆❅❄☃"),
+	testRaw(t, func(c *client) {
+		c.Do("SET", "a", "foo")
+		c.Do("SET", "b", "aap")
+		c.Do("SET", "c", "noot")
+		c.Do("SET", "d", "mies")
+		c.Do("SET", "e", "❆❅❄☃")
 
 		// ANDs
-		succ("BITOP", "AND", "target", "a", "b", "c", "d"),
-		succ("GET", "target"),
-		succ("BITOP", "AND", "target", "a", "nosuch", "c", "d"),
-		succ("GET", "target"),
-		succ("BITOP", "AND", "utf8", "e", "e"),
-		succ("GET", "utf8"),
-		succ("BITOP", "AND", "utf8", "b", "e"),
-		succ("GET", "utf8"),
+		c.Do("BITOP", "AND", "target", "a", "b", "c", "d")
+		c.Do("GET", "target")
+		c.Do("BITOP", "AND", "target", "a", "nosuch", "c", "d")
+		c.Do("GET", "target")
+		c.Do("BITOP", "AND", "utf8", "e", "e")
+		c.Do("GET", "utf8")
+		c.Do("BITOP", "AND", "utf8", "b", "e")
+		c.Do("GET", "utf8")
 		// BITOP on only unknown keys:
-		succ("BITOP", "AND", "bits", "nosuch", "nosucheither"),
-		succ("GET", "bits"),
+		c.Do("BITOP", "AND", "bits", "nosuch", "nosucheither")
+		c.Do("GET", "bits")
 
 		// ORs
-		succ("BITOP", "OR", "target", "a", "b", "c", "d"),
-		succ("GET", "target"),
-		succ("BITOP", "OR", "target", "a", "nosuch", "c", "d"),
-		succ("GET", "target"),
-		succ("BITOP", "OR", "utf8", "e", "e"),
-		succ("GET", "utf8"),
-		succ("BITOP", "OR", "utf8", "b", "e"),
-		succ("GET", "utf8"),
+		c.Do("BITOP", "OR", "target", "a", "b", "c", "d")
+		c.Do("GET", "target")
+		c.Do("BITOP", "OR", "target", "a", "nosuch", "c", "d")
+		c.Do("GET", "target")
+		c.Do("BITOP", "OR", "utf8", "e", "e")
+		c.Do("GET", "utf8")
+		c.Do("BITOP", "OR", "utf8", "b", "e")
+		c.Do("GET", "utf8")
 		// BITOP on only unknown keys:
-		succ("BITOP", "OR", "bits", "nosuch", "nosucheither"),
-		succ("GET", "bits"),
-		succ("SET", "empty", ""),
+		c.Do("BITOP", "OR", "bits", "nosuch", "nosucheither")
+		c.Do("GET", "bits")
+		c.Do("SET", "empty", "")
 		// BITOP on empty key
-		succ("BITOP", "OR", "bits", "empty"),
-		succ("GET", "bits"),
+		c.Do("BITOP", "OR", "bits", "empty")
+		c.Do("GET", "bits")
 
 		// XORs
-		succ("BITOP", "XOR", "target", "a", "b", "c", "d"),
-		succ("GET", "target"),
-		succ("BITOP", "XOR", "target", "a", "nosuch", "c", "d"),
-		succ("GET", "target"),
-		succ("BITOP", "XOR", "target", "a"),
-		succ("GET", "target"),
-		succ("BITOP", "XOR", "utf8", "e", "e"),
-		succ("GET", "utf8"),
-		succ("BITOP", "XOR", "utf8", "b", "e"),
-		succ("GET", "utf8"),
+		c.Do("BITOP", "XOR", "target", "a", "b", "c", "d")
+		c.Do("GET", "target")
+		c.Do("BITOP", "XOR", "target", "a", "nosuch", "c", "d")
+		c.Do("GET", "target")
+		c.Do("BITOP", "XOR", "target", "a")
+		c.Do("GET", "target")
+		c.Do("BITOP", "XOR", "utf8", "e", "e")
+		c.Do("GET", "utf8")
+		c.Do("BITOP", "XOR", "utf8", "b", "e")
+		c.Do("GET", "utf8")
 
 		// NOTs
-		succ("BITOP", "NOT", "target", "a"),
-		succ("GET", "target"),
-		succ("BITOP", "NOT", "target", "e"),
-		succ("GET", "target"),
-		succ("BITOP", "NOT", "bits", "nosuch"),
-		succ("GET", "bits"),
+		c.Do("BITOP", "NOT", "target", "a")
+		c.Do("GET", "target")
+		c.Do("BITOP", "NOT", "target", "e")
+		c.Do("GET", "target")
+		c.Do("BITOP", "NOT", "bits", "nosuch")
+		c.Do("GET", "bits")
 
-		fail("BITOP", "AND", "utf8"),
-		fail("BITOP", "AND"),
-		fail("BITOP", "NOT", "foo", "bar", "baz"),
-		fail("BITOP", "WRONGOP", "key"),
-		fail("BITOP", "WRONGOP"),
+		c.Do("BITOP", "AND", "utf8")
+		c.Do("BITOP", "AND")
+		c.Do("BITOP", "NOT", "foo", "bar", "baz")
+		c.Do("BITOP", "WRONGOP", "key")
+		c.Do("BITOP", "WRONGOP")
 
-		succ("HSET", "hash", "aap", "noot"),
-		fail("BITOP", "AND", "t", "hash", "irrelevant"),
-		fail("BITOP", "OR", "t", "hash", "irrelevant"),
-		fail("BITOP", "XOR", "t", "hash", "irrelevant"),
-		fail("BITOP", "NOT", "t", "hash"),
-	)
+		c.Do("HSET", "hash", "aap", "noot")
+		c.Do("BITOP", "AND", "t", "hash", "irrelevant")
+		c.Do("BITOP", "OR", "t", "hash", "irrelevant")
+		c.Do("BITOP", "XOR", "t", "hash", "irrelevant")
+		c.Do("BITOP", "NOT", "t", "hash")
+	})
 }
 
 func TestBitpos(t *testing.T) {
-	testCommands(t,
-		succ("SET", "a", "\x00\x0f"),
-		succ("SET", "b", "\xf0\xf0"),
-		succ("SET", "c", "\x00\x00\x00\x0f"),
-		succ("SET", "d", "\x00\x00\x00"),
-		succ("SET", "e", "\xff\xff\xff"),
+	testRaw(t, func(c *client) {
+		c.Do("SET", "a", "\x00\x0f")
+		c.Do("SET", "b", "\xf0\xf0")
+		c.Do("SET", "c", "\x00\x00\x00\x0f")
+		c.Do("SET", "d", "\x00\x00\x00")
+		c.Do("SET", "e", "\xff\xff\xff")
 
-		succ("BITPOS", "a", 1),
-		succ("BITPOS", "a", 0),
-		succ("BITPOS", "a", 1, 1),
-		succ("BITPOS", "a", 0, 1),
-		succ("BITPOS", "a", 1, 1, 2),
-		succ("BITPOS", "a", 0, 1, 2),
-		succ("BITPOS", "b", 1),
-		succ("BITPOS", "b", 0),
-		succ("BITPOS", "c", 1),
-		succ("BITPOS", "c", 0),
-		succ("BITPOS", "d", 1),
-		succ("BITPOS", "d", 0),
-		succ("BITPOS", "e", 1),
-		succ("BITPOS", "e", 0),
-		succ("BITPOS", "e", 1, 1),
-		succ("BITPOS", "e", 0, 1),
-		succ("BITPOS", "e", 1, 1, 2),
-		succ("BITPOS", "e", 0, 1, 2),
-		succ("BITPOS", "e", 1, 100, 2),
-		succ("BITPOS", "e", 0, 100, 2),
-		succ("BITPOS", "e", 1, 1, -2),
-		succ("BITPOS", "e", 1, 1, -2000),
-		succ("BITPOS", "e", 0, 1, 2),
-		succ("BITPOS", "nosuch", 1),
-		succ("BITPOS", "nosuch", 0),
+		c.Do("BITPOS", "a", "1")
+		c.Do("BITPOS", "a", "0")
+		c.Do("BITPOS", "a", "1", "1")
+		c.Do("BITPOS", "a", "0", "1")
+		c.Do("BITPOS", "a", "1", "1", "2")
+		c.Do("BITPOS", "a", "0", "1", "2")
+		c.Do("BITPOS", "b", "1")
+		c.Do("BITPOS", "b", "0")
+		c.Do("BITPOS", "c", "1")
+		c.Do("BITPOS", "c", "0")
+		c.Do("BITPOS", "d", "1")
+		c.Do("BITPOS", "d", "0")
+		c.Do("BITPOS", "e", "1")
+		c.Do("BITPOS", "e", "0")
+		c.Do("BITPOS", "e", "1", "1")
+		c.Do("BITPOS", "e", "0", "1")
+		c.Do("BITPOS", "e", "1", "1", "2")
+		c.Do("BITPOS", "e", "0", "1", "2")
+		c.Do("BITPOS", "e", "1", "100", "2")
+		c.Do("BITPOS", "e", "0", "100", "2")
+		c.Do("BITPOS", "e", "1", "1", "-2")
+		c.Do("BITPOS", "e", "1", "1", "-2000")
+		c.Do("BITPOS", "e", "0", "1", "2")
+		c.Do("BITPOS", "nosuch", "1")
+		c.Do("BITPOS", "nosuch", "0")
 
-		succ("HSET", "hash", "aap", "noot"),
-		fail("BITPOS", "hash", 1),
-		fail("BITPOS", "a", "aap"),
-	)
+		c.Do("HSET", "hash", "aap", "noot")
+		c.Do("BITPOS", "hash", "1")
+		c.Do("BITPOS", "a", "aap")
+	})
 }
 
 func TestGetbit(t *testing.T) {
-	commands := []command{
-		succ("SET", "a", "\x00\x0f"),
-		succ("SET", "e", "\xff\xff\xff"),
-		succ("GETBIT", "nosuch", 1),
-		succ("GETBIT", "nosuch", 0),
+	testRaw(t, func(c *client) {
+		for i := 0; i < 100; i++ {
+			c.Do("SET", "a", "\x00\x0f")
+			c.Do("SET", "e", "\xff\xff\xff")
+			c.Do("GETBIT", "nosuch", "1")
+			c.Do("GETBIT", "nosuch", "0")
 
-		// Error cases
-		succ("HSET", "hash", "aap", "noot"),
-		fail("GETBIT", "hash", 1),
-		fail("GETBIT", "a", "aap"),
-		fail("GETBIT", "a"),
-		fail("GETBIT", "too", 1, "many"),
-	}
+			// Error cases
+			c.Do("HSET", "hash", "aap", "noot")
+			c.Do("GETBIT", "hash", "1")
+			c.Do("GETBIT", "a", "aap")
+			c.Do("GETBIT", "a")
+			c.Do("GETBIT", "too", "1", "many")
 
-	// Generate read commands.
-	for i := range make([]struct{}, 100) {
-		commands = append(commands,
-			succ("GETBIT", "a", i),
-			succ("GETBIT", "e", i),
-		)
-	}
-
-	testCommands(t, commands...)
+			c.Do("GETBIT", "a", strconv.Itoa(i))
+			c.Do("GETBIT", "e", strconv.Itoa(i))
+		}
+	})
 }
 
 func TestSetbit(t *testing.T) {
-	commands := []command{
-		succ("SET", "a", "\x00\x0f"),
-		succ("SETBIT", "a", 0, 1),
-		succ("GET", "a"),
-		succ("SETBIT", "a", 0, 0),
-		succ("GET", "a"),
-		succ("SETBIT", "a", 13, 0),
-		succ("GET", "a"),
-		succ("SETBIT", "nosuch", 11111, 1),
-		succ("GET", "nosuch"),
+	testRaw(t, func(c *client) {
+		for i := 0; i < 100; i++ {
+			c.Do("SET", "a", "\x00\x0f")
+			c.Do("SETBIT", "a", "0", "1")
+			c.Do("GET", "a")
+			c.Do("SETBIT", "a", "0", "0")
+			c.Do("GET", "a")
+			c.Do("SETBIT", "a", "13", "0")
+			c.Do("GET", "a")
+			c.Do("SETBIT", "nosuch", "11111", "1")
+			c.Do("GET", "nosuch")
 
-		// Error cases
-		succ("HSET", "hash", "aap", "noot"),
-		fail("SETBIT", "hash", 1, 1),
-		fail("SETBIT", "a", "aap", 0),
-		fail("SETBIT", "a", 0, "aap"),
-		fail("SETBIT", "a", -1, 0),
-		fail("SETBIT", "a", 1, -1),
-		fail("SETBIT", "a", 1, 2),
-		fail("SETBIT", "too", 1, 2, "many"),
-	}
+			// Error cases
+			c.Do("HSET", "hash", "aap", "noot")
+			c.Do("SETBIT", "hash", "1", "1")
+			c.Do("SETBIT", "a", "aap", "0")
+			c.Do("SETBIT", "a", "0", "aap")
+			c.Do("SETBIT", "a", "-1", "0")
+			c.Do("SETBIT", "a", "1", "-1")
+			c.Do("SETBIT", "a", "1", "2")
+			c.Do("SETBIT", "too", "1", "2", "many")
 
-	// Generate read commands.
-	for i := range make([]struct{}, 100) {
-		commands = append(commands,
-			succ("GETBIT", "a", i),
-			succ("GETBIT", "e", i),
-		)
-	}
-
-	testCommands(t, commands...)
+			c.Do("GETBIT", "a", strconv.Itoa(i))
+			c.Do("GETBIT", "e", strconv.Itoa(i))
+		}
+	})
 }
 
 func TestAppend(t *testing.T) {
-	testCommands(t,
-		succ("SET", "foo", "bar"),
-		succ("APPEND", "foo", "more"),
-		succ("GET", "foo"),
-		succ("APPEND", "nosuch", "more"),
-		succ("GET", "nosuch"),
+	testRaw(t, func(c *client) {
+		c.Do("SET", "foo", "bar")
+		c.Do("APPEND", "foo", "more")
+		c.Do("GET", "foo")
+		c.Do("APPEND", "nosuch", "more")
+		c.Do("GET", "nosuch")
 
 		// Failure cases
-		fail("APPEND"),
-		fail("APPEND", "foo"),
-	)
+		c.Do("APPEND")
+		c.Do("APPEND", "foo")
+	})
 }
 
 func TestMove(t *testing.T) {
-	testCommands(t,
-		succ("SET", "foo", "bar"),
-		succ("EXPIRE", "foo", 12345),
-		succ("MOVE", "foo", 2),
-		succ("GET", "foo"),
-		succ("TTL", "foo"),
-		succ("SELECT", 2),
-		succ("GET", "foo"),
-		succ("TTL", "foo"),
+	testRaw(t, func(c *client) {
+		c.Do("SET", "foo", "bar")
+		c.Do("EXPIRE", "foo", "12345")
+		c.Do("MOVE", "foo", "2")
+		c.Do("GET", "foo")
+		c.Do("TTL", "foo")
+		c.Do("SELECT", "2")
+		c.Do("GET", "foo")
+		c.Do("TTL", "foo")
 
 		// Failure cases
-		fail("MOVE"),
-		fail("MOVE", "foo"),
-		// fail("MOVE", "foo", "noint"),
-	)
+		c.Do("MOVE")
+		c.Do("MOVE", "foo")
+		// c.Do("MOVE", "foo", "noint")
+	})
 	// hash key
-	testCommands(t,
-		succ("HSET", "hash", "key", "value"),
-		succ("EXPIRE", "hash", 12345),
-		succ("MOVE", "hash", 2),
-		succ("MGET", "hash", "key"),
-		succ("TTL", "hash"),
-		succ("SELECT", 2),
-		succ("MGET", "hash", "key"),
-		succ("TTL", "hash"),
-	)
-	testCommands(t,
-		succ("SET", "foo", "bar"),
+	testRaw(t, func(c *client) {
+		c.Do("HSET", "hash", "key", "value")
+		c.Do("EXPIRE", "hash", "12345")
+		c.Do("MOVE", "hash", "2")
+		c.Do("MGET", "hash", "key")
+		c.Do("TTL", "hash")
+		c.Do("SELECT", "2")
+		c.Do("MGET", "hash", "key")
+		c.Do("TTL", "hash")
+	})
+	testRaw(t, func(c *client) {
+		c.Do("SET", "foo", "bar")
 		// to current DB.
-		fail("MOVE", "foo", 0),
-	)
+		c.Do("MOVE", "foo", "0")
+	})
 }

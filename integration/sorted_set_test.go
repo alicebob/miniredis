@@ -5,701 +5,700 @@ package main
 // Sorted Set keys.
 
 import (
-	"math"
 	"testing"
 )
 
 func TestSortedSet(t *testing.T) {
-	testCommands(t,
-		succ("ZADD", "z", 1, "aap", 2, "noot", 3, "mies"),
-		succ("ZADD", "z", 1, "vuur", 4, "noot"),
-		succ("TYPE", "z"),
-		succ("EXISTS", "z"),
-		succ("ZCARD", "z"),
+	testRaw(t, func(c *client) {
+		c.Do("ZADD", "z", "1", "aap", "2", "noot", "3", "mies")
+		c.Do("ZADD", "z", "1", "vuur", "4", "noot")
+		c.Do("TYPE", "z")
+		c.Do("EXISTS", "z")
+		c.Do("ZCARD", "z")
 
-		succ("ZRANK", "z", "aap"),
-		succ("ZRANK", "z", "noot"),
-		succ("ZRANK", "z", "mies"),
-		succ("ZRANK", "z", "vuur"),
-		succ("ZRANK", "z", "nosuch"),
-		succ("ZRANK", "nosuch", "nosuch"),
-		succ("ZREVRANK", "z", "aap"),
-		succ("ZREVRANK", "z", "noot"),
-		succ("ZREVRANK", "z", "mies"),
-		succ("ZREVRANK", "z", "vuur"),
-		succ("ZREVRANK", "z", "nosuch"),
-		succ("ZREVRANK", "nosuch", "nosuch"),
+		c.Do("ZRANK", "z", "aap")
+		c.Do("ZRANK", "z", "noot")
+		c.Do("ZRANK", "z", "mies")
+		c.Do("ZRANK", "z", "vuur")
+		c.Do("ZRANK", "z", "nosuch")
+		c.Do("ZRANK", "nosuch", "nosuch")
+		c.Do("ZREVRANK", "z", "aap")
+		c.Do("ZREVRANK", "z", "noot")
+		c.Do("ZREVRANK", "z", "mies")
+		c.Do("ZREVRANK", "z", "vuur")
+		c.Do("ZREVRANK", "z", "nosuch")
+		c.Do("ZREVRANK", "nosuch", "nosuch")
 
-		succ("ZADD", "zi", "inf", "aap", "-inf", "noot", "+inf", "mies"),
-		succ("ZRANK", "zi", "noot"),
+		c.Do("ZADD", "zi", "inf", "aap", "-inf", "noot", "+inf", "mies")
+		c.Do("ZRANK", "zi", "noot")
 
 		// Double key
-		succ("ZADD", "zz", 1, "aap", 2, "aap"),
-		succ("ZCARD", "zz"),
+		c.Do("ZADD", "zz", "1", "aap", "2", "aap")
+		c.Do("ZCARD", "zz")
 
-		succ("ZPOPMAX", "zz", 2),
-		succ("ZPOPMAX", "zz"),
-		succ("ZPOPMAX", "zz", -100),
-		succ("ZPOPMAX", "nosuch", 1),
-		succ("ZPOPMAX", "zz", 100),
+		c.Do("ZPOPMAX", "zz", "2")
+		c.Do("ZPOPMAX", "zz")
+		c.Do("ZPOPMAX", "zz", "-100")
+		c.Do("ZPOPMAX", "nosuch", "1")
+		c.Do("ZPOPMAX", "zz", "100")
 
-		succ("ZPOPMIN", "zz", 2),
-		succ("ZPOPMIN", "zz"),
-		succ("ZPOPMIN", "zz", -100),
-		succ("ZPOPMIN", "nosuch", 1),
-		succ("ZPOPMIN", "zz", 100),
+		c.Do("ZPOPMIN", "zz", "2")
+		c.Do("ZPOPMIN", "zz")
+		c.Do("ZPOPMIN", "zz", "-100")
+		c.Do("ZPOPMIN", "nosuch", "1")
+		c.Do("ZPOPMIN", "zz", "100")
 
 		// failure cases
-		succ("SET", "str", "I am a string"),
-		fail("ZADD"),
-		fail("ZADD", "s"),
-		fail("ZADD", "s", 1),
-		fail("ZADD", "s", 1, "aap", 1),
-		fail("ZADD", "s", "nofloat", "aap"),
-		fail("ZADD", "str", 1, "aap"),
-		fail("ZCARD"),
-		fail("ZCARD", "too", "many"),
-		fail("ZCARD", "str"),
-		fail("ZRANK"),
-		fail("ZRANK", "key"),
-		fail("ZRANK", "key", "too", "many"),
-		fail("ZRANK", "str", "member"),
-		fail("ZREVRANK"),
-		fail("ZREVRANK", "key"),
-		fail("ZPOPMAX"),
-		fail("ZPOPMAX", "set", "noint"),
-		fail("ZPOPMAX", "set", 1, "toomany"),
-		fail("ZPOPMIN"),
-		fail("ZPOPMIN", "set", "noint"),
-		fail("ZPOPMIN", "set", 1, "toomany"),
+		c.Do("SET", "str", "I am a string")
+		c.Do("ZADD")
+		c.Do("ZADD", "s")
+		c.Do("ZADD", "s", "1")
+		c.Do("ZADD", "s", "1", "aap", "1")
+		c.Do("ZADD", "s", "nofloat", "aap")
+		c.Do("ZADD", "str", "1", "aap")
+		c.Do("ZCARD")
+		c.Do("ZCARD", "too", "many")
+		c.Do("ZCARD", "str")
+		c.Do("ZRANK")
+		c.Do("ZRANK", "key")
+		c.Do("ZRANK", "key", "too", "many")
+		c.Do("ZRANK", "str", "member")
+		c.Do("ZREVRANK")
+		c.Do("ZREVRANK", "key")
+		c.Do("ZPOPMAX")
+		c.Do("ZPOPMAX", "set", "noint")
+		c.Do("ZPOPMAX", "set", "1", "toomany")
+		c.Do("ZPOPMIN")
+		c.Do("ZPOPMIN", "set", "noint")
+		c.Do("ZPOPMIN", "set", "1", "toomany")
 
-		succ("RENAME", "z", "z2"),
-		succ("EXISTS", "z"),
-		succ("EXISTS", "z2"),
-		succ("MOVE", "z2", 3),
-		succ("EXISTS", "z2"),
-		succ("SELECT", 3),
-		succ("EXISTS", "z2"),
-		succ("DEL", "z2"),
-		succ("EXISTS", "z2"),
-	)
+		c.Do("RENAME", "z", "z2")
+		c.Do("EXISTS", "z")
+		c.Do("EXISTS", "z2")
+		c.Do("MOVE", "z2", "3")
+		c.Do("EXISTS", "z2")
+		c.Do("SELECT", "3")
+		c.Do("EXISTS", "z2")
+		c.Do("DEL", "z2")
+		c.Do("EXISTS", "z2")
+	})
 
-	testCommands(t,
-		succ("ZADD", "z", 0, "new\nline\n"),
-		succ("ZADD", "z", 0, "line"),
-		succ("ZADD", "z", 0, "another\nnew\nline\n"),
-		succ("ZSCAN", "z", 0, "MATCH", "*"),
-		succ("ZRANGEBYLEX", "z", "[a", "[z"),
-		succ("ZRANGE", "z", 0, -1, "WITHSCORES"),
-	)
+	testRaw(t, func(c *client) {
+		c.Do("ZADD", "z", "0", "new\nline\n")
+		c.Do("ZADD", "z", "0", "line")
+		c.Do("ZADD", "z", "0", "another\nnew\nline\n")
+		c.Do("ZSCAN", "z", "0", "MATCH", "*")
+		c.Do("ZRANGEBYLEX", "z", "[a", "[z")
+		c.Do("ZRANGE", "z", "0", "-1", "WITHSCORES")
+	})
 }
 
 func TestSortedSetAdd(t *testing.T) {
-	testCommands(t,
-		succ("ZADD", "z",
-			1, "aap",
-			2, "noot",
-		),
-		succ("ZADD", "z", "NX",
-			1.1, "aap",
-			3, "mies",
-		),
-		succ("ZADD", "z", "XX",
-			1.2, "aap",
-			4, "vuur",
-		),
-		succ("ZADD", "z", "CH",
-			1.2, "aap",
-			4.1, "vuur",
-			5, "roos",
-		),
-		succ("ZADD", "z", "CH", "XX",
-			1.2, "aap",
-			4.2, "vuur",
-			5, "roos",
-			5, "zand",
-		),
-		succ("ZADD", "z", "XX", "XX", "XX", "XX",
-			1.2, "aap",
-		),
-		succ("ZADD", "z", "NX", "NX", "NX", "NX",
-			1.2, "aap",
-		),
-		fail("ZADD", "z", "XX", "NX", 1.1, "foo"),
-		fail("ZADD", "z", "XX"),
-		fail("ZADD", "z", "NX"),
-		fail("ZADD", "z", "CH"),
-		fail("ZADD", "z", "??"),
-		fail("ZADD", "z", 1.2, "aap", "XX"),
-		fail("ZADD", "z", 1.2, "aap", "CH"),
-		fail("ZADD", "z"),
-	)
-	testCommands(t,
-		succ("ZADD", "z", "INCR", 1, "aap"),
-		succ("ZADD", "z", "INCR", 1, "aap"),
-		succ("ZADD", "z", "INCR", 1, "aap"),
-		succ("ZADD", "z", "INCR", -12, "aap"),
-		succ("ZADD", "z", "INCR", "INCR", -12, "aap"),
-		succ("ZADD", "z", "CH", "INCR", -12, "aap"), // 'CH' is ignored
-		succ("ZADD", "z", "INCR", "CH", -12, "aap"), // 'CH' is ignored
-		succ("ZADD", "z", "INCR", "NX", 12, "aap"),
-		succ("ZADD", "z", "INCR", "XX", 12, "aap"),
-		succ("ZADD", "q", "INCR", "NX", 12, "aap"),
-		succ("ZADD", "q", "INCR", "XX", 12, "aap"),
+	testRaw(t, func(c *client) {
+		c.Do("ZADD", "z",
+			"1", "aap",
+			"2", "noot",
+		)
+		c.Do("ZADD", "z", "NX",
+			"1.1", "aap",
+			"3", "mies",
+		)
+		c.Do("ZADD", "z", "XX",
+			"1.2", "aap",
+			"4", "vuur",
+		)
+		c.Do("ZADD", "z", "CH",
+			"1.2", "aap",
+			"4.1", "vuur",
+			"5", "roos",
+		)
+		c.Do("ZADD", "z", "CH", "XX",
+			"1.2", "aap",
+			"4.2", "vuur",
+			"5", "roos",
+			"5", "zand",
+		)
+		c.Do("ZADD", "z", "XX", "XX", "XX", "XX",
+			"1.2", "aap",
+		)
+		c.Do("ZADD", "z", "NX", "NX", "NX", "NX",
+			"1.2", "aap",
+		)
+		c.Do("ZADD", "z", "XX", "NX", "1.1", "foo")
+		c.Do("ZADD", "z", "XX")
+		c.Do("ZADD", "z", "NX")
+		c.Do("ZADD", "z", "CH")
+		c.Do("ZADD", "z", "??")
+		c.Do("ZADD", "z", "1.2", "aap", "XX")
+		c.Do("ZADD", "z", "1.2", "aap", "CH")
+		c.Do("ZADD", "z")
+	})
+	testRaw(t, func(c *client) {
+		c.Do("ZADD", "z", "INCR", "1", "aap")
+		c.Do("ZADD", "z", "INCR", "1", "aap")
+		c.Do("ZADD", "z", "INCR", "1", "aap")
+		c.Do("ZADD", "z", "INCR", "-12", "aap")
+		c.Do("ZADD", "z", "INCR", "INCR", "-12", "aap")
+		c.Do("ZADD", "z", "CH", "INCR", "-12", "aap") // 'CH' is ignored
+		c.Do("ZADD", "z", "INCR", "CH", "-12", "aap") // 'CH' is ignored
+		c.Do("ZADD", "z", "INCR", "NX", "12", "aap")
+		c.Do("ZADD", "z", "INCR", "XX", "12", "aap")
+		c.Do("ZADD", "q", "INCR", "NX", "12", "aap")
+		c.Do("ZADD", "q", "INCR", "XX", "12", "aap")
 
-		fail("ZADD", "z", "INCR", 1, "aap", 2, "tiger"),
-		fail("ZADD", "z", "INCR", -12),
-		fail("ZADD", "z", "INCR", -12, "aap", "NX"),
-	)
+		c.Do("ZADD", "z", "INCR", "1", "aap", "2", "tiger")
+		c.Do("ZADD", "z", "INCR", "-12")
+		c.Do("ZADD", "z", "INCR", "-12", "aap", "NX")
+	})
 }
 
 func TestSortedSetRange(t *testing.T) {
-	testCommands(t,
-		succ("ZADD", "z",
-			1, "aap",
-			2, "noot",
-			3, "mies",
-			2, "nootagain",
-			3, "miesagain",
-			math.Inf(+1), "the stars",
-			math.Inf(+1), "more stars",
-			math.Inf(-1), "big bang",
-		),
-		succ("ZRANGE", "z", 0, -1),
-		succ("ZRANGE", "z", 0, -1, "WITHSCORES"),
-		succ("ZRANGE", "z", 0, -1, "WiThScOrEs"),
-		succ("ZRANGE", "z", 0, -2),
-		succ("ZRANGE", "z", 0, -1000),
-		succ("ZRANGE", "z", 2, -2),
-		succ("ZRANGE", "z", 400, -1),
-		succ("ZRANGE", "z", 300, -110),
-		succ("ZREVRANGE", "z", 0, -1),
-		succ("ZREVRANGE", "z", 0, -1, "WITHSCORES"),
-		succ("ZREVRANGE", "z", 0, -1, "WiThScOrEs"),
-		succ("ZREVRANGE", "z", 0, -2),
-		succ("ZREVRANGE", "z", 0, -1000),
-		succ("ZREVRANGE", "z", 2, -2),
-		succ("ZREVRANGE", "z", 400, -1),
-		succ("ZREVRANGE", "z", 300, -110),
+	testRaw(t, func(c *client) {
+		c.Do("ZADD", "z",
+			"1", "aap",
+			"2", "noot",
+			"3", "mies",
+			"2", "nootagain",
+			"3", "miesagain",
+			"+Inf", "the stars",
+			"+Inf", "more stars",
+			"-Inf", "big bang",
+		)
+		c.Do("ZRANGE", "z", "0", "-1")
+		c.Do("ZRANGE", "z", "0", "-1", "WITHSCORES")
+		c.Do("ZRANGE", "z", "0", "-1", "WiThScOrEs")
+		c.Do("ZRANGE", "z", "0", "-2")
+		c.Do("ZRANGE", "z", "0", "-1000")
+		c.Do("ZRANGE", "z", "2", "-2")
+		c.Do("ZRANGE", "z", "400", "-1")
+		c.Do("ZRANGE", "z", "300", "-110")
+		c.Do("ZREVRANGE", "z", "0", "-1")
+		c.Do("ZREVRANGE", "z", "0", "-1", "WITHSCORES")
+		c.Do("ZREVRANGE", "z", "0", "-1", "WiThScOrEs")
+		c.Do("ZREVRANGE", "z", "0", "-2")
+		c.Do("ZREVRANGE", "z", "0", "-1000")
+		c.Do("ZREVRANGE", "z", "2", "-2")
+		c.Do("ZREVRANGE", "z", "400", "-1")
+		c.Do("ZREVRANGE", "z", "300", "-110")
 
-		succ("ZADD", "zz",
-			0, "aap",
-			0, "Aap",
-			0, "AAP",
-			0, "aAP",
-			0, "aAp",
-		),
-		succ("ZRANGE", "zz", 0, -1),
+		c.Do("ZADD", "zz",
+			"0", "aap",
+			"0", "Aap",
+			"0", "AAP",
+			"0", "aAP",
+			"0", "aAp",
+		)
+		c.Do("ZRANGE", "zz", "0", "-1")
 
 		// failure cases
-		fail("ZRANGE"),
-		fail("ZRANGE", "foo"),
-		fail("ZRANGE", "foo", 1),
-		fail("ZRANGE", "foo", 2, 3, "toomany"),
-		fail("ZRANGE", "foo", 2, 3, "WITHSCORES", "toomany"),
-		fail("ZRANGE", "foo", "noint", 3),
-		fail("ZRANGE", "foo", 2, "noint"),
-		succ("SET", "str", "I am a string"),
-		fail("ZRANGE", "str", 300, -110),
+		c.Do("ZRANGE")
+		c.Do("ZRANGE", "foo")
+		c.Do("ZRANGE", "foo", "1")
+		c.Do("ZRANGE", "foo", "2", "3", "toomany")
+		c.Do("ZRANGE", "foo", "2", "3", "WITHSCORES", "toomany")
+		c.Do("ZRANGE", "foo", "noint", "3")
+		c.Do("ZRANGE", "foo", "2", "noint")
+		c.Do("SET", "str", "I am a string")
+		c.Do("ZRANGE", "str", "300", "-110")
 
-		fail("ZREVRANGE"),
-		fail("ZREVRANGE", "str", 300, -110),
-	)
+		c.Do("ZREVRANGE")
+		c.Do("ZREVRANGE", "str", "300", "-110")
+	})
 }
 
 func TestSortedSetRem(t *testing.T) {
-	testCommands(t,
-		succ("ZADD", "z",
-			1, "aap",
-			2, "noot",
-			3, "mies",
-			2, "nootagain",
-			3, "miesagain",
-			math.Inf(+1), "the stars",
-			math.Inf(+1), "more stars",
-			math.Inf(-1), "big bang",
-		),
-		succ("ZREM", "z", "nosuch"),
-		succ("ZREM", "z", "mies", "nootagain"),
-		succ("ZRANGE", "z", 0, -1),
+	testRaw(t, func(c *client) {
+		c.Do("ZADD", "z",
+			"1", "aap",
+			"2", "noot",
+			"3", "mies",
+			"2", "nootagain",
+			"3", "miesagain",
+			"+Inf", "the stars",
+			"+Inf", "more stars",
+			"-Inf", "big bang",
+		)
+		c.Do("ZREM", "z", "nosuch")
+		c.Do("ZREM", "z", "mies", "nootagain")
+		c.Do("ZRANGE", "z", "0", "-1")
 
 		// failure cases
-		fail("ZREM"),
-		fail("ZREM", "foo"),
-		succ("SET", "str", "I am a string"),
-		fail("ZREM", "str", "member"),
-	)
+		c.Do("ZREM")
+		c.Do("ZREM", "foo")
+		c.Do("SET", "str", "I am a string")
+		c.Do("ZREM", "str", "member")
+	})
 }
 
 func TestSortedSetRemRangeByLex(t *testing.T) {
-	testCommands(t,
-		succ("ZADD", "z",
-			12, "zero kelvin",
-			12, "minusfour",
-			12, "one",
-			12, "oneone",
-			12, "two",
-			12, "zwei",
-			12, "three",
-			12, "drei",
-			12, "inf",
-		),
-		succ("ZRANGEBYLEX", "z", "-", "+"),
-		succ("ZREMRANGEBYLEX", "z", "[o", "(t"),
-		succ("ZRANGEBYLEX", "z", "-", "+"),
-		succ("ZREMRANGEBYLEX", "z", "-", "+"),
-		succ("ZRANGEBYLEX", "z", "-", "+"),
+	testRaw(t, func(c *client) {
+		c.Do("ZADD", "z",
+			"12", "zero kelvin",
+			"12", "minusfour",
+			"12", "one",
+			"12", "oneone",
+			"12", "two",
+			"12", "zwei",
+			"12", "three",
+			"12", "drei",
+			"12", "inf",
+		)
+		c.Do("ZRANGEBYLEX", "z", "-", "+")
+		c.Do("ZREMRANGEBYLEX", "z", "[o", "(t")
+		c.Do("ZRANGEBYLEX", "z", "-", "+")
+		c.Do("ZREMRANGEBYLEX", "z", "-", "+")
+		c.Do("ZRANGEBYLEX", "z", "-", "+")
 
 		// failure cases
-		fail("ZREMRANGEBYLEX"),
-		fail("ZREMRANGEBYLEX", "key"),
-		fail("ZREMRANGEBYLEX", "key", "[a"),
-		fail("ZREMRANGEBYLEX", "key", "[a", "[b", "c"),
-		fail("ZREMRANGEBYLEX", "key", "!a", "[b"),
-		succ("SET", "str", "I am a string"),
-		fail("ZREMRANGEBYLEX", "str", "[a", "[b"),
-	)
+		c.Do("ZREMRANGEBYLEX")
+		c.Do("ZREMRANGEBYLEX", "key")
+		c.Do("ZREMRANGEBYLEX", "key", "[a")
+		c.Do("ZREMRANGEBYLEX", "key", "[a", "[b", "c")
+		c.Do("ZREMRANGEBYLEX", "key", "!a", "[b")
+		c.Do("SET", "str", "I am a string")
+		c.Do("ZREMRANGEBYLEX", "str", "[a", "[b")
+	})
 }
 
 func TestSortedSetRemRangeByRank(t *testing.T) {
-	testCommands(t,
-		succ("ZADD", "z",
-			12, "zero kelvin",
-			12, "minusfour",
-			12, "one",
-			12, "oneone",
-			12, "two",
-			12, "zwei",
-			12, "three",
-			12, "drei",
-			12, "inf",
-		),
-		succ("ZREMRANGEBYRANK", "z", -2, -1),
-		succ("ZRANGE", "z", 0, -1),
-		succ("ZRANGEBYSCORE", "z", "-inf", "inf"),
-		succ("ZREMRANGEBYRANK", "z", -2, -1),
-		succ("ZRANGE", "z", 0, -1),
-		succ("ZREMRANGEBYRANK", "z", 0, -1),
-		succ("EXISTS", "z"),
+	testRaw(t, func(c *client) {
+		c.Do("ZADD", "z",
+			"12", "zero kelvin",
+			"12", "minusfour",
+			"12", "one",
+			"12", "oneone",
+			"12", "two",
+			"12", "zwei",
+			"12", "three",
+			"12", "drei",
+			"12", "inf",
+		)
+		c.Do("ZREMRANGEBYRANK", "z", "-2", "-1")
+		c.Do("ZRANGE", "z", "0", "-1")
+		c.Do("ZRANGEBYSCORE", "z", "-inf", "inf")
+		c.Do("ZREMRANGEBYRANK", "z", "-2", "-1")
+		c.Do("ZRANGE", "z", "0", "-1")
+		c.Do("ZREMRANGEBYRANK", "z", "0", "-1")
+		c.Do("EXISTS", "z")
 
-		succ("ZREMRANGEBYRANK", "nosuch", -2, -1),
+		c.Do("ZREMRANGEBYRANK", "nosuch", "-2", "-1")
 
 		// failure cases
-		fail("ZREMRANGEBYRANK"),
-		fail("ZREMRANGEBYRANK", "key"),
-		fail("ZREMRANGEBYRANK", "key", 0),
-		fail("ZREMRANGEBYRANK", "key", "noint", -1),
-		fail("ZREMRANGEBYRANK", "key", 0, "noint"),
-		fail("ZREMRANGEBYRANK", "key", "0", "1", "too many"),
-		succ("SET", "str", "I am a string"),
-		fail("ZREMRANGEBYRANK", "str", "0", "-1"),
-	)
+		c.Do("ZREMRANGEBYRANK")
+		c.Do("ZREMRANGEBYRANK", "key")
+		c.Do("ZREMRANGEBYRANK", "key", "0")
+		c.Do("ZREMRANGEBYRANK", "key", "noint", "-1")
+		c.Do("ZREMRANGEBYRANK", "key", "0", "noint")
+		c.Do("ZREMRANGEBYRANK", "key", "0", "1", "too many")
+		c.Do("SET", "str", "I am a string")
+		c.Do("ZREMRANGEBYRANK", "str", "0", "-1")
+	})
 }
 
 func TestSortedSetRemRangeByScore(t *testing.T) {
-	testCommands(t,
-		succ("ZADD", "z",
-			1, "aap",
-			2, "noot",
-			3, "mies",
-			2, "nootagain",
-			3, "miesagain",
-			math.Inf(+1), "the stars",
-			math.Inf(+1), "more stars",
-			math.Inf(-1), "big bang",
-		),
-		succ("ZREMRANGEBYSCORE", "z", "-inf", "(2"),
-		succ("ZRANGE", "z", 0, -1),
-		succ("ZREMRANGEBYSCORE", "z", "(1000", "(2000"),
-		succ("ZRANGE", "z", 0, -1),
-		succ("ZREMRANGEBYSCORE", "z", "-inf", "+inf"),
-		succ("EXISTS", "z"),
+	testRaw(t, func(c *client) {
+		c.Do("ZADD", "z",
+			"1", "aap",
+			"2", "noot",
+			"3", "mies",
+			"2", "nootagain",
+			"3", "miesagain",
+			"+Inf", "the stars",
+			"+Inf", "more stars",
+			"-Inf", "big bang",
+		)
+		c.Do("ZREMRANGEBYSCORE", "z", "-inf", "(2")
+		c.Do("ZRANGE", "z", "0", "-1")
+		c.Do("ZREMRANGEBYSCORE", "z", "(1000", "(2000")
+		c.Do("ZRANGE", "z", "0", "-1")
+		c.Do("ZREMRANGEBYSCORE", "z", "-inf", "+inf")
+		c.Do("EXISTS", "z")
 
-		succ("ZREMRANGEBYSCORE", "nosuch", "-inf", "inf"),
+		c.Do("ZREMRANGEBYSCORE", "nosuch", "-inf", "inf")
 
 		// failure cases
-		fail("ZREMRANGEBYSCORE"),
-		fail("ZREMRANGEBYSCORE", "key"),
-		fail("ZREMRANGEBYSCORE", "key", 0),
-		fail("ZREMRANGEBYSCORE", "key", "noint", -1),
-		fail("ZREMRANGEBYSCORE", "key", 0, "noint"),
-		fail("ZREMRANGEBYSCORE", "key", "0", "1", "too many"),
-		succ("SET", "str", "I am a string"),
-		fail("ZREMRANGEBYSCORE", "str", "0", "-1"),
-	)
+		c.Do("ZREMRANGEBYSCORE")
+		c.Do("ZREMRANGEBYSCORE", "key")
+		c.Do("ZREMRANGEBYSCORE", "key", "0")
+		c.Do("ZREMRANGEBYSCORE", "key", "noint", "-1")
+		c.Do("ZREMRANGEBYSCORE", "key", "0", "noint")
+		c.Do("ZREMRANGEBYSCORE", "key", "0", "1", "too many")
+		c.Do("SET", "str", "I am a string")
+		c.Do("ZREMRANGEBYSCORE", "str", "0", "-1")
+	})
 }
 
 func TestSortedSetScore(t *testing.T) {
-	testCommands(t,
-		succ("ZADD", "z",
-			1, "aap",
-			2, "noot",
-			3, "mies",
-			2, "nootagain",
-			3, "miesagain",
-			math.Inf(+1), "the stars",
-		),
-		succ("ZSCORE", "z", "mies"),
-		succ("ZSCORE", "z", "the stars"),
-		succ("ZSCORE", "z", "nosuch"),
-		succ("ZSCORE", "nosuch", "nosuch"),
+	testRaw(t, func(c *client) {
+		c.Do("ZADD", "z",
+			"1", "aap",
+			"2", "noot",
+			"3", "mies",
+			"2", "nootagain",
+			"3", "miesagain",
+			"+Inf", "the stars",
+		)
+		c.Do("ZSCORE", "z", "mies")
+		c.Do("ZSCORE", "z", "the stars")
+		c.Do("ZSCORE", "z", "nosuch")
+		c.Do("ZSCORE", "nosuch", "nosuch")
 
 		// failure cases
-		fail("ZSCORE"),
-		fail("ZSCORE", "foo"),
-		fail("ZSCORE", "foo", "too", "many"),
-		succ("SET", "str", "I am a string"),
-		fail("ZSCORE", "str", "member"),
-	)
+		c.Do("ZSCORE")
+		c.Do("ZSCORE", "foo")
+		c.Do("ZSCORE", "foo", "too", "many")
+		c.Do("SET", "str", "I am a string")
+		c.Do("ZSCORE", "str", "member")
+	})
 }
 
 func TestSortedSetRangeByScore(t *testing.T) {
-	testCommands(t,
-		succ("ZADD", "z",
-			1, "aap",
-			2, "noot",
-			3, "mies",
-			2, "nootagain",
-			3, "miesagain",
-			math.Inf(+1), "the stars",
-			math.Inf(+1), "more stars",
-			math.Inf(-1), "big bang",
-		),
-		succ("ZRANGEBYSCORE", "z", "-inf", "inf"),
-		succ("ZRANGEBYSCORE", "z", "-inf", "inf", "LIMIT", 1, 2),
-		succ("ZRANGEBYSCORE", "z", "-inf", "inf", "LIMIT", -1, 2),
-		succ("ZRANGEBYSCORE", "z", "-inf", "inf", "LIMIT", 1, -2),
-		succ("ZREVRANGEBYSCORE", "z", "inf", "-inf"),
-		succ("ZREVRANGEBYSCORE", "z", "inf", "-inf", "LIMIT", 1, 2),
-		succ("ZREVRANGEBYSCORE", "z", "inf", "-inf", "LIMIT", -1, 2),
-		succ("ZREVRANGEBYSCORE", "z", "inf", "-inf", "LIMIT", 1, -2),
-		succ("ZRANGEBYSCORE", "z", "-inf", "inf", "WITHSCORES"),
-		succ("ZRANGEBYSCORE", "z", "-inf", "inf", "WiThScOrEs"),
-		succ("ZREVRANGEBYSCORE", "z", "-inf", "inf", "WITHSCORES", "LIMIT", 1, 2),
-		succ("ZRANGEBYSCORE", "z", 0, 3),
-		succ("ZRANGEBYSCORE", "z", 0, "inf"),
-		succ("ZRANGEBYSCORE", "z", "(1", "3"),
-		succ("ZRANGEBYSCORE", "z", "(1", "(3"),
-		succ("ZRANGEBYSCORE", "z", "1", "(3"),
-		succ("ZRANGEBYSCORE", "z", "1", "(3", "LIMIT", 0, 2),
-		succ("ZRANGEBYSCORE", "foo", 2, 3, "LIMIT", 1, 2, "WITHSCORES"),
-		succ("ZCOUNT", "z", "-inf", "inf"),
-		succ("ZCOUNT", "z", 0, 3),
-		succ("ZCOUNT", "z", 0, "inf"),
-		succ("ZCOUNT", "z", "(2", "inf"),
+	testRaw(t, func(c *client) {
+		c.Do("ZADD", "z",
+			"1", "aap",
+			"2", "noot",
+			"3", "mies",
+			"2", "nootagain",
+			"3", "miesagain",
+			"+Inf", "the stars",
+			"+Inf", "more stars",
+			"-Inf", "big bang",
+		)
+		c.Do("ZRANGEBYSCORE", "z", "-inf", "inf")
+		c.Do("ZRANGEBYSCORE", "z", "-inf", "inf", "LIMIT", "1", "2")
+		c.Do("ZRANGEBYSCORE", "z", "-inf", "inf", "LIMIT", "-1", "2")
+		c.Do("ZRANGEBYSCORE", "z", "-inf", "inf", "LIMIT", "1", "-2")
+		c.Do("ZREVRANGEBYSCORE", "z", "inf", "-inf")
+		c.Do("ZREVRANGEBYSCORE", "z", "inf", "-inf", "LIMIT", "1", "2")
+		c.Do("ZREVRANGEBYSCORE", "z", "inf", "-inf", "LIMIT", "-1", "2")
+		c.Do("ZREVRANGEBYSCORE", "z", "inf", "-inf", "LIMIT", "1", "-2")
+		c.Do("ZRANGEBYSCORE", "z", "-inf", "inf", "WITHSCORES")
+		c.Do("ZRANGEBYSCORE", "z", "-inf", "inf", "WiThScOrEs")
+		c.Do("ZREVRANGEBYSCORE", "z", "-inf", "inf", "WITHSCORES", "LIMIT", "1", "2")
+		c.Do("ZRANGEBYSCORE", "z", "0", "3")
+		c.Do("ZRANGEBYSCORE", "z", "0", "inf")
+		c.Do("ZRANGEBYSCORE", "z", "(1", "3")
+		c.Do("ZRANGEBYSCORE", "z", "(1", "(3")
+		c.Do("ZRANGEBYSCORE", "z", "1", "(3")
+		c.Do("ZRANGEBYSCORE", "z", "1", "(3", "LIMIT", "0", "2")
+		c.Do("ZRANGEBYSCORE", "foo", "2", "3", "LIMIT", "1", "2", "WITHSCORES")
+		c.Do("ZCOUNT", "z", "-inf", "inf")
+		c.Do("ZCOUNT", "z", "0", "3")
+		c.Do("ZCOUNT", "z", "0", "inf")
+		c.Do("ZCOUNT", "z", "(2", "inf")
 
 		// Bunch of limit edge cases
-		succ("ZRANGEBYSCORE", "z", "-inf", "inf", "LIMIT", 0, 7),
-		succ("ZRANGEBYSCORE", "z", "-inf", "inf", "LIMIT", 0, 8),
-		succ("ZRANGEBYSCORE", "z", "-inf", "inf", "LIMIT", 0, 9),
-		succ("ZRANGEBYSCORE", "z", "-inf", "inf", "LIMIT", 7, 0),
-		succ("ZRANGEBYSCORE", "z", "-inf", "inf", "LIMIT", 7, 1),
-		succ("ZRANGEBYSCORE", "z", "-inf", "inf", "LIMIT", 7, 2),
-		succ("ZRANGEBYSCORE", "z", "-inf", "inf", "LIMIT", 8, 0),
-		succ("ZRANGEBYSCORE", "z", "-inf", "inf", "LIMIT", 8, 1),
-		succ("ZRANGEBYSCORE", "z", "-inf", "inf", "LIMIT", 8, 2),
-		succ("ZRANGEBYSCORE", "z", "-inf", "inf", "LIMIT", 9, 2),
-		succ("ZRANGEBYSCORE", "z", "-inf", "inf", "LIMIT", -1, 2),
-		succ("ZRANGEBYSCORE", "z", "-inf", "inf", "LIMIT", -1, -1),
+		c.Do("ZRANGEBYSCORE", "z", "-inf", "inf", "LIMIT", "0", "7")
+		c.Do("ZRANGEBYSCORE", "z", "-inf", "inf", "LIMIT", "0", "8")
+		c.Do("ZRANGEBYSCORE", "z", "-inf", "inf", "LIMIT", "0", "9")
+		c.Do("ZRANGEBYSCORE", "z", "-inf", "inf", "LIMIT", "7", "0")
+		c.Do("ZRANGEBYSCORE", "z", "-inf", "inf", "LIMIT", "7", "1")
+		c.Do("ZRANGEBYSCORE", "z", "-inf", "inf", "LIMIT", "7", "2")
+		c.Do("ZRANGEBYSCORE", "z", "-inf", "inf", "LIMIT", "8", "0")
+		c.Do("ZRANGEBYSCORE", "z", "-inf", "inf", "LIMIT", "8", "1")
+		c.Do("ZRANGEBYSCORE", "z", "-inf", "inf", "LIMIT", "8", "2")
+		c.Do("ZRANGEBYSCORE", "z", "-inf", "inf", "LIMIT", "9", "2")
+		c.Do("ZRANGEBYSCORE", "z", "-inf", "inf", "LIMIT", "-1", "2")
+		c.Do("ZRANGEBYSCORE", "z", "-inf", "inf", "LIMIT", "-1", "-1")
 
 		// failure cases
-		fail("ZRANGEBYSCORE"),
-		fail("ZRANGEBYSCORE", "foo"),
-		fail("ZRANGEBYSCORE", "foo", 1),
-		fail("ZRANGEBYSCORE", "foo", 2, 3, "toomany"),
-		fail("ZRANGEBYSCORE", "foo", 2, 3, "WITHSCORES", "toomany"),
-		fail("ZRANGEBYSCORE", "foo", 2, 3, "LIMIT", "noint", 1),
-		fail("ZRANGEBYSCORE", "foo", 2, 3, "LIMIT", 1, "noint"),
-		fail("ZREVRANGEBYSCORE", "z", "-inf", "inf", "WITHSCORES", "LIMIT", 1, -2, "toomany"),
-		fail("ZRANGEBYSCORE", "foo", "noint", 3),
-		fail("ZRANGEBYSCORE", "foo", "[4", 3),
-		fail("ZRANGEBYSCORE", "foo", 2, "noint"),
-		fail("ZRANGEBYSCORE", "foo", "4", "[3"),
-		succ("SET", "str", "I am a string"),
-		fail("ZRANGEBYSCORE", "str", 300, -110),
+		c.Do("ZRANGEBYSCORE")
+		c.Do("ZRANGEBYSCORE", "foo")
+		c.Do("ZRANGEBYSCORE", "foo", "1")
+		c.Do("ZRANGEBYSCORE", "foo", "2", "3", "toomany")
+		c.Do("ZRANGEBYSCORE", "foo", "2", "3", "WITHSCORES", "toomany")
+		c.Do("ZRANGEBYSCORE", "foo", "2", "3", "LIMIT", "noint", "1")
+		c.Do("ZRANGEBYSCORE", "foo", "2", "3", "LIMIT", "1", "noint")
+		c.Do("ZREVRANGEBYSCORE", "z", "-inf", "inf", "WITHSCORES", "LIMIT", "1", "-2", "toomany")
+		c.Do("ZRANGEBYSCORE", "foo", "noint", "3")
+		c.Do("ZRANGEBYSCORE", "foo", "[4", "3")
+		c.Do("ZRANGEBYSCORE", "foo", "2", "noint")
+		c.Do("ZRANGEBYSCORE", "foo", "4", "[3")
+		c.Do("SET", "str", "I am a string")
+		c.Do("ZRANGEBYSCORE", "str", "300", "-110")
 
-		fail("ZREVRANGEBYSCORE"),
-		fail("ZREVRANGEBYSCORE", "foo", "[4", 3),
-		fail("ZREVRANGEBYSCORE", "str", 300, -110),
+		c.Do("ZREVRANGEBYSCORE")
+		c.Do("ZREVRANGEBYSCORE", "foo", "[4", "3")
+		c.Do("ZREVRANGEBYSCORE", "str", "300", "-110")
 
-		fail("ZCOUNT"),
-		fail("ZCOUNT", "foo", "[4", 3),
-		fail("ZCOUNT", "str", 300, -110),
-	)
+		c.Do("ZCOUNT")
+		c.Do("ZCOUNT", "foo", "[4", "3")
+		c.Do("ZCOUNT", "str", "300", "-110")
+	})
 
 	// Issue #10
-	testCommands(t,
-		succ("ZADD", "key", "3.3", "element"),
-		succ("ZRANGEBYSCORE", "key", "3.3", "3.3"),
-		succ("ZRANGEBYSCORE", "key", "4.3", "4.3"),
-		succ("ZREVRANGEBYSCORE", "key", "3.3", "3.3"),
-		succ("ZREVRANGEBYSCORE", "key", "4.3", "4.3"),
-	)
+	testRaw(t, func(c *client) {
+		c.Do("ZADD", "key", "3.3", "element")
+		c.Do("ZRANGEBYSCORE", "key", "3.3", "3.3")
+		c.Do("ZRANGEBYSCORE", "key", "4.3", "4.3")
+		c.Do("ZREVRANGEBYSCORE", "key", "3.3", "3.3")
+		c.Do("ZREVRANGEBYSCORE", "key", "4.3", "4.3")
+	})
 }
 
 func TestSortedSetRangeByLex(t *testing.T) {
-	testCommands(t,
-		succ("ZADD", "z",
-			12, "zero kelvin",
-			12, "minusfour",
-			12, "one",
-			12, "oneone",
-			12, "two",
-			12, "zwei",
-			12, "three",
-			12, "drei",
-			12, "inf",
-		),
-		succ("ZRANGEBYLEX", "z", "-", "+"),
-		succ("ZREVRANGEBYLEX", "z", "+", "-"),
-		succ("ZLEXCOUNT", "z", "-", "+"),
-		succ("ZRANGEBYLEX", "z", "[o", "[three"),
-		succ("ZREVRANGEBYLEX", "z", "[three", "[o"),
-		succ("ZLEXCOUNT", "z", "[o", "[three"),
-		succ("ZRANGEBYLEX", "z", "(o", "(z"),
-		succ("ZREVRANGEBYLEX", "z", "(z", "(o"),
-		succ("ZLEXCOUNT", "z", "(o", "(z"),
-		succ("ZRANGEBYLEX", "z", "+", "(z"),
-		succ("ZREVRANGEBYLEX", "z", "(z", "+"),
-		succ("ZRANGEBYLEX", "z", "(a", "-"),
-		succ("ZREVRANGEBYLEX", "z", "-", "(a"),
-		succ("ZRANGEBYLEX", "z", "(z", "(a"),
-		succ("ZREVRANGEBYLEX", "z", "(a", "(z"),
-		succ("ZRANGEBYLEX", "nosuch", "-", "+"),
-		succ("ZREVRANGEBYLEX", "nosuch", "+", "-"),
-		succ("ZLEXCOUNT", "nosuch", "-", "+"),
-		succ("ZRANGEBYLEX", "z", "-", "+", "LIMIT", 1, 2),
-		succ("ZREVRANGEBYLEX", "z", "+", "-", "LIMIT", 1, 2),
-		succ("ZRANGEBYLEX", "z", "-", "+", "LIMIT", -1, 2),
-		succ("ZREVRANGEBYLEX", "z", "+", "-", "LIMIT", -1, 2),
-		succ("ZRANGEBYLEX", "z", "-", "+", "LIMIT", 1, -2),
-		succ("ZREVRANGEBYLEX", "z", "+", "-", "LIMIT", 1, -2),
+	testRaw(t, func(c *client) {
+		c.Do("ZADD", "z",
+			"12", "zero kelvin",
+			"12", "minusfour",
+			"12", "one",
+			"12", "oneone",
+			"12", "two",
+			"12", "zwei",
+			"12", "three",
+			"12", "drei",
+			"12", "inf",
+		)
+		c.Do("ZRANGEBYLEX", "z", "-", "+")
+		c.Do("ZREVRANGEBYLEX", "z", "+", "-")
+		c.Do("ZLEXCOUNT", "z", "-", "+")
+		c.Do("ZRANGEBYLEX", "z", "[o", "[three")
+		c.Do("ZREVRANGEBYLEX", "z", "[three", "[o")
+		c.Do("ZLEXCOUNT", "z", "[o", "[three")
+		c.Do("ZRANGEBYLEX", "z", "(o", "(z")
+		c.Do("ZREVRANGEBYLEX", "z", "(z", "(o")
+		c.Do("ZLEXCOUNT", "z", "(o", "(z")
+		c.Do("ZRANGEBYLEX", "z", "+", "(z")
+		c.Do("ZREVRANGEBYLEX", "z", "(z", "+")
+		c.Do("ZRANGEBYLEX", "z", "(a", "-")
+		c.Do("ZREVRANGEBYLEX", "z", "-", "(a")
+		c.Do("ZRANGEBYLEX", "z", "(z", "(a")
+		c.Do("ZREVRANGEBYLEX", "z", "(a", "(z")
+		c.Do("ZRANGEBYLEX", "nosuch", "-", "+")
+		c.Do("ZREVRANGEBYLEX", "nosuch", "+", "-")
+		c.Do("ZLEXCOUNT", "nosuch", "-", "+")
+		c.Do("ZRANGEBYLEX", "z", "-", "+", "LIMIT", "1", "2")
+		c.Do("ZREVRANGEBYLEX", "z", "+", "-", "LIMIT", "1", "2")
+		c.Do("ZRANGEBYLEX", "z", "-", "+", "LIMIT", "-1", "2")
+		c.Do("ZREVRANGEBYLEX", "z", "+", "-", "LIMIT", "-1", "2")
+		c.Do("ZRANGEBYLEX", "z", "-", "+", "LIMIT", "1", "-2")
+		c.Do("ZREVRANGEBYLEX", "z", "+", "-", "LIMIT", "1", "-2")
 
-		succ("ZADD", "z", 12, "z"),
-		succ("ZADD", "z", 12, "zz"),
-		succ("ZADD", "z", 12, "zzz"),
-		succ("ZADD", "z", 12, "zzzz"),
-		succ("ZRANGEBYLEX", "z", "[z", "+"),
-		succ("ZREVRANGEBYLEX", "z", "+", "[z"),
-		succ("ZRANGEBYLEX", "z", "(z", "+"),
-		succ("ZREVRANGEBYLEX", "z", "+", "(z"),
-		succ("ZLEXCOUNT", "z", "(z", "+"),
+		c.Do("ZADD", "z", "12", "z")
+		c.Do("ZADD", "z", "12", "zz")
+		c.Do("ZADD", "z", "12", "zzz")
+		c.Do("ZADD", "z", "12", "zzzz")
+		c.Do("ZRANGEBYLEX", "z", "[z", "+")
+		c.Do("ZREVRANGEBYLEX", "z", "+", "[z")
+		c.Do("ZRANGEBYLEX", "z", "(z", "+")
+		c.Do("ZREVRANGEBYLEX", "z", "+", "(z")
+		c.Do("ZLEXCOUNT", "z", "(z", "+")
 
 		// failure cases
-		fail("ZRANGEBYLEX"),
-		fail("ZREVRANGEBYLEX"),
-		fail("ZRANGEBYLEX", "key"),
-		fail("ZRANGEBYLEX", "key", "[a"),
-		fail("ZRANGEBYLEX", "key", "[a", "[b", "c"),
-		fail("ZRANGEBYLEX", "key", "!a", "[b"),
-		fail("ZRANGEBYLEX", "key", "[a", "!b"),
-		fail("ZRANGEBYLEX", "key", "[a", "b]"),
-		failWith("not valid string range item", "ZRANGEBYLEX", "key", "[a", ""),
-		failWith("not valid string range item", "ZRANGEBYLEX", "key", "", "[b"),
-		fail("ZRANGEBYLEX", "key", "[a", "[b", "LIMIT"),
-		fail("ZRANGEBYLEX", "key", "[a", "[b", "LIMIT", 1),
-		fail("ZRANGEBYLEX", "key", "[a", "[b", "LIMIT", "a", 1),
-		fail("ZRANGEBYLEX", "key", "[a", "[b", "LIMIT", 1, "a"),
-		fail("ZRANGEBYLEX", "key", "[a", "[b", "LIMIT", 1, 1, "toomany"),
-		succ("SET", "str", "I am a string"),
-		fail("ZRANGEBYLEX", "str", "[a", "[b"),
+		c.Do("ZRANGEBYLEX")
+		c.Do("ZREVRANGEBYLEX")
+		c.Do("ZRANGEBYLEX", "key")
+		c.Do("ZRANGEBYLEX", "key", "[a")
+		c.Do("ZRANGEBYLEX", "key", "[a", "[b", "c")
+		c.Do("ZRANGEBYLEX", "key", "!a", "[b")
+		c.Do("ZRANGEBYLEX", "key", "[a", "!b")
+		c.Do("ZRANGEBYLEX", "key", "[a", "b]")
+		c.Error("not valid string range item", "ZRANGEBYLEX", "key", "[a", "")
+		c.Error("not valid string range item", "ZRANGEBYLEX", "key", "", "[b")
+		c.Do("ZRANGEBYLEX", "key", "[a", "[b", "LIMIT")
+		c.Do("ZRANGEBYLEX", "key", "[a", "[b", "LIMIT", "1")
+		c.Do("ZRANGEBYLEX", "key", "[a", "[b", "LIMIT", "a", "1")
+		c.Do("ZRANGEBYLEX", "key", "[a", "[b", "LIMIT", "1", "a")
+		c.Do("ZRANGEBYLEX", "key", "[a", "[b", "LIMIT", "1", "1", "toomany")
+		c.Do("SET", "str", "I am a string")
+		c.Do("ZRANGEBYLEX", "str", "[a", "[b")
 
-		fail("ZLEXCOUNT"),
-		fail("ZLEXCOUNT", "key"),
-		fail("ZLEXCOUNT", "key", "[a"),
-		fail("ZLEXCOUNT", "key", "[a", "[b", "c"),
-		fail("ZLEXCOUNT", "key", "!a", "[b"),
-		fail("ZLEXCOUNT", "str", "[a", "[b"),
-	)
+		c.Do("ZLEXCOUNT")
+		c.Do("ZLEXCOUNT", "key")
+		c.Do("ZLEXCOUNT", "key", "[a")
+		c.Do("ZLEXCOUNT", "key", "[a", "[b", "c")
+		c.Do("ZLEXCOUNT", "key", "!a", "[b")
+		c.Do("ZLEXCOUNT", "str", "[a", "[b")
+	})
 
-	testCommands(t,
-		succ("ZADD", "idx", 0, "ccc"),
-		succ("ZRANGEBYLEX", "idx", "[d", "[e"),
-		succ("ZRANGEBYLEX", "idx", "[c", "[d"),
-	)
+	testRaw(t, func(c *client) {
+		c.Do("ZADD", "idx", "0", "ccc")
+		c.Do("ZRANGEBYLEX", "idx", "[d", "[e")
+		c.Do("ZRANGEBYLEX", "idx", "[c", "[d")
+	})
 }
 
 func TestSortedSetIncyby(t *testing.T) {
-	testCommands(t,
-		succ("ZINCRBY", "z", 1.0, "m"),
-		succ("ZINCRBY", "z", 1.0, "m"),
-		succ("ZINCRBY", "z", 1.0, "m"),
-		succ("ZINCRBY", "z", 2.0, "m"),
-		succ("ZINCRBY", "z", 3, "m2"),
-		succ("ZINCRBY", "z", 3, "m2"),
-		succ("ZINCRBY", "z", 3, "m2"),
+	testRaw(t, func(c *client) {
+		c.Do("ZINCRBY", "z", "1.0", "m")
+		c.Do("ZINCRBY", "z", "1.0", "m")
+		c.Do("ZINCRBY", "z", "1.0", "m")
+		c.Do("ZINCRBY", "z", "2.0", "m")
+		c.Do("ZINCRBY", "z", "3", "m2")
+		c.Do("ZINCRBY", "z", "3", "m2")
+		c.Do("ZINCRBY", "z", "3", "m2")
 
 		// failure cases
-		fail("ZINCRBY"),
-		fail("ZINCRBY", "key"),
-		fail("ZINCRBY", "key", 1.0),
-		fail("ZINCRBY", "key", "nofloat", "m"),
-		fail("ZINCRBY", "key", 1.0, "too", "many"),
-		succ("SET", "str", "I am a string"),
-		fail("ZINCRBY", "str", 1.0, "member"),
-	)
+		c.Do("ZINCRBY")
+		c.Do("ZINCRBY", "key")
+		c.Do("ZINCRBY", "key", "1.0")
+		c.Do("ZINCRBY", "key", "nofloat", "m")
+		c.Do("ZINCRBY", "key", "1.0", "too", "many")
+		c.Do("SET", "str", "I am a string")
+		c.Do("ZINCRBY", "str", "1.0", "member")
+	})
 }
 
 func TestZscan(t *testing.T) {
-	testCommands(t,
+	testRaw(t, func(c *client) {
 		// No set yet
-		succ("ZSCAN", "h", 0),
+		c.Do("ZSCAN", "h", "0")
 
-		succ("ZADD", "h", 1.0, "key1"),
-		succ("ZSCAN", "h", 0),
-		succ("ZSCAN", "h", 0, "COUNT", 12),
-		succ("ZSCAN", "h", 0, "cOuNt", 12),
+		c.Do("ZADD", "h", "1.0", "key1")
+		c.Do("ZSCAN", "h", "0")
+		c.Do("ZSCAN", "h", "0", "COUNT", "12")
+		c.Do("ZSCAN", "h", "0", "cOuNt", "12")
 
-		succ("ZADD", "h", 2.0, "anotherkey"),
-		succ("ZSCAN", "h", 0, "MATCH", "anoth*"),
-		succ("ZSCAN", "h", 0, "MATCH", "anoth*", "COUNT", 100),
-		succ("ZSCAN", "h", 0, "COUNT", 100, "MATCH", "anoth*"),
+		c.Do("ZADD", "h", "2.0", "anotherkey")
+		c.Do("ZSCAN", "h", "0", "MATCH", "anoth*")
+		c.Do("ZSCAN", "h", "0", "MATCH", "anoth*", "COUNT", "100")
+		c.Do("ZSCAN", "h", "0", "COUNT", "100", "MATCH", "anoth*")
 
 		// Can't really test multiple keys.
-		// succ("SET", "key2", "value2"),
-		// succ("SCAN", 0),
+		// c.Do("SET", "key2", "value2")
+		// c.Do("SCAN", "0")
 
 		// Error cases
-		fail("ZSCAN"),
-		fail("ZSCAN", "noint"),
-		fail("ZSCAN", "h", 0, "COUNT", "noint"),
-		fail("ZSCAN", "h", 0, "COUNT"),
-		fail("ZSCAN", "h", 0, "MATCH"),
-		fail("ZSCAN", "h", 0, "garbage"),
-		fail("ZSCAN", "h", 0, "COUNT", 12, "MATCH", "foo", "garbage"),
-		// fail("ZSCAN", "nosuch", 0, "COUNT", "garbage"),
-		succ("SET", "str", "1"),
-		fail("ZSCAN", "str", 0),
-	)
+		c.Do("ZSCAN")
+		c.Do("ZSCAN", "noint")
+		c.Do("ZSCAN", "h", "0", "COUNT", "noint")
+		c.Do("ZSCAN", "h", "0", "COUNT")
+		c.Do("ZSCAN", "h", "0", "MATCH")
+		c.Do("ZSCAN", "h", "0", "garbage")
+		c.Do("ZSCAN", "h", "0", "COUNT", "12", "MATCH", "foo", "garbage")
+		// c.Do("ZSCAN", "nosuch", "0", "COUNT", "garbage")
+		c.Do("SET", "str", "1")
+		c.Do("ZSCAN", "str", "0")
+	})
 }
 
 func TestZunionstore(t *testing.T) {
-	testCommands(t,
-		succ("ZADD", "h1", 1.0, "key1"),
-		succ("ZADD", "h1", 2.0, "key2"),
-		succ("ZADD", "h2", 1.0, "key1"),
-		succ("ZADD", "h2", 4.0, "key2"),
-		succ("ZUNIONSTORE", "res", 2, "h1", "h2"),
-		succ("ZRANGE", "res", 0, -1, "WITHSCORES"),
+	testRaw(t, func(c *client) {
+		c.Do("ZADD", "h1", "1.0", "key1")
+		c.Do("ZADD", "h1", "2.0", "key2")
+		c.Do("ZADD", "h2", "1.0", "key1")
+		c.Do("ZADD", "h2", "4.0", "key2")
+		c.Do("ZUNIONSTORE", "res", "2", "h1", "h2")
+		c.Do("ZRANGE", "res", "0", "-1", "WITHSCORES")
 
-		succ("ZUNIONSTORE", "weighted", 2, "h1", "h2", "WEIGHTS", "2.0", "12"),
-		succ("ZRANGE", "weighted", 0, -1, "WITHSCORES"),
-		succ("ZUNIONSTORE", "weighted2", 2, "h1", "h2", "WEIGHTS", "2", "-12"),
-		succ("ZRANGE", "weighted2", 0, -1, "WITHSCORES"),
+		c.Do("ZUNIONSTORE", "weighted", "2", "h1", "h2", "WEIGHTS", "2.0", "12")
+		c.Do("ZRANGE", "weighted", "0", "-1", "WITHSCORES")
+		c.Do("ZUNIONSTORE", "weighted2", "2", "h1", "h2", "WEIGHTS", "2", "-12")
+		c.Do("ZRANGE", "weighted2", "0", "-1", "WITHSCORES")
 
-		succ("ZUNIONSTORE", "amin", 2, "h1", "h2", "AGGREGATE", "min"),
-		succ("ZRANGE", "amin", 0, -1, "WITHSCORES"),
-		succ("ZUNIONSTORE", "amax", 2, "h1", "h2", "AGGREGATE", "max"),
-		succ("ZRANGE", "amax", 0, -1, "WITHSCORES"),
-		succ("ZUNIONSTORE", "asum", 2, "h1", "h2", "AGGREGATE", "sum"),
-		succ("ZRANGE", "asum", 0, -1, "WITHSCORES"),
+		c.Do("ZUNIONSTORE", "amin", "2", "h1", "h2", "AGGREGATE", "min")
+		c.Do("ZRANGE", "amin", "0", "-1", "WITHSCORES")
+		c.Do("ZUNIONSTORE", "amax", "2", "h1", "h2", "AGGREGATE", "max")
+		c.Do("ZRANGE", "amax", "0", "-1", "WITHSCORES")
+		c.Do("ZUNIONSTORE", "asum", "2", "h1", "h2", "AGGREGATE", "sum")
+		c.Do("ZRANGE", "asum", "0", "-1", "WITHSCORES")
 
 		// Error cases
-		fail("ZUNIONSTORE"),
-		fail("ZUNIONSTORE", "h"),
-		fail("ZUNIONSTORE", "h", "noint"),
-		fail("ZUNIONSTORE", "h", 0, "f"),
-		fail("ZUNIONSTORE", "h", 2, "f"),
-		fail("ZUNIONSTORE", "h", -1, "f"),
-		fail("ZUNIONSTORE", "h", 2, "f1", "f2", "f3"),
-		fail("ZUNIONSTORE", "h", 2, "f1", "f2", "WEIGHTS"),
-		fail("ZUNIONSTORE", "h", 2, "f1", "f2", "WEIGHTS", 1),
-		fail("ZUNIONSTORE", "h", 2, "f1", "f2", "WEIGHTS", 1, 2, 3),
-		fail("ZUNIONSTORE", "h", 2, "f1", "f2", "WEIGHTS", "f", 2),
-		fail("ZUNIONSTORE", "h", 2, "f1", "f2", "AGGREGATE", "foo"),
-		succ("SET", "str", "1"),
-		fail("ZUNIONSTORE", "h", 1, "str"),
-	)
+		c.Do("ZUNIONSTORE")
+		c.Do("ZUNIONSTORE", "h")
+		c.Do("ZUNIONSTORE", "h", "noint")
+		c.Do("ZUNIONSTORE", "h", "0", "f")
+		c.Do("ZUNIONSTORE", "h", "2", "f")
+		c.Do("ZUNIONSTORE", "h", "-1", "f")
+		c.Do("ZUNIONSTORE", "h", "2", "f1", "f2", "f3")
+		c.Do("ZUNIONSTORE", "h", "2", "f1", "f2", "WEIGHTS")
+		c.Do("ZUNIONSTORE", "h", "2", "f1", "f2", "WEIGHTS", "1")
+		c.Do("ZUNIONSTORE", "h", "2", "f1", "f2", "WEIGHTS", "1", "2", "3")
+		c.Do("ZUNIONSTORE", "h", "2", "f1", "f2", "WEIGHTS", "f", "2")
+		c.Do("ZUNIONSTORE", "h", "2", "f1", "f2", "AGGREGATE", "foo")
+		c.Do("SET", "str", "1")
+		c.Do("ZUNIONSTORE", "h", "1", "str")
+	})
 	// overwrite
-	testCommands(t,
-		succ("ZADD", "h1", 1.0, "key1"),
-		succ("ZADD", "h1", 2.0, "key2"),
-		succ("ZADD", "h2", 1.0, "key1"),
-		succ("ZADD", "h2", 4.0, "key2"),
-		succ("SET", "str", "1"),
-		succ("ZUNIONSTORE", "str", 2, "h1", "h2"),
-		succ("TYPE", "str"),
-		succ("ZUNIONSTORE", "h2", 2, "h1", "h2"),
-		succ("ZRANGE", "h2", 0, -1, "WITHSCORES"),
-		succ("TYPE", "h1"),
-		succ("TYPE", "h2"),
-	)
+	testRaw(t, func(c *client) {
+		c.Do("ZADD", "h1", "1.0", "key1")
+		c.Do("ZADD", "h1", "2.0", "key2")
+		c.Do("ZADD", "h2", "1.0", "key1")
+		c.Do("ZADD", "h2", "4.0", "key2")
+		c.Do("SET", "str", "1")
+		c.Do("ZUNIONSTORE", "str", "2", "h1", "h2")
+		c.Do("TYPE", "str")
+		c.Do("ZUNIONSTORE", "h2", "2", "h1", "h2")
+		c.Do("ZRANGE", "h2", "0", "-1", "WITHSCORES")
+		c.Do("TYPE", "h1")
+		c.Do("TYPE", "h2")
+	})
 	// not a sorted set, still fine
-	testCommands(t,
-		succ("SADD", "super", "1", "2", "3"),
-		succ("SADD", "exclude", "3"),
-		succ("ZUNIONSTORE", "tmp", "2", "super", "exclude", "weights", "1", "0", "aggregate", "min"),
-		succ("ZRANGE", "tmp", "0", "-1", "withscores"),
-	)
+	testRaw(t, func(c *client) {
+		c.Do("SADD", "super", "1", "2", "3")
+		c.Do("SADD", "exclude", "3")
+		c.Do("ZUNIONSTORE", "tmp", "2", "super", "exclude", "weights", "1", "0", "aggregate", "min")
+		c.Do("ZRANGE", "tmp", "0", "-1", "withscores")
+	})
 }
 
 func TestZinterstore(t *testing.T) {
-	testCommands(t,
-		succ("ZADD", "h1", 1.0, "key1"),
-		succ("ZADD", "h1", 2.0, "key2"),
-		succ("ZADD", "h1", 3.0, "key3"),
-		succ("ZADD", "h2", 1.0, "key1"),
-		succ("ZADD", "h2", 4.0, "key2"),
-		succ("ZADD", "h3", 4.0, "key4"),
-		succ("ZINTERSTORE", "res", 2, "h1", "h2"),
-		succ("ZRANGE", "res", 0, -1, "WITHSCORES"),
+	testRaw(t, func(c *client) {
+		c.Do("ZADD", "h1", "1.0", "key1")
+		c.Do("ZADD", "h1", "2.0", "key2")
+		c.Do("ZADD", "h1", "3.0", "key3")
+		c.Do("ZADD", "h2", "1.0", "key1")
+		c.Do("ZADD", "h2", "4.0", "key2")
+		c.Do("ZADD", "h3", "4.0", "key4")
+		c.Do("ZINTERSTORE", "res", "2", "h1", "h2")
+		c.Do("ZRANGE", "res", "0", "-1", "WITHSCORES")
 
-		succ("ZINTERSTORE", "weighted", 2, "h1", "h2", "WEIGHTS", "2.0", "12"),
-		succ("ZRANGE", "weighted", 0, -1, "WITHSCORES"),
-		succ("ZINTERSTORE", "weighted2", 2, "h1", "h2", "WEIGHTS", "2", "-12"),
-		succ("ZRANGE", "weighted2", 0, -1, "WITHSCORES"),
+		c.Do("ZINTERSTORE", "weighted", "2", "h1", "h2", "WEIGHTS", "2.0", "12")
+		c.Do("ZRANGE", "weighted", "0", "-1", "WITHSCORES")
+		c.Do("ZINTERSTORE", "weighted2", "2", "h1", "h2", "WEIGHTS", "2", "-12")
+		c.Do("ZRANGE", "weighted2", "0", "-1", "WITHSCORES")
 
-		succ("ZINTERSTORE", "amin", 2, "h1", "h2", "AGGREGATE", "min"),
-		succ("ZRANGE", "amin", 0, -1, "WITHSCORES"),
-		succ("ZINTERSTORE", "amax", 2, "h1", "h2", "AGGREGATE", "max"),
-		succ("ZRANGE", "amax", 0, -1, "WITHSCORES"),
-		succ("ZINTERSTORE", "asum", 2, "h1", "h2", "AGGREGATE", "sum"),
-		succ("ZRANGE", "asum", 0, -1, "WITHSCORES"),
+		c.Do("ZINTERSTORE", "amin", "2", "h1", "h2", "AGGREGATE", "min")
+		c.Do("ZRANGE", "amin", "0", "-1", "WITHSCORES")
+		c.Do("ZINTERSTORE", "amax", "2", "h1", "h2", "AGGREGATE", "max")
+		c.Do("ZRANGE", "amax", "0", "-1", "WITHSCORES")
+		c.Do("ZINTERSTORE", "asum", "2", "h1", "h2", "AGGREGATE", "sum")
+		c.Do("ZRANGE", "asum", "0", "-1", "WITHSCORES")
 
 		// Error cases
-		fail("ZINTERSTORE"),
-		fail("ZINTERSTORE", "h"),
-		fail("ZINTERSTORE", "h", "noint"),
-		fail("ZINTERSTORE", "h", 0, "f"),
-		fail("ZINTERSTORE", "h", 2, "f"),
-		fail("ZINTERSTORE", "h", -1, "f"),
-		fail("ZINTERSTORE", "h", 2, "f1", "f2", "f3"),
-		fail("ZINTERSTORE", "h", 2, "f1", "f2", "WEIGHTS"),
-		fail("ZINTERSTORE", "h", 2, "f1", "f2", "WEIGHTS", 1),
-		fail("ZINTERSTORE", "h", 2, "f1", "f2", "WEIGHTS", 1, 2, 3),
-		fail("ZINTERSTORE", "h", 2, "f1", "f2", "WEIGHTS", "f", 2),
-		fail("ZINTERSTORE", "h", 2, "f1", "f2", "AGGREGATE", "foo"),
-		succ("SET", "str", "1"),
-		fail("ZINTERSTORE", "h", 1, "str"),
-	)
+		c.Do("ZINTERSTORE")
+		c.Do("ZINTERSTORE", "h")
+		c.Do("ZINTERSTORE", "h", "noint")
+		c.Do("ZINTERSTORE", "h", "0", "f")
+		c.Do("ZINTERSTORE", "h", "2", "f")
+		c.Do("ZINTERSTORE", "h", "-1", "f")
+		c.Do("ZINTERSTORE", "h", "2", "f1", "f2", "f3")
+		c.Do("ZINTERSTORE", "h", "2", "f1", "f2", "WEIGHTS")
+		c.Do("ZINTERSTORE", "h", "2", "f1", "f2", "WEIGHTS", "1")
+		c.Do("ZINTERSTORE", "h", "2", "f1", "f2", "WEIGHTS", "1", "2", "3")
+		c.Do("ZINTERSTORE", "h", "2", "f1", "f2", "WEIGHTS", "f", "2")
+		c.Do("ZINTERSTORE", "h", "2", "f1", "f2", "AGGREGATE", "foo")
+		c.Do("SET", "str", "1")
+		c.Do("ZINTERSTORE", "h", "1", "str")
+	})
 }
 
 func TestZpopminmax(t *testing.T) {
-	testCommands(t,
-		succ("ZADD", "set:zpop", 1.0, "key1"),
-		succ("ZADD", "set:zpop", 2.0, "key2"),
-		succ("ZADD", "set:zpop", 3.0, "key3"),
-		succ("ZADD", "set:zpop", 4.0, "key4"),
-		succ("ZADD", "set:zpop", 5.0, "key5"),
-		succ("ZCARD", "set:zpop"),
+	testRaw(t, func(c *client) {
+		c.Do("ZADD", "set:zpop", "1.0", "key1")
+		c.Do("ZADD", "set:zpop", "2.0", "key2")
+		c.Do("ZADD", "set:zpop", "3.0", "key3")
+		c.Do("ZADD", "set:zpop", "4.0", "key4")
+		c.Do("ZADD", "set:zpop", "5.0", "key5")
+		c.Do("ZCARD", "set:zpop")
 
-		succ("ZSCORE", "set:zpop", "key1"),
-		succ("ZSCORE", "set:zpop", "key5"),
+		c.Do("ZSCORE", "set:zpop", "key1")
+		c.Do("ZSCORE", "set:zpop", "key5")
 
-		succ("ZPOPMIN", "set:zpop"),
-		succ("ZPOPMIN", "set:zpop", 2),
-		succ("ZPOPMIN", "set:zpop", 100),
-		succ("ZPOPMIN", "set:zpop", -100),
+		c.Do("ZPOPMIN", "set:zpop")
+		c.Do("ZPOPMIN", "set:zpop", "2")
+		c.Do("ZPOPMIN", "set:zpop", "100")
+		c.Do("ZPOPMIN", "set:zpop", "-100")
 
-		succ("ZPOPMAX", "set:zpop"),
-		succ("ZPOPMAX", "set:zpop", 2),
-		succ("ZPOPMAX", "set:zpop", 100),
-		succ("ZPOPMAX", "set:zpop", -100),
-		succ("ZPOPMAX", "nosuch", 1),
+		c.Do("ZPOPMAX", "set:zpop")
+		c.Do("ZPOPMAX", "set:zpop", "2")
+		c.Do("ZPOPMAX", "set:zpop", "100")
+		c.Do("ZPOPMAX", "set:zpop", "-100")
+		c.Do("ZPOPMAX", "nosuch", "1")
 
 		// Wrong args
-		fail("ZPOPMIN"),
-		fail("ZPOPMIN", "set:zpop", "h1"),
-		fail("ZPOPMIN", "set:zpop", 1, "h2"),
-	)
+		c.Do("ZPOPMIN")
+		c.Do("ZPOPMIN", "set:zpop", "h1")
+		c.Do("ZPOPMIN", "set:zpop", "1", "h2")
+	})
 }

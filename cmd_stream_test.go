@@ -385,7 +385,7 @@ func TestStreamReadGroup(t *testing.T) {
 		"XGROUP", "CREATE", "planets", "processing", "$", "MKSTREAM",
 	)
 
-	mustNil(t, c,
+	mustNilList(t, c,
 		"XREADGROUP", "GROUP", "processing", "alice", "STREAMS", "planets", ">",
 	)
 
@@ -405,7 +405,7 @@ func TestStreamReadGroup(t *testing.T) {
 		),
 	)
 
-	mustNil(t, c,
+	mustNilList(t, c,
 		"XREADGROUP", "GROUP", "processing", "alice", "STREAMS", "planets", ">",
 	)
 
@@ -447,7 +447,7 @@ func TestStreamDelete(t *testing.T) {
 		"XDEL", "planets", "0-1",
 	)
 
-	mustNil(t, c,
+	mustNilList(t, c,
 		"XREADGROUP", "GROUP", "processing", "alice", "STREAMS", "planets", "0-0",
 	)
 }
@@ -481,7 +481,7 @@ func TestStreamAck(t *testing.T) {
 		"XACK", "planets", "processing", "0-1",
 	)
 
-	mustNil(t, c,
+	mustNilList(t, c,
 		"XREADGROUP", "GROUP", "processing", "alice", "STREAMS", "planets", "0-0",
 	)
 }

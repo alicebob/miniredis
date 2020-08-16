@@ -421,9 +421,8 @@ parsing:
 			res[stream] = entries
 		}
 
-		// Real Redis returns Nil
 		if len(res) == 0 {
-			c.WriteNull()
+			c.WriteLen(-1)
 			return
 		}
 

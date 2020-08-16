@@ -2,6 +2,8 @@
 // There are no dependencies on system binaries, and every server you start
 // will be empty.
 //
+// import "github.com/alicebob/miniredis/v2"
+//
 // Start a server with `s, err := miniredis.Run()`.
 // Stop it with `defer s.Close()`.
 //

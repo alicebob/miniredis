@@ -2,6 +2,7 @@ package proto
 
 import (
 	"bufio"
+	"crypto/tls"
 	"net"
 )
 
@@ -12,6 +13,18 @@ type Client struct {
 
 func Dial(addr string) (*Client, error) {
 	c, err := net.Dial("tcp", addr)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Client{
+		c: c,
+		r: bufio.NewReader(c),
+	}, nil
+}
+
+func DialTLS(addr string, cfg *tls.Config) (*Client, error) {
+	c, err := tls.Dial("tcp", addr, cfg)
 	if err != nil {
 		return nil, err
 	}

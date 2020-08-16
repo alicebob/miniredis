@@ -7,26 +7,26 @@ import (
 )
 
 func TestEcho(t *testing.T) {
-	testCommands(t,
-		succ("ECHO", "hello world"),
-		succ("ECHO", 42),
-		succ("ECHO", 3.1415),
-		fail("ECHO", "hello", "world"),
-		fail("ECHO"),
-		fail("eChO", "hello", "world"),
-	)
+	testRaw(t, func(c *client) {
+		c.Do("ECHO", "hello world")
+		c.Do("ECHO", "42")
+		c.Do("ECHO", "3.1415")
+		c.Do("ECHO", "hello", "world")
+		c.Do("ECHO")
+		c.Do("eChO", "hello", "world")
+	})
 
-	testCommands(t,
-		succ("MULTI"),
-		succ("ECHO", "hi"),
-		succ("EXEC"),
-	)
+	testRaw(t, func(c *client) {
+		c.Do("MULTI")
+		c.Do("ECHO", "hi")
+		c.Do("EXEC")
+	})
 
-	testCommands(t,
-		succ("MULTI"),
-		fail("ECHO"),
-		fail("EXEC"),
-	)
+	testRaw(t, func(c *client) {
+		c.Do("MULTI")
+		c.Do("ECHO")
+		c.Do("EXEC")
+	})
 }
 
 func TestPing(t *testing.T) {
@@ -36,104 +36,108 @@ func TestPing(t *testing.T) {
 		c.Do("PING", "hello", "world")
 	})
 
-	testCommands(t,
-		succ("MULTI"),
-		succ("PING", "hi"),
-		succ("EXEC"),
-	)
+	testRaw(t, func(c *client) {
+		c.Do("MULTI")
+		c.Do("PING", "hi")
+		c.Do("EXEC")
+	})
 
-	testCommands(t,
-		succ("MULTI"),
-		succ("PING", "hi again"),
-		succ("EXEC"),
-	)
+	testRaw(t, func(c *client) {
+		c.Do("MULTI")
+		c.Do("PING", "hi again")
+		c.Do("EXEC")
+	})
 }
 
 func TestSelect(t *testing.T) {
-	testCommands(t,
-		succ("SET", "foo", "bar"),
-		succ("GET", "foo"),
-		succ("SELECT", 2),
-		succ("GET", "foo"),
-		succ("SET", "foo", "bar2"),
-		succ("GET", "foo"),
+	testRaw(t, func(c *client) {
+		c.Do("SET", "foo", "bar")
+		c.Do("GET", "foo")
+		c.Do("SELECT", "2")
+		c.Do("GET", "foo")
+		c.Do("SET", "foo", "bar2")
+		c.Do("GET", "foo")
 
-		fail("SELECT"),
-		fail("SELECT", -1),
-		fail("SELECT", "aap"),
-		fail("SELECT", 1, 2),
-	)
+		c.Do("SELECT")
+		c.Do("SELECT", "-1")
+		c.Do("SELECT", "aap")
+		c.Do("SELECT", "1", "2")
+	})
 
-	testCommands(t,
-		succ("MULTI"),
-		succ("SET", "foo", "bar"),
-		succ("GET", "foo"),
-		succ("SELECT", 2),
-		succ("GET", "foo"),
-		succ("SET", "foo", "bar2"),
-		succ("GET", "foo"),
-		succ("EXEC"),
-		succ("GET", "foo"),
-	)
+	testRaw(t, func(c *client) {
+		c.Do("MULTI")
+		c.Do("SET", "foo", "bar")
+		c.Do("GET", "foo")
+		c.Do("SELECT", "2")
+		c.Do("GET", "foo")
+		c.Do("SET", "foo", "bar2")
+		c.Do("GET", "foo")
+		c.Do("EXEC")
+		c.Do("GET", "foo")
+	})
 
-	testCommands(t,
-		succ("MULTI"),
-		succ("SELECT", -1),
-		succ("EXEC"),
-	)
+	testRaw(t, func(c *client) {
+		c.Do("MULTI")
+		c.Do("SELECT", "-1")
+		c.Do("EXEC")
+	})
 }
 
 func TestAuth(t *testing.T) {
-	testAuthCommands(t,
+	testAuth(t,
 		"supersecret",
-		fail("PING"),
-		fail("SET", "foo", "bar"),
-		fail("SET"),
-		fail("SET", "foo", "bar", "baz"),
-		fail("GET", "foo"),
-		fail("AUTH"),
-		fail("AUTH", "nosecret"),
-		fail("AUTH", "nosecret", "bar"),
-		fail("AUTH", "nosecret", "bar", "bar"),
-		succ("AUTH", "supersecret"),
-		succ("SET", "foo", "bar"),
-		succ("GET", "foo"),
+		func(c *client) {
+			c.Do("PING")
+			c.Do("SET", "foo", "bar")
+			c.Do("SET")
+			c.Do("SET", "foo", "bar", "baz")
+			c.Do("GET", "foo")
+			c.Do("AUTH")
+			c.Do("AUTH", "nosecret")
+			c.Do("AUTH", "nosecret", "bar")
+			c.Do("AUTH", "nosecret", "bar", "bar")
+			c.Do("AUTH", "supersecret")
+			c.Do("SET", "foo", "bar")
+			c.Do("GET", "foo")
+		},
 	)
 
-	testUserAuthCommands(t,
+	testUserAuth(t,
 		map[string]string{
 			"agent1": "supersecret",
 			"agent2": "dragon",
 		},
-		fail("PING"),
-		fail("SET", "foo", "bar"),
-		fail("SET"),
-		fail("SET", "foo", "bar", "baz"),
-		fail("GET", "foo"),
-		fail("AUTH"),
-		fail("AUTH", "nosecret"),
-		fail("AUTH", "agent100", "supersecret"),
-		fail("AUTH", "agent100", "supersecret", "supersecret"),
-		fail("AUTH", "agent1", "bzzzt"),
-		succ("AUTH", "agent1", "supersecret"),
-		succ("SET", "foo", "bar"),
-		succ("GET", "foo"),
+		func(c *client) {
+			c.Do("PING")
+			c.Do("SET", "foo", "bar")
+			c.Do("SET")
+			c.Do("SET", "foo", "bar", "baz")
+			c.Do("GET", "foo")
+			c.Do("AUTH")
+			c.Do("AUTH", "nosecret")
+			c.Do("AUTH", "agent100", "supersecret")
+			c.Do("AUTH", "agent100", "supersecret", "supersecret")
+			c.Do("AUTH", "agent1", "bzzzt")
+			c.Do("AUTH", "agent1", "supersecret")
+			c.Do("SET", "foo", "bar")
+			c.Do("GET", "foo")
 
-		// go back to invalid user
-		fail("AUTH", "agent100", "supersecret"),
-		succ("GET", "foo"), // still agent1
+			// go back to invalid user
+			c.Do("AUTH", "agent100", "supersecret")
+			c.Do("GET", "foo") // still agent1
+		},
 	)
 
-	testCommands(t,
-		fail("AUTH"),
-		fail("AUTH", "foo"),
-		fail("AUTH", "foo", "bar"),
-		fail("AUTH", "foo", "bar", "bar"),
-	)
+	testRaw(t, func(c *client) {
+		c.Do("AUTH")
+		c.Do("AUTH", "foo")
+		c.Do("AUTH", "foo", "bar")
+		c.Do("AUTH", "foo", "bar", "bar")
+	})
 
-	testCommands(t,
-		succ("MULTI"),
-		succ("AUTH", "apassword"),
-		succ("EXEC"),
-	)
+	testRaw(t, func(c *client) {
+		c.Do("MULTI")
+		c.Do("AUTH", "apassword")
+		c.Do("EXEC")
+	})
 }

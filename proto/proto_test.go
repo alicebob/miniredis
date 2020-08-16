@@ -113,3 +113,45 @@ func TestReadStrings(t *testing.T) {
 		t.Errorf("have %q, want %q", have, want)
 	}
 }
+
+func TestParse(t *testing.T) {
+	t.Run("int", func(t *testing.T) {
+		have, err := Parse(Int(42))
+		if err != nil {
+			t.Errorf("read: %s", err)
+		}
+		if want := 42; !reflect.DeepEqual(have, want) {
+			t.Errorf("have %q, want %q", have, want)
+		}
+	})
+
+	t.Run("inline", func(t *testing.T) {
+		have, err := Parse(Inline("foo"))
+		if err != nil {
+			t.Errorf("read: %s", err)
+		}
+		if want := "foo"; !reflect.DeepEqual(have, want) {
+			t.Errorf("have %q, want %q", have, want)
+		}
+	})
+
+	t.Run("string", func(t *testing.T) {
+		have, err := Parse(String("foo"))
+		if err != nil {
+			t.Errorf("read: %s", err)
+		}
+		if want := "foo"; !reflect.DeepEqual(have, want) {
+			t.Errorf("have %q, want %q", have, want)
+		}
+	})
+
+	t.Run("strings", func(t *testing.T) {
+		have, err := Parse(Strings("foo", "bar"))
+		if err != nil {
+			t.Errorf("read: %s", err)
+		}
+		if want := []interface{}{"foo", "bar"}; !reflect.DeepEqual(have, want) {
+			t.Errorf("have %q, want %q", have, want)
+		}
+	})
+}

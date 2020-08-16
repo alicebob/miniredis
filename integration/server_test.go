@@ -7,41 +7,41 @@ import (
 )
 
 func TestServer(t *testing.T) {
-	testCommands(t,
-		succ("SET", "foo", "bar"),
-		succ("SET", "baz", "bak"),
-		succ("DBSIZE"),
-		succ("SELECT", 2),
-		succ("DBSIZE"),
-		succ("SET", "baz", "bak"),
+	testRaw(t, func(c *client) {
+		c.Do("SET", "foo", "bar")
+		c.Do("SET", "baz", "bak")
+		c.Do("DBSIZE")
+		c.Do("SELECT", "2")
+		c.Do("DBSIZE")
+		c.Do("SET", "baz", "bak")
 
-		succ("SELECT", 0),
-		succ("FLUSHDB"),
-		succ("DBSIZE"),
+		c.Do("SELECT", "0")
+		c.Do("FLUSHDB")
+		c.Do("DBSIZE")
 
-		succ("SELECT", 2),
-		succ("DBSIZE"),
-		succ("FLUSHALL"),
-		succ("DBSIZE"),
+		c.Do("SELECT", "2")
+		c.Do("DBSIZE")
+		c.Do("FLUSHALL")
+		c.Do("DBSIZE")
 
-		succ("FLUSHDB", "aSyNc"),
-		succ("FLUSHALL", "AsYnC"),
+		c.Do("FLUSHDB", "aSyNc")
+		c.Do("FLUSHALL", "AsYnC")
 
 		// Failure cases
-		fail("DBSIZE", "foo"),
-		fail("FLUSHDB", "foo"),
-		fail("FLUSHALL", "foo"),
-		fail("FLUSHDB", "ASYNC", "foo"),
-		fail("FLUSHDB", "ASYNC", "ASYNC"),
-		fail("FLUSHALL", "ASYNC", "foo"),
-	)
+		c.Do("DBSIZE", "foo")
+		c.Do("FLUSHDB", "foo")
+		c.Do("FLUSHALL", "foo")
+		c.Do("FLUSHDB", "ASYNC", "foo")
+		c.Do("FLUSHDB", "ASYNC", "ASYNC")
+		c.Do("FLUSHALL", "ASYNC", "foo")
+	})
 }
 
 func TestServerTLS(t *testing.T) {
-	testCommandsTLS(t,
-		succ("PING", "foo"),
+	testTLS(t, func(c *client) {
+		c.Do("PING", "foo")
 
-		succ("SET", "foo", "bar"),
-		succ("GET", "foo"),
-	)
+		c.Do("SET", "foo", "bar")
+		c.Do("GET", "foo")
+	})
 }

@@ -10,7 +10,6 @@ import (
 	"testing"
 
 	"github.com/alicebob/miniredis/v2/proto"
-	"github.com/gomodule/redigo/redis"
 )
 
 const (
@@ -225,23 +224,15 @@ func TestTLS(t *testing.T) {
 		c.WriteInline("PONG")
 	})
 
-	cfg := testClientTLS(t)
-	c, err := redis.Dial("tcp",
-		s.Addr().String(),
-		redis.DialTLSConfig(cfg),
-		redis.DialUseTLS(true),
-	)
+	c, err := proto.DialTLS(s.Addr().String(), testClientTLS(t))
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	{
-		res, err := redis.String(c.Do("PING"))
-		if err != nil {
-			t.Fatal(err)
-		}
-		if have, want := res, "PONG"; have != want {
-			t.Errorf("have: %s, want: %s", have, want)
-		}
+	res, err := c.Do("PING")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if have, want := res, proto.Inline("PONG"); have != want {
+		t.Errorf("have: %s, want: %s", have, want)
 	}
 }
