@@ -38,6 +38,7 @@ const (
 	msgNoScriptFound      = "NOSCRIPT No matching script. Please use EVAL."
 	msgUnsupportedUnit    = "ERR unsupported unit provided. please use m, km, ft, mi"
 	msgNotFromScripts     = "This Redis command is not allowed from scripts"
+	msgXreadUnbalanced    = "ERR Unbalanced XREAD list of streams: for each stream key an ID or '$' must be specified."
 )
 
 func errWrongNumber(cmd string) string {

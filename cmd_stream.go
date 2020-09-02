@@ -15,6 +15,7 @@ import (
 func commandsStream(m *Miniredis) {
 	m.srv.Register("XADD", m.cmdXadd)
 	m.srv.Register("XLEN", m.cmdXlen)
+	m.srv.Register("XREAD", m.cmdXread)
 	m.srv.Register("XRANGE", m.makeCmdXrange(false))
 	m.srv.Register("XREVRANGE", m.makeCmdXrange(true))
 	m.srv.Register("XGROUP", m.cmdXgroup)
@@ -493,5 +494,133 @@ func (m *Miniredis) cmdXdel(c *server.Peer, cmd string, args []string) {
 		}
 
 		c.WriteInt(cnt)
+	})
+}
+
+// XREAD
+func (m *Miniredis) cmdXread(c *server.Peer, cmd string, args []string) {
+	if len(args) < 3 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
+	}
+	var count int
+	var err error
+	streams := make([]string, 0)
+	ids := make([]string, 0)
+
+parsing:
+	for len(args) > 0 {
+		switch strings.ToUpper(args[0]) {
+		case "COUNT":
+			if len(args) < 2 {
+				err = errors.New(errWrongNumber(cmd))
+				break parsing
+			}
+
+			count, err = strconv.Atoi(args[1])
+			if err != nil {
+				break parsing
+			}
+
+			args = args[2:]
+		case "BLOCK":
+			if len(args) < 2 {
+				err = errors.New(errWrongNumber(cmd))
+				break parsing
+			}
+			args = args[2:]
+		case "STREAMS":
+			args = args[1:]
+
+			if len(args)%2 != 0 {
+				err = errors.New(msgXreadUnbalanced)
+				break parsing
+			}
+
+			streams, ids = args[0:len(args)/2], args[len(args)/2:]
+			break parsing
+		default:
+			err = fmt.Errorf("ERR incorrect argument %s", args[0])
+			break parsing
+		}
+	}
+
+	if err != nil {
+		setDirty(c)
+		c.WriteError(err.Error())
+		return
+	}
+
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
+		res := make(map[string][]StreamEntry)
+
+		db := m.db(ctx.selectedDB)
+
+		for i := range streams {
+			stream := streams[i]
+			id := ids[i]
+
+			var entries = db.streamKeys[stream]
+			if entries == nil {
+				setDirty(c)
+				c.WriteError(msgInvalidStreamID)
+				return
+			}
+			entryCount := count
+			if entryCount == 0 {
+				entryCount = len(entries)
+			}
+
+			if len(entries) == 0 {
+				continue
+			}
+
+			returnedEntries := make([]StreamEntry, 0, entryCount)
+
+			for _, entry := range entries {
+				if len(returnedEntries) == entryCount {
+					break
+				}
+
+				// Continue if entry ID <= start
+				if streamCmp(entry.ID, id) <= 0 {
+					continue
+				}
+				returnedEntries = append(returnedEntries, entry)
+			}
+
+			res[stream] = returnedEntries
+		}
+
+		// Real Redis returns Nil
+		if len(res) == 0 {
+			c.WriteNull()
+			return
+		}
+
+		c.WriteLen(len(res))
+
+		for _, stream := range streams {
+			entries, ok := res[stream]
+			if !ok {
+				continue
+			}
+
+			c.WriteLen(2)
+			c.WriteBulk(stream)
+
+			c.WriteLen(len(entries))
+
+			for _, entry := range entries {
+				c.WriteLen(2)
+				c.WriteBulk(entry.ID)
+				c.WriteLen(len(entry.Values))
+
+				for _, v := range entry.Values {
+					c.WriteBulk(v)
+				}
+			}
+		}
 	})
 }

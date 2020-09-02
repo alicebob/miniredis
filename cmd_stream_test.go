@@ -319,6 +319,111 @@ func TestStreamRange(t *testing.T) {
 	})
 }
 
+// Test XREAD
+func TestStreamRead(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := proto.Dial(s.Addr())
+	ok(t, err)
+	defer c.Close()
+
+	_, err = c.Do("XADD", "planets", "0-1", "name", "Mercury", "greek-god", "Hermes", "idx", "1")
+	ok(t, err)
+	_, err = c.Do("XADD", "planets", "1-0", "name", "Venus", "greek-god", "Aphrodite", "idx", "2")
+	ok(t, err)
+	_, err = c.Do("XADD", "planets", "2-1", "name", "Earth", "greek-god", "", "idx", "3")
+	ok(t, err)
+	_, err = c.Do("XADD", "planets", "3-0", "greek-god", "Ares", "name", "Mars", "idx", "4")
+	ok(t, err)
+	_, err = c.Do("XADD", "planets", "4-1", "name", "Jupiter", "greek-god", "Dias", "idx", "5")
+	ok(t, err)
+
+	_, err = c.Do("XADD", "planets2", "0-1", "name", "Mercury", "greek-god", "Hermes", "idx", "1")
+	ok(t, err)
+	_, err = c.Do("XADD", "planets2", "1-0", "name", "Venus", "greek-god", "Aphrodite", "idx", "2")
+	ok(t, err)
+	_, err = c.Do("XADD", "planets2", "2-1", "name", "Earth", "greek-god", "", "idx", "3")
+	ok(t, err)
+	_, err = c.Do("XADD", "planets2", "3-0", "greek-god", "Ares", "name", "Mars", "idx", "4")
+	ok(t, err)
+	_, err = c.Do("XADD", "planets2", "4-1", "name", "Jupiter", "greek-god", "Dias", "idx", "5")
+	ok(t, err)
+
+	t.Run("XREAD", func(t *testing.T) {
+		mustDo(t, c,
+			"XREAD", "STREAMS", "planets", "1",
+			proto.Array(
+				proto.Array(proto.String("planets"),
+					proto.Array(
+						proto.Array(proto.String("2-1"), proto.Strings("name", "Earth", "greek-god", "", "idx", "3")),
+						proto.Array(proto.String("3-0"), proto.Strings("greek-god", "Ares", "name", "Mars", "idx", "4")),
+						proto.Array(proto.String("4-1"), proto.Strings("name", "Jupiter", "greek-god", "Dias", "idx", "5")),
+					),
+				),
+			),
+		)
+
+		mustDo(t, c,
+			"XREAD", "STREAMS", "planets", "planets2", "1", "3",
+			proto.Array(
+				proto.Array(proto.String("planets"),
+					proto.Array(
+						proto.Array(proto.String("2-1"), proto.Strings("name", "Earth", "greek-god", "", "idx", "3")),
+						proto.Array(proto.String("3-0"), proto.Strings("greek-god", "Ares", "name", "Mars", "idx", "4")),
+						proto.Array(proto.String("4-1"), proto.Strings("name", "Jupiter", "greek-god", "Dias", "idx", "5")),
+					),
+				),
+				proto.Array(proto.String("planets2"),
+					proto.Array(
+						proto.Array(proto.String("4-1"), proto.Strings("name", "Jupiter", "greek-god", "Dias", "idx", "5")),
+					),
+				),
+			),
+		)
+	})
+
+	t.Run("error cases", func(t *testing.T) {
+		mustOK(t, c, "SET", "str", "value")
+		mustDo(t, c,
+			"XREAD",
+			proto.Error(errWrongNumber("xread")),
+		)
+		mustDo(t, c,
+			"XREAD", "STREAMS", "foo",
+			proto.Error(errWrongNumber("xread")),
+		)
+		mustDo(t, c,
+			"XREAD", "STREAMS", "foo", "bar", "1",
+			proto.Error(msgXreadUnbalanced),
+		)
+		mustDo(t, c,
+			"XREAD", "COUNT",
+			proto.Error(errWrongNumber("xread")),
+		)
+		mustDo(t, c,
+			"XREAD", "COUNT", "notint",
+			proto.Error(errWrongNumber("xread")),
+		)
+		mustDo(t, c,
+			"XREAD", "COUNT", "10", // no STREAMS
+			proto.Error(errWrongNumber("xread")),
+		)
+		mustDo(t, c,
+			"XREAD", "STREAMS", "foo", "noint",
+			proto.Error(msgInvalidStreamID),
+		)
+		mustDo(t, c,
+			"XREAD", "STREAMS", "str", "noint",
+			proto.Error(msgInvalidStreamID),
+		)
+		mustDo(t, c,
+			"XREAD", "STREAMS", "foo", "2", "noint",
+			proto.Error(msgXreadUnbalanced),
+		)
+	})
+}
+
 // Test XINFO
 func TestStreamInfo(t *testing.T) {
 	s, err := Run()
