@@ -215,3 +215,60 @@ func TestStreamGroup(t *testing.T) {
 		c.Do("XDEL", "planets", "0-1")
 	})
 }
+
+func TestStreamRead(t *testing.T) {
+	testRaw(t, func(c *client) {
+		c.Do("XADD",
+			"ordplanets",
+			"0-1",
+			"name", "Mercury",
+			"greek-god", "Hermes",
+		)
+		c.Do("XADD",
+			"ordplanets",
+			"1-0",
+			"name", "Venus",
+			"greek-god", "Aphrodite",
+		)
+		c.Do("XADD",
+			"ordplanets",
+			"2-1",
+			"greek-god", "",
+			"name", "Earth",
+		)
+		c.Do("XADD",
+			"ordplanets",
+			"3-0",
+			"name", "Mars",
+			"greek-god", "Ares",
+		)
+		c.Do("XADD",
+			"ordplanets",
+			"4-1",
+			"greek-god", "Dias",
+			"name", "Jupiter",
+		)
+		c.Do("XADD", "ordplanets2", "0-1", "name", "Mercury", "greek-god", "Hermes", "idx", "1")
+		c.Do("XADD", "ordplanets2", "1-0", "name", "Venus", "greek-god", "Aphrodite", "idx", "2")
+		c.Do("XADD", "ordplanets2", "2-1", "name", "Earth", "greek-god", "", "idx", "3")
+		c.Do("XADD", "ordplanets2", "3-0", "greek-god", "Ares", "name", "Mars", "idx", "4")
+		c.Do("XADD", "ordplanets2", "4-1", "name", "Jupiter", "greek-god", "Dias", "idx", "5")
+
+		c.Do("XREAD", "STREAMS", "ordplanets", "0")
+		c.Do("XREAD", "STREAMS", "ordplanets", "2")
+		c.Do("XREAD", "STREAMS", "ordplanets", "ordplanets2", "0", "0")
+		c.Do("XREAD", "STREAMS", "ordplanets", "ordplanets2", "2", "0")
+		c.Do("XREAD", "STREAMS", "ordplanets", "ordplanets2", "0", "2")
+		c.Do("XREAD", "STREAMS", "ordplanets", "ordplanets2", "1", "3")
+
+		// failure cases
+		c.Do("XREAD")
+		c.Do("XREAD", "STREAMS", "foo")
+		c.Do("XREAD", "STREAMS", "ordplanets")
+		c.Do("XREAD", "STREAMS", "ordplanets", "foo", "0")
+		c.Do("XREAD", "COUNT")
+		c.Do("XREAD", "COUNT", "notint")
+		c.Do("XREAD", "COUNT", "10") // No streams
+		c.Do("XREAD", "STREAMS", "foo", "notint")
+	})
+}
