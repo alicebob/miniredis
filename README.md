@@ -16,6 +16,11 @@ stack.
 
 There are no dependencies on external binaries, so you can easily integrate it in automated build processes.
 
+Be sure to import v2:
+```
+import "github.com/alicebob/miniredis/v2"
+```
+
 ## Commands
 
 Implemented commands:
@@ -170,6 +175,7 @@ Implemented commands:
    - XINFO STREAM -- partly
    - XLEN
    - XRANGE
+   - XREAD -- partly
    - XREADGROUP -- partly
    - XREVRANGE
  - Scripting
