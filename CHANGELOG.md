@@ -1,5 +1,11 @@
 ## Changelog
 
+### v2.13.3
+
+- support Go 1.14 and 1.15
+- update the `Check...()` methods
+- support for XREAD (thanks @pieterlexis)
+
 ### v2.13.2
 
 - Use SAN instead of CN in self signed cert for testing (thanks @johejo)
