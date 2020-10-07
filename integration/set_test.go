@@ -40,6 +40,14 @@ func TestSet(t *testing.T) {
 		c.Do("SISMEMBER", "str", "noot")
 		c.Do("SCARD", "str")
 	})
+
+	testRESP3(t, func(c *client) {
+		c.Do("SMEMBERS", "q")
+		c.Do("SADD", "q", "aap")
+		c.Do("SMEMBERS", "q")
+		c.Do("SISMEMBER", "q", "aap")
+		c.Do("SISMEMBER", "q", "noot")
+	})
 }
 
 func TestSetMove(t *testing.T) {
@@ -179,16 +187,23 @@ func TestSetSrandmember(t *testing.T) {
 		c.Do("SET", "str", "I am a string")
 		c.Do("SRANDMEMBER", "str")
 	})
+
+	testRESP3(t, func(c *client) {
+		c.Do("SADD", "q", "aap")
+		c.Do("SRANDMEMBER", "q")
+		c.Do("SRANDMEMBER", "q", "1")
+		c.Do("SRANDMEMBER", "q", "0")
+	})
 }
 
 func TestSetSdiff(t *testing.T) {
 	testRaw(t, func(c *client) {
-		c.Do("SDIFF", "s1", "aap", "noot", "mies")
-		c.Do("SDIFF", "s2", "noot", "mies", "vuur")
-		c.Do("SDIFF", "s3", "mies", "wim")
-		c.Do("SDIFF", "s1")
-		c.Do("SDIFF", "s1", "s2")
-		c.Do("SDIFF", "s1", "s2", "s3")
+		c.Do("SADD", "s1", "aap", "noot", "mies")
+		c.Do("SADD", "s2", "noot", "mies", "vuur")
+		c.Do("SADD", "s3", "mies", "wim")
+		c.DoSorted("SDIFF", "s1")
+		c.DoSorted("SDIFF", "s1", "s2")
+		c.DoSorted("SDIFF", "s1", "s2", "s3")
 		c.Do("SDIFF", "nosuch")
 		c.Do("SDIFF", "s1", "nosuch", "s2", "nosuch", "s3")
 		c.Do("SDIFF", "s1", "s1")
@@ -207,6 +222,15 @@ func TestSetSdiff(t *testing.T) {
 		c.Do("SDIFF", "str", "s1")
 		c.Do("SDIFFSTORE", "res", "str", "s1")
 		c.Do("SDIFFSTORE", "res", "s1", "str")
+	})
+
+	testRESP3(t, func(c *client) {
+		c.Do("SADD", "s1", "aap", "noot", "mies")
+		c.Do("SADD", "s2", "noot", "mies", "vuur")
+		c.DoSorted("SDIFF", "s1")
+		c.DoSorted("SDIFF", "s1", "s2")
+		c.Do("SDIFFSTORE", "res", "s1", "s2")
+		c.Do("SMEMBERS", "res")
 	})
 }
 

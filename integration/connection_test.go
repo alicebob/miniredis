@@ -141,3 +141,66 @@ func TestAuth(t *testing.T) {
 		c.Do("EXEC")
 	})
 }
+
+func TestHello(t *testing.T) {
+	testRaw(t,
+		func(c *client) {
+			c.Do("SADD", "s", "aap") // sets have resp3 specific code
+
+			c.DoLoosely("HELLO", "3")
+			c.Do("SMEMBERS", "s")
+
+			c.DoLoosely("HELLO", "2")
+			c.Do("SMEMBERS", "s")
+
+			c.Do("HELLO", "twoandahalf")
+
+			c.DoLoosely("HELLO", "3", "AUTH", "default", "foo")
+			c.DoLoosely("HELLO", "3", "AUTH", "default", "foo", "SETNAME", "foo")
+			c.DoLoosely("HELLO", "3", "SETNAME", "foo")
+
+			// errors
+			c.Do("HELLO", "3", "default", "foo")
+			c.Do("HELLO", "three", "AUTH", "default", "foo")
+			c.Do("HELLO", "3", "AUTH", "default")
+			c.Do("HELLO", "default", "foo")
+			c.Do("HELLO", "3", "default", "foo", "SETNAME")
+			c.Do("HELLO", "3", "SETNAME")
+
+		},
+	)
+
+	testAuth(t,
+		"secret",
+		func(c *client) {
+			c.Do("SADD", "s", "aap") // sets have resp3 specific code
+
+			c.Do("HELLO", "3", "AUTH", "default", "foo")
+			c.Do("HELLO", "3", "AUTH", "wrong", "secret")
+			c.DoLoosely("HELLO", "3", "AUTH", "default", "secret")
+			c.Do("SMEMBERS", "s")
+			c.DoLoosely("HELLO", "3", "AUTH", "default", "secret") // again!
+			c.Do("SMEMBERS", "s")
+			c.DoLoosely("HELLO", "2", "AUTH", "default", "secret") // again!
+			c.Do("SMEMBERS", "s")
+
+			c.DoLoosely("HELLO", "3", "AUTH", "default", "wrong")
+			c.Do("SMEMBERS", "s")
+		},
+	)
+
+	testUserAuth(t,
+		map[string]string{
+			"sesame": "open",
+		},
+		func(c *client) {
+			c.Do("SADD", "s", "aap") // sets have resp3 specific code
+
+			c.Do("HELLO", "3", "AUTH", "foo", "bar")
+			c.Do("HELLO", "3", "AUTH", "sesame", "close")
+			c.Do("SMEMBERS", "s")
+			c.DoLoosely("HELLO", "3", "AUTH", "sesame", "open123")
+			c.Do("SMEMBERS", "s")
+		},
+	)
+}

@@ -3,7 +3,9 @@
 package miniredis
 
 import (
+	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/alicebob/miniredis/v2/server"
 )
@@ -11,10 +13,11 @@ import (
 func commandsConnection(m *Miniredis) {
 	m.srv.Register("AUTH", m.cmdAuth)
 	m.srv.Register("ECHO", m.cmdEcho)
+	m.srv.Register("HELLO", m.cmdHello)
 	m.srv.Register("PING", m.cmdPing)
+	m.srv.Register("QUIT", m.cmdQuit)
 	m.srv.Register("SELECT", m.cmdSelect)
 	m.srv.Register("SWAPDB", m.cmdSwapdb)
-	m.srv.Register("QUIT", m.cmdQuit)
 }
 
 // PING
@@ -96,6 +99,86 @@ func (m *Miniredis) cmdAuth(c *server.Peer, cmd string, args []string) {
 		ctx.authenticated = true
 		c.WriteOK()
 	})
+}
+
+// HELLO
+func (m *Miniredis) cmdHello(c *server.Peer, cmd string, args []string) {
+	if len(args) < 1 {
+		c.WriteError(errWrongNumber(cmd))
+		return
+	}
+
+	versionArg, args := args[0], args[1:]
+	var version int
+	switch versionArg {
+	case "2":
+		version = 2
+	case "3":
+		version = 3
+	default:
+		c.WriteError("NOPROTO unsupported protocol version")
+		return
+	}
+
+	var (
+		checkAuth          bool
+		username, password string
+	)
+	for len(args) > 0 {
+		switch strings.ToUpper(args[0]) {
+		case "AUTH":
+			if len(args) < 3 {
+				c.WriteError(fmt.Sprintf("ERR Syntax error in HELLO option '%s'", args[0]))
+				return
+			}
+			username, password, args = args[1], args[2], args[3:]
+			checkAuth = true
+		case "SETNAME":
+			if len(args) < 2 {
+				c.WriteError(fmt.Sprintf("ERR Syntax error in HELLO option '%s'", args[0]))
+				return
+			}
+			_, args = args[1], args[2:]
+		default:
+			c.WriteError(fmt.Sprintf("ERR Syntax error in HELLO option '%s'", args[0]))
+			return
+		}
+	}
+
+	if len(m.passwords) == 0 && username == "default" {
+		// redis ignores legacy "AUTH" if it's not enabled.
+		checkAuth = false
+	}
+	if checkAuth {
+		setPW, ok := m.passwords[username]
+		if !ok {
+			c.WriteError("WRONGPASS invalid username-password pair")
+			return
+		}
+		if setPW != password {
+			c.WriteError("WRONGPASS invalid username-password pair")
+			return
+		}
+		getCtx(c).authenticated = true
+	}
+
+	c.Resp3 = version == 3
+
+	c.WriteMapLen(7)
+	c.WriteBulk("server")
+	c.WriteBulk("miniredis")
+	c.WriteBulk("version")
+	c.WriteBulk("6.0.5")
+	c.WriteBulk("proto")
+	c.WriteInt(version)
+	c.WriteBulk("id")
+	c.WriteInt(42)
+	c.WriteBulk("mode")
+	c.WriteBulk("standalone")
+	c.WriteBulk("role")
+	c.WriteBulk("master")
+	c.WriteBulk("modules")
+	c.WriteLen(0)
 }
 
 // ECHO

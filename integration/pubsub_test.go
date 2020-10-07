@@ -149,6 +149,15 @@ func TestPubsubFull(t *testing.T) {
 		c1.Do("UNSUBSCRIBE", "news", "sport")
 		c1.Receive()
 	})
+
+	testRESP3Pair(t, func(c1, c2 *client) {
+		c1.Do("SUBSCRIBE", "news", "sport")
+		c1.Receive()
+		c2.Do("PUBLISH", "news", "fire!")
+		c1.Receive()
+		c1.Do("UNSUBSCRIBE", "news", "sport")
+		c1.Receive()
+	})
 }
 
 func TestPubsubMulti(t *testing.T) {

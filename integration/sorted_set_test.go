@@ -133,6 +133,7 @@ func TestSortedSetAdd(t *testing.T) {
 		c.Do("ZADD", "z", "1.2", "aap", "CH")
 		c.Do("ZADD", "z")
 	})
+
 	testRaw(t, func(c *client) {
 		c.Do("ZADD", "z", "INCR", "1", "aap")
 		c.Do("ZADD", "z", "INCR", "1", "aap")
@@ -149,6 +150,10 @@ func TestSortedSetAdd(t *testing.T) {
 		c.Do("ZADD", "z", "INCR", "1", "aap", "2", "tiger")
 		c.Do("ZADD", "z", "INCR", "-12")
 		c.Do("ZADD", "z", "INCR", "-12", "aap", "NX")
+	})
+
+	testRESP3(t, func(c *client) {
+		c.Do("ZADD", "z", "INCR", "1", "aap")
 	})
 }
 

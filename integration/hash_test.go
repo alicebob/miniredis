@@ -110,6 +110,15 @@ func TestHashGetall(t *testing.T) {
 		c.Do("SET", "str", "I am a string")
 		c.Do("HGETALL", "str")
 	})
+
+	testRESP3(t, func(c *client) {
+		c.Do("HSET", "aap", "noot", "mies")
+		c.Do("HGETALL", "aap")
+		c.Do("HSET", "aap", "vuur", "wim")
+		c.DoSorted("HGETALL", "aap")
+
+		c.Do("HGETALL", "nosuch")
+	})
 }
 
 func TestHmset(t *testing.T) {

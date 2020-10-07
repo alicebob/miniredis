@@ -10,7 +10,7 @@ import (
 )
 
 var (
-	ErrProtocol   = errors.New("invalid request")
+	ErrProtocol   = errors.New("unsupported protocol")
 	ErrUnexpected = errors.New("not what you asked for")
 )
 
@@ -26,6 +26,7 @@ func readLine(r *bufio.Reader) (string, error) {
 }
 
 // Read an array, with all elements are the raw redis commands
+// Also reads sets and maps.
 func ReadArray(b string) ([]string, error) {
 	r := bufio.NewReader(strings.NewReader(b))
 	line, err := readLine(r)
@@ -33,24 +34,37 @@ func ReadArray(b string) ([]string, error) {
 		return nil, err
 	}
 
+	elems := 0
 	switch line[0] {
 	default:
 		return nil, ErrUnexpected
-	case '*':
+	case '*', '>', '~':
+		// *: array
+		// >: push data
+		// ~: set
 		length, err := strconv.Atoi(line[1 : len(line)-2])
 		if err != nil {
 			return nil, err
 		}
-		var res []string
-		for i := 0; i < length; i++ {
-			next, err := Read(r)
-			if err != nil {
-				return nil, err
-			}
-			res = append(res, next)
+		elems = length
+	case '%':
+		// we also read maps.
+		length, err := strconv.Atoi(line[1 : len(line)-2])
+		if err != nil {
+			return nil, err
 		}
-		return res, nil
+		elems = length * 2
 	}
+
+	var res []string
+	for i := 0; i < elems; i++ {
+		next, err := Read(r)
+		if err != nil {
+			return nil, err
+		}
+		res = append(res, next)
+	}
+	return res, nil
 }
 
 func ReadString(b string) (string, error) {
@@ -132,14 +146,15 @@ func Read(r *bufio.Reader) (string, error) {
 		return "", err
 	}
 
-	// TODO: all other cases.
 	switch line[0] {
 	default:
 		return "", ErrProtocol
-	case '+', '-', ':':
+	case '+', '-', ':', ',', '_':
 		// +: inline string
 		// -: errors
 		// :: integer
+		// ,: float
+		// _: null
 		// Simple line based replies.
 		return line, nil
 	case '$':
@@ -164,12 +179,29 @@ func Read(r *bufio.Reader) (string, error) {
 			pos += n
 		}
 		return line + string(buf), nil
-	case '*':
+	case '*', '>', '~':
+		// arrays are: `*6\r\n...`
+		// pushdata is: `>6\r\n...`
+		// sets are: `~6\r\n...`
 		length, err := strconv.Atoi(line[1 : len(line)-2])
 		if err != nil {
 			return "", err
 		}
 		for i := 0; i < length; i++ {
+			next, err := Read(r)
+			if err != nil {
+				return "", err
+			}
+			line += next
+		}
+		return line, nil
+	case '%':
+		// maps are: `%3\r\n...`
+		length, err := strconv.Atoi(line[1 : len(line)-2])
+		if err != nil {
+			return "", err
+		}
+		for i := 0; i < length*2; i++ {
 			next, err := Read(r)
 			if err != nil {
 				return "", err
@@ -231,6 +263,25 @@ func Parse(b string) (interface{}, error) {
 				return nil, err
 			}
 			res = append(res, e)
+		}
+		return res, nil
+	case '%':
+		elems, err := ReadArray(b)
+		if err != nil {
+			return nil, err
+		}
+		var res = map[interface{}]interface{}{}
+		for len(elems) > 1 {
+			key, err := Parse(elems[0])
+			if err != nil {
+				return nil, err
+			}
+			value, err := Parse(elems[1])
+			if err != nil {
+				return nil, err
+			}
+			res[key] = value
+			elems = elems[2:]
 		}
 		return res, nil
 	}

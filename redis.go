@@ -2,7 +2,6 @@ package miniredis
 
 import (
 	"fmt"
-	"math"
 	"math/big"
 	"strings"
 	"sync"
@@ -142,17 +141,6 @@ func blocking(
 		}
 		wg.Wait()
 	}
-}
-
-// formatFloat formats a float the way redis does (sort-of)
-func formatFloat(v float64) string {
-	if math.IsInf(v, 1) {
-		return "inf"
-	}
-	if math.IsInf(v, -1) {
-		return "-inf"
-	}
-	return stripZeros(fmt.Sprintf("%.12f", v))
 }
 
 // formatBig formats a float the way redis does

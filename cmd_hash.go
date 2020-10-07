@@ -284,7 +284,7 @@ func (m *Miniredis) cmdHgetall(c *server.Peer, cmd string, args []string) {
 
 		t, ok := db.keys[key]
 		if !ok {
-			c.WriteLen(0)
+			c.WriteMapLen(0)
 			return
 		}
 		if t != "hash" {
@@ -292,7 +292,7 @@ func (m *Miniredis) cmdHgetall(c *server.Peer, cmd string, args []string) {
 			return
 		}
 
-		c.WriteLen(len(db.hashKeys[key]) * 2)
+		c.WriteMapLen(len(db.hashKeys[key]))
 		for _, k := range db.hashFields(key) {
 			c.WriteBulk(k)
 			c.WriteBulk(db.hashGet(key, k))

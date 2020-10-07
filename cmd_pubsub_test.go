@@ -63,6 +63,25 @@ func TestSubscribe(t *testing.T) {
 			proto.Strings("message", "colors", "green"),
 		)
 	}
+
+	useRESP3(t, c)
+	t.Run("RESP3", func(t *testing.T) {
+		mustDo(t, c,
+			"SUBSCRIBE", "q1", "q2",
+			proto.Push(
+				proto.String("subscribe"),
+				proto.String("q1"),
+				proto.Int(6),
+			),
+		)
+		mustRead(t, c,
+			proto.Push(
+				proto.String("subscribe"),
+				proto.String("q2"),
+				proto.Int(7),
+			),
+		)
+	})
 }
 
 func TestUnsubscribe(t *testing.T) {
@@ -133,6 +152,18 @@ func TestUnsubscribe(t *testing.T) {
 			),
 		)
 	}
+
+	useRESP3(t, c)
+	t.Run("RESP3", func(t *testing.T) {
+		mustDo(t, c,
+			"UNSUBSCRIBE", "q1",
+			proto.Push(
+				proto.String("unsubscribe"),
+				proto.String("q1"),
+				proto.Int(0),
+			),
+		)
+	})
 }
 
 func TestPsubscribe(t *testing.T) {
@@ -180,6 +211,18 @@ func TestPsubscribe(t *testing.T) {
 			proto.Strings("pmessage", "event4[abc]", "event4b", "hello 4b!"),
 		)
 	}
+
+	useRESP3(t, c)
+	t.Run("RESP3", func(t *testing.T) {
+		mustDo(t, c,
+			"PSUBSCRIBE", "q1",
+			proto.Push(
+				proto.String("psubscribe"),
+				proto.String("q1"),
+				proto.Int(6),
+			),
+		)
+	})
 }
 
 func TestPunsubscribe(t *testing.T) {
@@ -226,6 +269,18 @@ func TestPunsubscribe(t *testing.T) {
 			proto.Array(proto.String("punsubscribe"), proto.String("event5[]"), proto.Int(0)),
 		)
 	}
+
+	useRESP3(t, c)
+	t.Run("RESP3", func(t *testing.T) {
+		mustDo(t, c,
+			"PUNSUBSCRIBE", "q1",
+			proto.Push(
+				proto.String("punsubscribe"),
+				proto.String("q1"),
+				proto.Int(0),
+			),
+		)
+	})
 }
 
 func TestPublishMode(t *testing.T) {
