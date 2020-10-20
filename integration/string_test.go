@@ -16,6 +16,7 @@ func TestString(t *testing.T) {
 		c.Do("SET", "foo", "bar", "EX", "100")
 		c.Do("SET", "foo", "bar", "EX", "noint")
 		c.Do("SET", "utf8", "❆❅❄☃")
+		c.Do("SET", "foo", "baz", "KEEPTTL")
 
 		// Failure cases
 		c.Do("SET")
