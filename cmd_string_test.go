@@ -156,6 +156,17 @@ func TestSet(t *testing.T) {
 		)
 	}
 
+	// KEEPTTL argument
+	{
+		s.Set("foo", "bar")
+		s.SetTTL("foo", time.Second*1337)
+		mustOK(t, c,
+			"SET", "foo", "baz", "KEEPTTL",
+		)
+		s.CheckGet(t, "foo", "baz")
+		equals(t, time.Second*1337, s.TTL("foo"))
+	}
+
 	// Invalid argument
 	mustDo(t, c,
 		"SET", "one", "two", "FOO",

@@ -55,6 +55,7 @@ func (m *Miniredis) cmdSet(c *server.Peer, cmd string, args []string) {
 	var (
 		nx  = false // set iff not exists
 		xx  = false // set iff exists
+		keepttl = false // set keepttl
 		ttl time.Duration
 	)
 
@@ -68,6 +69,10 @@ func (m *Miniredis) cmdSet(c *server.Peer, cmd string, args []string) {
 			continue
 		case "XX":
 			xx = true
+			args = args[1:]
+			continue
+		case "KEEPTTL":
+			keepttl = true
 			args = args[1:]
 			continue
 		case "PX":
@@ -114,6 +119,11 @@ func (m *Miniredis) cmdSet(c *server.Peer, cmd string, args []string) {
 			if !db.exists(key) {
 				c.WriteNull()
 				return
+			}
+		}
+		if keepttl {
+			if val, ok := db.ttl[key]; ok {
+				ttl = val
 			}
 		}
 
