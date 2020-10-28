@@ -28,6 +28,7 @@ Implemented commands:
  - Connection (complete)
    - AUTH -- see RequireAuth()
    - ECHO
+   - HELLO -- see RequireUserAuth()
    - PING
    - SELECT
    - SWAPDB
@@ -311,6 +312,9 @@ Commands which will probably not be implemented:
 
 Tests are run against Redis 6.0.5. The [./integration](./integration/) subdir
 compares miniredis against a real redis instance.
+
+The Redis 6 RESP3 protocol is supported. If there are problems, please open
+an issue.
 
 If you want to test Redis Sentinel have a look at [minisentinel](https://github.com/Bose/minisentinel).
 

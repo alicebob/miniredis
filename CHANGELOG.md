@@ -1,5 +1,10 @@
 ## Changelog
 
+### v2.14.0
+
+- support for HELLO and the RESP3 protocol
+- KEEPTTL in SET (thanks @johnpena)
+
 ### v2.13.3
 
 - support Go 1.14 and 1.15
