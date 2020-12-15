@@ -322,3 +322,4 @@ A changelog is kept at [CHANGELOG.md](https://github.com/alicebob/miniredis/blob
 
 [![Build Status](https://travis-ci.org/alicebob/miniredis.svg?branch=master)](https://travis-ci.org/alicebob/miniredis)
 [![GoDoc](https://godoc.org/github.com/alicebob/miniredis?status.svg)](https://godoc.org/github.com/alicebob/miniredis)
+[![Go Reference](https://pkg.go.dev/badge/github.com/alicebob/miniredis/v2.svg)](https://pkg.go.dev/github.com/alicebob/miniredis/v2)
