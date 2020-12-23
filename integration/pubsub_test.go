@@ -18,10 +18,14 @@ func TestSubscribe(t *testing.T) {
 		c.Do("UNSUBSCRIBE", "foo")
 
 		c.Do("SUBSCRIBE", "foo", "bar")
+		c.Receive()
 		c.Do("UNSUBSCRIBE", "foo", "bar")
+		c.Receive()
 
 		c.Do("SUBSCRIBE", "-1")
 		c.Do("UNSUBSCRIBE", "-1")
+
+		c.Do("UNSUBSCRIBE")
 	})
 }
 
@@ -95,6 +99,11 @@ func TestPsubscribe(t *testing.T) {
 		c1.Do("PSUBSCRIBE", "news") // no pattern
 		c2.Do("PUBLISH", "news", "fire!")
 		c1.Receive()
+	})
+
+	testRaw(t, func(c *client) {
+		c.Do("PUNSUBSCRIBE")
+		c.Do("PUNSUBSCRIBE")
 	})
 }
 

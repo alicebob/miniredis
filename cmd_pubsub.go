@@ -77,6 +77,15 @@ func (m *Miniredis) cmdUnsubscribe(c *server.Peer, cmd string, args []string) {
 				w.WriteInt(n)
 			})
 		}
+		if len(channels) == 0 {
+			// special case: there is always a reply
+			c.Block(func(w *server.Writer) {
+				w.WritePushLen(3)
+				w.WriteBulk("unsubscribe")
+				w.WriteNull()
+				w.WriteInt(0)
+			})
+		}
 
 		if sub.Count() == 0 {
 			endSubscriber(m, c)
@@ -140,6 +149,15 @@ func (m *Miniredis) cmdPunsubscribe(c *server.Peer, cmd string, args []string) {
 				w.WriteBulk("punsubscribe")
 				w.WriteBulk(pat)
 				w.WriteInt(n)
+			})
+		}
+		if len(patterns) == 0 {
+			// special case: there is always a reply
+			c.Block(func(w *server.Writer) {
+				w.WritePushLen(3)
+				w.WriteBulk("punsubscribe")
+				w.WriteNull()
+				w.WriteInt(0)
 			})
 		}
 
