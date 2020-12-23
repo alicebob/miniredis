@@ -166,6 +166,24 @@ func TestUnsubscribe(t *testing.T) {
 	})
 }
 
+func TestUnsubscribeEmpty(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := proto.Dial(s.Addr())
+	ok(t, err)
+	defer c.Close()
+
+	mustDo(t, c,
+		"UNSUBSCRIBE",
+		proto.Array(
+			proto.String("unsubscribe"),
+			proto.Nil,
+			proto.Int(0),
+		),
+	)
+}
+
 func TestPsubscribe(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
@@ -281,6 +299,24 @@ func TestPunsubscribe(t *testing.T) {
 			),
 		)
 	})
+}
+
+func TestPunsubscribeEmpty(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := proto.Dial(s.Addr())
+	ok(t, err)
+	defer c.Close()
+
+	mustDo(t, c,
+		"PUNSUBSCRIBE",
+		proto.Array(
+			proto.String("punsubscribe"),
+			proto.Nil,
+			proto.Int(0),
+		),
+	)
 }
 
 func TestPublishMode(t *testing.T) {
