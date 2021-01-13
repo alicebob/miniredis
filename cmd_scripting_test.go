@@ -432,22 +432,22 @@ func TestCmdEvalReply(t *testing.T) {
 
 	mustContain(t, c,
 		"EVAL", `return redis.error_reply()`, "0",
-		"string expected, got nil",
+		"wrong number or type of arguments",
 	)
 
 	mustContain(t, c,
 		"EVAL", `return redis.error_reply(1)`, "0",
-		"string expected, got number",
+		"wrong number or type of arguments",
 	)
 
 	mustContain(t, c,
 		"EVAL", `return redis.status_reply()`, "0",
-		"string expected, got nil",
+		"wrong number or type of arguments",
 	)
 
 	mustContain(t, c,
 		"EVAL", `return redis.status_reply(1)`, "0",
-		"string expected, got number",
+		"wrong number or type of arguments",
 	)
 }
 
