@@ -95,14 +95,24 @@ func mkLuaFuncs(srv *server.Server, c *server.Peer) map[string]lua.LGFunction {
 		"call":  mkCall(true),
 		"pcall": mkCall(false),
 		"error_reply": func(l *lua.LState) int {
-			msg := l.CheckString(1)
+			v := l.Get(1)
+			msg, ok := v.(lua.LString)
+			if !ok {
+				l.Error(lua.LString("wrong number or type of arguments"), 1)
+				return 0
+			}
 			res := &lua.LTable{}
 			res.RawSetString("err", lua.LString(msg))
 			l.Push(res)
 			return 1
 		},
 		"status_reply": func(l *lua.LState) int {
-			msg := l.CheckString(1)
+			v := l.Get(1)
+			msg, ok := v.(lua.LString)
+			if !ok {
+				l.Error(lua.LString("wrong number or type of arguments"), 1)
+				return 0
+			}
 			res := &lua.LTable{}
 			res.RawSetString("ok", lua.LString(msg))
 			l.Push(res)

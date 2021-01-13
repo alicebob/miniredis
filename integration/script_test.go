@@ -119,12 +119,12 @@ func TestLua(t *testing.T) {
 		c.Do("EVAL", "return {ok = 'great', notok = 'yes'}", "0")       // doc error?
 		c.Do("EVAL", "return {1, 2, ok = 'great', notok = 'yes'}", "0") // doc error?
 
-		c.DoLoosely("EVAL", "return redis.error_reply(1)", "0")
-		c.DoLoosely("EVAL", "return redis.error_reply()", "0")
-		c.DoLoosely("EVAL", "return redis.error_reply(redis.error_reply('foo'))", "0")
-		c.DoLoosely("EVAL", "return redis.status_reply(1)", "0")
-		c.DoLoosely("EVAL", "return redis.status_reply()", "0")
-		c.DoLoosely("EVAL", "return redis.status_reply(redis.status_reply('foo'))", "0")
+		c.Error("type of arguments", "EVAL", "return redis.error_reply(1)", "0")
+		c.Error("type of arguments", "EVAL", "return redis.error_reply()", "0")
+		c.Error("type of arguments", "EVAL", "return redis.error_reply(redis.error_reply('foo'))", "0")
+		c.Error("type of arguments", "EVAL", "return redis.status_reply(1)", "0")
+		c.Error("type of arguments", "EVAL", "return redis.status_reply()", "0")
+		c.Error("type of arguments", "EVAL", "return redis.status_reply(redis.status_reply('foo'))", "0")
 	})
 
 	// state inside lua
