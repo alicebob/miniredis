@@ -1,15 +1,28 @@
 ## Changelog
 
+### v2.14.2
+
+- update LUA dependency
+- deal with (p)unsubscribe when there are no channels
+
+
+### v2.14.1
+
+- mod tidy
+
+
 ### v2.14.0
 
 - support for HELLO and the RESP3 protocol
 - KEEPTTL in SET (thanks @johnpena)
+
 
 ### v2.13.3
 
 - support Go 1.14 and 1.15
 - update the `Check...()` methods
 - support for XREAD (thanks @pieterlexis)
+
 
 ### v2.13.2
 
@@ -18,15 +31,18 @@
 - changed unit and integration tests to compare raw payloads, not parsed payloads
 - remove "redigo" dependency
 
+
 ### v2.13.1
 
 - added HSTRLEN
 - minimal support for ACL users in AUTH
 
+
 ### v2.13.0
 
 - added RunTLS(...)
 - added SetError(...)
+
 
 ### v2.12.0
 
@@ -36,25 +52,30 @@
 - fix TOUCH
 - fix a shutdown race condition
 
+
 ### v2.11.4
 
 - ZUNIONSTORE now supports standard set types (thanks @wshirey)
+
 
 ### v2.11.3
 
 - support for TOUCH (thanks @cleroux)
 - support for cluster and stream commands (thanks @kak-tus)
 
+
 ### v2.11.2
 
 - make sure Lua code is executed concurrently
 - add command GEORADIUSBYMEMBER (thanks @kyeett)
+
 
 ### v2.11.1
 
 - globals protection for Lua code (thanks @vk-outreach)
 - HSET update (thanks @carlgreen)
 - fix BLPOP block on shutdown (thanks @Asalle)
+
 
 ### v2.11.0
 
@@ -63,9 +84,11 @@
 - improved precision for geohashes, closer to what real redis does
 - use 128bit floats internally for INCRBYFLOAT and related (thanks @timnd)
 
+
 ### v2.10.1
 
 - added m.Server()
+
 
 ### v2.10.0
 
