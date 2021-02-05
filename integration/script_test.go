@@ -196,6 +196,15 @@ func TestLua(t *testing.T) {
 			"EVAL", `return cjson.decode(1, 2)`, "0",
 		)
 	})
+
+	// selected DB gets passed on to lua
+	testRaw(t, func(c *client) {
+		c.Do("SELECT", "3")
+		c.Do("EVAL", "redis.call('SET', 'foo', 'bar')", "0")
+		c.Do("GET", "foo")
+		c.Do("SELECT", "0")
+		c.Do("GET", "foo")
+	})
 }
 
 func TestLuaCall(t *testing.T) {
