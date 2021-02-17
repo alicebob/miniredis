@@ -19,6 +19,7 @@ func mkLuaFuncs(srv *server.Server, c *server.Peer) map[string]lua.LGFunction {
 			pCtx.authenticated = true
 		}
 		pCtx.nested = true
+		pCtx.selectedDB = getCtx(c).selectedDB
 
 		return func(l *lua.LState) int {
 			top := l.GetTop()
