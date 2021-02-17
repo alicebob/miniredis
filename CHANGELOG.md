@@ -1,5 +1,11 @@
 ## Changelog
 
+### v2.14.3
+
+- fix problem where Lua code didn't set the selected DB
+- update to redis 6.0.10 (thanks @lazappa)
+
+
 ### v2.14.2
 
 - update LUA dependency
