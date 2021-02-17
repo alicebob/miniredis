@@ -49,7 +49,7 @@ func (m *Miniredis) cmdHset(c *server.Peer, cmd string, args []string) {
 		db := m.db(ctx.selectedDB)
 
 		if len(pairs)%2 == 1 {
-			c.WriteError("ERR wrong number of arguments for HMSET")
+			c.WriteError(errWrongNumber(cmd))
 			return
 		}
 
@@ -119,8 +119,7 @@ func (m *Miniredis) cmdHmset(c *server.Peer, cmd string, args []string) {
 	key, args := args[0], args[1:]
 	if len(args)%2 != 0 {
 		setDirty(c)
-		// non-default error message
-		c.WriteError("ERR wrong number of arguments for HMSET")
+		c.WriteError(errWrongNumber(cmd))
 		return
 	}
 

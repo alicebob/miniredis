@@ -9,49 +9,53 @@ import (
 )
 
 func TestHash(t *testing.T) {
-	testRaw(t, func(c *client) {
-		c.Do("HSET", "aap", "noot", "mies")
-		c.Do("HGET", "aap", "noot")
-		c.Do("HMGET", "aap", "noot")
-		c.Do("HLEN", "aap")
-		c.Do("HKEYS", "aap")
-		c.Do("HVALS", "aap")
-		c.Do("HSET", "aaa", "bb", "1", "cc", "2")
-		c.Do("HGET", "aaa", "bb")
-		c.Do("HGET", "aaa", "cc")
+	t.Run("basics", func(t *testing.T) {
+		testRaw(t, func(c *client) {
+			c.Do("HSET", "aap", "noot", "mies")
+			c.Do("HGET", "aap", "noot")
+			c.Do("HMGET", "aap", "noot")
+			c.Do("HLEN", "aap")
+			c.Do("HKEYS", "aap")
+			c.Do("HVALS", "aap")
+			c.Do("HSET", "aaa", "bb", "1", "cc", "2")
+			c.Do("HGET", "aaa", "bb")
+			c.Do("HGET", "aaa", "cc")
 
-		c.Do("HDEL", "aap", "noot")
-		c.Do("HGET", "aap", "noot")
-		c.Do("EXISTS", "aap") // key is gone
+			c.Do("HDEL", "aap", "noot")
+			c.Do("HGET", "aap", "noot")
+			c.Do("EXISTS", "aap") // key is gone
 
-		// failure cases
-		c.Do("HSET", "aap", "noot")
-		c.Do("HGET", "aap")
-		c.Do("HMGET", "aap")
-		c.Do("HLEN")
-		c.Do("HKEYS")
-		c.Do("HVALS")
-		c.Do("SET", "str", "I am a string")
-		c.Do("HSET", "str", "noot", "mies")
-		c.Do("HGET", "str", "noot")
-		c.Do("HMGET", "str", "noot")
-		c.Do("HLEN", "str")
-		c.Do("HKEYS", "str")
-		c.Do("HVALS", "str")
-		c.Do("HSET")
-		c.Do("HSET", "a1")
-		c.Do("HSET", "a1", "b")
-		c.Do("HSET", "a2", "b", "c", "d")
+			// failure cases
+			c.Do("HSET", "aap", "noot")
+			c.Do("HGET", "aap")
+			c.Do("HMGET", "aap")
+			c.Do("HLEN")
+			c.Do("HKEYS")
+			c.Do("HVALS")
+			c.Do("SET", "str", "I am a string")
+			c.Do("HSET", "str", "noot", "mies")
+			c.Do("HGET", "str", "noot")
+			c.Do("HMGET", "str", "noot")
+			c.Do("HLEN", "str")
+			c.Do("HKEYS", "str")
+			c.Do("HVALS", "str")
+			c.Do("HSET")
+			c.Do("HSET", "a1")
+			c.Do("HSET", "a1", "b")
+			c.Do("HSET", "a2", "b", "c", "d")
+		})
 	})
 
-	testRaw(t, func(c *client) {
-		c.Do("MULTI")
-		c.Do("HSET", "aap", "noot", "mies", "vuur", "wim")
-		c.Do("EXEC")
+	t.Run("tx", func(t *testing.T) {
+		testRaw(t, func(c *client) {
+			c.Do("MULTI")
+			c.Do("HSET", "aap", "noot", "mies", "vuur", "wim")
+			c.Do("EXEC")
 
-		c.Do("MULTI")
-		c.Do("HSET", "aap", "noot", "mies", "vuur") // uneven arg count
-		c.Do("EXEC")
+			c.Do("MULTI")
+			c.Do("HSET", "aap", "noot", "mies", "vuur") // uneven arg count
+			c.Do("EXEC")
+		})
 	})
 }
 

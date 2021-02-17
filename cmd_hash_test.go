@@ -56,7 +56,7 @@ func TestHash(t *testing.T) {
 	t.Run("unmatched pairs", func(t *testing.T) {
 		mustDo(t, c,
 			"HSET", "a", "b", "c", "d",
-			proto.Error("ERR wrong number of arguments for HMSET"),
+			proto.Error(errWrongNumber("hset")),
 		)
 	})
 
@@ -150,7 +150,7 @@ func TestHashMSet(t *testing.T) {
 		// Usage error
 		mustDo(t, c, "HMSET", "str", proto.Error(errWrongNumber("hmset")))
 		mustDo(t, c, "HMSET", "str", "odd", proto.Error(errWrongNumber("hmset")))
-		mustDo(t, c, "HMSET", "str", "key", "value", "odd", proto.Error("ERR wrong number of arguments for HMSET"))
+		mustDo(t, c, "HMSET", "str", "key", "value", "odd", proto.Error(errWrongNumber("hmset")))
 	}
 }
 
