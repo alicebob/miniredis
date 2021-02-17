@@ -434,8 +434,13 @@ func (m *Miniredis) checkPubsub(c *server.Peer, cmd string) bool {
 		return false
 	}
 
+	prefix := "ERR "
+	if strings.ToLower(cmd) == "exec" {
+		prefix = "EXECABORT Transaction discarded because of: "
+	}
 	c.WriteError(fmt.Sprintf(
-		"ERR Can't execute '%s': only (P)SUBSCRIBE / (P)UNSUBSCRIBE / PING / QUIT are allowed in this context",
+		"%sCan't execute '%s': only (P)SUBSCRIBE / (P)UNSUBSCRIBE / PING / QUIT are allowed in this context",
+		prefix,
 		strings.ToLower(cmd),
 	))
 	return true
