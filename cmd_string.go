@@ -952,8 +952,17 @@ func (m *Miniredis) cmdBitpos(c *server.Peer, cmd string, args []string) {
 		if t, ok := db.keys[key]; ok && t != "string" {
 			c.WriteError(msgWrongType)
 			return
+		} else if !ok {
+			// non-existing key behaves differently
+			if bit == 0 {
+				c.WriteInt(0)
+			} else {
+				c.WriteInt(-1)
+			}
+			return
 		}
 		value := db.stringKeys[key]
+
 		if start < 0 {
 			start += len(value)
 			if start < 0 {
@@ -963,20 +972,22 @@ func (m *Miniredis) cmdBitpos(c *server.Peer, cmd string, args []string) {
 		if start > len(value) {
 			start = len(value)
 		}
+
 		if withEnd {
 			if end < 0 {
 				end += len(value)
+			}
+			if end < 0 {
+				end = 0
 			}
 			end++ // +1 for redis end semantics
 			if end > len(value) {
 				end = len(value)
 			}
-			if end <= 0 {
-				end = 1
-			}
 		} else {
 			end = len(value)
 		}
+
 		if start != 0 || withEnd {
 			if end < start {
 				value = ""
@@ -990,7 +1001,7 @@ func (m *Miniredis) cmdBitpos(c *server.Peer, cmd string, args []string) {
 		}
 		// Special case when looking for 0, but not when start and end are
 		// given.
-		if bit == 0 && pos == -1 && !withEnd {
+		if bit == 0 && pos == -1 && !withEnd && len(value) > 0 {
 			pos = start*8 + len(value)*8
 		}
 		c.WriteInt(pos)
