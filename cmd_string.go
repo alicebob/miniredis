@@ -53,10 +53,10 @@ func (m *Miniredis) cmdSet(c *server.Peer, cmd string, args []string) {
 	}
 
 	var (
-		nx  = false // set iff not exists
-		xx  = false // set iff exists
+		nx      = false // set iff not exists
+		xx      = false // set iff exists
 		keepttl = false // set keepttl
-		ttl time.Duration
+		ttl     time.Duration
 	)
 
 	key, value, args := args[0], args[1], args[2:]
@@ -954,18 +954,25 @@ func (m *Miniredis) cmdBitpos(c *server.Peer, cmd string, args []string) {
 			return
 		}
 		value := db.stringKeys[key]
-		if start != 0 {
-			if start > len(value) {
-				start = len(value)
+		if start < 0 {
+			start += len(value)
+			if start < 0 {
+				start = 0
 			}
 		}
+		if start > len(value) {
+			start = len(value)
+		}
 		if withEnd {
-			end++ // redis end semantics.
 			if end < 0 {
-				end = len(value) + end
+				end += len(value)
 			}
+			end++ // +1 for redis end semantics
 			if end > len(value) {
 				end = len(value)
+			}
+			if end <= 0 {
+				end = 1
 			}
 		} else {
 			end = len(value)
