@@ -960,10 +960,10 @@ func (m *Miniredis) cmdBitpos(c *server.Peer, cmd string, args []string) {
 			}
 		}
 		if withEnd {
-			end++ // redis end semantics.
 			if end < 0 {
-				end = len(value) + end
+				end += len(value)
 			}
+			end++ // +1 for redis end semantics
 			if end > len(value) {
 				end = len(value)
 			}

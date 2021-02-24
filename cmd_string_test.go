@@ -1244,8 +1244,33 @@ func TestBitpos(t *testing.T) {
 		)
 	})
 
-	// Only zeros.
-	{
+	t.Run("substrings", func(t *testing.T) {
+		s.Set("bin", string([]rune{rune(0b0000_0000), rune(0b0010_0000), rune(0b0001_0000)}))
+		mustDo(t, c, "BITPOS", "bin", "1",
+			proto.Int(10))
+		mustDo(t, c, "BITPOS", "bin", "1", "1",
+			proto.Int(10))
+		mustDo(t, c, "BITPOS", "bin", "1", "1", "2",
+			proto.Int(10))
+		mustDo(t, c, "BITPOS", "bin", "1", "2", "2",
+			proto.Int(19))
+		mustDo(t, c, "BITPOS", "bin", "1", "0", "0",
+			proto.Int(-1))
+		mustDo(t, c, "BITPOS", "bin", "1", "0", "-1",
+			proto.Int(10))
+		mustDo(t, c, "BITPOS", "bin", "1", "0", "-2",
+			proto.Int(10))
+		mustDo(t, c, "BITPOS", "bin", "1", "0", "-3",
+			proto.Int(-1))
+		/*
+			mustDo(t, c, "BITPOS", "bin", "1", "-1",
+				proto.Int(3))
+			mustDo(t, c, "BITPOS", "bin", "1", "-2",
+				proto.Int(2))
+		*/
+	})
+
+	t.Run("only zeros", func(t *testing.T) {
 		s.Set("zero", "\x00\x00")
 		mustDo(t, c,
 			"BITPOS", "zero", "1",
@@ -1260,7 +1285,7 @@ func TestBitpos(t *testing.T) {
 			"BITPOS", "zero", "0", "0", "-100",
 			proto.Int(-1),
 		)
-	}
+	})
 
 	t.Run("only ones", func(t *testing.T) {
 		s.Set("one", "\xff\xff")
