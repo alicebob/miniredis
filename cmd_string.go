@@ -954,10 +954,14 @@ func (m *Miniredis) cmdBitpos(c *server.Peer, cmd string, args []string) {
 			return
 		}
 		value := db.stringKeys[key]
-		if start != 0 {
-			if start > len(value) {
-				start = len(value)
+		if start < 0 {
+			start += len(value)
+			if start < 0 {
+				start = 0
 			}
+		}
+		if start > len(value) {
+			start = len(value)
 		}
 		if withEnd {
 			if end < 0 {
@@ -966,6 +970,9 @@ func (m *Miniredis) cmdBitpos(c *server.Peer, cmd string, args []string) {
 			end++ // +1 for redis end semantics
 			if end > len(value) {
 				end = len(value)
+			}
+			if end <= 0 {
+				end = 1
 			}
 		} else {
 			end = len(value)

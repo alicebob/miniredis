@@ -1262,12 +1262,16 @@ func TestBitpos(t *testing.T) {
 			proto.Int(10))
 		mustDo(t, c, "BITPOS", "bin", "1", "0", "-3",
 			proto.Int(-1))
-		/*
-			mustDo(t, c, "BITPOS", "bin", "1", "-1",
-				proto.Int(3))
-			mustDo(t, c, "BITPOS", "bin", "1", "-2",
-				proto.Int(2))
-		*/
+		mustDo(t, c, "BITPOS", "bin", "0", "0", "-999",
+			proto.Int(0))
+		mustDo(t, c, "BITPOS", "bin", "1", "-1",
+			proto.Int(19))
+		mustDo(t, c, "BITPOS", "bin", "1", "-1", "-1",
+			proto.Int(19))
+		mustDo(t, c, "BITPOS", "bin", "1", "-1", "2",
+			proto.Int(19))
+		mustDo(t, c, "BITPOS", "bin", "1", "-2",
+			proto.Int(10))
 	})
 
 	t.Run("only zeros", func(t *testing.T) {
@@ -1283,7 +1287,7 @@ func TestBitpos(t *testing.T) {
 		// -end is ok
 		mustDo(t, c,
 			"BITPOS", "zero", "0", "0", "-100",
-			proto.Int(-1),
+			proto.Int(0),
 		)
 	})
 
