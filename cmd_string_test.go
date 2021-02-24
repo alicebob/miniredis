@@ -1320,13 +1320,17 @@ func TestBitpos(t *testing.T) {
 	})
 
 	t.Run("non-existing", func(t *testing.T) {
-		mustDo(t, c,
-			"BITPOS", "nosuch", "1",
+		mustDo(t, c, "BITPOS", "nosuch", "1",
 			proto.Int(-1),
 		)
-		mustDo(t, c,
-			"BITPOS", "nosuch", "0",
-			proto.Int(0), // that makes no sense.
+		mustDo(t, c, "BITPOS", "nosuch", "1", "0",
+			proto.Int(-1),
+		)
+		mustDo(t, c, "BITPOS", "nosuch", "0",
+			proto.Int(0),
+		)
+		mustDo(t, c, "BITPOS", "nosuch", "0", "0",
+			proto.Int(0),
 		)
 	})
 
@@ -1336,8 +1340,21 @@ func TestBitpos(t *testing.T) {
 			"BITPOS", "empty", "1",
 			proto.Int(-1),
 		)
-		must0(t, c,
+		mustDo(t, c,
 			"BITPOS", "empty", "0",
+			proto.Int(-1),
+		)
+		mustDo(t, c,
+			"BITPOS", "empty", "0", "0",
+			proto.Int(-1),
+		)
+		mustDo(t, c,
+			"BITPOS", "empty", "0", "0", "0",
+			proto.Int(-1),
+		)
+		mustDo(t, c,
+			"BITPOS", "empty", "0", "0", "-1",
+			proto.Int(-1),
 		)
 	})
 
