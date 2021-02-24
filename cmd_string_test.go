@@ -1211,7 +1211,7 @@ func TestBitpos(t *testing.T) {
 	ok(t, err)
 	defer c.Close()
 
-	{
+	t.Run("basic", func(t *testing.T) {
 		s.Set("findme", "\xff\xf0\x00")
 		mustDo(t, c,
 			"BITPOS", "findme", "0",
@@ -1242,7 +1242,7 @@ func TestBitpos(t *testing.T) {
 			"BITPOS", "findme", "1", "10000",
 			proto.Int(-1),
 		)
-	}
+	})
 
 	// Only zeros.
 	{
@@ -1262,8 +1262,7 @@ func TestBitpos(t *testing.T) {
 		)
 	}
 
-	// Only ones.
-	{
+	t.Run("only ones", func(t *testing.T) {
 		s.Set("one", "\xff\xff")
 		mustDo(t, c,
 			"BITPOS", "one", "1",
@@ -1289,10 +1288,9 @@ func TestBitpos(t *testing.T) {
 			"BITPOS", "one", "0", "0", "1",
 			proto.Int(-1), // Counter the special case
 		)
-	}
+	})
 
-	// Non-existing
-	{
+	t.Run("non-existing", func(t *testing.T) {
 		mustDo(t, c,
 			"BITPOS", "nosuch", "1",
 			proto.Int(-1),
@@ -1301,10 +1299,9 @@ func TestBitpos(t *testing.T) {
 			"BITPOS", "nosuch", "0",
 			proto.Int(0), // that makes no sense.
 		)
-	}
+	})
 
-	// Empty string
-	{
+	t.Run("empty string", func(t *testing.T) {
 		s.Set("empty", "")
 		mustDo(t, c,
 			"BITPOS", "empty", "1",
@@ -1313,19 +1310,17 @@ func TestBitpos(t *testing.T) {
 		must0(t, c,
 			"BITPOS", "empty", "0",
 		)
-	}
+	})
 
-	// Wrong type of existing key
-	{
+	t.Run("wrong type", func(t *testing.T) {
 		s.HSet("wrong", "aap", "noot")
 		mustDo(t, c,
 			"BITPOS", "wrong", "1",
 			proto.Error(msgWrongType),
 		)
-	}
+	})
 
-	// Wrong usage
-	{
+	t.Run("wrong usage", func(t *testing.T) {
 		mustDo(t, c,
 			"BITPOS",
 			proto.Error(errWrongNumber("bitpos")),
@@ -1338,7 +1333,7 @@ func TestBitpos(t *testing.T) {
 			"BITPOS", "many",
 			proto.Error(errWrongNumber("bitpos")),
 		)
-	}
+	})
 }
 
 func TestGetbit(t *testing.T) {

@@ -368,7 +368,7 @@ func (c *client) Do(cmd string, args ...string) {
 		return
 	}
 
-	c.t.Logf("real:%q mini:%q", string(resReal), string(resMini))
+	// c.t.Logf("real:%q mini:%q", string(resReal), string(resMini))
 
 	if resReal != resMini {
 		c.t.Errorf("expected: %q got: %q", string(resReal), string(resMini))
@@ -390,7 +390,7 @@ func (c *client) DoSorted(cmd string, args ...string) {
 		return
 	}
 
-	c.t.Logf("real:%q mini:%q", string(resReal), string(resMini))
+	// c.t.Logf("real:%q mini:%q", string(resReal), string(resMini))
 	realStrings, err := proto.ReadStrings(resReal)
 	if err != nil {
 		c.t.Errorf("readstrings realredis: %s", errReal)
@@ -425,7 +425,7 @@ func (c *client) DoLoosely(cmd string, args ...string) {
 		return
 	}
 
-	c.t.Logf("real:%q mini:%q", string(resReal), string(resMini))
+	// c.t.Logf("real:%q mini:%q", string(resReal), string(resMini))
 
 	mini, err := proto.Parse(resMini)
 	if err != nil {
@@ -457,7 +457,7 @@ func (c *client) DoRounded(rounded int, cmd string, args ...string) {
 		return
 	}
 
-	c.t.Logf("real:%q mini:%q", string(resReal), string(resMini))
+	// c.t.Logf("real:%q mini:%q", string(resReal), string(resMini))
 
 	mini, err := proto.Parse(resMini)
 	if err != nil {
@@ -491,7 +491,7 @@ func (c *client) Error(msg string, cmd string, args ...string) {
 		return
 	}
 
-	c.t.Logf("real:%q mini:%q", string(resReal), string(resMini))
+	// c.t.Logf("real:%q mini:%q", string(resReal), string(resMini))
 
 	mini, err := proto.ReadError(resMini)
 	if err != nil {
@@ -527,7 +527,7 @@ func (c *client) Receive() {
 		return
 	}
 
-	c.t.Logf("real:%q mini:%q", string(resReal), string(resMini))
+	// c.t.Logf("real:%q mini:%q", string(resReal), string(resMini))
 
 	if strings.HasPrefix(resReal, "-") {
 		c.t.Errorf("error from realredis: %q", string(resReal))

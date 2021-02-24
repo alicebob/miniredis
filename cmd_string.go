@@ -53,10 +53,10 @@ func (m *Miniredis) cmdSet(c *server.Peer, cmd string, args []string) {
 	}
 
 	var (
-		nx  = false // set iff not exists
-		xx  = false // set iff exists
+		nx      = false // set iff not exists
+		xx      = false // set iff exists
 		keepttl = false // set keepttl
-		ttl time.Duration
+		ttl     time.Duration
 	)
 
 	key, value, args := args[0], args[1], args[2:]
