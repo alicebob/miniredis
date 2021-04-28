@@ -46,7 +46,7 @@ func (ss *streamKey) generateID(now time.Time) string {
 	if streamCmp(lastID, next) == -1 {
 		return next
 	}
-	last := parseStreamID(lastID)
+	last, _ := parseStreamID(lastID)
 	return fmt.Sprintf("%d-%d", last[0], last[1]+1)
 }
 
@@ -58,33 +58,43 @@ func (ss *streamKey) lastID() string {
 	return (*ss)[len(*ss)-1].ID
 }
 
-func parseStreamID(id string) [2]uint64 {
-	var res [2]uint64
+func parseStreamID(id string) ([2]uint64, error) {
+	var (
+		res [2]uint64
+		err error
+	)
 	parts := strings.SplitN(id, "-", 2)
-	res[0], _ = strconv.ParseUint(parts[0], 10, 64)
-	if len(parts) == 2 {
-		res[1], _ = strconv.ParseUint(parts[1], 10, 64)
+	res[0], err = strconv.ParseUint(parts[0], 10, 64)
+	if err != nil {
+		return res, errors.New(msgInvalidStreamID)
 	}
-	return res
+	if len(parts) == 2 {
+		res[1], err = strconv.ParseUint(parts[1], 10, 64)
+		if err != nil {
+			return res, errors.New(msgInvalidStreamID)
+		}
+	}
+	return res, nil
 }
 
 // compares two stream IDs (of the full format: "123-123"). Returns: -1, 0, 1
+// The given IDs should be valid stream IDs.
 func streamCmp(a, b string) int {
-	ap := parseStreamID(a)
-	bp := parseStreamID(b)
-	if ap[0] < bp[0] {
+	ap, _ := parseStreamID(a)
+	bp, _ := parseStreamID(b)
+
+	switch {
+	case ap[0] < bp[0]:
 		return -1
-	}
-	if ap[0] > bp[0] {
+	case ap[0] > bp[0]:
 		return 1
-	}
-	if ap[1] < bp[1] {
+	case ap[1] < bp[1]:
 		return -1
-	}
-	if ap[1] > bp[1] {
+	case ap[1] > bp[1]:
 		return 1
+	default:
+		return 0
 	}
-	return 0
 }
 
 // formatStreamID makes a full id ("42-42") out of a partial one ("42")

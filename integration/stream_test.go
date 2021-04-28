@@ -267,7 +267,9 @@ func TestStreamRead(t *testing.T) {
 
 		// failure cases
 		c.Do("XREAD")
+		c.Do("XREAD", "STREAMS")
 		c.Do("XREAD", "STREAMS", "foo")
+		c.Do("XREAD", "STREAMS", "foo", "0")
 		c.Do("XREAD", "STREAMS", "ordplanets")
 		c.Do("XREAD", "STREAMS", "ordplanets", "foo", "0")
 		c.Do("XREAD", "COUNT")
