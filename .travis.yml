@@ -12,5 +12,5 @@ install: go get -t
 script: make test testrace int
 
 go:
-  - "1.14"
   - "1.15"
+  - "1.16"
