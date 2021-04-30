@@ -538,6 +538,13 @@ parsing:
 			}
 
 			streams, ids = args[0:len(args)/2], args[len(args)/2:]
+			for _, id := range ids {
+				if _, err := parseStreamID(id); err != nil {
+					setDirty(c)
+					c.WriteError(msgInvalidStreamID)
+					return
+				}
+			}
 			break parsing
 		default:
 			err = fmt.Errorf("ERR incorrect argument %s", args[0])
@@ -560,11 +567,9 @@ parsing:
 			stream := streams[i]
 			id := ids[i]
 
-			var entries = db.streamKeys[stream]
-			if entries == nil {
-				setDirty(c)
-				c.WriteError(msgInvalidStreamID)
-				return
+			var entries, ok = db.streamKeys[stream]
+			if !ok {
+				continue
 			}
 			entryCount := count
 			if entryCount == 0 {
@@ -592,9 +597,8 @@ parsing:
 			res[stream] = returnedEntries
 		}
 
-		// Real Redis returns Nil
 		if len(res) == 0 {
-			c.WriteNull()
+			c.WriteLen(-1)
 			return
 		}
 
