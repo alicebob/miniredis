@@ -556,8 +556,17 @@ func TestStreamDelete(t *testing.T) {
 		),
 	)
 
+	mustDo(t, c,
+		"XADD", "planets", "0-2", "name", "Mercury",
+		proto.String("0-2"),
+	)
+
 	must1(t, c,
 		"XDEL", "planets", "0-1",
+	)
+
+	must1(t, c,
+		"XDEL", "planets", "0-2",
 	)
 
 	mustNilList(t, c,

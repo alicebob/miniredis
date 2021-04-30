@@ -748,7 +748,7 @@ func (db *RedisDB) streamDelete(stream string, ids []string) (int, error) {
 
 	for _, id := range ids {
 		pos := sort.Search(len(streamData), func(i int) bool {
-			return streamCmp(id, streamData[i].ID) == 0
+			return streamCmp(id, streamData[i].ID) <= 0
 		})
 
 		if pos == len(streamData) {
