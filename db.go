@@ -741,7 +741,7 @@ func (db *RedisDB) streamRead(stream, group, consumer, id string, count int) ([]
 func (db *RedisDB) streamDelete(stream string, ids []string) (int, error) {
 	streamData, ok := db.streamKeys[stream]
 	if !ok {
-		return 0, fmt.Errorf("stream %s not exists", stream)
+		return 0, nil
 	}
 
 	count := 0
