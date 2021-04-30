@@ -234,7 +234,7 @@ func TestTxWatchErr(t *testing.T) {
 		proto.Inline("QUEUED"),
 	)
 
-	mustNil(t, c,
+	mustNilList(t, c,
 		"EXEC",
 	)
 

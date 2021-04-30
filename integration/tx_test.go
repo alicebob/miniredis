@@ -17,6 +17,12 @@ func TestTx(t *testing.T) {
 		c.Do("GET", "AAP")
 	})
 
+	// empty
+	testRaw(t, func(c *client) {
+		c.Do("MULTI")
+		c.Do("EXEC")
+	})
+
 	// err: Double MULTI
 	testRaw(t, func(c *client) {
 		c.Do("MULTI")
@@ -172,5 +178,6 @@ func TestTx(t *testing.T) {
 		c1.Do("MULTI")
 		c2.Do("SET", "foo", "12")
 		c2.Do("EXEC") // nil
+		c1.Do("EXEC") // 0-length
 	})
 }
