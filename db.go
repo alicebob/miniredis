@@ -741,14 +741,14 @@ func (db *RedisDB) streamRead(stream, group, consumer, id string, count int) ([]
 func (db *RedisDB) streamDelete(stream string, ids []string) (int, error) {
 	streamData, ok := db.streamKeys[stream]
 	if !ok {
-		return 0, fmt.Errorf("stream %s not exists", stream)
+		return 0, nil
 	}
 
 	count := 0
 
 	for _, id := range ids {
 		pos := sort.Search(len(streamData), func(i int) bool {
-			return streamCmp(id, streamData[i].ID) == 0
+			return streamCmp(id, streamData[i].ID) <= 0
 		})
 
 		if pos == len(streamData) {

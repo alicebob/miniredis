@@ -57,6 +57,13 @@ func TestStream(t *testing.T) {
 	})
 
 	testRaw(t, func(c *client) {
+		c.Do("XDEL", "newplanets", "123-123")
+		c.Do("XADD", "newplanets", "123-123", "foo", "bar")
+		c.Do("XDEL", "newplanets", "123-123")
+		c.Do("XDEL", "newplanets", "123-123")
+	})
+
+	testRaw(t, func(c *client) {
 		c.Do("XADD", "planets", "MAXLEN", "4", "456-1", "name", "Mercury")
 		c.Do("XADD", "planets", "MAXLEN", "4", "456-2", "name", "Mercury")
 		c.Do("XADD", "planets", "MAXLEN", "4", "456-3", "name", "Mercury")
@@ -193,6 +200,7 @@ func TestStreamRange(t *testing.T) {
 
 		c.Do("MULTI")
 		c.Do("XADD", "ordplanets", "123123-123", "name", "Mercury")
+		c.Do("XDEL", "ordplanets", "123123-123")
 		c.Do("XADD", "ordplanets", "invalid", "name", "Mercury")
 		c.Do("EXEC")
 		c.Do("XLEN", "ordplanets")
