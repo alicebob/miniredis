@@ -30,18 +30,18 @@ func TestLPush(t *testing.T) {
 		c.Do("LPOP", "nosuch")
 
 		// failure cases
-		c.Do("LPUSH")
-		c.Do("LPUSH", "l")
+		c.Error("wrong number", "LPUSH")
+		c.Error("wrong number", "LPUSH", "l")
 		c.Do("SET", "str", "I am a string")
-		c.Do("LPUSH", "str", "noot", "mies")
-		c.Do("LRANGE")
-		c.Do("LRANGE", "key")
-		c.Do("LRANGE", "key", "2")
-		c.Do("LRANGE", "key", "2", "6", "toomany")
-		c.Do("LRANGE", "key", "noint", "6")
-		c.Do("LRANGE", "key", "2", "noint")
-		c.Do("LPOP")
-		c.Do("LPOP", "key", "args")
+		c.Error("wrong kind", "LPUSH", "str", "noot", "mies")
+		c.Error("wrong number", "LRANGE")
+		c.Error("wrong number", "LRANGE", "key")
+		c.Error("wrong number", "LRANGE", "key", "2")
+		c.Error("wrong number", "LRANGE", "key", "2", "6", "toomany")
+		c.Error("not an integer", "LRANGE", "key", "noint", "6")
+		c.Error("not an integer", "LRANGE", "key", "2", "noint")
+		c.Error("wrong number", "LPOP")
+		c.Error("wrong number", "LPOP", "key", "args")
 	})
 }
 
@@ -57,10 +57,10 @@ func TestLPushx(t *testing.T) {
 		c.Do("LPUSHX", "l", "even", "more", "arguments")
 
 		// failure cases
-		c.Do("LPUSHX")
-		c.Do("LPUSHX", "l")
+		c.Error("wrong number", "LPUSHX")
+		c.Error("wrong number", "LPUSHX", "l")
 		c.Do("SET", "str", "I am a string")
-		c.Do("LPUSHX", "str", "mies")
+		c.Error("wrong kind", "LPUSHX", "str", "mies")
 	})
 }
 
@@ -82,12 +82,12 @@ func TestRPush(t *testing.T) {
 		c.Do("RPOP", "nosuch")
 
 		// failure cases
-		c.Do("RPUSH")
-		c.Do("RPUSH", "l")
+		c.Error("wrong number", "RPUSH")
+		c.Error("wrong number", "RPUSH", "l")
 		c.Do("SET", "str", "I am a string")
-		c.Do("RPUSH", "str", "noot", "mies")
-		c.Do("RPOP")
-		c.Do("RPOP", "key", "args")
+		c.Error("wrong kind", "RPUSH", "str", "noot", "mies")
+		c.Error("wrong number", "RPOP")
+		c.Error("wrong number", "RPOP", "key", "args")
 	})
 }
 
@@ -100,7 +100,7 @@ func TestLinxed(t *testing.T) {
 		c.Do("LINDEX", "l", "3")
 		c.Do("LINDEX", "l", "4")
 		c.Do("LINDEX", "l", "44444")
-		c.Do("LINDEX", "l", "-0")
+		c.Error("not an integer", "LINDEX", "l", "-0")
 		c.Do("LINDEX", "l", "-1")
 		c.Do("LINDEX", "l", "-2")
 		c.Do("LINDEX", "l", "-3")
@@ -108,12 +108,12 @@ func TestLinxed(t *testing.T) {
 		c.Do("LINDEX", "l", "-4000")
 
 		// failure cases
-		c.Do("LINDEX")
-		c.Do("LINDEX", "l")
+		c.Error("wrong number", "LINDEX")
+		c.Error("wrong number", "LINDEX", "l")
 		c.Do("SET", "str", "I am a string")
-		c.Do("LINDEX", "str", "1")
-		c.Do("LINDEX", "l", "noint")
-		c.Do("LINDEX", "l", "1", "too many")
+		c.Error("wrong kind", "LINDEX", "str", "1")
+		c.Error("not an integer", "LINDEX", "l", "noint")
+		c.Error("wrong number", "LINDEX", "l", "1", "too many")
 	})
 }
 
@@ -125,9 +125,9 @@ func TestLlen(t *testing.T) {
 
 		// failure cases
 		c.Do("SET", "str", "I am a string")
-		c.Do("LLEN", "str")
-		c.Do("LLEN")
-		c.Do("LLEN", "l", "too many")
+		c.Error("wrong kind", "LLEN", "str")
+		c.Error("wrong number", "LLEN")
+		c.Error("wrong number", "LLEN", "l", "too many")
 	})
 }
 
@@ -150,13 +150,13 @@ func TestLtrim(t *testing.T) {
 
 		// failure cases
 		c.Do("SET", "str", "I am a string")
-		c.Do("LTRIM", "str", "0", "1")
-		c.Do("LTRIM", "l", "0", "1", "toomany")
-		c.Do("LTRIM", "l", "noint", "1")
-		c.Do("LTRIM", "l", "0", "noint")
-		c.Do("LTRIM", "l", "0")
-		c.Do("LTRIM", "l")
-		c.Do("LTRIM")
+		c.Error("wrong kind", "LTRIM", "str", "0", "1")
+		c.Error("wrong number", "LTRIM", "l", "0", "1", "toomany")
+		c.Error("not an integer", "LTRIM", "l", "noint", "1")
+		c.Error("not an integer", "LTRIM", "l", "0", "noint")
+		c.Error("wrong number", "LTRIM", "l", "0")
+		c.Error("wrong number", "LTRIM", "l")
+		c.Error("wrong number", "LTRIM")
 	})
 }
 
@@ -179,12 +179,12 @@ func TestLrem(t *testing.T) {
 
 		// failure cases
 		c.Do("SET", "str", "I am a string")
-		c.Do("LREM", "str", "0", "aap")
-		c.Do("LREM", "l", "0", "aap", "toomany")
-		c.Do("LREM", "l", "noint", "aap")
-		c.Do("LREM", "l", "0")
-		c.Do("LREM", "l")
-		c.Do("LREM")
+		c.Error("wrong kind", "LREM", "str", "0", "aap")
+		c.Error("wrong number", "LREM", "l", "0", "aap", "toomany")
+		c.Error("not an integer", "LREM", "l", "noint", "aap")
+		c.Error("wrong number", "LREM", "l", "0")
+		c.Error("wrong number", "LREM", "l")
+		c.Error("wrong number", "LREM")
 	})
 }
 
@@ -195,18 +195,18 @@ func TestLset(t *testing.T) {
 		c.Do("LRANGE", "l", "0", "-1")
 		c.Do("LSET", "l", "-1", "[cencored]")
 		c.Do("LRANGE", "l", "0", "-1")
-		c.Do("LSET", "l", "1000", "new")
-		c.Do("LSET", "l", "-7000", "new")
-		c.Do("LSET", "nosuch", "1", "new")
+		c.Error("out of range", "LSET", "l", "1000", "new")
+		c.Error("out of range", "LSET", "l", "-7000", "new")
+		c.Error("no such key", "LSET", "nosuch", "1", "new")
 
 		// failure cases
-		c.Do("LSET")
-		c.Do("LSET", "l")
-		c.Do("LSET", "l", "0")
-		c.Do("LSET", "l", "noint", "aap")
-		c.Do("LSET", "l", "0", "aap", "toomany")
+		c.Error("wrong number", "LSET")
+		c.Error("wrong number", "LSET", "l")
+		c.Error("wrong number", "LSET", "l", "0")
+		c.Error("not an integer", "LSET", "l", "noint", "aap")
+		c.Error("wrong number", "LSET", "l", "0", "aap", "toomany")
 		c.Do("SET", "str", "I am a string")
-		c.Do("LSET", "str", "0", "aap")
+		c.Error("wrong kind", "LSET", "str", "0", "aap")
 	})
 }
 
@@ -224,14 +224,14 @@ func TestLinsert(t *testing.T) {
 		c.Do("LRANGE", "l", "0", "-1")
 
 		// failure cases
-		c.Do("LINSERT")
-		c.Do("LINSERT", "l")
-		c.Do("LINSERT", "l", "before")
-		c.Do("LINSERT", "l", "before", "aap")
-		c.Do("LINSERT", "l", "before", "aap", "too", "many")
-		c.Do("LINSERT", "l", "What?", "aap", "noot")
+		c.Error("wrong number", "LINSERT")
+		c.Error("wrong number", "LINSERT", "l")
+		c.Error("wrong number", "LINSERT", "l", "before")
+		c.Error("wrong number", "LINSERT", "l", "before", "aap")
+		c.Error("wrong number", "LINSERT", "l", "before", "aap", "too", "many")
+		c.Error("syntax error", "LINSERT", "l", "What?", "aap", "noot")
 		c.Do("SET", "str", "I am a string")
-		c.Do("LINSERT", "str", "before", "aap", "noot")
+		c.Error("wrong kind", "LINSERT", "str", "before", "aap", "noot")
 	})
 }
 
@@ -258,12 +258,12 @@ func TestRpoplpush(t *testing.T) {
 
 		// failure cases
 		c.Do("RPUSH", "chk", "aap", "noot", "mies")
-		c.Do("RPOPLPUSH")
-		c.Do("RPOPLPUSH", "chk")
-		c.Do("RPOPLPUSH", "chk", "too", "many")
+		c.Error("wrong number", "RPOPLPUSH")
+		c.Error("wrong number", "RPOPLPUSH", "chk")
+		c.Error("wrong number", "RPOPLPUSH", "chk", "too", "many")
 		c.Do("SET", "str", "I am a string")
-		c.Do("RPOPLPUSH", "chk", "str")
-		c.Do("RPOPLPUSH", "str", "chk")
+		c.Error("wrong kind", "RPOPLPUSH", "chk", "str")
+		c.Error("wrong kind", "RPOPLPUSH", "str", "chk")
 		c.Do("LRANGE", "chk", "0", "-1")
 	})
 }
@@ -280,11 +280,11 @@ func TestRpushx(t *testing.T) {
 
 		// failure cases
 		c.Do("RPUSH", "chk", "noot", "mies")
-		c.Do("RPUSHX")
-		c.Do("RPUSHX", "chk")
+		c.Error("wrong number", "RPUSHX")
+		c.Error("wrong number", "RPUSHX", "chk")
 		c.Do("LRANGE", "chk", "0", "-1")
 		c.Do("SET", "str", "I am a string")
-		c.Do("RPUSHX", "str", "value")
+		c.Error("wrong kind", "RPUSHX", "str", "value")
 	})
 }
 
@@ -300,12 +300,12 @@ func TestBrpop(t *testing.T) {
 		c.Do("EXEC")
 
 		// failure cases
-		c.Do("BRPOP")
-		c.Do("BRPOP", "l")
-		c.Do("BRPOP", "l", "X")
-		c.Do("BRPOP", "l", "")
-		c.Do("BRPOP", "1")
-		c.Do("BRPOP", "key", "-1")
+		c.Error("wrong number", "BRPOP")
+		c.Error("wrong number", "BRPOP", "l")
+		c.Error("not a float", "BRPOP", "l", "X")
+		c.Error("not a float", "BRPOP", "l", "")
+		c.Error("wrong number", "BRPOP", "1")
+		c.Error("negative", "BRPOP", "key", "-1")
 	})
 }
 
@@ -346,12 +346,12 @@ func TestBlpop(t *testing.T) {
 		c.Do("EXISTS", "l")
 
 		// failure cases
-		c.Do("BLPOP")
-		c.Do("BLPOP", "l")
-		c.Do("BLPOP", "l", "X")
-		c.Do("BLPOP", "l", "")
-		c.Do("BLPOP", "1")
-		c.Do("BLPOP", "key", "-1")
+		c.Error("wrong number", "BLPOP")
+		c.Error("wrong number", "BLPOP", "l")
+		c.Error("not a float", "BLPOP", "l", "X")
+		c.Error("not a float", "BLPOP", "l", "")
+		c.Error("wrong number", "BLPOP", "1")
+		c.Error("negative", "BLPOP", "key", "-1")
 	})
 
 	testMulti(t,
@@ -380,12 +380,12 @@ func TestBrpoplpush(t *testing.T) {
 		c.Do("LRANGE", "l2", "0", "-1")
 
 		// failure cases
-		c.Do("BRPOPLPUSH")
-		c.Do("BRPOPLPUSH", "l")
-		c.Do("BRPOPLPUSH", "l", "x")
-		c.Do("BRPOPLPUSH", "1")
-		c.Do("BRPOPLPUSH", "from", "to", "-1")
-		c.Do("BRPOPLPUSH", "from", "to", "-1", "xxx")
+		c.Error("wrong number", "BRPOPLPUSH")
+		c.Error("wrong number", "BRPOPLPUSH", "l")
+		c.Error("wrong number", "BRPOPLPUSH", "l", "x")
+		c.Error("wrong number", "BRPOPLPUSH", "1")
+		c.Error("negative", "BRPOPLPUSH", "from", "to", "-1")
+		c.Error("wrong number", "BRPOPLPUSH", "from", "to", "-1", "xxx")
 	})
 
 	wg := &sync.WaitGroup{}

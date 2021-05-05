@@ -24,21 +24,21 @@ func TestSet(t *testing.T) {
 		c.Do("SISMEMBER", "nosuch", "nosuch")
 
 		// failure cases
-		c.Do("SADD")
-		c.Do("SADD", "s")
-		c.Do("SMEMBERS")
-		c.Do("SMEMBERS", "too", "many")
-		c.Do("SCARD")
-		c.Do("SCARD", "too", "many")
-		c.Do("SISMEMBER")
-		c.Do("SISMEMBER", "few")
-		c.Do("SISMEMBER", "too", "many", "arguments")
+		c.Error("wrong number", "SADD")
+		c.Error("wrong number", "SADD", "s")
+		c.Error("wrong number", "SMEMBERS")
+		c.Error("wrong number", "SMEMBERS", "too", "many")
+		c.Error("wrong number", "SCARD")
+		c.Error("wrong number", "SCARD", "too", "many")
+		c.Error("wrong number", "SISMEMBER")
+		c.Error("wrong number", "SISMEMBER", "few")
+		c.Error("wrong number", "SISMEMBER", "too", "many", "arguments")
 		// Wrong type
 		c.Do("SET", "str", "I am a string")
-		c.Do("SADD", "str", "noot", "mies")
-		c.Do("SMEMBERS", "str")
-		c.Do("SISMEMBER", "str", "noot")
-		c.Do("SCARD", "str")
+		c.Error("wrong kind", "SADD", "str", "noot", "mies")
+		c.Error("wrong kind", "SMEMBERS", "str")
+		c.Error("wrong kind", "SISMEMBER", "str", "noot")
+		c.Error("wrong kind", "SCARD", "str")
 	})
 
 	testRESP3(t, func(c *client) {
@@ -72,11 +72,11 @@ func TestSetDel(t *testing.T) {
 		c.DoSorted("SMEMBERS", "s")
 
 		// failure cases
-		c.Do("SREM")
-		c.Do("SREM", "s")
+		c.Error("wrong number", "SREM")
+		c.Error("wrong number", "SREM", "s")
 		// Wrong type
 		c.Do("SET", "str", "I am a string")
-		c.Do("SREM", "str", "noot")
+		c.Error("wrong kind", "SREM", "str", "noot")
 	})
 }
 
@@ -106,14 +106,14 @@ func TestSetSMove(t *testing.T) {
 		c.Do("SMOVE", "s5", "s6", "aap")
 
 		// failure cases
-		c.Do("SMOVE")
-		c.Do("SMOVE", "s")
-		c.Do("SMOVE", "s", "s2")
-		c.Do("SMOVE", "s", "s2", "too", "many")
+		c.Error("wrong number", "SMOVE")
+		c.Error("wrong number", "SMOVE", "s")
+		c.Error("wrong number", "SMOVE", "s", "s2")
+		c.Error("wrong number", "SMOVE", "s", "s2", "too", "many")
 		// Wrong type
 		c.Do("SET", "str", "I am a string")
-		c.Do("SMOVE", "str", "s2", "noot")
-		c.Do("SMOVE", "s2", "str", "noot")
+		c.Error("wrong kind", "SMOVE", "str", "s2", "noot")
+		c.Error("wrong kind", "SMOVE", "s2", "str", "noot")
 	})
 }
 
@@ -134,13 +134,13 @@ func TestSetSpop(t *testing.T) {
 		c.DoLoosely("SMEMBERS", "s")
 
 		// failure cases
-		c.Do("SPOP")
+		c.Error("wrong number", "SPOP")
 		c.Do("SADD", "s", "aap")
-		c.Do("SPOP", "s", "s2")
-		c.Do("SPOP", "nosuch", "s2")
+		c.Error("not an integer", "SPOP", "s", "s2")
+		c.Error("not an integer", "SPOP", "nosuch", "s2")
 		// Wrong type
 		c.Do("SET", "str", "I am a string")
-		c.Do("SPOP", "str")
+		c.Error("wrong kind", "SPOP", "str")
 	})
 
 	testRaw(t, func(c *client) {
@@ -161,8 +161,8 @@ func TestSetSpop(t *testing.T) {
 		c.Do("SPOP", "nosuch", "0")
 
 		// failure cases
-		c.Do("SPOP", "foo", "one")
-		c.Do("SPOP", "foo", "-4")
+		c.Error("not an integer", "SPOP", "foo", "one")
+		c.Error("out of range", "SPOP", "foo", "-4")
 	})
 }
 
@@ -180,12 +180,12 @@ func TestSetSrandmember(t *testing.T) {
 		c.Do("SPOP", "nosuch")
 
 		// failure cases
-		c.Do("SRANDMEMBER")
-		c.Do("SRANDMEMBER", "s", "noint")
-		c.Do("SRANDMEMBER", "s", "1", "toomany")
+		c.Error("wrong number", "SRANDMEMBER")
+		c.Error("not an integer", "SRANDMEMBER", "s", "noint")
+		c.Error("syntax error", "SRANDMEMBER", "s", "1", "toomany")
 		// Wrong type
 		c.Do("SET", "str", "I am a string")
-		c.Do("SRANDMEMBER", "str")
+		c.Error("wrong kind", "SRANDMEMBER", "str")
 	})
 
 	testRESP3(t, func(c *client) {
@@ -212,16 +212,16 @@ func TestSetSdiff(t *testing.T) {
 		c.Do("SMEMBERS", "res")
 
 		// failure cases
-		c.Do("SDIFF")
-		c.Do("SDIFFSTORE")
-		c.Do("SDIFFSTORE", "key")
+		c.Error("wrong number", "SDIFF")
+		c.Error("wrong number", "SDIFFSTORE")
+		c.Error("wrong number", "SDIFFSTORE", "key")
 		// Wrong type
 		c.Do("SET", "str", "I am a string")
-		c.Do("SDIFF", "s1", "str")
-		c.Do("SDIFF", "nosuch", "str")
-		c.Do("SDIFF", "str", "s1")
-		c.Do("SDIFFSTORE", "res", "str", "s1")
-		c.Do("SDIFFSTORE", "res", "s1", "str")
+		c.Error("wrong kind", "SDIFF", "s1", "str")
+		c.Error("wrong kind", "SDIFF", "nosuch", "str")
+		c.Error("wrong kind", "SDIFF", "str", "s1")
+		c.Error("wrong kind", "SDIFFSTORE", "res", "str", "s1")
+		c.Error("wrong kind", "SDIFFSTORE", "res", "s1", "str")
 	})
 
 	testRESP3(t, func(c *client) {
@@ -250,17 +250,17 @@ func TestSetSinter(t *testing.T) {
 		c.Do("SMEMBERS", "res")
 
 		// failure cases
-		c.Do("SINTER")
-		c.Do("SINTERSTORE")
-		c.Do("SINTERSTORE", "key")
+		c.Error("wrong number", "SINTER")
+		c.Error("wrong number", "SINTERSTORE")
+		c.Error("wrong number", "SINTERSTORE", "key")
 		// Wrong type
 		c.Do("SET", "str", "I am a string")
-		c.Do("SINTER", "s1", "str")
+		c.Error("wrong kind", "SINTER", "s1", "str")
 		c.Do("SINTER", "nosuch", "str") // SINTER succeeds if an input type is wrong as long as the preceding inputs result in an empty set
-		c.Do("SINTER", "str", "nosuch")
-		c.Do("SINTER", "str", "s1")
-		c.Do("SINTERSTORE", "res", "str", "s1")
-		c.Do("SINTERSTORE", "res", "s1", "str")
+		c.Error("wrong kind", "SINTER", "str", "nosuch")
+		c.Error("wrong kind", "SINTER", "str", "s1")
+		c.Error("wrong kind", "SINTERSTORE", "res", "str", "s1")
+		c.Error("wrong kind", "SINTERSTORE", "res", "s1", "str")
 	})
 }
 
@@ -280,16 +280,16 @@ func TestSetSunion(t *testing.T) {
 		c.Do("SMEMBERS", "res")
 
 		// failure cases
-		c.Do("SUNION")
-		c.Do("SUNIONSTORE")
-		c.Do("SUNIONSTORE", "key")
+		c.Error("wrong number", "SUNION")
+		c.Error("wrong number", "SUNIONSTORE")
+		c.Error("wrong number", "SUNIONSTORE", "key")
 		// Wrong type
 		c.Do("SET", "str", "I am a string")
-		c.Do("SUNION", "s1", "str")
-		c.Do("SUNION", "nosuch", "str")
-		c.Do("SUNION", "str", "s1")
-		c.Do("SUNIONSTORE", "res", "str", "s1")
-		c.Do("SUNIONSTORE", "res", "s1", "str")
+		c.Error("wrong kind", "SUNION", "s1", "str")
+		c.Error("wrong kind", "SUNION", "nosuch", "str")
+		c.Error("wrong kind", "SUNION", "str", "s1")
+		c.Error("wrong kind", "SUNIONSTORE", "res", "str", "s1")
+		c.Error("wrong kind", "SUNIONSTORE", "res", "s1", "str")
 	})
 }
 
@@ -313,15 +313,15 @@ func TestSscan(t *testing.T) {
 		// c.Do("SCAN", "0")
 
 		// Error cases
-		c.Do("SSCAN")
-		c.Do("SSCAN", "noint")
-		c.Do("SSCAN", "set", "0", "COUNT", "noint")
-		c.Do("SSCAN", "set", "0", "COUNT")
-		c.Do("SSCAN", "set", "0", "MATCH")
-		c.Do("SSCAN", "set", "0", "garbage")
-		c.Do("SSCAN", "set", "0", "COUNT", "12", "MATCH", "foo", "garbage")
+		c.Error("wrong number", "SSCAN")
+		c.Error("wrong number", "SSCAN", "noint")
+		c.Error("not an integer", "SSCAN", "set", "0", "COUNT", "noint")
+		c.Error("syntax error", "SSCAN", "set", "0", "COUNT")
+		c.Error("syntax error", "SSCAN", "set", "0", "MATCH")
+		c.Error("syntax error", "SSCAN", "set", "0", "garbage")
+		c.Error("syntax error", "SSCAN", "set", "0", "COUNT", "12", "MATCH", "foo", "garbage")
 		c.Do("SET", "str", "1")
-		c.Do("SSCAN", "str", "0")
+		c.Error("wrong kind", "SSCAN", "str", "0")
 	})
 }
 
@@ -329,7 +329,7 @@ func TestSetNoAuth(t *testing.T) {
 	testAuth(t,
 		"supersecret",
 		func(c *client) {
-			c.Do("SET", "foo", "bar")
+			c.Error("Authentication required", "SET", "foo", "bar")
 			c.Do("AUTH", "supersecret")
 			c.Do("SET", "foo", "bar")
 		},

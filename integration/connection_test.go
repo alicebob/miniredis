@@ -11,9 +11,9 @@ func TestEcho(t *testing.T) {
 		c.Do("ECHO", "hello world")
 		c.Do("ECHO", "42")
 		c.Do("ECHO", "3.1415")
-		c.Do("ECHO", "hello", "world")
-		c.Do("ECHO")
-		c.Do("eChO", "hello", "world")
+		c.Error("wrong number", "ECHO", "hello", "world")
+		c.Error("wrong number", "ECHO")
+		c.Error("wrong number", "eChO", "hello", "world")
 	})
 
 	testRaw(t, func(c *client) {
@@ -24,8 +24,8 @@ func TestEcho(t *testing.T) {
 
 	testRaw(t, func(c *client) {
 		c.Do("MULTI")
-		c.Do("ECHO")
-		c.Do("EXEC")
+		c.Error("wrong number", "ECHO")
+		c.Error("discarded", "EXEC")
 	})
 }
 
@@ -33,7 +33,7 @@ func TestPing(t *testing.T) {
 	testRaw(t, func(c *client) {
 		c.Do("PING")
 		c.Do("PING", "hello world")
-		c.Do("PING", "hello", "world")
+		c.Error("wrong number", "PING", "hello", "world")
 	})
 
 	testRaw(t, func(c *client) {
@@ -58,10 +58,10 @@ func TestSelect(t *testing.T) {
 		c.Do("SET", "foo", "bar2")
 		c.Do("GET", "foo")
 
-		c.Do("SELECT")
-		c.Do("SELECT", "-1")
-		c.Do("SELECT", "aap")
-		c.Do("SELECT", "1", "2")
+		c.Error("wrong number", "SELECT")
+		c.Error("out of range", "SELECT", "-1")
+		c.Error("invalid DB", "SELECT", "aap")
+		c.Error("wrong number", "SELECT", "1", "2")
 	})
 
 	testRaw(t, func(c *client) {
@@ -87,15 +87,15 @@ func TestAuth(t *testing.T) {
 	testAuth(t,
 		"supersecret",
 		func(c *client) {
-			c.Do("PING")
-			c.Do("SET", "foo", "bar")
-			c.Do("SET")
-			c.Do("SET", "foo", "bar", "baz")
-			c.Do("GET", "foo")
-			c.Do("AUTH")
-			c.Do("AUTH", "nosecret")
-			c.Do("AUTH", "nosecret", "bar")
-			c.Do("AUTH", "nosecret", "bar", "bar")
+			c.Error("Authentication required", "PING")
+			c.Error("Authentication required", "SET", "foo", "bar")
+			c.Error("wrong number", "SET")
+			c.Error("Authentication required", "SET", "foo", "bar", "baz")
+			c.Error("Authentication required", "GET", "foo")
+			c.Error("wrong number", "AUTH")
+			c.Error("invalid", "AUTH", "nosecret")
+			c.Error("invalid", "AUTH", "nosecret", "bar")
+			c.Error("syntax error", "AUTH", "nosecret", "bar", "bar")
 			c.Do("AUTH", "supersecret")
 			c.Do("SET", "foo", "bar")
 			c.Do("GET", "foo")
@@ -108,31 +108,31 @@ func TestAuth(t *testing.T) {
 			"agent2": "dragon",
 		},
 		func(c *client) {
-			c.Do("PING")
-			c.Do("SET", "foo", "bar")
-			c.Do("SET")
-			c.Do("SET", "foo", "bar", "baz")
-			c.Do("GET", "foo")
-			c.Do("AUTH")
-			c.Do("AUTH", "nosecret")
-			c.Do("AUTH", "agent100", "supersecret")
-			c.Do("AUTH", "agent100", "supersecret", "supersecret")
-			c.Do("AUTH", "agent1", "bzzzt")
+			c.Error("Authentication required", "PING")
+			c.Error("Authentication required", "SET", "foo", "bar")
+			c.Error("wrong number", "SET")
+			c.Error("Authentication required", "SET", "foo", "bar", "baz")
+			c.Error("Authentication required", "GET", "foo")
+			c.Error("wrong number", "AUTH")
+			c.Error("invalid", "AUTH", "nosecret")
+			c.Error("invalid", "AUTH", "agent100", "supersecret")
+			c.Error("syntax error", "AUTH", "agent100", "supersecret", "supersecret")
+			c.Error("invalid", "AUTH", "agent1", "bzzzt")
 			c.Do("AUTH", "agent1", "supersecret")
 			c.Do("SET", "foo", "bar")
 			c.Do("GET", "foo")
 
 			// go back to invalid user
-			c.Do("AUTH", "agent100", "supersecret")
+			c.Error("invalid", "AUTH", "agent100", "supersecret")
 			c.Do("GET", "foo") // still agent1
 		},
 	)
 
 	testRaw(t, func(c *client) {
-		c.Do("AUTH")
-		c.Do("AUTH", "foo")
-		c.Do("AUTH", "foo", "bar")
-		c.Do("AUTH", "foo", "bar", "bar")
+		c.Error("wrong number", "AUTH")
+		c.Error("without any", "AUTH", "foo")
+		c.Error("invalid", "AUTH", "foo", "bar")
+		c.Error("syntax error", "AUTH", "foo", "bar", "bar")
 	})
 
 	testRaw(t, func(c *client) {
@@ -153,19 +153,19 @@ func TestHello(t *testing.T) {
 			c.DoLoosely("HELLO", "2")
 			c.Do("SMEMBERS", "s")
 
-			c.Do("HELLO", "twoandahalf")
+			c.Error("unsupported", "HELLO", "twoandahalf")
 
 			c.DoLoosely("HELLO", "3", "AUTH", "default", "foo")
 			c.DoLoosely("HELLO", "3", "AUTH", "default", "foo", "SETNAME", "foo")
 			c.DoLoosely("HELLO", "3", "SETNAME", "foo")
 
 			// errors
-			c.Do("HELLO", "3", "default", "foo")
-			c.Do("HELLO", "three", "AUTH", "default", "foo")
-			c.Do("HELLO", "3", "AUTH", "default")
-			c.Do("HELLO", "default", "foo")
-			c.Do("HELLO", "3", "default", "foo", "SETNAME")
-			c.Do("HELLO", "3", "SETNAME")
+			c.Error("Syntax error", "HELLO", "3", "default", "foo")
+			c.Error("unsupported", "HELLO", "three", "AUTH", "default", "foo")
+			c.Error("Syntax error", "HELLO", "3", "AUTH", "default")
+			c.Error("unsupported", "HELLO", "default", "foo")
+			c.Error("Syntax error", "HELLO", "3", "default", "foo", "SETNAME")
+			c.Error("Syntax error", "HELLO", "3", "SETNAME")
 
 		},
 	)
@@ -173,10 +173,10 @@ func TestHello(t *testing.T) {
 	testAuth(t,
 		"secret",
 		func(c *client) {
-			c.Do("SADD", "s", "aap") // sets have resp3 specific code
+			c.Error("Authentication required", "SADD", "s", "aap") // sets have resp3 specific code
 
-			c.Do("HELLO", "3", "AUTH", "default", "foo")
-			c.Do("HELLO", "3", "AUTH", "wrong", "secret")
+			c.Error("invalid", "HELLO", "3", "AUTH", "default", "foo")
+			c.Error("invalid", "HELLO", "3", "AUTH", "wrong", "secret")
 			c.DoLoosely("HELLO", "3", "AUTH", "default", "secret")
 			c.Do("SMEMBERS", "s")
 			c.DoLoosely("HELLO", "3", "AUTH", "default", "secret") // again!
@@ -194,13 +194,13 @@ func TestHello(t *testing.T) {
 			"sesame": "open",
 		},
 		func(c *client) {
-			c.Do("SADD", "s", "aap") // sets have resp3 specific code
+			c.Error("Authentication required", "SADD", "s", "aap") // sets have resp3 specific code
 
-			c.Do("HELLO", "3", "AUTH", "foo", "bar")
-			c.Do("HELLO", "3", "AUTH", "sesame", "close")
-			c.Do("SMEMBERS", "s")
+			c.Error("invalid", "HELLO", "3", "AUTH", "foo", "bar")
+			c.Error("invalid", "HELLO", "3", "AUTH", "sesame", "close")
+			c.Error("Authentication required", "SMEMBERS", "s")
 			c.DoLoosely("HELLO", "3", "AUTH", "sesame", "open123")
-			c.Do("SMEMBERS", "s")
+			c.Error("Authentication required", "SMEMBERS", "s")
 		},
 	)
 }

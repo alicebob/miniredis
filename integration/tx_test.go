@@ -26,21 +26,21 @@ func TestTx(t *testing.T) {
 	// err: Double MULTI
 	testRaw(t, func(c *client) {
 		c.Do("MULTI")
-		c.Do("MULTI")
+		c.Error("nested", "MULTI")
 	})
 
 	// err: No MULTI
 	testRaw(t, func(c *client) {
-		c.Do("EXEC")
+		c.Error("without MULTI", "EXEC")
 	})
 
 	// Errors in the MULTI sequence
 	testRaw(t, func(c *client) {
 		c.Do("MULTI")
 		c.Do("SET", "foo", "bar")
-		c.Do("SET", "foo")
+		c.Error("wrong number", "SET", "foo")
 		c.Do("SET", "foo", "bar")
-		c.Do("EXEC")
+		c.Error("EXECABORT", "EXEC")
 	})
 
 	// Simple WATCH
@@ -152,8 +152,8 @@ func TestTx(t *testing.T) {
 	// fail on invalid command
 	testRaw(t, func(c *client) {
 		c.Do("MULTI")
-		c.Do("GET")
-		c.Do("EXEC")
+		c.Error("wrong number", "GET")
+		c.Error("Transaction discarded", "EXEC")
 	})
 
 	/* FIXME
@@ -168,8 +168,8 @@ func TestTx(t *testing.T) {
 	// failed EXEC cleaned up the tx
 	testRaw(t, func(c *client) {
 		c.Do("MULTI")
-		c.Do("GET")
-		c.Do("EXEC")
+		c.Error("wrong number", "GET")
+		c.Error("Transaction discarded", "EXEC")
 		c.Do("MULTI")
 	})
 
@@ -177,7 +177,7 @@ func TestTx(t *testing.T) {
 		c1.Do("WATCH", "foo")
 		c1.Do("MULTI")
 		c2.Do("SET", "foo", "12")
-		c2.Do("EXEC") // nil
-		c1.Do("EXEC") // 0-length
+		c2.Error("without", "EXEC") // nil
+		c1.Do("EXEC")               // 0-length
 	})
 }

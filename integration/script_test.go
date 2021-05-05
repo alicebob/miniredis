@@ -22,13 +22,13 @@ func TestEval(t *testing.T) {
 		c.Do("EVAL", "return redis.call('LPOP', 'foo')", "0")
 
 		// failure cases
-		c.Do("EVAL")
-		c.Do("EVAL", "return 42")
-		c.Do("EVAL", "[")
-		c.Do("EVAL", "return 42", "return 43")
-		c.Do("EVAL", "return 42", "1")
-		c.Do("EVAL", "return 42", "-1")
-		c.Do("EVAL", "42")
+		c.Error("wrong number", "EVAL")
+		c.Error("wrong number", "EVAL", "return 42")
+		c.Error("wrong number", "EVAL", "[")
+		c.Error("not an integer", "EVAL", "return 42", "return 43")
+		c.Error("greater", "EVAL", "return 42", "1")
+		c.Error("negative", "EVAL", "return 42", "-1")
+		c.Error("wrong number", "EVAL", "42")
 	})
 }
 
@@ -46,13 +46,13 @@ func TestScript(t *testing.T) {
 		c.Do("SCRIPT", "FLUSH")
 		c.Do("SCRIPT", "EXISTS", "1fa00e76656cc152ad327c13fe365858fd7be306")
 
-		c.Do("SCRIPT")
-		c.Do("SCRIPT", "LOAD", "return 42", "return 42")
+		c.Error("wrong number", "SCRIPT")
+		c.Error("wrong number", "SCRIPT", "LOAD", "return 42", "return 42")
 		c.DoLoosely("SCRIPT", "LOAD", "]")
-		c.Do("SCRIPT", "LOAD", "]", "foo")
-		c.Do("SCRIPT", "LOAD")
-		c.Do("SCRIPT", "FLUSH", "foo")
-		c.Do("SCRIPT", "FOO")
+		c.Error("wrong number", "SCRIPT", "LOAD", "]", "foo")
+		c.Error("wrong number", "SCRIPT", "LOAD")
+		c.Error("wrong number", "SCRIPT", "FLUSH", "foo")
+		c.Error("wrong number", "SCRIPT", "FOO")
 	})
 }
 
@@ -71,13 +71,13 @@ func TestEvalsha(t *testing.T) {
 		c.Do("EVALSHA", sha2, "1", "foo", "bar", "baz")
 
 		c.Do("SCRIPT", "FLUSH")
-		c.Do("EVALSHA", sha1, "0")
+		c.Error("Please use EVAL", "EVALSHA", sha1, "0")
 
 		c.Do("SCRIPT", "LOAD", "return 42")
-		c.Do("EVALSHA", sha1)
-		c.Do("EVALSHA")
-		c.Do("EVALSHA", "nosuch")
-		c.Do("EVALSHA", "nosuch", "0")
+		c.Error("wrong number", "EVALSHA", sha1)
+		c.Error("wrong number", "EVALSHA")
+		c.Error("wrong number", "EVALSHA", "nosuch")
+		c.Error("Please use EVAL", "EVALSHA", "nosuch", "0")
 	})
 }
 
@@ -105,12 +105,12 @@ func TestLua(t *testing.T) {
 
 	// special returns
 	testRaw(t, func(c *client) {
-		c.Do("EVAL", "return {err = 'oops'}", "0")
+		c.Error("oops", "EVAL", "return {err = 'oops'}", "0")
 		c.Do("EVAL", "return {1,{err = 'oops'}}", "0")
-		c.Do("EVAL", "return redis.error_reply('oops')", "0")
+		c.Error("oops", "EVAL", "return redis.error_reply('oops')", "0")
 		c.Do("EVAL", "return {1,redis.error_reply('oops')}", "0")
-		c.Do("EVAL", "return {err = 'oops', noerr = true}", "0") // doc error?
-		c.Do("EVAL", "return {1, 2, err = 'oops'}", "0")         // doc error?
+		c.Error("oops", "EVAL", "return {err = 'oops', noerr = true}", "0") // doc error?
+		c.Error("oops", "EVAL", "return {1, 2, err = 'oops'}", "0")         // doc error?
 
 		c.Do("EVAL", "return {ok = 'great'}", "0")
 		c.Do("EVAL", "return {1,{ok = 'great'}}", "0")
@@ -346,7 +346,7 @@ func TestScriptNoAuth(t *testing.T) {
 	testAuth(t,
 		"supersecret",
 		func(c *client) {
-			c.Do("EVAL", `redis.call("ECHO", "foo")`, "0")
+			c.Error("Authentication required", "EVAL", `redis.call("ECHO", "foo")`, "0")
 			c.Do("AUTH", "supersecret")
 			c.Do("EVAL", `redis.call("ECHO", "foo")`, "0")
 		},
