@@ -400,20 +400,18 @@ parsing:
 	}
 
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
-		res := make(map[string][]StreamEntry)
-
 		db := m.db(ctx.selectedDB)
 
+		res := map[string][]StreamEntry{}
 		for i := range streams {
 			stream := streams[i]
 			id := ids[i]
 
-			entries, err := db.streamRead(stream, group, consumer, id, count)
+			entries, err := db.streamReadgroup(stream, group, consumer, id, count)
 			if err != nil {
 				c.WriteError(err.Error())
 				return
 			}
-
 			if len(entries) == 0 {
 				continue
 			}
@@ -425,7 +423,6 @@ parsing:
 			c.WriteLen(-1)
 			return
 		}
-
 		c.WriteLen(len(res))
 
 		for _, stream := range streams {
@@ -482,13 +479,13 @@ func (m *Miniredis) cmdXdel(c *server.Peer, cmd string, args []string) {
 		return
 	}
 
-	stream, args := args[0], args[1:]
+	stream, ids := args[0], args[1:]
 
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
-		cnt, err := db.streamDelete(stream, args)
+		cnt, err := db.streamDelete(stream, ids)
 		if err != nil {
-			c.WriteError(fmt.Sprintf("ERR %s", err.Error()))
+			c.WriteError(err.Error())
 			return
 		}
 

@@ -491,7 +491,7 @@ func TestStreamReadGroup(t *testing.T) {
 
 	mustDo(t, c,
 		"XREADGROUP", "GROUP", "processing", "alice", "STREAMS", "planets", ">",
-		proto.Error("stream planets not exists"),
+		proto.Error("NOGROUP No such key 'planets' or consumer group 'processing' in XREADGROUP with GROUP option"),
 	)
 
 	mustOK(t, c,

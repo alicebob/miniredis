@@ -48,6 +48,10 @@ func errLuaParseError(err error) string {
 	return fmt.Sprintf("ERR Error compiling script (new function): %s", err.Error())
 }
 
+func errReadgroup(key, group string) error {
+	return fmt.Errorf("NOGROUP No such key '%s' or consumer group '%s' in XREADGROUP with GROUP option", key, group)
+}
+
 // withTx wraps the non-argument-checking part of command handling code in
 // transaction logic.
 func withTx(
