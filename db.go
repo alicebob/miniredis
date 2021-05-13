@@ -42,6 +42,8 @@ func (db *RedisDB) flush() {
 	db.setKeys = map[string]setKey{}
 	db.sortedsetKeys = map[string]sortedSet{}
 	db.ttl = map[string]time.Duration{}
+	db.streamKeys = map[string]streamKey{}
+	db.streamGroupKeys = map[string]streamGroupKey{}
 }
 
 // move something to another db. Will return ok. Or not.
@@ -661,23 +663,22 @@ func (db *RedisDB) streamGroupCreate(stream, group, id string) error {
 	return nil
 }
 
-func (db *RedisDB) streamRead(stream, group, consumer, id string, count int) ([]StreamEntry, error) {
+func (db *RedisDB) streamReadgroup(stream, group, consumer, id string, count int) ([]StreamEntry, error) {
 	streamData, ok := db.streamKeys[stream]
 	if !ok {
-		return nil, fmt.Errorf("stream %s not exists", stream)
+		return nil, errReadgroup(stream, group)
 	}
 
 	if _, ok := db.streamGroupKeys[stream]; !ok {
-		// Error for group because this is key for group
-		return nil, fmt.Errorf("group %s not exists", group)
+		return nil, errReadgroup(stream, group)
 	}
 
 	groupData, ok := db.streamGroupKeys[stream][group]
 	if !ok {
-		return nil, fmt.Errorf("group %s not exists", group)
+		return nil, errReadgroup(stream, group)
 	}
 
-	res := make([]StreamEntry, 0)
+	var res []StreamEntry
 
 	if id == ">" {
 		next := sort.Search(len(streamData), func(i int) bool {
@@ -747,11 +748,14 @@ func (db *RedisDB) streamDelete(stream string, ids []string) (int, error) {
 	count := 0
 
 	for _, id := range ids {
+		if _, err := parseStreamID(id); err != nil {
+			return 0, errors.New(msgInvalidStreamID)
+		}
+
 		pos := sort.Search(len(streamData), func(i int) bool {
 			return streamCmp(id, streamData[i].ID) <= 0
 		})
-
-		if pos == len(streamData) {
+		if streamData[pos].ID != id {
 			continue
 		}
 
@@ -768,18 +772,21 @@ func (db *RedisDB) streamDelete(stream string, ids []string) (int, error) {
 
 func (db *RedisDB) streamAck(stream, group string, ids []string) (int, error) {
 	if _, ok := db.streamGroupKeys[stream]; !ok {
-		// Error for group because this is key for group
-		return 0, fmt.Errorf("group %s not exists", group)
+		return 0, nil
 	}
 
 	groupData, ok := db.streamGroupKeys[stream][group]
 	if !ok {
-		return 0, fmt.Errorf("group %s not exists", group)
+		return 0, nil
 	}
 
 	count := 0
 
 	for _, id := range ids {
+		if _, err := parseStreamID(id); err != nil {
+			return 0, errors.New(msgInvalidStreamID)
+		}
+
 		pos := sort.Search(len(groupData.pending), func(i int) bool {
 			return streamCmp(id, groupData.pending[i].ID) == 0
 		})

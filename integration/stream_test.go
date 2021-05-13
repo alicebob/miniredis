@@ -33,6 +33,7 @@ func TestStream(t *testing.T) {
 		c.Do("DEL", "planets2")
 		c.Do("XLEN", "planets")
 
+		// error cases
 		c.Error("wrong number", "XADD",
 			"planets",
 			"1000",
@@ -54,13 +55,6 @@ func TestStream(t *testing.T) {
 
 		c.Error("wrong number", "XADD", "planets")
 		c.Error("wrong number", "XADD")
-	})
-
-	testRaw(t, func(c *client) {
-		c.Do("XDEL", "newplanets", "123-123")
-		c.Do("XADD", "newplanets", "123-123", "foo", "bar")
-		c.Do("XDEL", "newplanets", "123-123")
-		c.Do("XDEL", "newplanets", "123-123")
 	})
 
 	testRaw(t, func(c *client) {
@@ -105,6 +99,43 @@ func TestStream(t *testing.T) {
 		c.Do("MULTI")
 		c.Do("XADD", "planets", "MAXLEN", "four", "*", "name", "Mercury")
 		c.Do("EXEC")
+	})
+
+	t.Run("XDEL", func(t *testing.T) {
+		testRaw(t, func(c *client) {
+			c.Do("XDEL", "newplanets", "123-123")
+			c.Do("XADD", "newplanets", "123-123", "foo", "bar")
+			c.Do("XADD", "newplanets", "123-124", "baz", "bak")
+			c.Do("XADD", "newplanets", "123-125", "bal", "bag")
+			c.Do("XDEL", "newplanets", "123-123", "123-125", "123-123")
+			c.Do("XDEL", "newplanets", "123-123")
+			c.Do("XDEL", "notexisting", "123-123")
+
+			c.Do("XADD", "gaps", "400-400", "foo", "bar")
+			c.Do("XADD", "gaps", "400-600", "foo", "bar")
+			c.Do("XDEL", "gaps", "400-500")
+
+			// errors
+			c.Do("XADD", "existing", "123-123", "foo", "bar")
+			c.Error("wrong number", "XDEL")             // no key
+			c.Error("wrong number", "XDEL", "existing") // no id
+			c.Error("Invalid stream ID", "XDEL", "existing", "aa-bb")
+			c.Do("XDEL", "notexisting", "aa-bb") // invalid id
+
+			c.Do("MULTI")
+			c.Do("XDEL", "existing", "aa-bb")
+			c.Do("EXEC")
+		})
+	})
+
+	t.Run("FLUSHALL", func(t *testing.T) {
+		testRaw(t, func(c *client) {
+			c.Do("XADD", "planets", "0-1", "name", "Mercury")
+			c.Do("XGROUP", "CREATE", "planets", "universe", "$")
+			c.Do("FLUSHALL")
+			c.Do("XREAD", "STREAMS", "planets", "0")
+			c.Error("consumer group", "XREADGROUP", "GROUP", "universe", "alice", "STREAMS", "planets", ">")
+		})
 	})
 }
 
@@ -221,6 +252,33 @@ func TestStreamGroup(t *testing.T) {
 		c.Do("XREADGROUP", "GROUP", "processing", "alice", "STREAMS", "planets", ">")
 		c.Do("XACK", "planets", "processing", "0-1")
 		c.Do("XDEL", "planets", "0-1")
+
+		// errors
+		c.Error("consumer group", "XREADGROUP", "GROUP", "nosuch", "alice", "STREAMS", "planets", ">")
+		c.Error("consumer group", "XREADGROUP", "GROUP", "processing", "alice", "STREAMS", "nosuchplanets", ">")
+	})
+
+	t.Run("XACK", func(t *testing.T) {
+		testRaw(t, func(c *client) {
+			c.Do("XGROUP", "CREATE", "planets", "processing", "$", "MKSTREAM")
+			c.Do("XADD", "planets", "4000-1", "name", "Mercury")
+			c.Do("XADD", "planets", "4000-2", "name", "Venus")
+			c.Do("XADD", "planets", "4000-3", "name", "not Pluto")
+			c.Do("XADD", "planets", "4000-4", "name", "Mars")
+			c.Do("XREADGROUP", "GROUP", "processing", "alice", "COUNT", "1", "STREAMS", "planets", ">")
+			c.Do("XACK", "planets", "processing", "4000-2", "4000-3")
+			c.Do("XACK", "planets", "processing", "4000-4")
+			c.Do("XACK", "planets", "processing", "2000-1")
+
+			c.Do("XACK", "nosuch", "processing", "0-1")
+			c.Do("XACK", "planets", "nosuch", "0-1")
+
+			// error cases
+			c.Error("wrong number", "XACK")
+			c.Error("wrong number", "XACK", "planets")
+			c.Error("wrong number", "XACK", "planets", "processing")
+			c.Error("Invalid stream", "XACK", "planets", "processing", "invalid")
+		})
 	})
 
 	testRESP3(t, func(c *client) {

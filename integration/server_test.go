@@ -10,6 +10,7 @@ func TestServer(t *testing.T) {
 	testRaw(t, func(c *client) {
 		c.Do("SET", "foo", "bar")
 		c.Do("SET", "baz", "bak")
+		c.Do("XADD", "planets", "123-456", "name", "Earth")
 		c.Do("DBSIZE")
 		c.Do("SELECT", "2")
 		c.Do("DBSIZE")
