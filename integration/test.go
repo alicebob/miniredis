@@ -372,6 +372,11 @@ func (c *client) Do(cmd string, args ...string) {
 
 	if resReal != resMini {
 		c.t.Errorf("expected: %q got: %q", string(resReal), string(resMini))
+		return
+	}
+
+	if strings.HasPrefix(string(resReal), "-") {
+		c.t.Errorf("Do() returned a redis error, use c.Error(): %q", string(resReal))
 	}
 }
 

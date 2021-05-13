@@ -35,23 +35,23 @@ func TestGeoadd(t *testing.T) {
 		c.Do("ZRANGE", "mountains", "0", "-1")
 
 		// failure cases
-		c.Do("GEOADD", "err", "186.9248308", "27.9878675", "not the Everest")
-		c.Do("GEOADD", "err", "-186.9248308", "27.9878675", "not the Everest")
-		c.Do("GEOADD", "err", "86.9248308", "87.9878675", "not the Everest")
-		c.Do("GEOADD", "err", "86.9248308", "-87.9", "not the Everest")
+		c.Error("invalid", "GEOADD", "err", "186.9248308", "27.9878675", "not the Everest")
+		c.Error("invalid", "GEOADD", "err", "-186.9248308", "27.9878675", "not the Everest")
+		c.Error("invalid", "GEOADD", "err", "86.9248308", "87.9878675", "not the Everest")
+		c.Error("invalid", "GEOADD", "err", "86.9248308", "-87.9", "not the Everest")
 		c.Do("SET", "str", "I am a string")
-		c.Do("GEOADD", "str", "86.9248308", "27.9878675", "Everest")
-		c.Do("GEOADD")
-		c.Do("GEOADD", "foo")
-		c.Do("GEOADD", "foo", "86.9248308")
-		c.Do("GEOADD", "foo", "86.9248308", "27.9878675")
+		c.Error("wrong kind", "GEOADD", "str", "86.9248308", "27.9878675", "Everest")
+		c.Error("wrong number", "GEOADD")
+		c.Error("wrong number", "GEOADD", "foo")
+		c.Error("wrong number", "GEOADD", "foo", "86.9248308")
+		c.Error("wrong number", "GEOADD", "foo", "86.9248308", "27.9878675")
 		c.Do("GEOADD", "foo", "86.9248308", "27.9878675", "")
-		c.Do("GEOADD", "foo", "eight", "27.9878675", "bar")
-		c.Do("GEOADD", "foo", "86.9248308", "seven", "bar")
+		c.Error("not a valid float", "GEOADD", "foo", "eight", "27.9878675", "bar")
+		c.Error("not a valid float", "GEOADD", "foo", "86.9248308", "seven", "bar")
 		// failures in a transaction
 		c.Do("MULTI")
-		c.Do("GEOADD", "foo")
-		c.Do("EXEC")
+		c.Error("wrong number", "GEOADD", "foo")
+		c.Error("discarded", "EXEC")
 		c.Do("MULTI")
 		c.Do("GEOADD", "foo", "eight", "27.9878675", "bar")
 		c.Do("EXEC")
@@ -82,9 +82,9 @@ func TestGeopos(t *testing.T) {
 		c.Do("GEOPOS", "nosuch", "Palermo")
 
 		// failure cases
-		c.Do("GEOPOS")
+		c.Error("wrong number", "GEOPOS")
 		c.Do("SET", "foo", "bar")
-		c.Do("GEOPOS", "foo", "Palermo")
+		c.Error("wrong kind", "GEOPOS", "foo", "Palermo")
 	})
 }
 
@@ -106,13 +106,13 @@ func TestGeodist(t *testing.T) {
 		c.DoRounded(2, "GEODIST", "Sicily", "Palermo", "Catania", "ft")
 		c.Do("GEODIST", "Sicily", "Palermo", "Palermo")
 
-		c.Do("GEODIST", "Sicily", "Palermo", "Palermo", "yards")
-		c.Do("GEODIST")
-		c.Do("GEODIST", "Sicily")
-		c.Do("GEODIST", "Sicily", "Palermo")
-		c.Do("GEODIST", "Sicily", "Palermo", "Palermo", "miles", "too many")
+		c.Error("unsupported unit", "GEODIST", "Sicily", "Palermo", "Palermo", "yards")
+		c.Error("wrong number", "GEODIST")
+		c.Error("wrong number", "GEODIST", "Sicily")
+		c.Error("wrong number", "GEODIST", "Sicily", "Palermo")
+		c.Error("syntax error", "GEODIST", "Sicily", "Palermo", "Palermo", "miles", "too many")
 		c.Do("SET", "string", "123")
-		c.Do("GEODIST", "string", "a", "b")
+		c.Error("wrong kind", "GEODIST", "string", "a", "b")
 	})
 }
 
@@ -148,25 +148,25 @@ func TestGeoradius(t *testing.T) {
 			c.DoRounded(3, "GEORADIUS", "stations", "-73.9718893", "40.7728773", "400", "km", "ASC", "COUNT", "1")
 			c.DoRounded(3, "GEORADIUS", "stations", "-73.9718893", "40.7728773", "400", "km", "ASC", "COUNT", "2")
 			c.DoRounded(3, "GEORADIUS", "stations", "-73.9718893", "40.7728773", "400", "km", "ASC", "COUNT", "999")
-			c.Do("GEORADIUS", "stations", "-73.9718893", "40.7728773", "400", "km", "COUNT")
-			c.Do("GEORADIUS", "stations", "-73.9718893", "40.7728773", "400", "km", "COUNT", "0")
-			c.Do("GEORADIUS", "stations", "-73.9718893", "40.7728773", "400", "km", "COUNT", "-12")
-			c.Do("GEORADIUS", "stations", "-73.9718893", "40.7728773", "400", "km", "COUNT", "foobar")
+			c.Error("syntax error", "GEORADIUS", "stations", "-73.9718893", "40.7728773", "400", "km", "COUNT")
+			c.Error("COUNT must", "GEORADIUS", "stations", "-73.9718893", "40.7728773", "400", "km", "COUNT", "0")
+			c.Error("COUNT must", "GEORADIUS", "stations", "-73.9718893", "40.7728773", "400", "km", "COUNT", "-12")
+			c.Error("not an integer", "GEORADIUS", "stations", "-73.9718893", "40.7728773", "400", "km", "COUNT", "foobar")
 
 			// non-existing key
 			c.Do("GEORADIUS", "foo", "-73.9718893", "40.7728773", "4", "km")
 
 			// no error in redis, for some reason
 			// c.Do("GEORADIUS", "foo", "-73.9718893", "40.7728773", "4", "km", "FOOBAR")
-			c.Do("GEORADIUS", "stations", "-73.9718893", "40.7728773", "400", "km", "ASC", "FOOBAR")
+			c.Error("syntax error", "GEORADIUS", "stations", "-73.9718893", "40.7728773", "400", "km", "ASC", "FOOBAR")
 
 			// GEORADIUS_RO
 			c.Do("GEORADIUS_RO", "stations", "-73.9718893", "40.7728773", "4", "km")
 			c.Do("GEORADIUS_RO", "stations", "1.0", "1.0", "1", "km")
-			c.Do("GEORADIUS_RO", "stations", "-73.9718893", "40.7728773", "4", "km", "STORE", "bar")
-			c.Do("GEORADIUS_RO", "stations", "-73.9718893", "40.7728773", "4", "km", "STOREDIST", "bar")
-			c.Do("GEORADIUS_RO", "stations", "-73.9718893", "40.7728773", "4", "km", "STORE")
-			c.Do("GEORADIUS_RO", "stations", "-73.9718893", "40.7728773", "4", "km", "STOREDIST")
+			c.Error("syntax error", "GEORADIUS_RO", "stations", "-73.9718893", "40.7728773", "4", "km", "STORE", "bar")
+			c.Error("syntax error", "GEORADIUS_RO", "stations", "-73.9718893", "40.7728773", "4", "km", "STOREDIST", "bar")
+			c.Error("syntax error", "GEORADIUS_RO", "stations", "-73.9718893", "40.7728773", "4", "km", "STORE")
+			c.Error("syntax error", "GEORADIUS_RO", "stations", "-73.9718893", "40.7728773", "4", "km", "STOREDIST")
 		})
 	})
 
@@ -203,9 +203,9 @@ func TestGeoradius(t *testing.T) {
 			c.Do("TTL", "taken")
 
 			// errors
-			c.Do("GEORADIUS", "stations", "-73.9718893", "40.7728773", "400", "km", "STORE")
-			c.Do("GEORADIUS", "stations", "-73.9718893", "40.7728773", "400", "km", "WITHDIST", "STORE", "foo")
-			c.Do("GEORADIUS", "stations", "-73.9718893", "40.7728773", "400", "km", "WITHCOORD", "STORE", "foo")
+			c.Error("syntax error", "GEORADIUS", "stations", "-73.9718893", "40.7728773", "400", "km", "STORE")
+			c.Error("not compatible", "GEORADIUS", "stations", "-73.9718893", "40.7728773", "400", "km", "WITHDIST", "STORE", "foo")
+			c.Error("not compatible", "GEORADIUS", "stations", "-73.9718893", "40.7728773", "400", "km", "WITHCOORD", "STORE", "foo")
 		})
 	})
 
@@ -258,9 +258,9 @@ func TestGeoradius(t *testing.T) {
 			c.Do("ZRANGE", "b", "0", "-1")
 
 			// errors
-			c.Do("GEORADIUS", "stations", "-73.9718893", "40.7728773", "400", "km", "STOREDIST")
-			c.Do("GEORADIUS", "stations", "-73.9718893", "40.7728773", "400", "km", "WITHDIST", "STOREDIST", "foo")
-			c.Do("GEORADIUS", "stations", "-73.9718893", "40.7728773", "400", "km", "WITHCOORD", "STOREDIST", "foo")
+			c.Error("syntax error", "GEORADIUS", "stations", "-73.9718893", "40.7728773", "400", "km", "STOREDIST")
+			c.Error("not compatible", "GEORADIUS", "stations", "-73.9718893", "40.7728773", "400", "km", "WITHDIST", "STOREDIST", "foo")
+			c.Error("not compatible", "GEORADIUS", "stations", "-73.9718893", "40.7728773", "400", "km", "WITHCOORD", "STOREDIST", "foo")
 		})
 	})
 }
@@ -298,10 +298,10 @@ func TestGeoradiusByMember(t *testing.T) {
 			c.DoRounded(3, "GEORADIUSBYMEMBER", "stations", "Astor Pl", "400", "km", "ASC", "COUNT", "1")
 			c.DoRounded(3, "GEORADIUSBYMEMBER", "stations", "Astor Pl", "400", "km", "ASC", "COUNT", "2")
 			c.DoRounded(3, "GEORADIUSBYMEMBER", "stations", "Astor Pl", "400", "km", "ASC", "COUNT", "999")
-			c.Do("GEORADIUSBYMEMBER", "stations", "Astor Pl", "400", "km", "COUNT")
-			c.Do("GEORADIUSBYMEMBER", "stations", "Astor Pl", "400", "km", "COUNT", "0")
-			c.Do("GEORADIUSBYMEMBER", "stations", "Astor Pl", "400", "km", "COUNT", "-12")
-			c.Do("GEORADIUSBYMEMBER", "stations", "Astor Pl", "400", "km", "COUNT", "foobar")
+			c.Error("syntax error", "GEORADIUSBYMEMBER", "stations", "Astor Pl", "400", "km", "COUNT")
+			c.Error("COUNT must", "GEORADIUSBYMEMBER", "stations", "Astor Pl", "400", "km", "COUNT", "0")
+			c.Error("COUNT must", "GEORADIUSBYMEMBER", "stations", "Astor Pl", "400", "km", "COUNT", "-12")
+			c.Error("not an integer", "GEORADIUSBYMEMBER", "stations", "Astor Pl", "400", "km", "COUNT", "foobar")
 
 			// non-existing key
 			// c.Do("GEORADIUSBYMEMBER", "foo", "Astor Pl", "4", "km") // Failing
@@ -309,15 +309,15 @@ func TestGeoradiusByMember(t *testing.T) {
 
 			// no error in redis, for some reason
 			// c.Do("GEORADIUSBYMEMBER", "foo", "Astor Pl", "4", "km", "FOOBAR")
-			c.Do("GEORADIUSBYMEMBER", "stations", "Astor Pl", "400", "km", "ASC", "FOOBAR")
+			c.Error("syntax error", "GEORADIUSBYMEMBER", "stations", "Astor Pl", "400", "km", "ASC", "FOOBAR")
 
 			// GEORADIUSBYMEMBER_RO
 			c.Do("GEORADIUSBYMEMBER_RO", "stations", "Astor Pl", "4", "km")
 			// c.Do("GEORADIUSBYMEMBER_RO", "stations", "1.0", "1.0", "1", "km") // Not a valid test
-			c.Do("GEORADIUSBYMEMBER_RO", "stations", "Astor Pl", "4", "km", "STORE", "bar")
-			c.Do("GEORADIUSBYMEMBER_RO", "stations", "Astor Pl", "4", "km", "STOREDIST", "bar")
-			c.Do("GEORADIUSBYMEMBER_RO", "stations", "Astor Pl", "4", "km", "STORE")
-			c.Do("GEORADIUSBYMEMBER_RO", "stations", "Astor Pl", "4", "km", "STOREDIST")
+			c.Error("syntax error", "GEORADIUSBYMEMBER_RO", "stations", "Astor Pl", "4", "km", "STORE", "bar")
+			c.Error("syntax error", "GEORADIUSBYMEMBER_RO", "stations", "Astor Pl", "4", "km", "STOREDIST", "bar")
+			c.Error("syntax error", "GEORADIUSBYMEMBER_RO", "stations", "Astor Pl", "4", "km", "STORE")
+			c.Error("syntax error", "GEORADIUSBYMEMBER_RO", "stations", "Astor Pl", "4", "km", "STOREDIST")
 		})
 	})
 
@@ -354,9 +354,9 @@ func TestGeoradiusByMember(t *testing.T) {
 			c.Do("TTL", "taken")
 
 			// errors
-			c.Do("GEORADIUSBYMEMBER", "stations", "Astor Pl", "400", "km", "STORE")
-			c.Do("GEORADIUSBYMEMBER", "stations", "Astor Pl", "400", "km", "WITHDIST", "STORE", "foo")
-			c.Do("GEORADIUSBYMEMBER", "stations", "Astor Pl", "400", "km", "WITHCOORD", "STORE", "foo")
+			c.Error("syntax error", "GEORADIUSBYMEMBER", "stations", "Astor Pl", "400", "km", "STORE")
+			c.Error("not compatible", "GEORADIUSBYMEMBER", "stations", "Astor Pl", "400", "km", "WITHDIST", "STORE", "foo")
+			c.Error("not compatible", "GEORADIUSBYMEMBER", "stations", "Astor Pl", "400", "km", "WITHCOORD", "STORE", "foo")
 		})
 	})
 
@@ -409,9 +409,9 @@ func TestGeoradiusByMember(t *testing.T) {
 			c.Do("ZRANGE", "b", "0", "-1")
 
 			// errors
-			c.Do("GEORADIUSBYMEMBER", "stations", "Astor Pl", "400", "km", "STOREDIST")
-			c.Do("GEORADIUSBYMEMBER", "stations", "Astor Pl", "400", "km", "WITHDIST", "STOREDIST", "foo")
-			c.Do("GEORADIUSBYMEMBER", "stations", "Astor Pl", "400", "km", "WITHCOORD", "STOREDIST", "foo")
+			c.Error("syntax error", "GEORADIUSBYMEMBER", "stations", "Astor Pl", "400", "km", "STOREDIST")
+			c.Error("not compatible", "GEORADIUSBYMEMBER", "stations", "Astor Pl", "400", "km", "WITHDIST", "STOREDIST", "foo")
+			c.Error("not compatible", "GEORADIUSBYMEMBER", "stations", "Astor Pl", "400", "km", "WITHCOORD", "STOREDIST", "foo")
 		})
 	})
 }

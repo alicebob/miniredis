@@ -28,12 +28,12 @@ func TestServer(t *testing.T) {
 		c.Do("FLUSHALL", "AsYnC")
 
 		// Failure cases
-		c.Do("DBSIZE", "foo")
-		c.Do("FLUSHDB", "foo")
-		c.Do("FLUSHALL", "foo")
-		c.Do("FLUSHDB", "ASYNC", "foo")
-		c.Do("FLUSHDB", "ASYNC", "ASYNC")
-		c.Do("FLUSHALL", "ASYNC", "foo")
+		c.Error("wrong number","DBSIZE", "foo")
+		c.Error("syntax error","FLUSHDB", "foo")
+		c.Error("syntax error","FLUSHALL", "foo")
+		c.Error("syntax error","FLUSHDB", "ASYNC", "foo")
+		c.Error("syntax error","FLUSHDB", "ASYNC", "ASYNC")
+		c.Error("syntax error","FLUSHALL", "ASYNC", "foo")
 	})
 }
 

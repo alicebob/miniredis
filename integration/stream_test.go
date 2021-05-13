@@ -23,7 +23,7 @@ func TestStream(t *testing.T) {
 			"18446744073709551000-0",
 			"name", "Earth",
 		)
-		c.Do("XADD",
+		c.Error("ID specified", "XADD",
 			"planets",
 			"18446744073709551000-0", // <-- duplicate
 			"name", "Earth",
@@ -33,27 +33,27 @@ func TestStream(t *testing.T) {
 		c.Do("DEL", "planets2")
 		c.Do("XLEN", "planets")
 
-		c.Do("XADD",
+		c.Error("wrong number", "XADD",
 			"planets",
 			"1000",
 			"name", "Mercury",
 			"ignored", // <-- not an even number of keys
 		)
-		c.Do("XADD",
+		c.Error("ID specified", "XADD",
 			"newplanets",
 			"0", // <-- invalid key
 			"foo", "bar",
 		)
-		c.Do("XADD", "newplanets", "123-123") // no args
-		c.Do("XADD", "newplanets", "123-bar", "foo", "bar")
-		c.Do("XADD", "newplanets", "bar-123", "foo", "bar")
-		c.Do("XADD", "newplanets", "123-123-123", "foo", "bar")
+		c.Error("wrong number", "XADD", "newplanets", "123-123") // no args
+		c.Error("stream ID", "XADD", "newplanets", "123-bar", "foo", "bar")
+		c.Error("stream ID", "XADD", "newplanets", "bar-123", "foo", "bar")
+		c.Error("stream ID", "XADD", "newplanets", "123-123-123", "foo", "bar")
 		c.Do("SET", "str", "I am a string")
 		// c.Do("XADD", "str", "1000", "foo", "bar")
 		// c.Do("XADD", "str", "invalid-key", "foo", "bar")
 
-		c.Do("XADD", "planets")
-		c.Do("XADD")
+		c.Error("wrong number", "XADD", "planets")
+		c.Error("wrong number", "XADD")
 	})
 
 	testRaw(t, func(c *client) {
@@ -73,20 +73,20 @@ func TestStream(t *testing.T) {
 		c.Do("XLEN", "planets")
 		c.Do("XADD", "planets", "MAXLEN", "~", "4", "456-7", "name", "Mercury")
 
-		c.Do("XADD", "planets", "MAXLEN", "!", "4", "*", "name", "Mercury")
-		c.Do("XADD", "planets", "MAXLEN", " ~", "4", "*", "name", "Mercury")
-		c.Do("XADD", "planets", "MAXLEN", "-4", "*", "name", "Mercury")
-		c.Do("XADD", "planets", "MAXLEN", "", "*", "name", "Mercury")
-		c.Do("XADD", "planets", "MAXLEN", "!", "four", "*", "name", "Mercury")
-		c.Do("XADD", "planets", "MAXLEN", "~", "four")
-		c.Do("XADD", "planets", "MAXLEN", "~")
-		c.Do("XADD", "planets", "MAXLEN")
+		c.Error("not an integer", "XADD", "planets", "MAXLEN", "!", "4", "*", "name", "Mercury")
+		c.Error("not an integer", "XADD", "planets", "MAXLEN", " ~", "4", "*", "name", "Mercury")
+		c.Error("MAXLEN argument", "XADD", "planets", "MAXLEN", "-4", "*", "name", "Mercury")
+		c.Error("not an integer", "XADD", "planets", "MAXLEN", "", "*", "name", "Mercury")
+		c.Error("not an integer", "XADD", "planets", "MAXLEN", "!", "four", "*", "name", "Mercury")
+		c.Error("not an integer", "XADD", "planets", "MAXLEN", "~", "four")
+		c.Error("wrong number", "XADD", "planets", "MAXLEN", "~")
+		c.Error("wrong number", "XADD", "planets", "MAXLEN")
 
 		c.Do("XADD", "planets", "MAXLEN", "0", "456-8", "name", "Mercury")
 		c.Do("XLEN", "planets")
 
 		c.Do("SET", "str", "I am a string")
-		c.Do("XADD", "str", "MAXLEN", "four", "*", "foo", "bar")
+		c.Error("not an integer", "XADD", "str", "MAXLEN", "four", "*", "foo", "bar")
 	})
 
 	testRaw(t, func(c *client) {
@@ -95,8 +95,8 @@ func TestStream(t *testing.T) {
 		c.Do("EXEC")
 
 		c.Do("MULTI")
-		c.Do("XADD", "newplanets", "123-123") // no args
-		c.Do("EXEC")
+		c.Error("wrong number", "XADD", "newplanets", "123-123") // no args
+		c.Error("discarded", "EXEC")
 
 		c.Do("MULTI")
 		c.Do("XADD", "planets", "foo-bar", "name", "Mercury")
@@ -165,15 +165,15 @@ func TestStreamRange(t *testing.T) {
 		c.Do("DEL", "ordplanets")
 
 		// failure cases
-		c.Do("XRANGE")
-		c.Do("XRANGE", "foo")
-		c.Do("XRANGE", "foo", "1")
-		c.Do("XRANGE", "foo", "2", "3", "toomany")
-		c.Do("XRANGE", "foo", "2", "3", "COUNT", "noint")
-		c.Do("XRANGE", "foo", "2", "3", "COUNT", "1", "toomany")
-		c.Do("XRANGE", "foo", "-", "noint")
+		c.Error("wrong number", "XRANGE")
+		c.Error("wrong number", "XRANGE", "foo")
+		c.Error("wrong number", "XRANGE", "foo", "1")
+		c.Error("syntax error", "XRANGE", "foo", "2", "3", "toomany")
+		c.Error("not an integer", "XRANGE", "foo", "2", "3", "COUNT", "noint")
+		c.Error("syntax error", "XRANGE", "foo", "2", "3", "COUNT", "1", "toomany")
+		c.Error("stream ID", "XRANGE", "foo", "-", "noint")
 		c.Do("SET", "str", "I am a string")
-		c.Do("XRANGE", "str", "-", "+")
+		c.Error("wrong kind", "XRANGE", "str", "-", "+")
 	})
 
 	testRaw(t, func(c *client) {
@@ -195,8 +195,8 @@ func TestStreamRange(t *testing.T) {
 		c.Do("EXEC")
 
 		c.Do("MULTI")
-		c.Do("XRANGE", "ordplanets", "+")
-		c.Do("EXEC")
+		c.Error("wrong number", "XRANGE", "ordplanets", "+")
+		c.Error("discarded", "EXEC")
 
 		c.Do("MULTI")
 		c.Do("XADD", "ordplanets", "123123-123", "name", "Mercury")
@@ -274,15 +274,15 @@ func TestStreamRead(t *testing.T) {
 		c.Do("XREAD", "STREAMS", "ordplanets", "ordplanets2", "1", "3")
 
 		// failure cases
-		c.Do("XREAD")
-		c.Do("XREAD", "STREAMS")
-		c.Do("XREAD", "STREAMS", "foo")
+		c.Error("wrong number", "XREAD")
+		c.Error("wrong number", "XREAD", "STREAMS")
+		c.Error("wrong number", "XREAD", "STREAMS", "foo")
 		c.Do("XREAD", "STREAMS", "foo", "0")
-		c.Do("XREAD", "STREAMS", "ordplanets")
-		c.Do("XREAD", "STREAMS", "ordplanets", "foo", "0")
-		c.Do("XREAD", "COUNT")
-		c.Do("XREAD", "COUNT", "notint")
-		c.Do("XREAD", "COUNT", "10") // No streams
-		c.Do("XREAD", "STREAMS", "foo", "notint")
+		c.Error("wrong number", "XREAD", "STREAMS", "ordplanets")
+		c.Error("Unbalanced XREAD", "XREAD", "STREAMS", "ordplanets", "foo", "0")
+		c.Error("wrong number", "XREAD", "COUNT")
+		c.Error("wrong number", "XREAD", "COUNT", "notint")
+		c.Error("wrong number", "XREAD", "COUNT", "10") // No streams
+		c.Error("stream ID", "XREAD", "STREAMS", "foo", "notint")
 	})
 }

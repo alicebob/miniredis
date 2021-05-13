@@ -27,8 +27,8 @@ func TestKeys(t *testing.T) {
 		c.Do("GET", "")
 
 		// Simple failure cases
-		c.Do("KEYS")
-		c.Do("KEYS", "foo", "bar")
+		c.Error("wrong number", "KEYS")
+		c.Error("wrong number", "KEYS", "foo", "bar")
 	})
 
 	testRaw(t, func(c *client) {
@@ -49,15 +49,15 @@ func TestRandom(t *testing.T) {
 		c.Do("RANDOMKEY")
 
 		// Simple failure cases
-		c.Do("RANDOMKEY", "bar")
+		c.Error("wrong number", "RANDOMKEY", "bar")
 	})
 }
 
 func TestUnknownCommand(t *testing.T) {
 	testRaw(t, func(c *client) {
-		c.Do("nosuch")
-		c.Do("noSUCH")
-		c.Do("noSUCH", "1", "2", "3")
+		c.Error("unknown", "nosuch")
+		c.Error("unknown", "noSUCH")
+		c.Error("unknown", "noSUCH", "1", "2", "3")
 	})
 }
 
@@ -76,14 +76,14 @@ func TestExists(t *testing.T) {
 		c.Do("EXISTS", "a", "b", "b", "b", "a", "q")
 
 		// Error cases
-		c.Do("EXISTS")
+		c.Error("wrong number", "EXISTS")
 	})
 }
 
 func TestRename(t *testing.T) {
 	testRaw(t, func(c *client) {
 		// No 'a' key
-		c.Do("RENAME", "a", "b")
+		c.Error("no such", "RENAME", "a", "b")
 
 		// Move a key with the TTL.
 		c.Do("SET", "a", "3")
@@ -106,16 +106,16 @@ func TestRename(t *testing.T) {
 		c.Do("TTL", "stillnottl")
 
 		// Error cases
-		c.Do("RENAME")
-		c.Do("RENAME", "a")
-		c.Do("RENAME", "a", "b", "toomany")
+		c.Error("wrong number", "RENAME")
+		c.Error("wrong number", "RENAME", "a")
+		c.Error("wrong number", "RENAME", "a", "b", "toomany")
 	})
 }
 
 func TestRenamenx(t *testing.T) {
 	testRaw(t, func(c *client) {
 		// No 'a' key
-		c.Do("RENAMENX", "a", "b")
+		c.Error("no such", "RENAMENX", "a", "b")
 
 		c.Do("SET", "a", "value")
 		c.Do("SET", "str", "value")
@@ -130,9 +130,9 @@ func TestRenamenx(t *testing.T) {
 		c.Do("EXISTS", "nosuch")
 
 		// Error cases
-		c.Do("RENAMENX")
-		c.Do("RENAMENX", "a")
-		c.Do("RENAMENX", "a", "b", "toomany")
+		c.Error("wrong number", "RENAMENX")
+		c.Error("wrong number", "RENAMENX", "a")
+		c.Error("wrong number", "RENAMENX", "a", "b", "toomany")
 	})
 }
 
@@ -156,13 +156,13 @@ func TestScan(t *testing.T) {
 		// c.Do("SCAN", "0")
 
 		// Error cases
-		c.Do("SCAN")
-		c.Do("SCAN", "noint")
-		c.Do("SCAN", "0", "COUNT", "noint")
-		c.Do("SCAN", "0", "COUNT")
-		c.Do("SCAN", "0", "MATCH")
-		c.Do("SCAN", "0", "garbage")
-		c.Do("SCAN", "0", "COUNT", "12", "MATCH", "foo", "garbage")
+		c.Error("wrong number", "SCAN")
+		c.Error("invalid cursor", "SCAN", "noint")
+		c.Error("not an integer", "SCAN", "0", "COUNT", "noint")
+		c.Error("syntax error", "SCAN", "0", "COUNT")
+		c.Error("syntax error", "SCAN", "0", "MATCH")
+		c.Error("syntax error", "SCAN", "0", "garbage")
+		c.Error("syntax error", "SCAN", "0", "COUNT", "12", "MATCH", "foo", "garbage")
 	})
 }
 
@@ -177,9 +177,9 @@ func TestFastForward(t *testing.T) {
 	})
 
 	testRaw(t, func(c *client) {
-		c.Do("SET", "key1", "value", "PX", "-100")
-		c.Do("SET", "key2", "value", "EX", "-100")
-		c.Do("SET", "key3", "value", "EX", "0")
+		c.Error("invalid expire", "SET", "key1", "value", "PX", "-100")
+		c.Error("invalid expire", "SET", "key2", "value", "EX", "-100")
+		c.Error("invalid expire", "SET", "key3", "value", "EX", "0")
 		c.DoSorted("KEYS", "*")
 
 		c.Do("SET", "key4", "value")
@@ -210,14 +210,14 @@ func TestSwapdb(t *testing.T) {
 		c.Do("SWAPDB", "1", "1")
 		c.Do("GET", "key1")
 
-		c.Do("SWAPDB")
-		c.Do("SWAPDB", "1")
-		c.Do("SWAPDB", "1", "2", "3")
-		c.Do("SWAPDB", "foo", "2")
-		c.Do("SWAPDB", "1", "bar")
-		c.Do("SWAPDB", "foo", "bar")
-		c.Do("SWAPDB", "-1", "2")
-		c.Do("SWAPDB", "1", "-2")
+		c.Error("wrong number", "SWAPDB")
+		c.Error("wrong number", "SWAPDB", "1")
+		c.Error("wrong number", "SWAPDB", "1", "2", "3")
+		c.Error("invalid first", "SWAPDB", "foo", "2")
+		c.Error("invalid second", "SWAPDB", "1", "bar")
+		c.Error("invalid first", "SWAPDB", "foo", "bar")
+		c.Error("out of range", "SWAPDB", "-1", "2")
+		c.Error("out of range", "SWAPDB", "1", "-2")
 		// c.Do("SWAPDB", "1", "1000") // miniredis has no upperlimit
 	})
 
@@ -251,7 +251,7 @@ func TestDel(t *testing.T) {
 		c.Do("DEL", "two", "four")
 		c.DoSorted("KEYS", "*")
 
-		c.Do("DEL")
+		c.Error("wrong number", "DEL")
 		c.DoSorted("KEYS", "*")
 	})
 }
@@ -271,7 +271,7 @@ func TestUnlink(t *testing.T) {
 		c.Do("UNLINK", "two", "four")
 		c.DoSorted("KEYS", "*")
 
-		c.Do("UNLINK")
+		c.Error("wrong number", "UNLINK")
 		c.DoSorted("KEYS", "*")
 	})
 }
@@ -285,7 +285,7 @@ func TestTouch(t *testing.T) {
 
 		c.Do("TOUCH", "a", "foobar", "a")
 
-		c.Do("TOUCH")
+		c.Error("wrong number", "TOUCH")
 	})
 }
 

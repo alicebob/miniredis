@@ -14,21 +14,21 @@ func TestString(t *testing.T) {
 		c.Do("SET", "foo", "bar\bbaz")
 		c.Do("GET", "foo")
 		c.Do("SET", "foo", "bar", "EX", "100")
-		c.Do("SET", "foo", "bar", "EX", "noint")
+		c.Error("not an integer", "SET", "foo", "bar", "EX", "noint")
 		c.Do("SET", "utf8", "❆❅❄☃")
 		c.Do("SET", "foo", "baz", "KEEPTTL")
 
 		// Failure cases
-		c.Do("SET")
-		c.Do("SET", "foo")
-		c.Do("SET", "foo", "bar", "baz")
-		c.Do("GET")
-		c.Do("GET", "too", "many")
-		c.Do("SET", "foo", "bar", "EX", "0")
-		c.Do("SET", "foo", "bar", "EX", "-100")
+		c.Error("wrong number", "SET")
+		c.Error("wrong number", "SET", "foo")
+		c.Error("syntax error", "SET", "foo", "bar", "baz")
+		c.Error("wrong number", "GET")
+		c.Error("wrong number", "GET", "too", "many")
+		c.Error("invalid expire", "SET", "foo", "bar", "EX", "0")
+		c.Error("invalid expire", "SET", "foo", "bar", "EX", "-100")
 		// Wrong type
 		c.Do("HSET", "hash", "key", "value")
-		c.Do("GET", "hash")
+		c.Error("wrong kind", "GET", "hash")
 	})
 }
 
@@ -42,12 +42,12 @@ func TestStringGetSet(t *testing.T) {
 		c.Do("GET", "nosuch")
 
 		// Failure cases
-		c.Do("GETSET")
-		c.Do("GETSET", "foo")
-		c.Do("GETSET", "foo", "bar", "baz")
+		c.Error("wrong number", "GETSET")
+		c.Error("wrong number", "GETSET", "foo")
+		c.Error("wrong number", "GETSET", "foo", "bar", "baz")
 		// Wrong type
 		c.Do("HSET", "hash", "key", "value")
-		c.Do("GETSET", "hash", "new")
+		c.Error("wrong kind", "GETSET", "hash", "new")
 	})
 }
 
@@ -61,7 +61,7 @@ func TestStringMget(t *testing.T) {
 		c.Do("MGET", "nosuch", "neither", "foo")
 
 		// Failure cases
-		c.Do("MGET")
+		c.Error("wrong number", "MGET")
 		// Wrong type
 		c.Do("HSET", "hash", "key", "value")
 		c.Do("MGET", "hash") // not an error.
@@ -76,9 +76,9 @@ func TestStringSetnx(t *testing.T) {
 		c.Do("GET", "foo")
 
 		// Failure cases
-		c.Do("SETNX")
-		c.Do("SETNX", "foo")
-		c.Do("SETNX", "foo", "bar", "baz")
+		c.Error("wrong number", "SETNX")
+		c.Error("wrong number", "SETNX", "foo")
+		c.Error("wrong number", "SETNX", "foo", "bar", "baz")
 		// Wrong type
 		c.Do("HSET", "hash", "key", "value")
 		c.Do("SETNX", "hash", "value")
@@ -105,20 +105,20 @@ func TestExpire(t *testing.T) {
 		c.Do("EXPIRE", "foo", "-12")
 		c.Do("EXISTS", "foo")
 
-		c.Do("EXPIRE")
-		c.Do("EXPIRE", "foo")
-		c.Do("EXPIRE", "foo", "noint")
-		c.Do("EXPIRE", "foo", "12", "toomany")
-		c.Do("EXPIREAT")
-		c.Do("TTL")
-		c.Do("TTL", "too", "many")
-		c.Do("PEXPIRE")
-		c.Do("PEXPIRE", "foo")
-		c.Do("PEXPIRE", "foo", "noint")
-		c.Do("PEXPIRE", "foo", "12", "toomany")
-		c.Do("PEXPIREAT")
-		c.Do("PTTL")
-		c.Do("PTTL", "too", "many")
+		c.Error("wrong number", "EXPIRE")
+		c.Error("wrong number", "EXPIRE", "foo")
+		c.Error("not an integer", "EXPIRE", "foo", "noint")
+		c.Error("wrong number", "EXPIRE", "foo", "12", "toomany")
+		c.Error("wrong number", "EXPIREAT")
+		c.Error("wrong number", "TTL")
+		c.Error("wrong number", "TTL", "too", "many")
+		c.Error("wrong number", "PEXPIRE")
+		c.Error("wrong number", "PEXPIRE", "foo")
+		c.Error("not an integer", "PEXPIRE", "foo", "noint")
+		c.Error("wrong number", "PEXPIRE", "foo", "12", "toomany")
+		c.Error("wrong number", "PEXPIREAT")
+		c.Error("wrong number", "PTTL")
+		c.Error("wrong number", "PTTL", "too", "many")
 	})
 }
 
@@ -129,9 +129,9 @@ func TestMset(t *testing.T) {
 		c.Do("MSET", "foo", "bar", "foo", "baz") // double key
 		c.Do("GET", "foo")
 		// Error cases
-		c.Do("MSET")
-		c.Do("MSET", "foo")
-		c.Do("MSET", "foo", "bar", "baz")
+		c.Error("wrong number", "MSET")
+		c.Error("wrong number", "MSET", "foo")
+		c.Error("wrong number", "MSET", "foo", "bar", "baz")
 
 		c.Do("MSETNX", "foo", "bar", "aap", "noot")
 		c.Do("MSETNX", "one", "two", "three", "four")
@@ -144,9 +144,9 @@ func TestMset(t *testing.T) {
 		c.Do("MSETNX", "aap", "again", "eight", "nine")
 
 		// Error cases
-		c.Do("MSETNX")
-		c.Do("MSETNX", "one")
-		c.Do("MSETNX", "one", "two", "three")
+		c.Error("wrong number", "MSETNX")
+		c.Error("wrong number", "MSETNX", "one")
+		c.Error("wrong number", "MSETNX", "one", "two", "three")
 	})
 }
 
@@ -155,22 +155,22 @@ func TestSetx(t *testing.T) {
 		c.Do("SETEX", "foo", "12", "bar")
 		c.Do("GET", "foo")
 		c.Do("TTL", "foo")
-		c.Do("SETEX", "foo")
-		c.Do("SETEX", "foo", "noint", "bar")
-		c.Do("SETEX", "foo", "12")
-		c.Do("SETEX", "foo", "12", "bar", "toomany")
-		c.Do("SETEX", "foo", "0")
-		c.Do("SETEX", "foo", "-12")
+		c.Error("wrong number", "SETEX", "foo")
+		c.Error("not an integer", "SETEX", "foo", "noint", "bar")
+		c.Error("wrong number", "SETEX", "foo", "12")
+		c.Error("wrong number", "SETEX", "foo", "12", "bar", "toomany")
+		c.Error("wrong number", "SETEX", "foo", "0")
+		c.Error("wrong number", "SETEX", "foo", "-12")
 
 		c.Do("PSETEX", "foo", "12", "bar")
 		c.Do("GET", "foo")
 		// c.Do("PTTL", "foo") // counts down too quickly to compare
-		c.Do("PSETEX", "foo")
-		c.Do("PSETEX", "foo", "noint", "bar")
-		c.Do("PSETEX", "foo", "12")
-		c.Do("PSETEX", "foo", "12", "bar", "toomany")
-		c.Do("PSETEX", "foo", "0")
-		c.Do("PSETEX", "foo", "-12")
+		c.Error("wrong number", "PSETEX", "foo")
+		c.Error("not an integer", "PSETEX", "foo", "noint", "bar")
+		c.Error("wrong number", "PSETEX", "foo", "12")
+		c.Error("wrong number", "PSETEX", "foo", "12", "bar", "toomany")
+		c.Error("wrong number", "PSETEX", "foo", "0")
+		c.Error("wrong number", "PSETEX", "foo", "-12")
 	})
 }
 
@@ -183,12 +183,12 @@ func TestGetrange(t *testing.T) {
 		c.Do("GETRANGE", "foo", "0", "-400")
 		c.Do("GETRANGE", "foo", "-4", "-4")
 		c.Do("GETRANGE", "foo", "4", "2")
-		c.Do("GETRANGE", "foo", "aap", "2")
-		c.Do("GETRANGE", "foo", "4", "aap")
-		c.Do("GETRANGE", "foo", "4", "2", "aap")
-		c.Do("GETRANGE", "foo")
+		c.Error("not an integer", "GETRANGE", "foo", "aap", "2")
+		c.Error("not an integer", "GETRANGE", "foo", "4", "aap")
+		c.Error("wrong number", "GETRANGE", "foo", "4", "2", "aap")
+		c.Error("wrong number", "GETRANGE", "foo")
 		c.Do("HSET", "aap", "noot", "mies")
-		c.Do("GETRANGE", "aap", "4", "2")
+		c.Error("wrong kind", "GETRANGE", "aap", "4", "2")
 	})
 }
 
@@ -197,10 +197,10 @@ func TestStrlen(t *testing.T) {
 		c.Do("SET", "str", "The quick brown fox jumps over the lazy dog")
 		c.Do("STRLEN", "str")
 		// failure cases
-		c.Do("STRLEN")
-		c.Do("STRLEN", "str", "bar")
+		c.Error("wrong number", "STRLEN")
+		c.Error("wrong number", "STRLEN", "str", "bar")
 		c.Do("HSET", "hash", "key", "value")
-		c.Do("STRLEN", "hash")
+		c.Error("wrong kind", "STRLEN", "hash")
 	})
 }
 
@@ -220,13 +220,13 @@ func TestSetrange(t *testing.T) {
 		c.Do("GET", "nosuch")
 
 		// Error cases
-		c.Do("SETRANGE", "foo")
-		c.Do("SETRANGE", "foo", "1")
-		c.Do("SETRANGE", "foo", "aap", "bar")
-		c.Do("SETRANGE", "foo", "noint", "bar")
-		c.Do("SETRANGE", "foo", "-1", "bar")
+		c.Error("wrong number", "SETRANGE", "foo")
+		c.Error("wrong number", "SETRANGE", "foo", "1")
+		c.Error("not an integer", "SETRANGE", "foo", "aap", "bar")
+		c.Error("not an integer", "SETRANGE", "foo", "noint", "bar")
+		c.Error("out of range", "SETRANGE", "foo", "-1", "bar")
 		c.Do("HSET", "aap", "noot", "mies")
-		c.Do("SETRANGE", "aap", "4", "bar")
+		c.Error("wrong kind", "SETRANGE", "aap", "4", "bar")
 	})
 }
 
@@ -262,28 +262,28 @@ func TestIncrAndFriends(t *testing.T) {
 
 		// Floats are not ints.
 		c.Do("SET", "float", "1.23")
-		c.Do("INCR", "float")
-		c.Do("INCRBY", "float", "12")
-		c.Do("DECR", "float")
-		c.Do("DECRBY", "float", "12")
+		c.Error("not an integer", "INCR", "float")
+		c.Error("not an integer", "INCRBY", "float", "12")
+		c.Error("not an integer", "DECR", "float")
+		c.Error("not an integer", "DECRBY", "float", "12")
 		c.Do("SET", "str", "I'm a string")
-		c.Do("INCRBYFLOAT", "str", "123.5")
+		c.Error("not a valid float", "INCRBYFLOAT", "str", "123.5")
 
 		// Error cases
 		c.Do("HSET", "mies", "noot", "mies")
-		c.Do("INCR", "mies")
-		c.Do("INCRBY", "mies", "1")
-		c.Do("INCRBY", "mies", "foo")
-		c.Do("DECR", "mies")
-		c.Do("DECRBY", "mies", "1")
-		c.Do("INCRBYFLOAT", "mies", "1")
-		c.Do("INCRBYFLOAT", "int", "foo")
+		c.Error("wrong kind", "INCR", "mies")
+		c.Error("wrong kind", "INCRBY", "mies", "1")
+		c.Error("not an integer", "INCRBY", "mies", "foo")
+		c.Error("wrong kind", "DECR", "mies")
+		c.Error("wrong kind", "DECRBY", "mies", "1")
+		c.Error("wrong kind", "INCRBYFLOAT", "mies", "1")
+		c.Error("not a valid float", "INCRBYFLOAT", "int", "foo")
 
-		c.Do("INCR", "int", "err")
-		c.Do("INCRBY", "int")
-		c.Do("DECR", "int", "err")
-		c.Do("DECRBY", "int")
-		c.Do("INCRBYFLOAT", "int")
+		c.Error("wrong number", "INCR", "int", "err")
+		c.Error("wrong number", "INCRBY", "int")
+		c.Error("wrong number", "DECR", "int", "err")
+		c.Error("wrong number", "DECRBY", "int")
+		c.Error("wrong number", "INCRBYFLOAT", "int")
 
 		// Rounding
 		c.Do("INCRBYFLOAT", "zero", "12.3")
@@ -292,11 +292,11 @@ func TestIncrAndFriends(t *testing.T) {
 		// E
 		c.Do("INCRBYFLOAT", "one", "12e12")
 		// c.Do("INCRBYFLOAT", "one", "12e34") // FIXME
-		c.Do("INCRBYFLOAT", "one", "12e34.1")
+		c.Error("not a valid float", "INCRBYFLOAT", "one", "12e34.1")
 		// c.Do("INCRBYFLOAT", "one", "0x12e12") // FIXME
 		// c.Do("INCRBYFLOAT", "one", "012e12") // FIXME
 		c.Do("INCRBYFLOAT", "two", "012")
-		c.Do("INCRBYFLOAT", "one", "0b12e12")
+		c.Error("not a valid float", "INCRBYFLOAT", "one", "0b12e12")
 	})
 }
 
@@ -313,12 +313,12 @@ func TestBitcount(t *testing.T) {
 		c.Do("BITCOUNT", "str", "-2", "-12")
 		c.Do("BITCOUNT", "utf8", "0", "0")
 
-		c.Do("BITCOUNT")
+		c.Error("wrong number", "BITCOUNT")
 		c.Do("BITCOUNT", "wrong", "arguments")
-		c.Do("BITCOUNT", "str", "4", "2", "2", "2", "2")
-		c.Do("BITCOUNT", "str", "foo", "2")
+		c.Error("syntax error", "BITCOUNT", "str", "4", "2", "2", "2", "2")
+		c.Error("not an integer", "BITCOUNT", "str", "foo", "2")
 		c.Do("HSET", "aap", "noot", "mies")
-		c.Do("BITCOUNT", "aap", "4", "2")
+		c.Error("wrong kind", "BITCOUNT", "aap", "4", "2")
 	})
 }
 
@@ -380,17 +380,17 @@ func TestBitop(t *testing.T) {
 		c.Do("BITOP", "NOT", "bits", "nosuch")
 		c.Do("GET", "bits")
 
-		c.Do("BITOP", "AND", "utf8")
-		c.Do("BITOP", "AND")
-		c.Do("BITOP", "NOT", "foo", "bar", "baz")
-		c.Do("BITOP", "WRONGOP", "key")
-		c.Do("BITOP", "WRONGOP")
+		c.Error("wrong number", "BITOP", "AND", "utf8")
+		c.Error("wrong number", "BITOP", "AND")
+		c.Error("single source key", "BITOP", "NOT", "foo", "bar", "baz")
+		c.Error("wrong number", "BITOP", "WRONGOP", "key")
+		c.Error("wrong number", "BITOP", "WRONGOP")
 
 		c.Do("HSET", "hash", "aap", "noot")
-		c.Do("BITOP", "AND", "t", "hash", "irrelevant")
-		c.Do("BITOP", "OR", "t", "hash", "irrelevant")
-		c.Do("BITOP", "XOR", "t", "hash", "irrelevant")
-		c.Do("BITOP", "NOT", "t", "hash")
+		c.Error("wrong kind", "BITOP", "AND", "t", "hash", "irrelevant")
+		c.Error("wrong kind", "BITOP", "OR", "t", "hash", "irrelevant")
+		c.Error("wrong kind", "BITOP", "XOR", "t", "hash", "irrelevant")
+		c.Error("wrong kind", "BITOP", "NOT", "t", "hash")
 	})
 }
 
@@ -457,8 +457,8 @@ func TestBitpos(t *testing.T) {
 		c.Do("BITPOS", "nosuch", "1", "0", "0")
 
 		c.Do("HSET", "hash", "aap", "noot")
-		c.Do("BITPOS", "hash", "1")
-		c.Do("BITPOS", "a", "aap")
+		c.Error("wrong kind", "BITPOS", "hash", "1")
+		c.Error("not an integer", "BITPOS", "a", "aap")
 	})
 }
 
@@ -472,10 +472,10 @@ func TestGetbit(t *testing.T) {
 
 			// Error cases
 			c.Do("HSET", "hash", "aap", "noot")
-			c.Do("GETBIT", "hash", "1")
-			c.Do("GETBIT", "a", "aap")
-			c.Do("GETBIT", "a")
-			c.Do("GETBIT", "too", "1", "many")
+			c.Error("wrong kind", "GETBIT", "hash", "1")
+			c.Error("not an integer", "GETBIT", "a", "aap")
+			c.Error("wrong number", "GETBIT", "a")
+			c.Error("wrong number", "GETBIT", "too", "1", "many")
 
 			c.Do("GETBIT", "a", strconv.Itoa(i))
 			c.Do("GETBIT", "e", strconv.Itoa(i))
@@ -498,13 +498,13 @@ func TestSetbit(t *testing.T) {
 
 			// Error cases
 			c.Do("HSET", "hash", "aap", "noot")
-			c.Do("SETBIT", "hash", "1", "1")
-			c.Do("SETBIT", "a", "aap", "0")
-			c.Do("SETBIT", "a", "0", "aap")
-			c.Do("SETBIT", "a", "-1", "0")
-			c.Do("SETBIT", "a", "1", "-1")
-			c.Do("SETBIT", "a", "1", "2")
-			c.Do("SETBIT", "too", "1", "2", "many")
+			c.Error("wrong kind", "SETBIT", "hash", "1", "1")
+			c.Error("not an integer", "SETBIT", "a", "aap", "0")
+			c.Error("not an integer", "SETBIT", "a", "0", "aap")
+			c.Error("not an integer", "SETBIT", "a", "-1", "0")
+			c.Error("not an integer", "SETBIT", "a", "1", "-1")
+			c.Error("not an integer", "SETBIT", "a", "1", "2")
+			c.Error("wrong number", "SETBIT", "too", "1", "2", "many")
 
 			c.Do("GETBIT", "a", strconv.Itoa(i))
 			c.Do("GETBIT", "e", strconv.Itoa(i))
@@ -521,8 +521,8 @@ func TestAppend(t *testing.T) {
 		c.Do("GET", "nosuch")
 
 		// Failure cases
-		c.Do("APPEND")
-		c.Do("APPEND", "foo")
+		c.Error("wrong number", "APPEND")
+		c.Error("wrong number", "APPEND", "foo")
 	})
 }
 
@@ -538,8 +538,8 @@ func TestMove(t *testing.T) {
 		c.Do("TTL", "foo")
 
 		// Failure cases
-		c.Do("MOVE")
-		c.Do("MOVE", "foo")
+		c.Error("wrong number", "MOVE")
+		c.Error("wrong number", "MOVE", "foo")
 		// c.Do("MOVE", "foo", "noint")
 	})
 	// hash key
@@ -556,6 +556,6 @@ func TestMove(t *testing.T) {
 	testRaw(t, func(c *client) {
 		c.Do("SET", "foo", "bar")
 		// to current DB.
-		c.Do("MOVE", "foo", "0")
+		c.Error("the same", "MOVE", "foo", "0")
 	})
 }
