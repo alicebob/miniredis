@@ -32,6 +32,13 @@ func equals(tb testing.TB, exp, act interface{}) {
 	}
 }
 
+func equalStr(tb testing.TB, want, have string) {
+	tb.Helper()
+	if have != want {
+		tb.Errorf("want: %q have: %q", want, have)
+	}
+}
+
 // mustFail compares the error strings
 func mustFail(tb testing.TB, err error, want string) {
 	tb.Helper()

@@ -42,8 +42,7 @@ func (db *RedisDB) flush() {
 	db.setKeys = map[string]setKey{}
 	db.sortedsetKeys = map[string]sortedSet{}
 	db.ttl = map[string]time.Duration{}
-	db.streamKeys = map[string]streamKey{}
-	db.streamGroupKeys = map[string]streamGroupKey{}
+	db.streamKeys = map[string]*streamKey{}
 }
 
 // move something to another db. Will return ok. Or not.
@@ -571,239 +570,36 @@ func (db *RedisDB) setUnion(keys []string) (setKey, error) {
 	return s, nil
 }
 
-// stream set returns a stream as a slice. Lowest ID first.
-func (db *RedisDB) stream(key string) []StreamEntry {
-	return db.streamKeys[key]
-}
-
-func (db *RedisDB) streamCreate(key string) {
-	_, ok := db.streamKeys[key]
-	if !ok {
-		db.keys[key] = "stream"
+func (db *RedisDB) newStream(key string) (*streamKey, error) {
+	if s, err := db.stream(key); err != nil {
+		return nil, err
+	} else if s != nil {
+		return nil, fmt.Errorf("ErrAlreadyExists")
 	}
 
-	db.streamKeys[key] = make(streamKey, 0)
+	db.keys[key] = "stream"
+	s := newStreamKey()
+	db.streamKeys[key] = s
 	db.keyVersion[key]++
+	return s, nil
 }
 
-// streamAdd adds an entry to a stream. Returns the new entry ID.
-// If id is empty or "*" the ID will be generated automatically.
-// `values` should have an even length.
-func (db *RedisDB) streamAdd(key, entryID string, values []string) (string, error) {
-	stream, ok := db.streamKeys[key]
-	if !ok {
-		db.keys[key] = "stream"
+// return existing stream, or nil.
+func (db *RedisDB) stream(key string) (*streamKey, error) {
+	if db.exists(key) && db.t(key) != "stream" {
+		return nil, ErrWrongType
 	}
 
-	if entryID == "" || entryID == "*" {
-		entryID = stream.generateID(db.master.effectiveNow())
-	}
-	entryID, err := formatStreamID(entryID)
-	if err != nil {
-		return "", err
-	}
-	if entryID == "0-0" {
-		return "", errZeroStreamValue
-	}
-	if streamCmp(stream.lastID(), entryID) != -1 {
-		return "", errInvalidStreamValue
-	}
-	db.streamKeys[key] = append(stream, StreamEntry{
-		ID:     entryID,
-		Values: values,
-	})
-	db.keyVersion[key]++
-	return entryID, nil
+	return db.streamKeys[key], nil
 }
 
-func (db *RedisDB) streamMaxlen(key string, n int) {
-	stream, ok := db.streamKeys[key]
-	if !ok {
-		return
+// return existing stream group, or nil.
+func (db *RedisDB) streamGroup(key, group string) (*streamGroup, error) {
+	s, err := db.stream(key)
+	if err != nil || s == nil {
+		return nil, err
 	}
-	if len(stream) > n {
-		db.streamKeys[key] = stream[len(stream)-n:]
-	}
-}
-
-func (db *RedisDB) streamLen(key string) (int, error) {
-	stream, ok := db.streamKeys[key]
-	if !ok {
-		return 0, fmt.Errorf("stream %s not exists", key)
-	}
-	return len(stream), nil
-}
-
-func (db *RedisDB) streamGroupCreate(stream, group, id string) error {
-	streamData, ok := db.streamKeys[stream]
-	if !ok {
-		return fmt.Errorf("stream %s not exists", stream)
-	}
-
-	if _, ok := db.streamGroupKeys[stream]; !ok {
-		db.streamGroupKeys[stream] = streamGroupKey{}
-	}
-
-	if _, ok := db.streamGroupKeys[stream][group]; ok {
-		return errors.New("BUSYGROUP")
-	}
-
-	entry := streamGroupEntry{
-		pending: make([]pendingEntry, 0),
-	}
-
-	if id == "$" {
-		entry.lastID = streamData.lastID()
-	} else {
-		entry.lastID = id
-	}
-
-	db.streamGroupKeys[stream][group] = entry
-
-	return nil
-}
-
-func (db *RedisDB) streamReadgroup(stream, group, consumer, id string, count int) ([]StreamEntry, error) {
-	streamData, ok := db.streamKeys[stream]
-	if !ok {
-		return nil, errReadgroup(stream, group)
-	}
-
-	if _, ok := db.streamGroupKeys[stream]; !ok {
-		return nil, errReadgroup(stream, group)
-	}
-
-	groupData, ok := db.streamGroupKeys[stream][group]
-	if !ok {
-		return nil, errReadgroup(stream, group)
-	}
-
-	var res []StreamEntry
-
-	if id == ">" {
-		next := sort.Search(len(streamData), func(i int) bool {
-			return streamCmp(groupData.lastID, streamData[i].ID) < 0
-		})
-
-		if len(streamData[next:]) == 0 {
-			return nil, nil
-		}
-
-		if count == 0 || count > len(streamData[next:]) {
-			count = len(streamData[next:])
-		}
-
-		res = append(res, streamData[next:count]...)
-
-		for _, en := range res {
-			pending := pendingEntry{
-				consumer: consumer,
-				ID:       en.ID,
-			}
-			groupData.pending = append(groupData.pending, pending)
-		}
-
-		groupData.lastID = res[len(res)-1].ID
-		db.streamGroupKeys[stream][group] = groupData
-	} else {
-		next := sort.Search(len(groupData.pending), func(i int) bool {
-			return streamCmp(id, groupData.pending[i].ID) < 0
-		})
-
-		if len(groupData.pending[next:]) == 0 {
-			return nil, nil
-		}
-
-		for _, e := range groupData.pending[next:] {
-			if e.consumer != consumer {
-				continue
-			}
-
-			pos := sort.Search(len(streamData), func(i int) bool {
-				return streamCmp(e.ID, streamData[i].ID) == 0
-			})
-
-			// Not found
-			if pos == len(streamData) {
-				continue
-			}
-
-			res = append(res, streamData[pos])
-
-			// Truncate to allow faster next search, because next element in pending
-			// is greater, then current, so on for stream
-			streamData = streamData[pos:]
-		}
-	}
-
-	return res, nil
-}
-
-func (db *RedisDB) streamDelete(stream string, ids []string) (int, error) {
-	streamData, ok := db.streamKeys[stream]
-	if !ok {
-		return 0, nil
-	}
-
-	count := 0
-
-	for _, id := range ids {
-		if _, err := parseStreamID(id); err != nil {
-			return 0, errors.New(msgInvalidStreamID)
-		}
-
-		pos := sort.Search(len(streamData), func(i int) bool {
-			return streamCmp(id, streamData[i].ID) <= 0
-		})
-		if streamData[pos].ID != id {
-			continue
-		}
-
-		streamData = append(streamData[:pos], streamData[pos+1:]...)
-		count++
-	}
-
-	if count > 0 {
-		db.streamKeys[stream] = streamData
-	}
-
-	return count, nil
-}
-
-func (db *RedisDB) streamAck(stream, group string, ids []string) (int, error) {
-	if _, ok := db.streamGroupKeys[stream]; !ok {
-		return 0, nil
-	}
-
-	groupData, ok := db.streamGroupKeys[stream][group]
-	if !ok {
-		return 0, nil
-	}
-
-	count := 0
-
-	for _, id := range ids {
-		if _, err := parseStreamID(id); err != nil {
-			return 0, errors.New(msgInvalidStreamID)
-		}
-
-		pos := sort.Search(len(groupData.pending), func(i int) bool {
-			return streamCmp(id, groupData.pending[i].ID) == 0
-		})
-
-		if pos == len(groupData.pending) {
-			continue
-		}
-
-		groupData.pending = append(groupData.pending[:pos], groupData.pending[pos+1:]...)
-		count++
-	}
-
-	if count > 0 {
-		db.streamGroupKeys[stream][group] = groupData
-	}
-
-	return count, nil
+	return s.groups[group], nil
 }
 
 // fastForward proceeds the current timestamp with duration, works as a time machine

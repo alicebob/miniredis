@@ -38,6 +38,7 @@ const (
 	msgUnsupportedUnit    = "ERR unsupported unit provided. please use m, km, ft, mi"
 	msgNotFromScripts     = "This Redis command is not allowed from scripts"
 	msgXreadUnbalanced    = "ERR Unbalanced XREAD list of streams: for each stream key an ID or '$' must be specified."
+	msgXgroupKeyNotFound  = "ERR The XGROUP subcommand requires the key to exist. Note that for CREATE you may want to use the MKSTREAM option to create an empty stream automatically."
 )
 
 func errWrongNumber(cmd string) string {
@@ -49,6 +50,10 @@ func errLuaParseError(err error) string {
 }
 
 func errReadgroup(key, group string) error {
+	return fmt.Errorf("NOGROUP No such key '%s' or consumer group '%s'", key, group)
+}
+
+func errXreadgroup(key, group string) error {
 	return fmt.Errorf("NOGROUP No such key '%s' or consumer group '%s' in XREADGROUP with GROUP option", key, group)
 }
 

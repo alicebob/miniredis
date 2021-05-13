@@ -35,18 +35,17 @@ type setKey map[string]struct{}
 
 // RedisDB holds a single (numbered) Redis database.
 type RedisDB struct {
-	master          *Miniredis                // pointer to the lock in Miniredis
-	id              int                       // db id
-	keys            map[string]string         // Master map of keys with their type
-	stringKeys      map[string]string         // GET/SET &c. keys
-	hashKeys        map[string]hashKey        // MGET/MSET &c. keys
-	listKeys        map[string]listKey        // LPUSH &c. keys
-	setKeys         map[string]setKey         // SADD &c. keys
-	sortedsetKeys   map[string]sortedSet      // ZADD &c. keys
-	streamKeys      map[string]streamKey      // XADD &c. keys
-	streamGroupKeys map[string]streamGroupKey // XREADGROUP &c. keys
-	ttl             map[string]time.Duration  // effective TTL values
-	keyVersion      map[string]uint           // used to watch values
+	master        *Miniredis               // pointer to the lock in Miniredis
+	id            int                      // db id
+	keys          map[string]string        // Master map of keys with their type
+	stringKeys    map[string]string        // GET/SET &c. keys
+	hashKeys      map[string]hashKey       // MGET/MSET &c. keys
+	listKeys      map[string]listKey       // LPUSH &c. keys
+	setKeys       map[string]setKey        // SADD &c. keys
+	sortedsetKeys map[string]sortedSet     // ZADD &c. keys
+	streamKeys    map[string]*streamKey    // XADD &c. keys
+	ttl           map[string]time.Duration // effective TTL values
+	keyVersion    map[string]uint          // used to watch values
 }
 
 // Miniredis is a Redis server implementation.
@@ -99,18 +98,17 @@ func NewMiniRedis() *Miniredis {
 
 func newRedisDB(id int, m *Miniredis) RedisDB {
 	return RedisDB{
-		id:              id,
-		master:          m,
-		keys:            map[string]string{},
-		stringKeys:      map[string]string{},
-		hashKeys:        map[string]hashKey{},
-		listKeys:        map[string]listKey{},
-		setKeys:         map[string]setKey{},
-		sortedsetKeys:   map[string]sortedSet{},
-		streamKeys:      map[string]streamKey{},
-		streamGroupKeys: map[string]streamGroupKey{},
-		ttl:             map[string]time.Duration{},
-		keyVersion:      map[string]uint{},
+		id:            id,
+		master:        m,
+		keys:          map[string]string{},
+		stringKeys:    map[string]string{},
+		hashKeys:      map[string]hashKey{},
+		listKeys:      map[string]listKey{},
+		setKeys:       map[string]setKey{},
+		sortedsetKeys: map[string]sortedSet{},
+		streamKeys:    map[string]*streamKey{},
+		ttl:           map[string]time.Duration{},
+		keyVersion:    map[string]uint{},
 	}
 }
 
@@ -364,7 +362,7 @@ func (m *Miniredis) Dump() string {
 				r += fmt.Sprintf("%s%f: %s\n", indent, el.score, v(el.member))
 			}
 		case "stream":
-			for _, entry := range db.streamKeys[k] {
+			for _, entry := range db.streamKeys[k].entries {
 				r += fmt.Sprintf("%s%s\n", indent, entry.ID)
 				ev := entry.Values
 				for i := 0; i < len(ev)/2; i++ {
