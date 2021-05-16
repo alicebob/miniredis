@@ -3,7 +3,9 @@
 package main
 
 import (
+	"sync"
 	"testing"
+	"time"
 )
 
 func TestStream(t *testing.T) {
@@ -203,6 +205,8 @@ func TestStream(t *testing.T) {
 			c.Do("XREAD", "STREAMS", "ordplanets", "ordplanets2", "2", "0")
 			c.Do("XREAD", "STREAMS", "ordplanets", "ordplanets2", "0", "2")
 			c.Do("XREAD", "STREAMS", "ordplanets", "ordplanets2", "1", "3")
+			c.Do("XREAD", "STREAMS", "ordplanets", "ordplanets2", "0", "999")
+			c.Do("XREAD", "COUNT", "1", "STREAMS", "ordplanets", "ordplanets2", "0", "0")
 
 			// failure cases
 			c.Error("wrong number", "XREAD")
@@ -215,6 +219,30 @@ func TestStream(t *testing.T) {
 			c.Error("wrong number", "XREAD", "COUNT", "notint")
 			c.Error("wrong number", "XREAD", "COUNT", "10") // No streams
 			c.Error("stream ID", "XREAD", "STREAMS", "foo", "notint")
+		})
+
+		testRaw2(t, func(c, c2 *client) {
+			c.Do("XADD", "pl", "55-88", "name", "Mercury")
+			// something is available: doesn't block
+			c.Do("XREAD", "BLOCK", "10", "STREAMS", "pl", "0")
+			c.Do("XREAD", "BLOCK", "0", "STREAMS", "pl", "0")
+
+			// blocks
+			var wg sync.WaitGroup
+			wg.Add(1)
+			go func() {
+				c.Do("XREAD", "BLOCK", "1000", "STREAMS", "pl", "60")
+				wg.Done()
+			}()
+			time.Sleep(10 * time.Millisecond)
+			c2.Do("XADD", "pl", "60-1", "name", "Mercury")
+			wg.Wait()
+
+			// timeout
+			c.Do("XREAD", "BLOCK", "10", "STREAMS", "pl", "70")
+
+			c.Error("not an int", "XREAD", "BLOCK", "foo", "STREAMS", "pl", "0")
+			c.Error("negative", "XREAD", "BLOCK", "-12", "STREAMS", "pl", "0")
 		})
 	})
 }
