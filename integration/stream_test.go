@@ -382,6 +382,75 @@ func TestStreamGroup(t *testing.T) {
 		})
 	})
 
+	t.Run("XPENDING", func(t *testing.T) {
+		// summary mode
+		testRaw(t, func(c *client) {
+			c.Do("XGROUP", "CREATE", "planets", "processing", "$", "MKSTREAM")
+			c.Do("XADD", "planets", "4000-1", "name", "Mercury")
+			c.Do("XADD", "planets", "4000-2", "name", "Venus")
+			c.Do("XADD", "planets", "4000-3", "name", "not Pluto")
+			c.Do("XADD", "planets", "4000-4", "name", "Mars")
+			c.Do("XREADGROUP", "GROUP", "processing", "alice", "STREAMS", "planets", ">")
+			c.Do("XPENDING", "planets", "processing")
+			c.Do("XACK", "planets", "processing", "4000-4")
+			c.Do("XPENDING", "planets", "processing")
+			c.Do("XACK", "planets", "processing", "4000-1")
+			c.Do("XACK", "planets", "processing", "4000-2")
+			c.Do("XACK", "planets", "processing", "4000-3")
+			c.Do("XPENDING", "planets", "processing")
+
+			// more consumers
+			c.Do("XADD", "planets", "4000-5", "name", "Earth")
+			c.Do("XADD", "planets", "4000-6", "name", "Neptune")
+			c.Do("XREADGROUP", "GROUP", "processing", "alice", "COUNT", "1", "STREAMS", "planets", ">")
+			c.Do("XREADGROUP", "GROUP", "processing", "bob", "COUNT", "1", "STREAMS", "planets", ">")
+			c.Do("XPENDING", "planets", "processing")
+
+			// no entries doesn't show up in pending
+			c.Do("XREADGROUP", "GROUP", "processing", "eve", "COUNT", "1", "STREAMS", "planets", ">")
+			c.Do("XPENDING", "planets", "processing")
+
+			c.Error("consumer group", "XPENDING", "foo", "processing")
+			c.Error("consumer group", "XPENDING", "planets", "foo")
+
+			// error cases
+			c.Error("wrong number", "XPENDING")
+			c.Error("wrong number", "XPENDING", "planets")
+			c.Error("syntax", "XPENDING", "planets", "processing", "too many")
+		})
+
+		// full mode
+		testRaw(t, func(c *client) {
+			c.Do("XGROUP", "CREATE", "planets", "processing", "$", "MKSTREAM")
+			c.Do("XADD", "planets", "4000-1", "name", "Mercury")
+			c.Do("XADD", "planets", "4000-2", "name", "Venus")
+			c.Do("XADD", "planets", "4000-3", "name", "not Pluto")
+			c.Do("XADD", "planets", "4000-4", "name", "Mars")
+			c.Do("XREADGROUP", "GROUP", "processing", "alice", "STREAMS", "planets", ">")
+
+			c.DoLoosely("XPENDING", "planets", "processing", "-", "+", "999")
+			c.DoLoosely("XPENDING", "planets", "processing", "4000-2", "+", "999")
+			c.DoLoosely("XPENDING", "planets", "processing", "-", "4000-3", "999")
+			c.DoLoosely("XPENDING", "planets", "processing", "-", "+", "1")
+			c.DoLoosely("XPENDING", "planets", "processing", "-", "+", "0")
+			c.DoLoosely("XPENDING", "planets", "processing", "-", "+", "-1")
+
+			c.Do("XADD", "planets", "4000-5", "name", "Earth")
+			c.Do("XREADGROUP", "GROUP", "processing", "bob", "STREAMS", "planets", ">")
+			c.DoLoosely("XPENDING", "planets", "processing", "-", "+", "999")
+			c.DoLoosely("XPENDING", "planets", "processing", "-", "+", "999", "bob")
+			c.DoLoosely("XPENDING", "planets", "processing", "-", "+", "999", "eve")
+
+			// update delivery counts (which we can't test thanks to the time field)
+			c.Do("XREADGROUP", "GROUP", "processing", "bob", "STREAMS", "planets", "99")
+			c.DoLoosely("XPENDING", "planets", "processing", "-", "+", "999", "bob")
+
+			c.Error("Invalid", "XPENDING", "planets", "processing", "foo", "+", "999")
+			c.Error("Invalid", "XPENDING", "planets", "processing", "-", "foo", "999")
+			c.Error("not an integer", "XPENDING", "planets", "processing", "-", "+", "foo")
+		})
+	})
+
 	testRESP3(t, func(c *client) {
 		c.DoLoosely("XINFO", "STREAM", "foo")
 	})

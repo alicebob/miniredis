@@ -5,8 +5,10 @@ package miniredis
 import (
 	"errors"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/alicebob/miniredis/v2/server"
 )
@@ -23,6 +25,7 @@ func commandsStream(m *Miniredis) {
 	m.srv.Register("XREADGROUP", m.cmdXreadgroup)
 	m.srv.Register("XACK", m.cmdXack)
 	m.srv.Register("XDEL", m.cmdXdel)
+	m.srv.Register("XPENDING", m.cmdXpending)
 }
 
 // XADD
@@ -677,4 +680,174 @@ parsing:
 			}
 		}
 	})
+}
+
+// XPENDING
+func (m *Miniredis) cmdXpending(c *server.Peer, cmd string, args []string) {
+	if len(args) < 2 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
+	}
+
+	key, group, args := args[0], args[1], args[2:]
+	summary := true
+	if len(args) > 0 && strings.ToUpper(args[0]) == "IDLE" {
+		setDirty(c)
+		c.WriteError("ERR IDLE is unsupported")
+		return
+	}
+	var (
+		start, end string
+		count      int
+		consumer   *string
+	)
+	if len(args) >= 3 {
+		summary = false
+
+		start_, err := formatStreamRangeBound(args[0], true, false)
+		if err != nil {
+			c.WriteError(msgInvalidStreamID)
+			return
+		}
+		start = start_
+		end_, err := formatStreamRangeBound(args[1], false, false)
+		if err != nil {
+			c.WriteError(msgInvalidStreamID)
+			return
+		}
+		end = end_
+		n, err := strconv.Atoi(args[2]) // negative is allowed
+		if err != nil {
+			c.WriteError(msgInvalidInt)
+			return
+		}
+		count = n
+		args = args[3:]
+
+		if len(args) == 1 {
+			var c string
+			c, args = args[0], args[1:]
+			consumer = &c
+		}
+	}
+	if len(args) != 0 {
+		setDirty(c)
+		c.WriteError(msgSyntaxError)
+		return
+	}
+
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
+		db := m.db(ctx.selectedDB)
+		g, err := db.streamGroup(key, group)
+		if err != nil {
+			c.WriteError(err.Error())
+			return
+		}
+		if g == nil {
+			c.WriteError(errReadgroup(key, group).Error())
+			return
+		}
+
+		if summary {
+			writeXpendingSummary(c, *g)
+			return
+		}
+		writeXpending(m.effectiveNow(), c, *g, start, end, count, consumer)
+	})
+}
+
+func writeXpendingSummary(c *server.Peer, g streamGroup) {
+	if len(g.pending) == 0 {
+		c.WriteLen(4)
+		c.WriteInt(0)
+		c.WriteNull()
+		c.WriteNull()
+		c.WriteLen(-1)
+		return
+	}
+
+	// format:
+	//  - number of pending
+	//  - smallest ID
+	//  - highest ID
+	//  - all consumers with > 0 pending items
+	c.WriteLen(4)
+	c.WriteInt(len(g.pending))
+	c.WriteBulk(g.pending[0].id)
+	c.WriteBulk(g.pending[len(g.pending)-1].id)
+	cons := map[string]int{}
+	for id := range g.consumers {
+		cnt := g.pendingCount(id)
+		if cnt > 0 {
+			cons[id] = cnt
+		}
+	}
+	c.WriteLen(len(cons))
+	var ids []string
+	for id := range cons {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids) // be predicatable
+	for _, id := range ids {
+		c.WriteLen(2)
+		c.WriteBulk(id)
+		c.WriteBulk(strconv.Itoa(cons[id]))
+	}
+}
+
+func writeXpending(
+	now time.Time,
+	c *server.Peer,
+	g streamGroup,
+	start,
+	end string,
+	count int,
+	consumer *string,
+) {
+	if len(g.pending) == 0 || count < 0 {
+		c.WriteLen(-1)
+		return
+	}
+
+	// format, list of:
+	//  - message ID
+	//  - consumer
+	//  - milliseconds since delivery
+	//  - delivery count
+	type entry struct {
+		id       string
+		consumer string
+		millis   int
+		count    int
+	}
+	var res []entry
+	for _, p := range g.pending {
+		if len(res) >= count {
+			break
+		}
+		if consumer != nil && p.consumer != *consumer {
+			continue
+		}
+		if streamCmp(p.id, start) < 0 {
+			continue
+		}
+		if streamCmp(p.id, end) > 0 {
+			continue
+		}
+		res = append(res, entry{
+			id:       p.id,
+			consumer: p.consumer,
+			millis:   int(now.Sub(p.lastDelivery).Milliseconds()),
+			count:    p.deliveryCount,
+		})
+	}
+	c.WriteLen(len(res))
+	for _, e := range res {
+		c.WriteLen(4)
+		c.WriteBulk(e.id)
+		c.WriteBulk(e.consumer)
+		c.WriteInt(e.millis)
+		c.WriteInt(e.count)
+	}
 }

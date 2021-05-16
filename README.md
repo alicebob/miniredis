@@ -179,6 +179,7 @@ Implemented commands:
    - XREAD -- partly
    - XREADGROUP -- partly
    - XREVRANGE
+   - XPENDING
  - Scripting
    - EVAL
    - EVALSHA
