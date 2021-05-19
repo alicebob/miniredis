@@ -368,7 +368,7 @@ func (m *Miniredis) cmdXreadgroup(c *server.Peer, cmd string, args []string) {
 
 	if strings.ToUpper(args[0]) != "GROUP" {
 		setDirty(c)
-		c.WriteError("ERR incorrect command")
+		c.WriteError(msgSyntaxError)
 		return
 	}
 
@@ -408,7 +408,7 @@ parsing:
 			args = args[1:]
 
 			if len(args)%2 != 0 {
-				err = errors.New(errWrongNumber(cmd))
+				err = errors.New(msgXreadUnbalanced)
 				break parsing
 			}
 

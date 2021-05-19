@@ -513,7 +513,7 @@ func (c *client) Error(msg string, cmd string, args ...string) {
 		c.t.Errorf("expected (real)\n%q\nto contain %q", real, msg)
 	}
 	if !strings.Contains(mini, msg) {
-		c.t.Errorf("expected (mini)\n%q\nto contain %q", mini, msg)
+		c.t.Errorf("expected (mini)\n%q\nto contain %q\nreal:\n%s", mini, msg, real)
 	}
 	// if real != mini {
 	// c.t.Errorf("expected error:\n%q\ngot:\n%q", real, mini)

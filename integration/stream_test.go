@@ -377,6 +377,15 @@ func TestStreamGroup(t *testing.T) {
 			c.Error("stream ID", "XREADGROUP", "GROUP", "processing", "bob", "STREAMS", "planets", "foo")
 
 			// errors
+			c.Error("wrong number", "XREADGROUP")
+			c.Error("wrong number", "XREADGROUP", "GROUP")
+			c.Error("wrong number", "XREADGROUP", "foo")
+			c.Error("wrong number", "XREADGROUP", "GROUP", "foo")
+			c.Error("wrong number", "XREADGROUP", "GROUP", "foo", "bar")
+			c.Error("wrong number", "XREADGROUP", "GROUP", "foo", "bar", "ZTREAMZ")
+			c.Error("wrong number", "XREADGROUP", "GROUP", "foo", "bar", "STREAMS", "foo")
+			c.Error("Unbalanced", "XREADGROUP", "GROUP", "foo", "bar", "STREAMS", "foo", "bar", ">")
+			c.Error("syntax error", "XREADGROUP", "_____", "foo", "bar", "STREAMS", "foo", ">")
 			c.Error("consumer group", "XREADGROUP", "GROUP", "nosuch", "alice", "STREAMS", "planets", ">")
 			c.Error("consumer group", "XREADGROUP", "GROUP", "processing", "alice", "STREAMS", "nosuchplanets", ">")
 			c.Do("SET", "scalar", "bar")
