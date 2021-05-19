@@ -357,7 +357,7 @@ func (m *Miniredis) cmdXinfoStream(c *server.Peer, args []string) {
 }
 
 // XREADGROUP
-// NOACK is not supported, BLOCK is not supported
+// NOACK is not supported
 func (m *Miniredis) cmdXreadgroup(c *server.Peer, cmd string, args []string) {
 	// XREADGROUP GROUP group consumer STREAMS key ID
 	if len(args) < 6 {
@@ -438,59 +438,80 @@ parsing:
 		return
 	}
 
-	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
-		db := m.db(ctx.selectedDB)
+	for _, id := range opts.ids {
+		if id != `>` {
+			opts.block = false
+		}
+	}
 
-		res := map[string][]StreamEntry{}
-		for i, key := range opts.streams {
-			id := opts.ids[i]
-
-			g, err := db.streamGroup(key, opts.group)
+	if !opts.block {
+		withTx(m, c, func(c *server.Peer, ctx *connCtx) {
+			db := m.db(ctx.selectedDB)
+			res, err := xreadgroup(db, opts.group, opts.consumer, opts.streams, opts.ids, opts.count, m.effectiveNow())
 			if err != nil {
 				c.WriteError(err.Error())
 				return
 			}
-			if g == nil {
-				c.WriteError(errXreadgroup(key, opts.group).Error())
-				return
-			}
+			writeXread(c, opts.streams, res)
+		})
+		return
+	}
 
-			if _, err := parseStreamID(id); id != `>` && err != nil {
+	blocking(
+		m,
+		c,
+		opts.blockTimeout,
+		func(c *server.Peer, ctx *connCtx) bool {
+			db := m.db(ctx.selectedDB)
+			res, err := xreadgroup(db, opts.group, opts.consumer, opts.streams, opts.ids, opts.count, m.effectiveNow())
+			if err != nil {
 				c.WriteError(err.Error())
-				return
+				return true
 			}
-			entries := g.readGroup(m.effectiveNow(), opts.consumer, id, opts.count)
-			if id == `>` && len(entries) == 0 {
-				continue
+			if len(res) == 0 {
+				return false
 			}
-
-			res[key] = entries
-		}
-
-		if len(res) == 0 {
+			writeXread(c, opts.streams, res)
+			return true
+		},
+		func(c *server.Peer) { // timeout
 			c.WriteLen(-1)
-			return
-		}
-		c.WriteLen(len(res))
-		for _, stream := range opts.streams {
-			entries, ok := res[stream]
-			if !ok {
-				continue
-			}
+		},
+	)
+}
 
-			c.WriteLen(2)
-			c.WriteBulk(stream)
-			c.WriteLen(len(entries))
-			for _, entry := range entries {
-				c.WriteLen(2)
-				c.WriteBulk(entry.ID)
-				c.WriteLen(len(entry.Values))
-				for _, v := range entry.Values {
-					c.WriteBulk(v)
-				}
-			}
+func xreadgroup(
+	db *RedisDB,
+	group,
+	consumer string,
+	streams []string,
+	ids []string,
+	count int,
+	now time.Time,
+) (map[string][]StreamEntry, error) {
+	res := map[string][]StreamEntry{}
+	for i, key := range streams {
+		id := ids[i]
+
+		g, err := db.streamGroup(key, group)
+		if err != nil {
+			return nil, err
 		}
-	})
+		if g == nil {
+			return nil, errXreadgroup(key, group)
+		}
+
+		if _, err := parseStreamID(id); id != `>` && err != nil {
+			return nil, err
+		}
+		entries := g.readGroup(now, consumer, id, count)
+		if id == `>` && len(entries) == 0 {
+			continue
+		}
+
+		res[key] = entries
+	}
+	return res, nil
 }
 
 // XACK
