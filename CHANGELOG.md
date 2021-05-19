@@ -1,5 +1,14 @@
 ## Changelog
 
+### v2.14.4
+
+- fix BITPOS error (thanks @xiaoyuzdy)
+- small fixes for XREAD, XACK, and XDEL. Mostly error cases.
+- fix empty EXEC return type (thanks @ashanbrown)
+- fix XDEL (thanks @svakili and @yvesf)
+- fix FLUSHALL for streams (thanks @svakili)
+
+
 ### v2.14.3
 
 - fix problem where Lua code didn't set the selected DB
