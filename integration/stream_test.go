@@ -378,6 +378,15 @@ func TestStreamGroup(t *testing.T) {
 			c.Do("XREADGROUP", "GROUP", "processing", "bob", "STREAMS", "planets", "42-9")
 			c.Error("stream ID", "XREADGROUP", "GROUP", "processing", "bob", "STREAMS", "planets", "foo")
 
+			// NOACK
+			{
+				c.Do("XGROUP", "CREATE", "colors", "pr", "$", "MKSTREAM")
+				c.Do("XADD", "colors", "42-2", "name", "Green")
+				c.Do("XREADGROUP", "GROUP", "pr", "alice", "NOACK", "STREAMS", "colors", ">")
+				c.Do("XREADGROUP", "GROUP", "pr", "alice", "NOACK", "STREAMS", "colors", "0")
+				c.Do("XACK", "colors", "p", "42-2")
+			}
+
 			// errors
 			c.Error("wrong number", "XREADGROUP")
 			c.Error("wrong number", "XREADGROUP", "GROUP")

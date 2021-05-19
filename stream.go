@@ -244,6 +244,7 @@ func (g *streamGroup) readGroup(
 	consumerID,
 	id string,
 	count int,
+	noack bool,
 ) []StreamEntry {
 	if id == ">" {
 		// undelivered messages
@@ -256,13 +257,15 @@ func (g *streamGroup) readGroup(
 			msgs = msgs[:count]
 		}
 
-		for _, msg := range msgs {
-			g.pending = append(g.pending, pendingEntry{
-				id:            msg.ID,
-				consumer:      consumerID,
-				deliveryCount: 1,
-				lastDelivery:  now,
-			})
+		if !noack {
+			for _, msg := range msgs {
+				g.pending = append(g.pending, pendingEntry{
+					id:            msg.ID,
+					consumer:      consumerID,
+					deliveryCount: 1,
+					lastDelivery:  now,
+				})
+			}
 		}
 		g.consumers[consumerID] = consumer{}
 		g.lastID = msgs[len(msgs)-1].ID

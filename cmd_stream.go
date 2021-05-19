@@ -357,7 +357,6 @@ func (m *Miniredis) cmdXinfoStream(c *server.Peer, args []string) {
 }
 
 // XREADGROUP
-// NOACK is not supported
 func (m *Miniredis) cmdXreadgroup(c *server.Peer, cmd string, args []string) {
 	// XREADGROUP GROUP group consumer STREAMS key ID
 	if len(args) < 6 {
@@ -447,7 +446,16 @@ parsing:
 	if !opts.block {
 		withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 			db := m.db(ctx.selectedDB)
-			res, err := xreadgroup(db, opts.group, opts.consumer, opts.streams, opts.ids, opts.count, m.effectiveNow())
+			res, err := xreadgroup(
+				db,
+				opts.group,
+				opts.consumer,
+				opts.noack,
+				opts.streams,
+				opts.ids,
+				opts.count,
+				m.effectiveNow(),
+			)
 			if err != nil {
 				c.WriteError(err.Error())
 				return
@@ -463,7 +471,16 @@ parsing:
 		opts.blockTimeout,
 		func(c *server.Peer, ctx *connCtx) bool {
 			db := m.db(ctx.selectedDB)
-			res, err := xreadgroup(db, opts.group, opts.consumer, opts.streams, opts.ids, opts.count, m.effectiveNow())
+			res, err := xreadgroup(
+				db,
+				opts.group,
+				opts.consumer,
+				opts.noack,
+				opts.streams,
+				opts.ids,
+				opts.count,
+				m.effectiveNow(),
+			)
 			if err != nil {
 				c.WriteError(err.Error())
 				return true
@@ -484,6 +501,7 @@ func xreadgroup(
 	db *RedisDB,
 	group,
 	consumer string,
+	noack bool,
 	streams []string,
 	ids []string,
 	count int,
@@ -504,7 +522,7 @@ func xreadgroup(
 		if _, err := parseStreamID(id); id != `>` && err != nil {
 			return nil, err
 		}
-		entries := g.readGroup(now, consumer, id, count)
+		entries := g.readGroup(now, consumer, id, count, noack)
 		if id == `>` && len(entries) == 0 {
 			continue
 		}

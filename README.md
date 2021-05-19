@@ -176,8 +176,8 @@ Implemented commands:
    - XINFO STREAM -- partly
    - XLEN
    - XRANGE
-   - XREAD -- partly
-   - XREADGROUP -- partly
+   - XREAD
+   - XREADGROUP
    - XREVRANGE
    - XPENDING
  - Scripting

@@ -124,21 +124,21 @@ func TestStreamKeyGroup(t *testing.T) {
 
 	{
 		s.add("999-1", []string{"k", "v"}, now)
-		ls := g.readGroup(now, "consumer1", ">", 999)
+		ls := g.readGroup(now, "consumer1", ">", 999, false)
 		equals(t, 1, len(ls))
 	}
 
 	{
 		s.add("999-2", []string{"k", "v"}, now)
 		s.add("999-3", []string{"k", "v"}, now)
-		ls := g.readGroup(now, "consumer1", ">", 1)
+		ls := g.readGroup(now, "consumer1", ">", 1, false)
 		equals(t, 1, len(ls))
 		equalStr(t, "999-2", ls[0].ID)
 	}
 
 	// re-read unacked messages
 	{
-		ls := g.readGroup(now, "consumer1", "0-0", 999)
+		ls := g.readGroup(now, "consumer1", "0-0", 999, false)
 		equals(t, 2, len(ls))
 		equalStr(t, "999-1", ls[0].ID)
 		equalStr(t, "999-2", ls[1].ID)
@@ -149,7 +149,7 @@ func TestStreamKeyGroup(t *testing.T) {
 		n, err := g.ack([]string{"999-2"})
 		ok(t, err)
 		equals(t, 1, n)
-		ls := g.readGroup(now, "consumer1", "0-0", 999)
+		ls := g.readGroup(now, "consumer1", "0-0", 999, false)
 		equals(t, 1, len(ls))
 		equalStr(t, "999-1", ls[0].ID)
 	}
@@ -168,7 +168,7 @@ func TestStreamKeyGroup(t *testing.T) {
 		_, err := s.delete([]string{"123-123"}) // !
 		ok(t, err)
 
-		ls := g.readGroup(now, "consumer1", ">", 999)
+		ls := g.readGroup(now, "consumer1", ">", 999, false)
 		equals(t, 0, len(ls))
 	})
 }
