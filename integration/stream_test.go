@@ -366,6 +366,8 @@ func TestStreamGroup(t *testing.T) {
 			c.Do("XREADGROUP", "GROUP", "processing", "alice", "STREAMS", "planets", ">")
 			c.Do("XREADGROUP", "GROUP", "processing", "alice", "COUNT", "1", "STREAMS", "planets", ">")
 			c.Do("XREADGROUP", "GROUP", "processing", "alice", "COUNT", "999", "STREAMS", "planets", ">")
+			c.Do("XREADGROUP", "GROUP", "processing", "alice", "COUNT", "0", "STREAMS", "planets", ">")
+			c.Do("XREADGROUP", "GROUP", "processing", "alice", "COUNT", "-1", "STREAMS", "planets", ">")
 			c.Do("XACK", "planets", "processing", "42-1")
 			c.Do("XDEL", "planets", "42-1")
 			c.Do("XGROUP", "CREATE", "planets", "newcons", "$", "MKSTREAM")
@@ -376,12 +378,71 @@ func TestStreamGroup(t *testing.T) {
 			c.Do("XREADGROUP", "GROUP", "processing", "bob", "STREAMS", "planets", "42-9")
 			c.Error("stream ID", "XREADGROUP", "GROUP", "processing", "bob", "STREAMS", "planets", "foo")
 
+			// NOACK
+			{
+				c.Do("XGROUP", "CREATE", "colors", "pr", "$", "MKSTREAM")
+				c.Do("XADD", "colors", "42-2", "name", "Green")
+				c.Do("XREADGROUP", "GROUP", "pr", "alice", "NOACK", "STREAMS", "colors", ">")
+				c.Do("XREADGROUP", "GROUP", "pr", "alice", "NOACK", "STREAMS", "colors", "0")
+				c.Do("XACK", "colors", "p", "42-2")
+			}
+
 			// errors
+			c.Error("wrong number", "XREADGROUP")
+			c.Error("wrong number", "XREADGROUP", "GROUP")
+			c.Error("wrong number", "XREADGROUP", "foo")
+			c.Error("wrong number", "XREADGROUP", "GROUP", "foo")
+			c.Error("wrong number", "XREADGROUP", "GROUP", "foo", "bar")
+			c.Error("wrong number", "XREADGROUP", "GROUP", "foo", "bar", "ZTREAMZ")
+			c.Error("wrong number", "XREADGROUP", "GROUP", "foo", "bar", "STREAMS", "foo")
+			c.Error("Unbalanced", "XREADGROUP", "GROUP", "foo", "bar", "STREAMS", "foo", "bar", ">")
+			c.Error("syntax error", "XREADGROUP", "_____", "foo", "bar", "STREAMS", "foo", ">")
 			c.Error("consumer group", "XREADGROUP", "GROUP", "nosuch", "alice", "STREAMS", "planets", ">")
 			c.Error("consumer group", "XREADGROUP", "GROUP", "processing", "alice", "STREAMS", "nosuchplanets", ">")
 			c.Do("SET", "scalar", "bar")
 			c.Error("wrong kind", "XGROUP", "CREATE", "scalar", "processing", "$", "MKSTREAM")
 			c.Error("BUSYGROUP", "XGROUP", "CREATE", "planets", "processing", "$", "MKSTREAM")
+		})
+
+		testRaw2(t, func(c, c2 *client) {
+			c.Do("XGROUP", "CREATE", "pl", "processing", "$", "MKSTREAM")
+			c.Do("XADD", "pl", "55-88", "name", "Mercury")
+			// something is available: doesn't block
+			c.Do("XREADGROUP", "GROUP", "processing", "foo", "BLOCK", "10", "STREAMS", "pl", ">")
+			// c.Do("XREADGROUP", "GROUP", "processing", "foo", "BLOCK", "0", "STREAMS", "pl", ">")
+
+			// blocks
+			{
+				var wg sync.WaitGroup
+				wg.Add(1)
+				go func() {
+					c.Do("XREADGROUP", "GROUP", "processing", "foo", "BLOCK", "999999", "STREAMS", "pl", ">")
+					wg.Done()
+				}()
+				time.Sleep(50 * time.Millisecond)
+				c2.Do("XADD", "pl", "60-1", "name", "Mercury")
+				wg.Wait()
+			}
+
+			// timeout
+			{
+				c.Do("XREADGROUP", "GROUP", "processing", "foo", "BLOCK", "10", "STREAMS", "pl", ">")
+			}
+
+			// block is ignored if id isn't ">"
+			{
+				c.Do("XREADGROUP", "GROUP", "processing", "foo", "BLOCK", "9999999999", "STREAMS", "pl", "8")
+			}
+
+			// block is ignored if _any_ id isn't ">"
+			{
+				c.Do("XGROUP", "CREATE", "pl2", "processing", "$", "MKSTREAM")
+				c.Do("XREADGROUP", "GROUP", "processing", "foo", "BLOCK", "9999999999", "STREAMS", "pl", "pl2", "8", ">")
+			}
+
+			c.Error("not an int", "XREADGROUP", "GROUP", "foo", "bar", "BLOCK", "foo", "STREAMS", "foo", ">")
+			c.Error("No such", "XREADGROUP", "GROUP", "foo", "bar", "BLOCK", "999999", "STREAMS", "pl", "invalid")
+			c.Error("negative", "XREADGROUP", "GROUP", "foo", "bar", "BLOCK", "-1", "STREAMS", "foo", ">")
 		})
 	})
 
