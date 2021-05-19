@@ -45,14 +45,14 @@ func TestStream(t *testing.T) {
 
 	t.Run("direct usage", func(t *testing.T) {
 		_, err := s.XAdd("s1", "0-0", []string{"name", "foo"})
-		mustFail(t, err, errZeroStreamValue.Error())
+		mustFail(t, err, msgStreamIDZero)
 
 		id, err := s.XAdd("s1", "12345-67", []string{"name", "bar"})
 		ok(t, err)
 		equals(t, "12345-67", id)
 
 		_, err = s.XAdd("s1", "12345-0", []string{"name", "foo"})
-		mustFail(t, err, errInvalidStreamValue.Error())
+		mustFail(t, err, msgStreamIDTooSmall)
 
 		id, err = s.XAdd("s1", "*", []string{"name", "baz"})
 		ok(t, err)
@@ -443,7 +443,7 @@ func TestStreamInfo(t *testing.T) {
 
 	mustDo(t, c,
 		"XINFO", "STREAM", "planets",
-		proto.Error("ERR stream planets not exists"),
+		proto.Error("ERR no such key"),
 	)
 
 	mustDo(t, c,
@@ -468,7 +468,7 @@ func TestStreamGroup(t *testing.T) {
 
 	mustDo(t, c,
 		"XGROUP", "CREATE", "s", "processing", "$",
-		proto.Error("ERR stream s not exists"),
+		proto.Error(msgXgroupKeyNotFound),
 	)
 
 	mustOK(t, c,
@@ -552,7 +552,15 @@ func TestStreamDelete(t *testing.T) {
 	mustDo(t, c,
 		"XREADGROUP", "GROUP", "processing", "alice", "STREAMS", "planets", ">",
 		proto.Array(
-			proto.Array(proto.String("planets"), proto.Array(proto.Array(proto.String("0-1"), proto.Strings("name", "Mercury")))),
+			proto.Array(
+				proto.String("planets"),
+				proto.Array(
+					proto.Array(
+						proto.String("0-1"),
+						proto.Strings("name", "Mercury"),
+					),
+				),
+			),
 		),
 	)
 
@@ -569,8 +577,14 @@ func TestStreamDelete(t *testing.T) {
 		"XDEL", "planets", "0-2",
 	)
 
-	mustNilList(t, c,
+	mustDo(t, c,
 		"XREADGROUP", "GROUP", "processing", "alice", "STREAMS", "planets", "0-0",
+		proto.Array(
+			proto.Array(
+				proto.String("planets"),
+				proto.Array(),
+			),
+		),
 	)
 }
 
@@ -602,8 +616,124 @@ func TestStreamAck(t *testing.T) {
 	must1(t, c,
 		"XACK", "planets", "processing", "0-1",
 	)
-
-	mustNilList(t, c,
+	mustDo(t, c,
 		"XREADGROUP", "GROUP", "processing", "alice", "STREAMS", "planets", "0-0",
+		proto.Array(
+			proto.Array(
+				proto.String("planets"),
+				proto.Array(),
+			),
+		),
 	)
+}
+
+// Test XPENDING
+func TestStreamXpending(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := proto.Dial(s.Addr())
+	ok(t, err)
+	defer c.Close()
+	now := time.Now()
+	s.SetTime(now)
+
+	mustOK(t, c, "XGROUP", "CREATE", "planets", "processing", "$", "MKSTREAM")
+	mustDo(t, c, "XADD", "planets", "99-1", "name", "Mercury",
+		proto.String("99-1"),
+	)
+	mustDo(t, c,
+		"XREADGROUP", "GROUP", "processing", "alice", "STREAMS", "planets", ">",
+		proto.Array(
+			proto.Array(
+				proto.String("planets"),
+				proto.Array(proto.Array(proto.String("99-1"), proto.Strings("name", "Mercury"))),
+			),
+		),
+	)
+
+	t.Run("summary mode", func(t *testing.T) {
+		mustDo(t, c,
+			"XPENDING", "planets", "processing",
+			proto.Array(
+				proto.Int(1),
+				proto.String("99-1"),
+				proto.String("99-1"),
+				proto.Array(
+					proto.Array(proto.String("alice"), proto.String("1")),
+				),
+			),
+		)
+		mustDo(t, c,
+			"XPENDING", "nosuch", "processing",
+			proto.Error("NOGROUP No such key 'nosuch' or consumer group 'processing'"),
+		)
+		mustDo(t, c,
+			"XPENDING", "planets", "nosuch",
+			proto.Error("NOGROUP No such key 'planets' or consumer group 'nosuch'"),
+		)
+	})
+
+	t.Run("full mode", func(t *testing.T) {
+		s.SetTime(now.Add(3 * time.Second))
+		mustDo(t, c,
+			"XPENDING", "planets", "processing", "-", "+", "999",
+			proto.Array(
+				proto.Array(
+					proto.String("99-1"),
+					proto.String("alice"),
+					proto.Int(3000),
+					proto.Int(1),
+				),
+			),
+		)
+		mustDo(t, c,
+			"XPENDING", "planets", "processing", "-", "+", "-99",
+			proto.NilList,
+		)
+
+		// Increase delivery count
+		s.SetTime(now.Add(5 * time.Second))
+		mustDo(t, c,
+			"XREADGROUP", "GROUP", "processing", "alice", "STREAMS", "planets", "99-0",
+			proto.Array(
+				proto.Array(proto.String("planets"), proto.Array(proto.Array(proto.String("99-1"), proto.Strings("name", "Mercury")))),
+			),
+		)
+		s.SetTime(now.Add(9 * time.Second))
+		mustDo(t, c,
+			"XPENDING", "planets", "processing", "-", "+", "999",
+			proto.Array(
+				proto.Array(
+					proto.String("99-1"),
+					proto.String("alice"),
+					proto.Int(4000),
+					proto.Int(2),
+				),
+			),
+		)
+	})
+
+	t.Run("errors", func(t *testing.T) {
+		mustDo(t, c,
+			"XPENDING",
+			proto.Error("ERR wrong number of arguments for 'xpending' command"),
+		)
+		mustDo(t, c,
+			"XPENDING", "planets",
+			proto.Error("ERR wrong number of arguments for 'xpending' command"),
+		)
+		mustDo(t, c,
+			"XPENDING", "planets", "processing", "toomany",
+			proto.Error("ERR syntax error"),
+		)
+		mustDo(t, c,
+			"XPENDING", "planets", "processing", "-", "+", "cons", "nine",
+			proto.Error("ERR value is not an integer or out of range"),
+		)
+		mustDo(t, c,
+			"XPENDING", "planets", "processing", "-", "+", "99", "cons", "foo",
+			proto.Error("ERR syntax error"),
+		)
+	})
 }

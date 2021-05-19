@@ -11,3 +11,4 @@ wget http://download.redis.io/releases/redis-${VERSION}.tar.gz -O ./redis.tar.gz
 tar -xf ./redis.tar.gz
 (cd ./redis-${VERSION}/src/ && make BUILD_TLS=yes)
 cp ./redis-${VERSION}/src/redis-server .
+cp ./redis-${VERSION}/src/redis-cli .

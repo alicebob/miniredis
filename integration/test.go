@@ -481,7 +481,7 @@ func (c *client) DoRounded(rounded int, cmd string, args ...string) {
 	}
 }
 
-// both must return an error, which much Contain() the message.
+// both must return an error, which much both Contain() the message.
 func (c *client) Error(msg string, cmd string, args ...string) {
 	c.t.Helper()
 
@@ -510,11 +510,14 @@ func (c *client) Error(msg string, cmd string, args ...string) {
 	}
 
 	if !strings.Contains(real, msg) {
-		c.t.Errorf("expected (real) %q to contain %q", real, msg)
+		c.t.Errorf("expected (real)\n%q\nto contain %q", real, msg)
 	}
 	if !strings.Contains(mini, msg) {
-		c.t.Errorf("expected (mini)\n%q\nto contain %q\nreal:\n%q", mini, msg, real)
+		c.t.Errorf("expected (mini)\n%q\nto contain %q", mini, msg)
 	}
+	// if real != mini {
+	// c.t.Errorf("expected error:\n%q\ngot:\n%q", real, mini)
+	// }
 }
 
 // only receive a command, which can't be an error

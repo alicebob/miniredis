@@ -678,11 +678,15 @@ func (db *RedisDB) XAdd(k string, id string, values []string) (string, error) {
 	defer db.master.Unlock()
 	defer db.master.signal.Broadcast()
 
-	if db.exists(k) && db.t(k) != "stream" {
-		return "", ErrWrongType
+	s, err := db.stream(k)
+	if err != nil {
+		return "", err
+	}
+	if s == nil {
+		s, _ = db.newStream(k)
 	}
 
-	return db.streamAdd(k, id, values)
+	return s.add(id, values, db.master.effectiveNow())
 }
 
 // Stream returns a slice of stream entries. Oldest first.
@@ -691,17 +695,18 @@ func (m *Miniredis) Stream(k string) ([]StreamEntry, error) {
 }
 
 // Stream returns a slice of stream entries. Oldest first.
-func (db *RedisDB) Stream(k string) ([]StreamEntry, error) {
+func (db *RedisDB) Stream(key string) ([]StreamEntry, error) {
 	db.master.Lock()
 	defer db.master.Unlock()
 
-	if !db.exists(k) {
-		return nil, ErrKeyNotFound
+	s, err := db.stream(key)
+	if err != nil {
+		return nil, err
 	}
-	if db.t(k) != "stream" {
-		return nil, ErrWrongType
+	if s == nil {
+		return nil, nil
 	}
-	return db.stream(k), nil
+	return s.entries, nil
 }
 
 // Publish a message to subscribers. Returns the number of receivers.
