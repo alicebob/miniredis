@@ -366,21 +366,26 @@ func (m *Miniredis) cmdXreadgroup(c *server.Peer, cmd string, args []string) {
 		return
 	}
 
+	var opts struct {
+		group        string
+		consumer     string
+		count        int
+		noack        bool
+		streams      []string
+		ids          []string
+		block        bool
+		blockTimeout time.Duration
+	}
+
 	if strings.ToUpper(args[0]) != "GROUP" {
 		setDirty(c)
 		c.WriteError(msgSyntaxError)
 		return
 	}
 
-	group, consumer, args := args[1], args[2], args[3:]
+	opts.group, opts.consumer, args = args[1], args[2], args[3:]
 
-	var (
-		count   int
-		err     error
-		streams []string
-		ids     []string
-	)
-
+	var err error
 parsing:
 	for len(args) > 0 {
 		switch strings.ToUpper(args[0]) {
@@ -390,20 +395,21 @@ parsing:
 				break parsing
 			}
 
-			count, err = strconv.Atoi(args[1])
+			opts.count, err = strconv.Atoi(args[1])
 			if err != nil {
 				break parsing
 			}
 
 			args = args[2:]
 		case "BLOCK":
-			if len(args) < 2 {
-				err = errors.New(errWrongNumber(cmd))
+			err = parseBlock(cmd, args, &opts.block, &opts.blockTimeout)
+			if err != nil {
 				break parsing
 			}
 			args = args[2:]
 		case "NOACK":
 			args = args[1:]
+			opts.noack = true
 		case "STREAMS":
 			args = args[1:]
 
@@ -412,7 +418,7 @@ parsing:
 				break parsing
 			}
 
-			streams, ids = args[0:len(args)/2], args[len(args)/2:]
+			opts.streams, opts.ids = args[0:len(args)/2], args[len(args)/2:]
 			break parsing
 		default:
 			err = fmt.Errorf("ERR incorrect argument %s", args[0])
@@ -426,7 +432,7 @@ parsing:
 		return
 	}
 
-	if len(streams) == 0 || len(ids) == 0 {
+	if len(opts.streams) == 0 || len(opts.ids) == 0 {
 		setDirty(c)
 		c.WriteError(errWrongNumber(cmd))
 		return
@@ -436,16 +442,16 @@ parsing:
 		db := m.db(ctx.selectedDB)
 
 		res := map[string][]StreamEntry{}
-		for i, key := range streams {
-			id := ids[i]
+		for i, key := range opts.streams {
+			id := opts.ids[i]
 
-			g, err := db.streamGroup(key, group)
+			g, err := db.streamGroup(key, opts.group)
 			if err != nil {
 				c.WriteError(err.Error())
 				return
 			}
 			if g == nil {
-				c.WriteError(errXreadgroup(key, group).Error())
+				c.WriteError(errXreadgroup(key, opts.group).Error())
 				return
 			}
 
@@ -453,7 +459,7 @@ parsing:
 				c.WriteError(err.Error())
 				return
 			}
-			entries := g.readGroup(m.effectiveNow(), consumer, id, count)
+			entries := g.readGroup(m.effectiveNow(), opts.consumer, id, opts.count)
 			if id == `>` && len(entries) == 0 {
 				continue
 			}
@@ -466,7 +472,7 @@ parsing:
 			return
 		}
 		c.WriteLen(len(res))
-		for _, stream := range streams {
+		for _, stream := range opts.streams {
 			entries, ok := res[stream]
 			if !ok {
 				continue
@@ -582,21 +588,10 @@ parsing:
 			}
 			args = args[2:]
 		case "BLOCK":
-			if len(args) < 2 {
-				err = errors.New(errWrongNumber(cmd))
+			err = parseBlock(cmd, args, &opts.block, &opts.blockTimeout)
+			if err != nil {
 				break parsing
 			}
-			opts.block = true
-			ms, nerr := strconv.Atoi(args[1])
-			if nerr != nil {
-				err = errors.New(msgInvalidInt)
-				break parsing
-			}
-			if ms < 0 {
-				err = errors.New("ERR timeout is negative")
-				break parsing
-			}
-			opts.blockTimeout = time.Millisecond * time.Duration(ms)
 			args = args[2:]
 		case "STREAMS":
 			args = args[1:]
@@ -885,4 +880,20 @@ func writeXpending(
 		c.WriteInt(e.millis)
 		c.WriteInt(e.count)
 	}
+}
+
+func parseBlock(cmd string, args []string, block *bool, timeout *time.Duration) error {
+	if len(args) < 2 {
+		return errors.New(errWrongNumber(cmd))
+	}
+	(*block) = true
+	ms, err := strconv.Atoi(args[1])
+	if err != nil {
+		return errors.New(msgInvalidInt)
+	}
+	if ms < 0 {
+		return errors.New("ERR timeout is negative")
+	}
+	(*timeout) = time.Millisecond * time.Duration(ms)
+	return nil
 }
