@@ -42,6 +42,7 @@ type RedisDB struct {
 	hashKeys      map[string]hashKey       // MGET/MSET &c. keys
 	listKeys      map[string]listKey       // LPUSH &c. keys
 	setKeys       map[string]setKey        // SADD &c. keys
+	hllKeys       map[string]*hll          // PFADD &c. keys
 	sortedsetKeys map[string]sortedSet     // ZADD &c. keys
 	streamKeys    map[string]*streamKey    // XADD &c. keys
 	ttl           map[string]time.Duration // effective TTL values
@@ -174,6 +175,7 @@ func (m *Miniredis) start(s *server.Server) error {
 	commandsGeo(m)
 	commandsCluster(m)
 	commandsCommand(m)
+	commandsHll(m)
 
 	return nil
 }
