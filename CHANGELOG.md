@@ -1,5 +1,11 @@
 ## Changelog
 
+### v2.14.5
+
+- added XPENDING
+- support for BLOCK option in XREAD and XREADGROUP
+
+
 ### v2.14.4
 
 - fix BITPOS error (thanks @xiaoyuzdy)
