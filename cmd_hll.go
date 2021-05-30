@@ -5,8 +5,8 @@ import "github.com/alicebob/miniredis/v2/server"
 // commandsHll handles all hll related operations.
 func commandsHll(m *Miniredis) {
 	m.srv.Register("PFADD", m.cmdPfadd)
-	m.srv.Register("PFCOUNT", m.cmdPfadd)
-	m.srv.Register("PFMERGE", m.cmdPfadd)
+	m.srv.Register("PFCOUNT", m.cmdPfcount)
+	m.srv.Register("PFMERGE", m.cmdPfmerge)
 }
 
 // PFADD

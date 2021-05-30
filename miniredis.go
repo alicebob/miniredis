@@ -106,6 +106,7 @@ func newRedisDB(id int, m *Miniredis) RedisDB {
 		hashKeys:      map[string]hashKey{},
 		listKeys:      map[string]listKey{},
 		setKeys:       map[string]setKey{},
+		hllKeys:       map[string]*hll{},
 		sortedsetKeys: map[string]sortedSet{},
 		streamKeys:    map[string]*streamKey{},
 		ttl:           map[string]time.Duration{},
@@ -370,6 +371,10 @@ func (m *Miniredis) Dump() string {
 				for i := 0; i < len(ev)/2; i++ {
 					r += fmt.Sprintf("%s%s%s: %s\n", indent, indent, v(ev[2*i]), v(ev[2*i+1]))
 				}
+			}
+		case "hll":
+			for _, entry := range db.hllKeys {
+				r += fmt.Sprintf("%s%s\n", indent, v(string(entry.Bytes())))
 			}
 		default:
 			r += fmt.Sprintf("%s(a %s, fixme!)\n", indent, t)

@@ -70,6 +70,8 @@ func (db *RedisDB) move(key string, to *RedisDB) bool {
 		to.sortedsetKeys[key] = db.sortedsetKeys[key]
 	case "stream":
 		to.streamKeys[key] = db.streamKeys[key]
+	case "hll":
+		to.hllKeys[key] = db.hllKeys[key]
 	default:
 		panic("unhandled key type")
 	}
@@ -96,6 +98,8 @@ func (db *RedisDB) rename(from, to string) {
 		db.sortedsetKeys[to] = db.sortedsetKeys[from]
 	case "stream":
 		db.streamKeys[to] = db.streamKeys[from]
+	case "hll":
+		db.hllKeys[to] = db.hllKeys[from]
 	default:
 		panic("missing case")
 	}
@@ -131,6 +135,8 @@ func (db *RedisDB) del(k string, delTTL bool) {
 		delete(db.sortedsetKeys, k)
 	case "stream":
 		delete(db.streamKeys, k)
+	case "hll":
+		delete(db.hllKeys, k)
 	default:
 		panic("Unknown key type: " + t)
 	}

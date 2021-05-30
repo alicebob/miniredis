@@ -748,3 +748,45 @@ func (m *Miniredis) PubSubNumPat() int {
 
 	return countPsubs(m.allSubscribers())
 }
+
+// PfAdd adds keys to a hll. Returns the flag which equals to 1 if the inner hll value has been changed.
+func (m *Miniredis) PfAdd(k string, elems ...string) (int, error) {
+	return m.DB(m.selectedDB).HllAdd(k, elems...)
+}
+
+// HllAdd adds keys to a hll. Returns the flag which equals to true if the inner hll value has been changed.
+func (db *RedisDB) HllAdd(k string, elems ...string) (int, error) {
+	db.master.Lock()
+	defer db.master.Unlock()
+
+	if db.exists(k) && db.t(k) != "hll" {
+		return 0, ErrWrongType
+	}
+	return db.hllAdd(k, elems...), nil
+}
+
+// PfCount returns an estimation of the amount of elements previously added to a hll.
+func (m *Miniredis) PfCount(keys ...string) (int, error) {
+	return m.DB(m.selectedDB).HllCount(keys...)
+}
+
+// HllCount returns an estimation of the amount of elements previously added to a hll.
+func (db *RedisDB) HllCount(keys ...string) (int, error) {
+	db.master.Lock()
+	defer db.master.Unlock()
+
+	return db.hllCount(keys)
+}
+
+// PfMerge merges all the input hlls into a hll under destKey key.
+func (m *Miniredis) PfMerge(destKey string, sourceKeys ...string) error {
+	return m.DB(m.selectedDB).HllMerge(destKey, sourceKeys...)
+}
+
+// HllMerge merges all the input hlls into a hll under destKey key.
+func (db *RedisDB) HllMerge(destKey string, sourceKeys ...string) error {
+	db.master.Lock()
+	defer db.master.Unlock()
+
+	return db.hllMerge(append([]string{destKey}, sourceKeys...))
+}
