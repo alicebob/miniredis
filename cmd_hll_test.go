@@ -218,7 +218,7 @@ func TestPfmerge(t *testing.T) {
 		equals(t, sum, 8)
 
 		s.PfMerge("h8", "h5", "h6")
-		sum, err = s.PfCount("h8") // h7 is empty
+		sum, err = s.PfCount("h8")
 		ok(t, err)
 		equals(t, sum, 7) // common elem is counted once
 	})
