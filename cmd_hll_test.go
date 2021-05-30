@@ -1,7 +1,6 @@
 package miniredis
 
 import (
-	"math/rand"
 	"testing"
 
 	"github.com/alicebob/miniredis/v2/proto"
@@ -134,16 +133,6 @@ func TestPfcount(t *testing.T) {
 	})
 }
 
-const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-
-func randomStr(length int) string {
-	b := make([]byte, length)
-	for i := range b {
-		b[i] = letters[rand.Intn(len(letters))]
-	}
-	return string(b)
-}
-
 // Test PFMERGE
 func TestPfmerge(t *testing.T) {
 	s, err := Run()
@@ -153,7 +142,7 @@ func TestPfmerge(t *testing.T) {
 	ok(t, err)
 	defer c.Close()
 
-	// Add 100 unique random values to h1
+	// Add 100 unique random values to h1 and 50 of these 100 to h2
 	for i := 0; i < 100; i++ {
 		value := randomStr(10)
 		mustDo(t, c,
