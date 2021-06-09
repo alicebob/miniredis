@@ -314,16 +314,20 @@ func (m *Miniredis) cmdXinfo(c *server.Peer, cmd string, args []string) {
 		c.WriteError(errWrongNumber(cmd))
 		return
 	}
-	switch strings.ToUpper(args[0]) {
+	subCmd, args := strings.ToUpper(args[0]), args[1:]
+	switch subCmd {
 	case "STREAM":
-		m.cmdXinfoStream(c, args[1:])
+		m.cmdXinfoStream(c, args)
 	case "CONSUMERS", "GROUPS", "HELP":
 		err := fmt.Sprintf("'XINFO %s' not supported", strings.Join(args, " "))
 		setDirty(c)
 		c.WriteError(err)
 	default:
 		setDirty(c)
-		c.WriteError("ERR syntax error, try 'XINFO HELP'")
+		c.WriteError(fmt.Sprintf(
+			"ERR Unknown subcommand or wrong number of arguments for '%s'. Try XINFO HELP.",
+			subCmd,
+		))
 	}
 
 }
