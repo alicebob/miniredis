@@ -416,7 +416,7 @@ func TestSrandmember(t *testing.T) {
 		)
 		mustDo(t, c,
 			"SRANDMEMBER", "q", "1",
-			proto.StringSet("aap"),
+			proto.Strings("aap"),
 		)
 	})
 }

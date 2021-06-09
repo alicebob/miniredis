@@ -487,7 +487,7 @@ func (m *Miniredis) cmdSrandmember(c *server.Peer, cmd string, args []string) {
 			c.WriteBulk(members[0])
 			return
 		}
-		c.WriteSetLen(count)
+		c.WriteLen(count)
 		for i := range make([]struct{}, count) {
 			c.WriteBulk(members[i])
 		}
