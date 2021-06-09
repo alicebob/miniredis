@@ -118,51 +118,57 @@ func TestSetSMove(t *testing.T) {
 }
 
 func TestSetSpop(t *testing.T) {
-	testRaw(t, func(c *client) {
-		// Without count argument
-		c.Do("SADD", "s", "aap")
-		c.Do("SPOP", "s")
-		c.Do("EXISTS", "s")
+	t.Run("without count", func(t *testing.T) {
+		testRaw(t, func(c *client) {
+			c.Do("SADD", "s", "aap")
+			c.Do("SPOP", "s")
+			c.Do("EXISTS", "s")
 
-		c.Do("SPOP", "nosuch")
+			c.Do("SPOP", "nosuch")
 
-		c.Do("SADD", "s", "aap")
-		c.Do("SADD", "s", "noot")
-		c.Do("SADD", "s", "mies")
-		c.Do("SADD", "s", "noot")
-		c.Do("SCARD", "s")
-		c.DoLoosely("SMEMBERS", "s")
+			c.Do("SADD", "s", "aap")
+			c.Do("SADD", "s", "noot")
+			c.Do("SADD", "s", "mies")
+			c.Do("SADD", "s", "noot")
+			c.Do("SCARD", "s")
+			c.DoLoosely("SMEMBERS", "s")
 
-		// failure cases
-		c.Error("wrong number", "SPOP")
-		c.Do("SADD", "s", "aap")
-		c.Error("not an integer", "SPOP", "s", "s2")
-		c.Error("not an integer", "SPOP", "nosuch", "s2")
-		// Wrong type
-		c.Do("SET", "str", "I am a string")
-		c.Error("wrong kind", "SPOP", "str")
+			c.Do("SPOP", "s", "0")
+
+			// failure cases
+			c.Error("wrong number", "SPOP")
+			c.Do("SADD", "s", "aap")
+			c.Error("out of range", "SPOP", "s", "s2")
+			c.Error("out of range", "SPOP", "s", "-1")
+			c.Error("out of range", "SPOP", "nosuch", "s2")
+			// Wrong type
+			c.Do("SET", "str", "I am a string")
+			c.Error("wrong kind", "SPOP", "str")
+		})
 	})
 
-	testRaw(t, func(c *client) {
-		// With count argument
-		c.Do("SADD", "s", "aap")
-		c.Do("SADD", "s", "noot")
-		c.Do("SADD", "s", "mies")
-		c.Do("SADD", "s", "vuur")
-		c.DoLoosely("SPOP", "s", "2")
-		c.Do("EXISTS", "s")
-		c.Do("SCARD", "s")
+	t.Run("with count", func(t *testing.T) {
+		testRaw(t, func(c *client) {
+			c.Do("SADD", "s", "aap")
+			c.Do("SADD", "s", "noot")
+			c.Do("SADD", "s", "mies")
+			c.Do("SADD", "s", "vuur")
+			c.DoLoosely("SPOP", "s", "2")
+			c.Do("EXISTS", "s")
+			c.Do("SCARD", "s")
 
-		c.DoLoosely("SPOP", "s", "200")
-		c.Do("SPOP", "s", "1")
-		c.Do("SCARD", "s")
+			c.DoLoosely("SPOP", "s", "200")
+			c.Do("SPOP", "s", "1")
+			c.Do("SPOP", "s", "0")
+			c.Do("SCARD", "s")
 
-		c.Do("SPOP", "nosuch", "1")
-		c.Do("SPOP", "nosuch", "0")
+			c.Do("SPOP", "nosuch", "1")
+			c.Do("SPOP", "nosuch", "0")
 
-		// failure cases
-		c.Error("not an integer", "SPOP", "foo", "one")
-		c.Error("out of range", "SPOP", "foo", "-4")
+			// failure cases
+			c.Error("out of range", "SPOP", "foo", "one")
+			c.Error("out of range", "SPOP", "foo", "-4")
+		})
 	})
 }
 
