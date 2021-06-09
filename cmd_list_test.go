@@ -195,13 +195,12 @@ func TestLpop(t *testing.T) {
 	ok(t, err)
 	defer c.Close()
 
-	mustDo(t, c,
-		"LPUSH", "l", "aap", "noot", "mies",
-		proto.Int(3),
-	)
+	t.Run("single", func(t *testing.T) {
+		mustDo(t, c,
+			"LPUSH", "l", "aap", "noot", "mies",
+			proto.Int(3),
+		)
 
-	// Simple pops.
-	{
 		mustDo(t, c,
 			"LPOP", "l",
 			proto.String("mies"),
@@ -222,7 +221,55 @@ func TestLpop(t *testing.T) {
 
 		// Can pop non-existing keys just fine.
 		mustNil(t, c, "LPOP", "l")
-	}
+	})
+
+	t.Run("with count", func(t *testing.T) {
+		mustDo(t, c,
+			"LPUSH", "l2", "aap", "noot", "mies",
+			proto.Int(3),
+		)
+
+		mustDo(t, c,
+			"LPOP", "l2", "2",
+			proto.Strings("mies", "noot"),
+		)
+
+		mustDo(t, c,
+			"LPOP", "l2", "2",
+			proto.Strings("aap"),
+		)
+
+		mustDo(t, c,
+			"LPOP", "l2", "99",
+			proto.Nil,
+		)
+
+		mustDo(t, c,
+			"LPOP", "l2", "0",
+			proto.Nil,
+		)
+
+		// Last element has been popped. Key is gone.
+		must0(t, c, "EXISTS", "l2")
+	})
+
+	t.Run("errors", func(t *testing.T) {
+		mustOK(t, c, "SET", "str", "value")
+		mustDo(t, c,
+			"LPOP", "str",
+			proto.Error(msgWrongType),
+		)
+		mustDo(t, c,
+			"LPOP", "str", "-1",
+			proto.Error(msgOutOfRange),
+		)
+	})
+
+	useRESP3(t, c)
+	t.Run("RESP3", func(t *testing.T) {
+		mustDo(t, c, "LPOP", "nosuch", proto.NilResp3)
+		mustDo(t, c, "LPOP", "nosuch", "2", proto.NilResp3)
+	})
 }
 
 func TestRPushPop(t *testing.T) {

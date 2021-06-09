@@ -10,38 +10,61 @@ import (
 	"time"
 )
 
-func TestLPush(t *testing.T) {
-	testRaw(t, func(c *client) {
-		c.Do("LPUSH", "l", "aap", "noot", "mies")
-		c.Do("TYPE", "l")
-		c.Do("LPUSH", "l", "more", "keys")
-		c.Do("LRANGE", "l", "0", "-1")
-		c.Do("LRANGE", "l", "0", "6")
-		c.Do("LRANGE", "l", "2", "6")
-		c.Do("LRANGE", "l", "-100", "-100")
-		c.Do("LRANGE", "nosuch", "2", "6")
-		c.Do("LPOP", "l")
-		c.Do("LPOP", "l")
-		c.Do("LPOP", "l")
-		c.Do("LPOP", "l")
-		c.Do("LPOP", "l")
-		c.Do("LPOP", "l")
-		c.Do("EXISTS", "l")
-		c.Do("LPOP", "nosuch")
+func TestLPushLpop(t *testing.T) {
+	t.Run("without count", func(t *testing.T) {
+		testRaw(t, func(c *client) {
+			c.Do("LPUSH", "l", "aap", "noot", "mies")
+			c.Do("TYPE", "l")
+			c.Do("LPUSH", "l", "more", "keys")
+			c.Do("LRANGE", "l", "0", "-1")
+			c.Do("LRANGE", "l", "0", "6")
+			c.Do("LRANGE", "l", "2", "6")
+			c.Do("LRANGE", "l", "-100", "-100")
+			c.Do("LRANGE", "nosuch", "2", "6")
+			c.Do("LPOP", "l")
+			c.Do("LPOP", "l")
+			c.Do("LPOP", "l")
+			c.Do("LPOP", "l")
+			c.Do("LPOP", "l")
+			c.Do("LPOP", "l")
+			c.Do("EXISTS", "l")
+			c.Do("LPOP", "nosuch")
 
-		// failure cases
-		c.Error("wrong number", "LPUSH")
-		c.Error("wrong number", "LPUSH", "l")
-		c.Do("SET", "str", "I am a string")
-		c.Error("wrong kind", "LPUSH", "str", "noot", "mies")
-		c.Error("wrong number", "LRANGE")
-		c.Error("wrong number", "LRANGE", "key")
-		c.Error("wrong number", "LRANGE", "key", "2")
-		c.Error("wrong number", "LRANGE", "key", "2", "6", "toomany")
-		c.Error("not an integer", "LRANGE", "key", "noint", "6")
-		c.Error("not an integer", "LRANGE", "key", "2", "noint")
-		c.Error("wrong number", "LPOP")
-		c.Error("wrong number", "LPOP", "key", "args")
+			// failure cases
+			c.Error("wrong number", "LPUSH")
+			c.Error("wrong number", "LPUSH", "l")
+			c.Do("SET", "str", "I am a string")
+			c.Error("wrong kind", "LPUSH", "str", "noot", "mies")
+			c.Error("wrong number", "LRANGE")
+			c.Error("wrong number", "LRANGE", "key")
+			c.Error("wrong number", "LRANGE", "key", "2")
+			c.Error("wrong number", "LRANGE", "key", "2", "6", "toomany")
+			c.Error("not an integer", "LRANGE", "key", "noint", "6")
+			c.Error("not an integer", "LRANGE", "key", "2", "noint")
+			c.Error("wrong number", "LPOP")
+		})
+	})
+
+	t.Run("with count", func(t *testing.T) {
+		testRaw(t, func(c *client) {
+			c.Do("LPUSH", "l", "aap", "noot", "mies")
+			c.Do("LPOP", "l", "0")
+			c.Do("LPOP", "l", "2")
+			c.Do("LPOP", "l", "2")
+			c.Do("LPOP", "nosuch", "2")
+
+			c.Error("wrong number", "LPOP", "nosuch", "2", "foobar")
+		})
+	})
+
+	t.Run("resp3", func(t *testing.T) {
+		testRESP3(t, func(c *client) {
+			c.Do("LPUSH", "l", "aap", "noot", "mies")
+			c.Do("LPOP", "l")
+			c.Do("LPOP", "l", "9")
+			c.Do("LPOP", "l")
+			c.Do("LPOP", "l", "9")
+		})
 	})
 }
 
@@ -64,30 +87,52 @@ func TestLPushx(t *testing.T) {
 	})
 }
 
-func TestRPush(t *testing.T) {
-	testRaw(t, func(c *client) {
-		c.Do("RPUSH", "l", "aap", "noot", "mies")
-		c.Do("TYPE", "l")
-		c.Do("RPUSH", "l", "more", "keys")
-		c.Do("LRANGE", "l", "0", "-1")
-		c.Do("LRANGE", "l", "0", "6")
-		c.Do("LRANGE", "l", "2", "6")
-		c.Do("RPOP", "l")
-		c.Do("RPOP", "l")
-		c.Do("RPOP", "l")
-		c.Do("RPOP", "l")
-		c.Do("RPOP", "l")
-		c.Do("RPOP", "l")
-		c.Do("EXISTS", "l")
-		c.Do("RPOP", "nosuch")
+func TestRPushRPop(t *testing.T) {
+	t.Run("without count", func(t *testing.T) {
+		testRaw(t, func(c *client) {
+			c.Do("RPUSH", "l", "aap", "noot", "mies")
+			c.Do("TYPE", "l")
+			c.Do("RPUSH", "l", "more", "keys")
+			c.Do("LRANGE", "l", "0", "-1")
+			c.Do("LRANGE", "l", "0", "6")
+			c.Do("LRANGE", "l", "2", "6")
+			c.Do("RPOP", "l")
+			c.Do("RPOP", "l")
+			c.Do("RPOP", "l")
+			c.Do("RPOP", "l")
+			c.Do("RPOP", "l")
+			c.Do("RPOP", "l")
+			c.Do("EXISTS", "l")
+			c.Do("RPOP", "nosuch")
 
-		// failure cases
-		c.Error("wrong number", "RPUSH")
-		c.Error("wrong number", "RPUSH", "l")
-		c.Do("SET", "str", "I am a string")
-		c.Error("wrong kind", "RPUSH", "str", "noot", "mies")
-		c.Error("wrong number", "RPOP")
-		c.Error("wrong number", "RPOP", "key", "args")
+			// failure cases
+			c.Error("wrong number", "RPUSH")
+			c.Error("wrong number", "RPUSH", "l")
+			c.Do("SET", "str", "I am a string")
+			c.Error("wrong kind", "RPUSH", "str", "noot", "mies")
+			c.Error("wrong number", "RPOP")
+		})
+	})
+
+	t.Run("with count", func(t *testing.T) {
+		testRaw(t, func(c *client) {
+			c.Do("RPUSH", "l", "aap", "noot", "mies")
+			c.Do("RPOP", "l", "0")
+			c.Do("RPOP", "l", "2")
+			c.Do("RPOP", "l", "99")
+			c.Do("RPOP", "l", "99")
+			c.Do("RPOP", "nosuch", "99")
+		})
+	})
+
+	t.Run("resp3", func(t *testing.T) {
+		testRESP3(t, func(c *client) {
+			c.Do("RPUSH", "l", "aap", "noot", "mies")
+			c.Do("RPOP", "l")
+			c.Do("RPOP", "l", "9")
+			c.Do("RPOP", "l")
+			c.Do("RPOP", "l", "9")
+		})
 	})
 }
 

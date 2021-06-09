@@ -276,7 +276,7 @@ func (m *Miniredis) cmdRpop(c *server.Peer, cmd string, args []string) {
 }
 
 func (m *Miniredis) cmdXpop(c *server.Peer, cmd string, args []string, lr leftright) {
-	if len(args) != 1 {
+	if len(args) < 1 {
 		setDirty(c)
 		c.WriteError(errWrongNumber(cmd))
 		return
@@ -288,27 +288,73 @@ func (m *Miniredis) cmdXpop(c *server.Peer, cmd string, args []string, lr leftri
 		return
 	}
 
-	key := args[0]
+	var opts struct {
+		key       string
+		withCount bool
+		count     int
+	}
+
+	opts.key, args = args[0], args[1:]
+	if len(args) > 0 {
+		v, err := strconv.Atoi(args[0])
+		if err != nil {
+			setDirty(c)
+			c.WriteError(msgInvalidInt)
+			return
+		}
+		if v < 0 {
+			setDirty(c)
+			c.WriteError(msgOutOfRange)
+			return
+		}
+		opts.count = v
+		opts.withCount = true
+		args = args[1:]
+	}
+	if len(args) > 0 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
+	}
 
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
-		if !db.exists(key) {
+		if !db.exists(opts.key) {
 			// non-existing key is fine
 			c.WriteNull()
 			return
 		}
-		if db.t(key) != "list" {
+		if db.t(opts.key) != "list" {
 			c.WriteError(msgWrongType)
+			return
+		}
+
+		if opts.withCount {
+			var popped []string
+			for opts.count > 0 && len(db.listKeys[opts.key]) > 0 {
+				switch lr {
+				case left:
+					popped = append(popped, db.listLpop(opts.key))
+				case right:
+					popped = append(popped, db.listPop(opts.key))
+				}
+				opts.count -= 1
+			}
+			if len(popped) == 0 {
+				c.WriteLen(-1)
+			} else {
+				c.WriteStrings(popped)
+			}
 			return
 		}
 
 		var elem string
 		switch lr {
 		case left:
-			elem = db.listLpop(key)
+			elem = db.listLpop(opts.key)
 		case right:
-			elem = db.listPop(key)
+			elem = db.listPop(opts.key)
 		}
 		c.WriteBulk(elem)
 	})

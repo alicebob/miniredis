@@ -35,8 +35,9 @@ func Float(n float64) string {
 }
 
 const (
-	Nil     = "$-1\r\n"
-	NilList = "*-1\r\n"
+	Nil      = "$-1\r\n"
+	NilResp3 = "_\r\n"
+	NilList  = "*-1\r\n"
 )
 
 // Array assembles the args in a list. Args should be raw redis commands.
