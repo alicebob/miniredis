@@ -323,7 +323,7 @@ func TestHello(t *testing.T) {
 			)
 			mustDo(t, c,
 				"HELLO", "foo",
-				proto.Error("NOPROTO unsupported protocol version"),
+				proto.Error("ERR Protocol version is not an integer or out of range"),
 			)
 			mustDo(t, c,
 				"HELLO", "3", "AUTH", "foo",

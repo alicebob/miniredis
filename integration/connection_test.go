@@ -60,7 +60,7 @@ func TestSelect(t *testing.T) {
 
 		c.Error("wrong number", "SELECT")
 		c.Error("out of range", "SELECT", "-1")
-		c.Error("invalid DB", "SELECT", "aap")
+		c.Error("not an integer", "SELECT", "aap")
 		c.Error("wrong number", "SELECT", "1", "2")
 	})
 
@@ -153,7 +153,7 @@ func TestHello(t *testing.T) {
 			c.DoLoosely("HELLO", "2")
 			c.Do("SMEMBERS", "s")
 
-			c.Error("unsupported", "HELLO", "twoandahalf")
+			c.Error("not an integer", "HELLO", "twoandahalf")
 
 			c.DoLoosely("HELLO", "3", "AUTH", "default", "foo")
 			c.DoLoosely("HELLO", "3", "AUTH", "default", "foo", "SETNAME", "foo")
@@ -161,9 +161,12 @@ func TestHello(t *testing.T) {
 
 			// errors
 			c.Error("Syntax error", "HELLO", "3", "default", "foo")
-			c.Error("unsupported", "HELLO", "three", "AUTH", "default", "foo")
+			c.Error("not an integer", "HELLO", "three", "AUTH", "default", "foo")
 			c.Error("Syntax error", "HELLO", "3", "AUTH", "default")
-			c.Error("unsupported", "HELLO", "default", "foo")
+			c.Error("unsupported", "HELLO", "-1", "foo")
+			c.Error("unsupported", "HELLO", "0", "foo")
+			c.Error("unsupported", "HELLO", "1", "foo")
+			c.Error("unsupported", "HELLO", "4", "foo")
 			c.Error("Syntax error", "HELLO", "3", "default", "foo", "SETNAME")
 			c.Error("Syntax error", "HELLO", "3", "SETNAME")
 

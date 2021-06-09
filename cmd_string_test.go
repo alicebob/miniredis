@@ -502,7 +502,7 @@ func TestIncrBy(t *testing.T) {
 		)
 	}
 
-	// Amount not an interger
+	// Amount not an integer
 	mustDo(t, c,
 		"INCRBY", "key", "noint",
 		proto.Error(msgInvalidInt),
@@ -643,7 +643,7 @@ func TestDecrBy(t *testing.T) {
 		)
 	}
 
-	// Amount not an interger
+	// Amount not an integer
 	mustDo(t, c,
 		"DECRBY", "key", "noint",
 		proto.Error(msgInvalidInt),
