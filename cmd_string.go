@@ -52,27 +52,29 @@ func (m *Miniredis) cmdSet(c *server.Peer, cmd string, args []string) {
 		return
 	}
 
-	var (
-		nx      = false // set iff not exists
-		xx      = false // set iff exists
-		keepttl = false // set keepttl
+	var opts struct {
+		key     string
+		value   string
+		nx      bool // set iff not exists
+		xx      bool // set iff exists
+		keepttl bool // set keepttl
 		ttl     time.Duration
-	)
+	}
 
-	key, value, args := args[0], args[1], args[2:]
+	opts.key, opts.value, args = args[0], args[1], args[2:]
 	for len(args) > 0 {
 		timeUnit := time.Second
 		switch strings.ToUpper(args[0]) {
 		case "NX":
-			nx = true
+			opts.nx = true
 			args = args[1:]
 			continue
 		case "XX":
-			xx = true
+			opts.xx = true
 			args = args[1:]
 			continue
 		case "KEEPTTL":
-			keepttl = true
+			opts.keepttl = true
 			args = args[1:]
 			continue
 		case "PX":
@@ -90,8 +92,8 @@ func (m *Miniredis) cmdSet(c *server.Peer, cmd string, args []string) {
 				c.WriteError(msgInvalidInt)
 				return
 			}
-			ttl = time.Duration(expire) * timeUnit
-			if ttl <= 0 {
+			opts.ttl = time.Duration(expire) * timeUnit
+			if opts.ttl <= 0 {
 				setDirty(c)
 				c.WriteError(msgInvalidSETime)
 				return
@@ -109,29 +111,29 @@ func (m *Miniredis) cmdSet(c *server.Peer, cmd string, args []string) {
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
-		if nx {
-			if db.exists(key) {
+		if opts.nx {
+			if db.exists(opts.key) {
 				c.WriteNull()
 				return
 			}
 		}
-		if xx {
-			if !db.exists(key) {
+		if opts.xx {
+			if !db.exists(opts.key) {
 				c.WriteNull()
 				return
 			}
 		}
-		if keepttl {
-			if val, ok := db.ttl[key]; ok {
-				ttl = val
+		if opts.keepttl {
+			if val, ok := db.ttl[opts.key]; ok {
+				opts.ttl = val
 			}
 		}
 
-		db.del(key, true) // be sure to remove existing values of other type keys.
+		db.del(opts.key, true) // be sure to remove existing values of other type keys.
 		// a vanilla SET clears the expire
-		db.stringSet(key, value)
-		if ttl != 0 {
-			db.ttl[key] = ttl
+		db.stringSet(opts.key, opts.value)
+		if opts.ttl != 0 {
+			db.ttl[opts.key] = opts.ttl
 		}
 		c.WriteOK()
 	})

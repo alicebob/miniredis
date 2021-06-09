@@ -72,20 +72,21 @@ func TestSet(t *testing.T) {
 	ok(t, err)
 	defer c.Close()
 
-	// Simple case
-	mustOK(t, c,
-		"SET", "aap", "noot",
-	)
+	t.Run("basic", func(t *testing.T) {
+		// Simple case
+		mustOK(t, c,
+			"SET", "aap", "noot",
+		)
 
-	// Overwrite other types.
-	s.HSet("wim", "teun", "vuur")
-	mustOK(t, c,
-		"SET", "wim", "gijs",
-	)
-	s.CheckGet(t, "wim", "gijs")
+		// Overwrite other types.
+		s.HSet("wim", "teun", "vuur")
+		mustOK(t, c,
+			"SET", "wim", "gijs",
+		)
+		s.CheckGet(t, "wim", "gijs")
+	})
 
-	// NX argument
-	{
+	t.Run("NX", func(t *testing.T) {
 		// new key
 		mustOK(t, c,
 			"SET", "mies", "toon", "NX",
@@ -98,10 +99,10 @@ func TestSet(t *testing.T) {
 		mustNil(t, c,
 			"SET", "mies", "toon", "nx",
 		)
-	}
+	})
 
 	// XX argument - only set if exists
-	{
+	t.Run("XX", func(t *testing.T) {
 		// new key, no go
 		mustNil(t, c,
 			"SET", "one", "two", "XX",
@@ -120,10 +121,10 @@ func TestSet(t *testing.T) {
 			"SET", "eleven", "fourteen", "XX",
 		)
 		s.CheckGet(t, "eleven", "fourteen")
-	}
+	})
 
-	// EX or PX argument. TTL values.
-	{
+	t.Run("EX PX", func(t *testing.T) {
+		// EX or PX argument. TTL values.
 		mustOK(t, c,
 			"SET", "one", "two", "EX", "1299",
 		)
@@ -154,10 +155,9 @@ func TestSet(t *testing.T) {
 			"SET", "aap", "noot", "EX", "-100",
 			proto.Error("ERR invalid expire time in set"),
 		)
-	}
+	})
 
-	// KEEPTTL argument
-	{
+	t.Run("KEEPTTL", func(t *testing.T) {
 		s.Set("foo", "bar")
 		s.SetTTL("foo", time.Second*1337)
 		mustOK(t, c,
@@ -165,13 +165,14 @@ func TestSet(t *testing.T) {
 		)
 		s.CheckGet(t, "foo", "baz")
 		equals(t, time.Second*1337, s.TTL("foo"))
-	}
+	})
 
-	// Invalid argument
-	mustDo(t, c,
-		"SET", "one", "two", "FOO",
-		proto.Error(msgSyntaxError),
-	)
+	t.Run("errors", func(t *testing.T) {
+		mustDo(t, c,
+			"SET", "one", "two", "FOO",
+			proto.Error(msgSyntaxError),
+		)
+	})
 }
 
 func TestMget(t *testing.T) {
