@@ -30,6 +30,7 @@ const (
 	msgNegativeKeysNumber = "ERR Number of keys can't be negative"
 	msgFScriptUsage       = "ERR Unknown subcommand or wrong number of arguments for '%s'. Try SCRIPT HELP."
 	msgFPubsubUsage       = "ERR Unknown subcommand or wrong number of arguments for '%s'. Try PUBSUB HELP."
+	msgScriptFlush        = "ERR SCRIPT FLUSH only support SYNC|ASYNC option"
 	msgSingleElementPair  = "ERR INCR option supports a single increment-element pair"
 	msgInvalidStreamID    = "ERR Invalid stream ID specified as stream command argument"
 	msgStreamIDTooSmall   = "ERR The ID specified in XADD is equal or smaller than the target stream top item"

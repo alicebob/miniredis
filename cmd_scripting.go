@@ -203,8 +203,15 @@ func (m *Miniredis) cmdScript(c *server.Peer, cmd string, args []string) {
 			}
 
 		case "flush":
+			if len(args) == 1 {
+				switch strings.ToUpper(args[0]) {
+				case "SYNC", "ASYNC":
+					args = args[1:]
+				default:
+				}
+			}
 			if len(args) != 0 {
-				c.WriteError(fmt.Sprintf(msgFScriptUsage, "FLUSH"))
+				c.WriteError(msgScriptFlush)
 				return
 			}
 

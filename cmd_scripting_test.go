@@ -142,9 +142,9 @@ func TestScript(t *testing.T) {
 		proto.Array(proto.Int(1), proto.Int(1), proto.Int(0)),
 	)
 
-	mustOK(t, c,
-		"SCRIPT", "FLUSH",
-	)
+	mustOK(t, c, "SCRIPT", "FLUSH")
+	mustOK(t, c, "SCRIPT", "FLUSH", "async")
+	mustOK(t, c, "SCRIPT", "FLUSH", "sync")
 
 	mustDo(t, c,
 		"SCRIPT", "EXISTS", script1sha,
@@ -178,7 +178,7 @@ func TestScript(t *testing.T) {
 
 	mustDo(t, c,
 		"SCRIPT", "FLUSH", "1",
-		proto.Error("ERR Unknown subcommand or wrong number of arguments for 'FLUSH'. Try SCRIPT HELP."),
+		proto.Error("ERR SCRIPT FLUSH only support SYNC|ASYNC option"),
 	)
 
 	mustDo(t, c,

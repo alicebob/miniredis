@@ -45,13 +45,16 @@ func TestScript(t *testing.T) {
 
 		c.Do("SCRIPT", "FLUSH")
 		c.Do("SCRIPT", "EXISTS", "1fa00e76656cc152ad327c13fe365858fd7be306")
+		c.Do("SCRIPT", "FLUSH", "ASYNC")
+		c.Do("SCRIPT", "FLUSH", "SyNc")
 
 		c.Error("wrong number", "SCRIPT")
 		c.Error("wrong number", "SCRIPT", "LOAD", "return 42", "return 42")
 		c.DoLoosely("SCRIPT", "LOAD", "]")
 		c.Error("wrong number", "SCRIPT", "LOAD", "]", "foo")
 		c.Error("wrong number", "SCRIPT", "LOAD")
-		c.Error("wrong number", "SCRIPT", "FLUSH", "foo")
+		c.Error("only support", "SCRIPT", "FLUSH", "foo")
+		c.Error("only support", "SCRIPT", "FLUSH", "ASYNC", "foo")
 		c.Error("wrong number", "SCRIPT", "FOO")
 	})
 }
