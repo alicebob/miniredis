@@ -167,6 +167,16 @@ func TestSet(t *testing.T) {
 		equals(t, time.Second*1337, s.TTL("foo"))
 	})
 
+	t.Run("GET", func(t *testing.T) {
+		mustNil(t, c,
+			"SET", "dino", "bar", "GET",
+		)
+		mustDo(t, c,
+			"SET", "dino", "bal", "GET",
+			proto.String("bar"),
+		)
+	})
+
 	t.Run("errors", func(t *testing.T) {
 		mustDo(t, c,
 			"SET", "one", "two", "FOO",

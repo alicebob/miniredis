@@ -17,6 +17,11 @@ func TestString(t *testing.T) {
 		c.Error("not an integer", "SET", "foo", "bar", "EX", "noint")
 		c.Do("SET", "utf8", "❆❅❄☃")
 		c.Do("SET", "foo", "baz", "KEEPTTL")
+		c.Do("SET", "foo", "bar", "GET")
+		c.Do("SET", "new", "bar", "GET")
+		c.Do("SET", "empty", "", "GET")
+		c.Do("SET", "empty", "filled", "GET")
+		c.Do("SET", "empty", "", "GET")
 
 		// Failure cases
 		c.Error("wrong number", "SET")
@@ -29,6 +34,7 @@ func TestString(t *testing.T) {
 		// Wrong type
 		c.Do("HSET", "hash", "key", "value")
 		c.Error("wrong kind", "GET", "hash")
+		c.Error("wrong kind", "SET", "hash", "foo", "GET")
 	})
 }
 

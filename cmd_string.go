@@ -59,6 +59,7 @@ func (m *Miniredis) cmdSet(c *server.Peer, cmd string, args []string) {
 		xx      bool // set iff exists
 		keepttl bool // set keepttl
 		ttl     time.Duration
+		get     bool
 	}
 
 	opts.key, opts.value, args = args[0], args[1], args[2:]
@@ -101,6 +102,10 @@ func (m *Miniredis) cmdSet(c *server.Peer, cmd string, args []string) {
 
 			args = args[2:]
 			continue
+		case "GET":
+			opts.get = true
+			args = args[1:]
+			continue
 		default:
 			setDirty(c)
 			c.WriteError(msgSyntaxError)
@@ -128,12 +133,26 @@ func (m *Miniredis) cmdSet(c *server.Peer, cmd string, args []string) {
 				opts.ttl = val
 			}
 		}
-
+		if opts.get {
+			if t, ok := db.keys[opts.key]; ok && t != "string" {
+				c.WriteError(msgWrongType)
+				return
+			}
+		}
+		old, existed := db.stringKeys[opts.key]
 		db.del(opts.key, true) // be sure to remove existing values of other type keys.
 		// a vanilla SET clears the expire
 		db.stringSet(opts.key, opts.value)
 		if opts.ttl != 0 {
 			db.ttl[opts.key] = opts.ttl
+		}
+		if opts.get {
+			if !existed {
+				c.WriteNull()
+			} else {
+				c.WriteBulk(old)
+			}
+			return
 		}
 		c.WriteOK()
 	})
