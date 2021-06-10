@@ -57,6 +57,23 @@ func TestStringGetSet(t *testing.T) {
 	})
 }
 
+func TestStringGetdel(t *testing.T) {
+	testRaw(t, func(c *client) {
+		c.Do("GETDEL", "missing")
+
+		c.Do("SET", "foo", "bar")
+		c.Do("GETDEL", "foo")
+		c.Do("EXISTS", "foo")
+
+		// Failure cases
+		c.Error("wrong number", "GETDEL")
+		c.Error("wrong number", "GETDEL", "foo", "bar")
+		// Wrong type
+		c.Do("HSET", "hash", "key", "value")
+		c.Error("wrong kind", "GETDEL", "hash")
+	})
+}
+
 func TestStringMget(t *testing.T) {
 	testRaw(t, func(c *client) {
 		c.Do("SET", "foo", "bar")
