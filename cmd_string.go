@@ -23,6 +23,7 @@ func commandsString(m *Miniredis) {
 	m.srv.Register("GET", m.cmdGet)
 	m.srv.Register("GETRANGE", m.cmdGetrange)
 	m.srv.Register("GETSET", m.cmdGetset)
+	m.srv.Register("GETDEL", m.cmdGetdel)
 	m.srv.Register("INCRBYFLOAT", m.cmdIncrbyfloat)
 	m.srv.Register("INCRBY", m.cmdIncrby)
 	m.srv.Register("INCR", m.cmdIncr)
@@ -391,6 +392,41 @@ func (m *Miniredis) cmdGetset(c *server.Peer, cmd string, args []string) {
 			return
 		}
 		c.WriteBulk(old)
+	})
+}
+
+// GETDEL
+func (m *Miniredis) cmdGetdel(c *server.Peer, cmd string, args []string) {
+	if len(args) != 1 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
+	}
+	if !m.handleAuth(c) {
+		return
+	}
+	if m.checkPubsub(c, cmd) {
+		return
+	}
+
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
+		db := m.db(ctx.selectedDB)
+
+		key := args[0]
+
+		if !db.exists(key) {
+			c.WriteNull()
+			return
+		}
+
+		if db.t(key) != "string" {
+			c.WriteError(msgWrongType)
+			return
+		}
+
+		v := db.stringGet(key)
+		db.del(key, true)
+		c.WriteBulk(v)
 	})
 }
 
