@@ -4,6 +4,7 @@ package main
 
 import (
 	"fmt"
+	"math"
 	"reflect"
 	"sort"
 	"strconv"
@@ -478,6 +479,48 @@ func (c *client) DoRounded(rounded int, cmd string, args ...string) {
 	mini = roundFloats(mini, rounded)
 	if !reflect.DeepEqual(real, mini) {
 		c.t.Errorf("expected a match (rounded to %d) want: %#v have: %#v", rounded, real, mini)
+	}
+}
+
+// result must match, with floats rounded
+func (c *client) DoApprox(threshold int, cmd string, args ...string) {
+	c.t.Helper()
+
+	resReal, errReal := c.real.Do(append([]string{cmd}, args...)...)
+	if errReal != nil {
+		c.t.Errorf("error from realredis: %s", errReal)
+		return
+	}
+	resMini, errMini := c.mini.Do(append([]string{cmd}, args...)...)
+	if errMini != nil {
+		c.t.Errorf("error from miniredis: %s", errMini)
+		return
+	}
+
+	// c.t.Logf("real:%q mini:%q", string(resReal), string(resMini))
+
+	mini, err := proto.Parse(resMini)
+	if err != nil {
+		c.t.Errorf("parse error miniredis: %s", err)
+		return
+	}
+	real, err := proto.Parse(resReal)
+	if err != nil {
+		c.t.Errorf("parse error realredis: %s", err)
+		return
+	}
+	miniInt, ok := mini.(int)
+	if !ok {
+		c.t.Errorf("parse int error miniredis: %T found (%#v)", mini, mini)
+		return
+	}
+	realInt, ok := real.(int)
+	if !ok {
+		c.t.Errorf("parse int error miniredis: %T found (%#v)", real, real)
+		return
+	}
+	if math.Abs(float64(miniInt-realInt)) > float64(threshold) {
+		c.t.Errorf("expected an approximated match (threshold is %d) want: %#v have: %#v", threshold, real, mini)
 	}
 }
 

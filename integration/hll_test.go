@@ -33,9 +33,7 @@ func TestHll(t *testing.T) {
 					"h1", // count 100
 					"h3", // count 100
 				)
-				c.DoLoosely(
-					"PFCOUNT", "res1",
-				)
+				c.DoApprox(2, "PFCOUNT", "res1")
 			}
 
 			// Merge intersecting hlls
@@ -46,7 +44,7 @@ func TestHll(t *testing.T) {
 					"h1", // count 100
 					"h2", // count 50 (all 50 are presented in h1)
 				)
-				c.DoLoosely("PFCOUNT", "res2")
+				c.DoApprox(2, "PFCOUNT", "res2")
 			}
 
 			// Merge all hlls
@@ -59,7 +57,7 @@ func TestHll(t *testing.T) {
 					"h3", // count 100
 					"h4", // empty key
 				)
-				c.DoLoosely("PFCOUNT", "res3")
+				c.DoApprox(2, "PFCOUNT", "res3")
 			}
 
 			// failure cases
@@ -82,10 +80,10 @@ func TestHll(t *testing.T) {
 			c.Do("MULTI")
 			c.Do("PFADD", "h1", "noot", "mies", "vuur", "wim")
 			c.Do("PFADD", "h2", "noot1", "mies1", "vuur1", "wim1")
-			c.DoLoosely("PFMERGE", "h3", "h1", "h2")
-			c.DoLoosely("PFCOUNT", "h1")
-			c.DoLoosely("PFCOUNT", "h2")
-			c.DoLoosely("PFCOUNT", "h3")
+			c.Do("PFMERGE", "h3", "h1", "h2")
+			c.Do("PFCOUNT", "h1")
+			c.Do("PFCOUNT", "h2")
+			c.Do("PFCOUNT", "h3")
 			c.Do("EXEC")
 		})
 	})
