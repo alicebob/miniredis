@@ -44,7 +44,7 @@ func TestPfadd(t *testing.T) {
 		mustOK(t, c, "SET", "str", "value")
 		mustDo(t, c,
 			"PFADD", "str", "hi",
-			proto.Error(msgWrongType),
+			proto.Error(msgNotValidHllValue),
 		)
 		// Wrong argument counts
 		mustDo(t, c,
@@ -124,11 +124,11 @@ func TestPfcount(t *testing.T) {
 		)
 		mustDo(t, c,
 			"PFCOUNT", "str",
-			proto.Error(msgWrongType),
+			proto.Error(msgNotValidHllValue),
 		)
 		mustDo(t, c,
 			"PFCOUNT", "h1", "str",
-			proto.Error(msgWrongType),
+			proto.Error(msgNotValidHllValue),
 		)
 	})
 }
@@ -232,7 +232,7 @@ func TestPfmerge(t *testing.T) {
 		)
 		mustDo(t, c,
 			"PFMERGE", "h10", "str",
-			proto.Error(msgWrongType),
+			proto.Error(msgNotValidHllValue),
 		)
 	})
 }

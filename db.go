@@ -648,7 +648,7 @@ func (db *RedisDB) hllCount(keys []string) (int, error) {
 	countOverall := 0
 	for _, key := range keys {
 		if db.exists(key) && db.t(key) != "hll" {
-			return 0, ErrWrongType
+			return 0, ErrNotValidHllValue
 		}
 		if !db.exists(key) {
 			continue
@@ -663,7 +663,7 @@ func (db *RedisDB) hllCount(keys []string) (int, error) {
 func (db *RedisDB) hllMerge(keys []string) error {
 	for _, key := range keys {
 		if db.exists(key) && db.t(key) != "hll" {
-			return ErrWrongType
+			return ErrNotValidHllValue
 		}
 	}
 

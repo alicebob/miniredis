@@ -29,7 +29,7 @@ func (m *Miniredis) cmdPfadd(c *server.Peer, cmd string, args []string) {
 		db := m.db(ctx.selectedDB)
 
 		if db.exists(key) && db.t(key) != "hll" {
-			c.WriteError(ErrWrongType.Error())
+			c.WriteError(ErrNotValidHllValue.Error())
 			return
 		}
 

@@ -15,6 +15,9 @@ var (
 	// ErrWrongType when a key is not the right type.
 	ErrWrongType = errors.New(msgWrongType)
 
+	// ErrNotValidHllValue when a key is not a valid HyperLogLog string value.
+	ErrNotValidHllValue = errors.New(msgNotValidHllValue)
+
 	// ErrIntValueError can returned by INCRBY
 	ErrIntValueError = errors.New(msgInvalidInt)
 
