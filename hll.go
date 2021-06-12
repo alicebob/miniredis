@@ -1,8 +1,7 @@
 package miniredis
 
 import (
-	"github.com/axiomhq/hyperloglog"
-	"github.com/spaolacci/murmur3"
+	"github.com/alicebob/miniredis/v2/hyperloglog"
 )
 
 type hll struct {
@@ -17,7 +16,7 @@ func newHll() *hll {
 
 // Add returns true if cardinality has been changed, or false otherwise.
 func (h *hll) Add(item []byte) bool {
-	return h.inner.InsertHash(murmur3.Sum64(item))
+	return h.inner.Insert(item)
 }
 
 // Count returns the estimation of a set cardinality.
