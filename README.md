@@ -311,7 +311,7 @@ Commands which will probably not be implemented:
 
 ## &c.
 
-Integration tests are run against Redis 6.0.10. The [./integration](./integration/) subdir
+Integration tests are run against Redis 6.2.4. The [./integration](./integration/) subdir
 compares miniredis against a real redis instance.
 
 The Redis 6 RESP3 protocol is supported. If there are problems, please open
