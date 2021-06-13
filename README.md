@@ -74,6 +74,7 @@ Implemented commands:
    - GETBIT
    - GETRANGE
    - GETSET
+   - GETDEL
    - INCR
    - INCRBY
    - INCRBYFLOAT

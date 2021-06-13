@@ -798,6 +798,51 @@ func TestGetSet(t *testing.T) {
 	}
 }
 
+func TestGetdel(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := proto.Dial(s.Addr())
+	ok(t, err)
+	defer c.Close()
+
+	// Missing key
+	{
+		mustNil(t, c, "GETDEL", "foo")
+	}
+
+	// Existing key
+	{
+		s.Set("foo", "bar")
+		mustDo(t, c,
+			"GETDEL", "foo",
+			proto.String("bar"),
+		)
+		must0(t, c, "EXISTS", "foo")
+	}
+
+	// Wrong type of existing key
+	{
+		s.HSet("wrong", "foo", "bar")
+		mustDo(t, c,
+			"GETDEL", "wrong",
+			proto.Error(msgWrongType),
+		)
+	}
+
+	// Wrong usage
+	{
+		mustDo(t, c,
+			"GETDEL",
+			proto.Error(errWrongNumber("getdel")),
+		)
+		mustDo(t, c,
+			"GETDEL", "foo", "bar",
+			proto.Error(errWrongNumber("getdel")),
+		)
+	}
+}
+
 func TestStrlen(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
