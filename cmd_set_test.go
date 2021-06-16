@@ -331,7 +331,7 @@ func TestSpop(t *testing.T) {
 		s.SetAdd("s", "aap", "noot", "mies", "vuur")
 		mustDo(t, c,
 			"SPOP", "s", "2",
-			proto.Strings("vuur", "mies"),
+			proto.Strings("aap", "noot"),
 		)
 		members, err := s.Members("s")
 		ok(t, err)

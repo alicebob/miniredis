@@ -1,6 +1,7 @@
 package miniredis
 
 import (
+	"math/rand"
 	"reflect"
 	"strings"
 	"testing"
@@ -114,4 +115,14 @@ func mustContain(tb testing.TB, c *proto.Client, args ...string) {
 
 func useRESP3(t *testing.T, c *proto.Client) {
 	mustContain(t, c, "HELLO", "3", "miniredis")
+}
+
+const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+func randomStr(length int) string {
+	b := make([]byte, length)
+	for i := range b {
+		b[i] = letters[rand.Intn(len(letters))]
+	}
+	return string(b)
 }

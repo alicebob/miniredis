@@ -40,6 +40,7 @@ func (db *RedisDB) flush() {
 	db.hashKeys = map[string]hashKey{}
 	db.listKeys = map[string]listKey{}
 	db.setKeys = map[string]setKey{}
+	db.hllKeys = map[string]*hll{}
 	db.sortedsetKeys = map[string]sortedSet{}
 	db.ttl = map[string]time.Duration{}
 	db.streamKeys = map[string]*streamKey{}
@@ -69,6 +70,8 @@ func (db *RedisDB) move(key string, to *RedisDB) bool {
 		to.sortedsetKeys[key] = db.sortedsetKeys[key]
 	case "stream":
 		to.streamKeys[key] = db.streamKeys[key]
+	case "hll":
+		to.hllKeys[key] = db.hllKeys[key]
 	default:
 		panic("unhandled key type")
 	}
@@ -95,6 +98,8 @@ func (db *RedisDB) rename(from, to string) {
 		db.sortedsetKeys[to] = db.sortedsetKeys[from]
 	case "stream":
 		db.streamKeys[to] = db.streamKeys[from]
+	case "hll":
+		db.hllKeys[to] = db.hllKeys[from]
 	default:
 		panic("missing case")
 	}
@@ -130,6 +135,8 @@ func (db *RedisDB) del(k string, delTTL bool) {
 		delete(db.sortedsetKeys, k)
 	case "stream":
 		delete(db.streamKeys, k)
+	case "hll":
+		delete(db.hllKeys, k)
 	default:
 		panic("Unknown key type: " + t)
 	}
@@ -616,4 +623,70 @@ func (db *RedisDB) checkTTL(key string) {
 	if v, ok := db.ttl[key]; ok && v <= 0 {
 		db.del(key, true)
 	}
+}
+
+// hllAdd adds members to a hll. Returns 1 if at least 1 if internal HyperLogLog was altered, otherwise 0
+func (db *RedisDB) hllAdd(k string, elems ...string) int {
+	s, ok := db.hllKeys[k]
+	if !ok {
+		s = newHll()
+		db.keys[k] = "hll"
+	}
+	hllAltered := 0
+	for _, e := range elems {
+		if s.Add([]byte(e)) {
+			hllAltered = 1
+		}
+	}
+	db.hllKeys[k] = s
+	db.keyVersion[k]++
+	return hllAltered
+}
+
+// hllCount estimates the amount of members added to hll by hllAdd. If called with several arguments, hllCount returns a sum of estimations
+func (db *RedisDB) hllCount(keys []string) (int, error) {
+	countOverall := 0
+	for _, key := range keys {
+		if db.exists(key) && db.t(key) != "hll" {
+			return 0, ErrNotValidHllValue
+		}
+		if !db.exists(key) {
+			continue
+		}
+		countOverall += db.hllKeys[key].Count()
+	}
+
+	return countOverall, nil
+}
+
+// hllMerge merges all the hlls provided as keys to the first key. Creates a new hll in the first key if it contains nothing
+func (db *RedisDB) hllMerge(keys []string) error {
+	for _, key := range keys {
+		if db.exists(key) && db.t(key) != "hll" {
+			return ErrNotValidHllValue
+		}
+	}
+
+	destKey := keys[0]
+	restKeys := keys[1:]
+
+	var destHll *hll
+	if db.exists(destKey) {
+		destHll = db.hllKeys[destKey]
+	} else {
+		destHll = newHll()
+	}
+
+	for _, key := range restKeys {
+		if !db.exists(key) {
+			continue
+		}
+		destHll.Merge(db.hllKeys[key])
+	}
+
+	db.hllKeys[destKey] = destHll
+	db.keys[destKey] = "hll"
+	db.keyVersion[destKey]++
+
+	return nil
 }
