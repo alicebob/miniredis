@@ -202,6 +202,10 @@ Implemented commands:
    - CLUSTER SLOTS
    - CLUSTER KEYSLOT
    - CLUSTER NODES
+ - HyperLogLog (complete)
+   - PFADD
+   - PFCOUNT
+   - PFMERGE
 
 
 ## TTLs, key expiration, and time
@@ -280,10 +284,6 @@ Commands which will probably not be implemented:
     - ~~CLUSTER *~~
     - ~~READONLY~~
     - ~~READWRITE~~
- - HyperLogLog (all) -- unless someone needs these
-    - ~~PFADD~~
-    - ~~PFCOUNT~~
-    - ~~PFMERGE~~
  - Key
     - ~~DUMP~~
     - ~~MIGRATE~~
