@@ -4,7 +4,7 @@
 ### v2.15.0
 
 - target redis 6.2 and added new args to various commands
-- support for all hyperlog commands (thanks @lbaktin)
+- support for all hyperlog commands (thanks @ilbaktin)
 - support for GETDEL (thanks @wszaranski)
 
 
