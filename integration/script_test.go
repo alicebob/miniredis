@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func TestEval(t *testing.T) {
+func TestScript(t *testing.T) {
 	t.Run("EVAL", func(t *testing.T) {
 		testRaw(t, func(c *client) {
 			c.Do("EVAL", "return 42", "0")
@@ -82,6 +82,28 @@ func TestEval(t *testing.T) {
 			c.Error("wrong number", "EVALSHA")
 			c.Error("wrong number", "EVALSHA", "nosuch")
 			c.Error("Please use EVAL", "EVALSHA", "nosuch", "0")
+		})
+	})
+
+	t.Run("combined", func(t *testing.T) {
+		sha1 := "1fa00e76656cc152ad327c13fe365858fd7be306" // "return 42"
+
+		testRaw(t, func(c *client) {
+			// EVAL stores the script
+			c.Do("EVAL", "return 42", "0")
+			c.Do("SCRIPT", "EXISTS", sha1)
+			c.Do("EVALSHA", sha1, "0")
+
+			// doesn't store the script on syntax error
+			c.Error("compiling", "EVAL", "return '<-syntax error", "0")
+			c.Do("SCRIPT", "EXISTS", "015cb4913729c68a7209188bbdee1b1ca19358bf")
+			c.Error("NOSCRIPT", "EVALSHA", "015cb4913729c68a7209188bbdee1b1ca19358bf", "0")
+
+			// does store the script on arg errors
+			c.Do("SCRIPT", "FLUSH")
+			c.Error("not an int", "EVAL", "return 42", "notanumber")
+			c.Do("SCRIPT", "EXISTS", sha1)
+			c.Error("NOSCRIPT", "EVALSHA", sha1, "0")
 		})
 	})
 }
