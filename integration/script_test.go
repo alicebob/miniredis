@@ -7,80 +7,82 @@ import (
 )
 
 func TestEval(t *testing.T) {
-	testRaw(t, func(c *client) {
-		c.Do("EVAL", "return 42", "0")
-		c.Do("EVAL", "", "0")
-		c.Do("EVAL", "return 42", "1", "foo")
-		c.Do("EVAL", "return {KEYS[1],KEYS[2],ARGV[1],ARGV[2]}", "2", "key1", "key2", "first", "second")
-		c.Do("EVAL", "return {ARGV[1]}", "0", "first")
-		c.Do("EVAL", "return {ARGV[1]}", "0", "first\nwith\nnewlines!\r\r\n\t!")
-		c.Do("EVAL", "return redis.call('GET', 'nosuch')==false", "0")
-		c.Do("EVAL", "return redis.call('GET', 'nosuch')==nil", "0")
-		c.Do("EVAL", "local a = redis.call('MGET', 'bar'); return a[1] == false", "0")
-		c.Do("EVAL", "local a = redis.call('MGET', 'bar'); return a[1] == nil", "0")
-		c.Do("EVAL", "return redis.call('ZRANGE', 'q', 0, -1)", "0")
-		c.Do("EVAL", "return redis.call('LPOP', 'foo')", "0")
+	t.Run("EVAL", func(t *testing.T) {
+		testRaw(t, func(c *client) {
+			c.Do("EVAL", "return 42", "0")
+			c.Do("EVAL", "", "0")
+			c.Do("EVAL", "return 42", "1", "foo")
+			c.Do("EVAL", "return {KEYS[1],KEYS[2],ARGV[1],ARGV[2]}", "2", "key1", "key2", "first", "second")
+			c.Do("EVAL", "return {ARGV[1]}", "0", "first")
+			c.Do("EVAL", "return {ARGV[1]}", "0", "first\nwith\nnewlines!\r\r\n\t!")
+			c.Do("EVAL", "return redis.call('GET', 'nosuch')==false", "0")
+			c.Do("EVAL", "return redis.call('GET', 'nosuch')==nil", "0")
+			c.Do("EVAL", "local a = redis.call('MGET', 'bar'); return a[1] == false", "0")
+			c.Do("EVAL", "local a = redis.call('MGET', 'bar'); return a[1] == nil", "0")
+			c.Do("EVAL", "return redis.call('ZRANGE', 'q', 0, -1)", "0")
+			c.Do("EVAL", "return redis.call('LPOP', 'foo')", "0")
 
-		// failure cases
-		c.Error("wrong number", "EVAL")
-		c.Error("wrong number", "EVAL", "return 42")
-		c.Error("wrong number", "EVAL", "[")
-		c.Error("not an integer", "EVAL", "return 42", "return 43")
-		c.Error("greater", "EVAL", "return 42", "1")
-		c.Error("negative", "EVAL", "return 42", "-1")
-		c.Error("wrong number", "EVAL", "42")
+			// failure cases
+			c.Error("wrong number", "EVAL")
+			c.Error("wrong number", "EVAL", "return 42")
+			c.Error("wrong number", "EVAL", "[")
+			c.Error("not an integer", "EVAL", "return 42", "return 43")
+			c.Error("greater", "EVAL", "return 42", "1")
+			c.Error("negative", "EVAL", "return 42", "-1")
+			c.Error("wrong number", "EVAL", "42")
+		})
 	})
-}
 
-func TestScript(t *testing.T) {
-	testRaw(t, func(c *client) {
-		c.Do("SCRIPT", "LOAD", "return 42")
-		c.Do("SCRIPT", "LOAD", "return 42")
-		c.Do("SCRIPT", "LOAD", "return 43")
+	t.Run("SCRIPT", func(t *testing.T) {
+		testRaw(t, func(c *client) {
+			c.Do("SCRIPT", "LOAD", "return 42")
+			c.Do("SCRIPT", "LOAD", "return 42")
+			c.Do("SCRIPT", "LOAD", "return 43")
 
-		c.Do("SCRIPT", "EXISTS", "1fa00e76656cc152ad327c13fe365858fd7be306")
-		c.Do("SCRIPT", "EXISTS", "0", "1fa00e76656cc152ad327c13fe365858fd7be306")
-		c.Do("SCRIPT", "EXISTS", "0")
-		c.Do("SCRIPT", "EXISTS")
+			c.Do("SCRIPT", "EXISTS", "1fa00e76656cc152ad327c13fe365858fd7be306")
+			c.Do("SCRIPT", "EXISTS", "0", "1fa00e76656cc152ad327c13fe365858fd7be306")
+			c.Do("SCRIPT", "EXISTS", "0")
+			c.Do("SCRIPT", "EXISTS")
 
-		c.Do("SCRIPT", "FLUSH")
-		c.Do("SCRIPT", "EXISTS", "1fa00e76656cc152ad327c13fe365858fd7be306")
-		c.Do("SCRIPT", "FLUSH", "ASYNC")
-		c.Do("SCRIPT", "FLUSH", "SyNc")
+			c.Do("SCRIPT", "FLUSH")
+			c.Do("SCRIPT", "EXISTS", "1fa00e76656cc152ad327c13fe365858fd7be306")
+			c.Do("SCRIPT", "FLUSH", "ASYNC")
+			c.Do("SCRIPT", "FLUSH", "SyNc")
 
-		c.Error("wrong number", "SCRIPT")
-		c.Error("wrong number", "SCRIPT", "LOAD", "return 42", "return 42")
-		c.DoLoosely("SCRIPT", "LOAD", "]")
-		c.Error("wrong number", "SCRIPT", "LOAD", "]", "foo")
-		c.Error("wrong number", "SCRIPT", "LOAD")
-		c.Error("only support", "SCRIPT", "FLUSH", "foo")
-		c.Error("only support", "SCRIPT", "FLUSH", "ASYNC", "foo")
-		c.Error("wrong number", "SCRIPT", "FOO")
+			c.Error("wrong number", "SCRIPT")
+			c.Error("wrong number", "SCRIPT", "LOAD", "return 42", "return 42")
+			c.DoLoosely("SCRIPT", "LOAD", "]")
+			c.Error("wrong number", "SCRIPT", "LOAD", "]", "foo")
+			c.Error("wrong number", "SCRIPT", "LOAD")
+			c.Error("only support", "SCRIPT", "FLUSH", "foo")
+			c.Error("only support", "SCRIPT", "FLUSH", "ASYNC", "foo")
+			c.Error("wrong number", "SCRIPT", "FOO")
+		})
 	})
-}
 
-func TestEvalsha(t *testing.T) {
-	sha1 := "1fa00e76656cc152ad327c13fe365858fd7be306" // "return 42"
-	sha2 := "bfbf458525d6a0b19200bfd6db3af481156b367b" // keys[1], argv[1]
+	t.Run("EVALSHA", func(t *testing.T) {
+		sha1 := "1fa00e76656cc152ad327c13fe365858fd7be306" // "return 42"
+		sha2 := "bfbf458525d6a0b19200bfd6db3af481156b367b" // keys[1], argv[1]
 
-	testRaw(t, func(c *client) {
-		c.Do("SCRIPT", "LOAD", "return 42")
-		c.Do("SCRIPT", "LOAD", "return {KEYS[1],ARGV[1]}")
-		c.Do("EVALSHA", sha1, "0")
-		c.Do("EVALSHA", sha2, "0")
-		c.Do("EVALSHA", sha2, "0", "foo")
-		c.Do("EVALSHA", sha2, "1", "foo")
-		c.Do("EVALSHA", sha2, "1", "foo", "bar")
-		c.Do("EVALSHA", sha2, "1", "foo", "bar", "baz")
+		testRaw(t, func(c *client) {
+			c.Do("SCRIPT", "LOAD", "return 42")
+			c.Do("SCRIPT", "LOAD", "return {KEYS[1],ARGV[1]}")
+			c.Do("EVALSHA", sha1, "0")
+			c.Do("EVALSHA", sha2, "0")
+			c.Do("EVALSHA", sha2, "0", "foo")
+			c.Do("EVALSHA", sha2, "1", "foo")
+			c.Do("EVALSHA", sha2, "1", "foo", "bar")
+			c.Do("EVALSHA", sha2, "1", "foo", "bar", "baz")
 
-		c.Do("SCRIPT", "FLUSH")
-		c.Error("Please use EVAL", "EVALSHA", sha1, "0")
+			c.Do("SCRIPT", "FLUSH")
+			c.Error("Please use EVAL", "EVALSHA", sha1, "0")
 
-		c.Do("SCRIPT", "LOAD", "return 42")
-		c.Error("wrong number", "EVALSHA", sha1)
-		c.Error("wrong number", "EVALSHA")
-		c.Error("wrong number", "EVALSHA", "nosuch")
-		c.Error("Please use EVAL", "EVALSHA", "nosuch", "0")
+			c.Do("SCRIPT", "LOAD", "return 42")
+			c.Error("wrong number", "EVALSHA", sha1)
+			c.Error("wrong number", "EVALSHA")
+			c.Error("wrong number", "EVALSHA", "nosuch")
+			c.Error("Please use EVAL", "EVALSHA", "nosuch", "0")
+		})
 	})
 }
 
