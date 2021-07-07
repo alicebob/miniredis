@@ -1,6 +1,11 @@
 ## Changelog
 
 
+### v2.15.1
+
+- EVAL should cache the script (thanks @guoshimin)
+
+
 ### v2.15.0
 
 - target redis 6.2 and added new args to various commands
