@@ -126,31 +126,38 @@ func blocking(
 		if done {
 			return
 		}
-		// there is no cond.WaitTimeout(), so hence the the goroutine to wait
-		// for a timeout
+		// there is no cond.WaitTimeout(), so we are starting a goroutine
+		// to send a broadcast on timeouts or when the global context goes away.
 		var (
 			wg     sync.WaitGroup
 			wakeup = make(chan struct{}, 1)
 		)
 		wg.Add(1)
+
+		retry := false
+
 		go func() {
-			m.signal.Wait()
-			wakeup <- struct{}{}
-			wg.Done()
+			defer wg.Done()
+
+			select {
+			case <-wakeup:
+				retry = true
+				return
+			case <-dlc:
+				onTimeout(c)
+			case <-m.Ctx.Done():
+			}
+
+			m.signal.Broadcast() // to kill the Wait() below
 		}()
-		select {
-		case <-wakeup:
-		case <-dlc:
-			onTimeout(c)
-			m.signal.Broadcast() // to kill the wakeup go routine
-			wg.Wait()
-			return
-		case <-m.Ctx.Done():
-			m.signal.Broadcast() // to kill the wakeup go routine
-			wg.Wait()
+
+		m.signal.Wait()
+		wakeup <- struct{}{}
+		wg.Wait()
+
+		if !retry {
 			return
 		}
-		wg.Wait()
 	}
 }
 
