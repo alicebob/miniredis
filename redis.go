@@ -3,8 +3,10 @@ package miniredis
 import (
 	"fmt"
 	"math/big"
+	"runtime"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/alicebob/miniredis/v2/server"
@@ -135,6 +137,7 @@ func blocking(
 		wg.Add(1)
 
 		retry := false
+		woken := int32(0)
 
 		go func() {
 			defer wg.Done()
@@ -148,10 +151,14 @@ func blocking(
 			case <-m.Ctx.Done():
 			}
 
-			m.signal.Broadcast() // to kill the Wait() below
+			for atomic.LoadInt32(&woken) == 0 {
+				m.signal.Broadcast() // to kill the Wait() below
+				runtime.Gosched()
+			}
 		}()
 
 		m.signal.Wait()
+		atomic.StoreInt32(&woken, 1)
 		wakeup <- struct{}{}
 		wg.Wait()
 
