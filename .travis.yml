@@ -1,6 +1,5 @@
 language: go
 arch:
-  - ppc64le
   - amd64
 os: linux
 
@@ -12,5 +11,4 @@ install: go get -t
 script: make test testrace int
 
 go:
-  - "1.15"
-  - "1.16"
+  - "1.17"
