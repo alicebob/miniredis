@@ -1250,7 +1250,7 @@ func TestBrpoplpushSimple(t *testing.T) {
 	case have := <-got:
 		equals(t, proto.String("e3"), have)
 	case <-time.After(500 * time.Millisecond):
-		t.Error("BRPOP took too long")
+		t.Fatal("BRPOP took too long")
 	}
 
 	lv, err := s.List("from")
