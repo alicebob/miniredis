@@ -1,6 +1,12 @@
 ## Changelog
 
 
+### v2.15.2
+
+- Fix race condition in blocking code (thanks @zonque and @robx)
+- XREAD accepts '$' as ID (thanks @bradengroom)
+
+
 ### v2.15.1
 
 - EVAL should cache the script (thanks @guoshimin)
