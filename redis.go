@@ -101,8 +101,6 @@ func blocking(
 ) {
 	var (
 		ctx = getCtx(c)
-		dl  *time.Timer
-		dlc <-chan time.Time
 	)
 	if inTx(ctx) {
 		addTxCmd(ctx, func(c *server.Peer, ctx *connCtx) {
@@ -113,11 +111,20 @@ func blocking(
 		c.WriteInline("QUEUED")
 		return
 	}
+
+	cleanup := make(chan struct{})
+	defer close(cleanup)
+	timedOut := false
 	if timeout != 0 {
-		dl = time.NewTimer(timeout)
-		defer dl.Stop()
-		dlc = dl.C
+		go setCondTimer(m.signal, &timedOut, timeout, cleanup)
 	}
+	go func() {
+		select {
+		case <-m.Ctx.Done():
+			m.signal.Broadcast() // main loop might miss this signal
+		case <-cleanup:
+		}
+	}()
 
 	m.Lock()
 	defer m.Unlock()
@@ -126,31 +133,29 @@ func blocking(
 		if done {
 			return
 		}
-		// there is no cond.WaitTimeout(), so hence the the goroutine to wait
-		// for a timeout
-		var (
-			wg     sync.WaitGroup
-			wakeup = make(chan struct{}, 1)
-		)
-		wg.Add(1)
-		go func() {
-			m.signal.Wait()
-			wakeup <- struct{}{}
-			wg.Done()
-		}()
-		select {
-		case <-wakeup:
-		case <-dlc:
-			onTimeout(c)
-			m.signal.Broadcast() // to kill the wakeup go routine
-			wg.Wait()
-			return
-		case <-m.Ctx.Done():
-			m.signal.Broadcast() // to kill the wakeup go routine
-			wg.Wait()
+
+		if m.Ctx.Err() != nil {
 			return
 		}
-		wg.Wait()
+		if timedOut {
+			onTimeout(c)
+			return
+		}
+
+		m.signal.Wait()
+	}
+}
+
+func setCondTimer(sig *sync.Cond, timedOut *bool, timeout time.Duration, cleanup chan struct{}) {
+	dl := time.NewTimer(timeout)
+	defer dl.Stop()
+	select {
+	case <-dl.C:
+		sig.L.Lock() // for timedOut
+		*timedOut = true
+		sig.Broadcast() // main loop might miss this signal
+		sig.L.Unlock()
+	case <-cleanup:
 	}
 }
 
