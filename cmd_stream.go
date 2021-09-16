@@ -646,7 +646,7 @@ parsing:
 
 			opts.streams, opts.ids = args[0:len(args)/2], args[len(args)/2:]
 			for _, id := range opts.ids {
-				if _, err := parseStreamID(id); err != nil {
+				if _, err := parseStreamID(id); id != `$` && err != nil {
 					setDirty(c)
 					c.WriteError(msgInvalidStreamID)
 					return
@@ -717,6 +717,9 @@ func xread(db *RedisDB, streams []string, ids []string, count int) map[string][]
 		for _, entry := range entries {
 			if len(returnedEntries) == entryCount {
 				break
+			}
+			if id == "$" {
+				id = s.lastID()
 			}
 			if streamCmp(entry.ID, id) <= 0 {
 				continue

@@ -244,6 +244,19 @@ func TestStream(t *testing.T) {
 			c.Error("not an int", "XREAD", "BLOCK", "foo", "STREAMS", "pl", "0")
 			c.Error("negative", "XREAD", "BLOCK", "-12", "STREAMS", "pl", "0")
 		})
+
+		// special '$' ID
+		testRaw2(t, func(c, c2 *client) {
+			var wg sync.WaitGroup
+			wg.Add(1)
+			go func() {
+				time.Sleep(10 * time.Millisecond)
+				c2.Do("XADD", "pl", "60-1", "name", "Mercury")
+				wg.Done()
+			}()
+			wg.Wait()
+			c.Do("XREAD", "BLOCK", "1000", "STREAMS", "pl", "$")
+		})
 	})
 }
 
