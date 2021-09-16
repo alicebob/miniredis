@@ -1,6 +1,7 @@
 package miniredis
 
 import (
+	"context"
 	"fmt"
 	"math/big"
 	"strings"
@@ -112,18 +113,15 @@ func blocking(
 		return
 	}
 
-	cleanup := make(chan struct{})
-	defer close(cleanup)
+	localCtx, cancel := context.WithCancel(m.Ctx)
+	defer cancel()
 	timedOut := false
 	if timeout != 0 {
-		go setCondTimer(m.signal, &timedOut, timeout, cleanup)
+		go setCondTimer(localCtx, m.signal, &timedOut, timeout)
 	}
 	go func() {
-		select {
-		case <-m.Ctx.Done():
-			m.signal.Broadcast() // main loop might miss this signal
-		case <-cleanup:
-		}
+		<-localCtx.Done()
+		m.signal.Broadcast() // main loop might miss this signal
 	}()
 
 	m.Lock()
@@ -146,7 +144,7 @@ func blocking(
 	}
 }
 
-func setCondTimer(sig *sync.Cond, timedOut *bool, timeout time.Duration, cleanup chan struct{}) {
+func setCondTimer(ctx context.Context, sig *sync.Cond, timedOut *bool, timeout time.Duration) {
 	dl := time.NewTimer(timeout)
 	defer dl.Stop()
 	select {
@@ -155,7 +153,7 @@ func setCondTimer(sig *sync.Cond, timedOut *bool, timeout time.Duration, cleanup
 		*timedOut = true
 		sig.Broadcast() // main loop might miss this signal
 		sig.L.Unlock()
-	case <-cleanup:
+	case <-ctx.Done():
 	}
 }
 
