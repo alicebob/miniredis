@@ -23,6 +23,16 @@ func TestString(t *testing.T) {
 		c.Do("SET", "empty", "filled", "GET")
 		c.Do("SET", "empty", "", "GET")
 
+		c.Do("SET", "fooexat", "bar", "EXAT", "2345678901")
+		c.DoApprox(10, "TTL", "fooexat")
+		c.Error("not an integer", "SET", "foo", "bar", "EXAT", "noint")
+		c.Do("SET", "foopxat", "bar", "PXAT", "2345678901000")
+		c.DoApprox(10, "TTL", "foopxat")
+		c.Error("not an integer", "SET", "foo", "bar", "PXAT", "noint")
+		// expires right away
+		c.Do("SET", "gone", "bar", "EXAT", "123")
+		c.Do("EXISTS", "gone")
+
 		// Failure cases
 		c.Error("wrong number", "SET")
 		c.Error("wrong number", "SET", "foo")
@@ -31,6 +41,12 @@ func TestString(t *testing.T) {
 		c.Error("wrong number", "GET", "too", "many")
 		c.Error("invalid expire", "SET", "foo", "bar", "EX", "0")
 		c.Error("invalid expire", "SET", "foo", "bar", "EX", "-100")
+		c.Error("syntax error", "SET", "both", "bar", "PXAT", "3345678901000", "EXAT", "2345678901")
+		c.Error("invalid expire", "SET", "foo", "bar", "EXAT", "-100")
+		c.Error("invalid expire", "SET", "foo", "bar", "PXAT", "-100")
+		c.Error("syntax error", "SET", "both", "bar", "PX", "6", "EX", "6")
+		c.Error("syntax error", "SET", "both", "bar", "PX", "6", "EX", "0")
+		c.Error("syntax error", "SET", "both", "bar", "PX", "6", "PXAT", "2345678901")
 		// Wrong type
 		c.Do("HSET", "hash", "key", "value")
 		c.Error("wrong kind", "GET", "hash")

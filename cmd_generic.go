@@ -72,17 +72,7 @@ func makeCmdExpire(m *Miniredis, unix bool, d time.Duration) func(*server.Peer, 
 				return
 			}
 			if unix {
-				var ts time.Time
-				switch d {
-				case time.Millisecond:
-					ts = time.Unix(int64(i/1000), 1000000*int64(i%1000))
-				case time.Second:
-					ts = time.Unix(int64(i), 0)
-				default:
-					panic("invalid time unit (d). Fixme!")
-				}
-				now := m.effectiveNow()
-				db.ttl[key] = ts.Sub(now)
+				db.ttl[key] = m.at(i, d)
 			} else {
 				db.ttl[key] = time.Duration(i) * d
 			}

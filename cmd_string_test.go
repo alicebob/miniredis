@@ -177,6 +177,30 @@ func TestSet(t *testing.T) {
 		)
 	})
 
+	t.Run("EXAT", func(t *testing.T) {
+		s.SetTime(time.Unix(1234567890, 0))
+		mustOK(t, c,
+			"SET", "exat", "bar", "EXAT", "2345678901",
+		)
+		equals(t, time.Second*1111111011, s.TTL("exat"))
+		mustDo(t, c,
+			"SET", "exat", "bal", "EXAT", "-1",
+			proto.Error(msgInvalidSETime),
+		)
+	})
+
+	t.Run("PXAT", func(t *testing.T) {
+		s.SetTime(time.Unix(1234567890, 0))
+		mustOK(t, c,
+			"SET", "pxat", "bar", "PXAT", "3345678901000",
+		)
+		equals(t, time.Second*2111111011, s.TTL("pxat"))
+		mustDo(t, c,
+			"SET", "pxat", "bal", "PXAT", "-1",
+			proto.Error(msgInvalidSETime),
+		)
+	})
+
 	t.Run("errors", func(t *testing.T) {
 		mustDo(t, c,
 			"SET", "one", "two", "FOO",

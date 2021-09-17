@@ -59,6 +59,7 @@ func (m *Miniredis) cmdSet(c *server.Peer, cmd string, args []string) {
 		nx      bool // set iff not exists
 		xx      bool // set iff exists
 		keepttl bool // set keepttl
+		ttlSet  bool
 		ttl     time.Duration
 		get     bool
 	}
@@ -66,7 +67,7 @@ func (m *Miniredis) cmdSet(c *server.Peer, cmd string, args []string) {
 	opts.key, opts.value, args = args[0], args[1], args[2:]
 	for len(args) > 0 {
 		timeUnit := time.Second
-		switch strings.ToUpper(args[0]) {
+		switch arg := strings.ToUpper(args[0]); arg {
 		case "NX":
 			opts.nx = true
 			args = args[1:]
@@ -79,13 +80,19 @@ func (m *Miniredis) cmdSet(c *server.Peer, cmd string, args []string) {
 			opts.keepttl = true
 			args = args[1:]
 			continue
-		case "PX":
+		case "PX", "PXAT":
 			timeUnit = time.Millisecond
 			fallthrough
-		case "EX":
+		case "EX", "EXAT":
 			if len(args) < 2 {
 				setDirty(c)
 				c.WriteError(msgInvalidInt)
+				return
+			}
+			if opts.ttlSet {
+				// multiple ex/exat/px/pxat options set
+				setDirty(c)
+				c.WriteError(msgSyntaxError)
 				return
 			}
 			expire, err := strconv.Atoi(args[1])
@@ -94,12 +101,18 @@ func (m *Miniredis) cmdSet(c *server.Peer, cmd string, args []string) {
 				c.WriteError(msgInvalidInt)
 				return
 			}
-			opts.ttl = time.Duration(expire) * timeUnit
-			if opts.ttl <= 0 {
+			if expire <= 0 {
 				setDirty(c)
 				c.WriteError(msgInvalidSETime)
 				return
 			}
+
+			if arg == "PXAT" || arg == "EXAT" {
+				opts.ttl = m.at(expire, timeUnit)
+			} else {
+				opts.ttl = time.Duration(expire) * timeUnit
+			}
+			opts.ttlSet = true
 
 			args = args[2:]
 			continue
@@ -143,7 +156,9 @@ func (m *Miniredis) cmdSet(c *server.Peer, cmd string, args []string) {
 		old, existed := db.stringKeys[opts.key]
 		db.del(opts.key, true) // be sure to remove existing values of other type keys.
 		// a vanilla SET clears the expire
-		db.stringSet(opts.key, opts.value)
+		if opts.ttl >= 0 { // EXAT/PXAT can expire right away
+			db.stringSet(opts.key, opts.value)
+		}
 		if opts.ttl != 0 {
 			db.ttl[opts.key] = opts.ttl
 		}
