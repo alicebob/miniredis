@@ -1,3 +1,4 @@
+//go:build int
 // +build int
 
 package main
@@ -26,23 +27,23 @@ func TestHash(t *testing.T) {
 			c.Do("EXISTS", "aap") // key is gone
 
 			// failure cases
-			c.Error("wrong number","HSET", "aap", "noot")
-			c.Error("wrong number","HGET", "aap")
-			c.Error("wrong number","HMGET", "aap")
-			c.Error("wrong number","HLEN")
-			c.Error("wrong number","HKEYS")
-			c.Error("wrong number","HVALS")
+			c.Error("wrong number", "HSET", "aap", "noot")
+			c.Error("wrong number", "HGET", "aap")
+			c.Error("wrong number", "HMGET", "aap")
+			c.Error("wrong number", "HLEN")
+			c.Error("wrong number", "HKEYS")
+			c.Error("wrong number", "HVALS")
 			c.Do("SET", "str", "I am a string")
-			c.Error("wrong kind","HSET", "str", "noot", "mies")
-			c.Error("wrong kind","HGET", "str", "noot")
-			c.Error("wrong kind","HMGET", "str", "noot")
-			c.Error("wrong kind","HLEN", "str")
-			c.Error("wrong kind","HKEYS", "str")
-			c.Error("wrong kind","HVALS", "str")
-			c.Error("wrong number","HSET")
-			c.Error("wrong number","HSET", "a1")
-			c.Error("wrong number","HSET", "a1", "b")
-			c.Error("wrong number","HSET", "a2", "b", "c", "d")
+			c.Error("wrong kind", "HSET", "str", "noot", "mies")
+			c.Error("wrong kind", "HGET", "str", "noot")
+			c.Error("wrong kind", "HMGET", "str", "noot")
+			c.Error("wrong kind", "HLEN", "str")
+			c.Error("wrong kind", "HKEYS", "str")
+			c.Error("wrong kind", "HVALS", "str")
+			c.Error("wrong number", "HSET")
+			c.Error("wrong number", "HSET", "a1")
+			c.Error("wrong number", "HSET", "a1", "b")
+			c.Error("wrong number", "HSET", "a2", "b", "c", "d")
 		})
 	})
 
@@ -69,9 +70,9 @@ func TestHashSetnx(t *testing.T) {
 		c.Do("HGET", "aap", "noot")
 
 		// failure cases
-		c.Error("wrong number","HSETNX", "aap")
-		c.Error("wrong number","HSETNX", "aap", "noot")
-		c.Error("wrong number","HSETNX", "aap", "noot", "too", "many")
+		c.Error("wrong number", "HSETNX", "aap")
+		c.Error("wrong number", "HSETNX", "aap", "noot")
+		c.Error("wrong number", "HSETNX", "aap", "noot", "too", "many")
 	})
 }
 
@@ -88,15 +89,15 @@ func TestHashDelExists(t *testing.T) {
 		c.Do("HEXISTS", "nosuch", "vuur")
 
 		// failure cases
-		c.Error("wrong number","HDEL")
-		c.Error("wrong number","HDEL", "aap")
+		c.Error("wrong number", "HDEL")
+		c.Error("wrong number", "HDEL", "aap")
 		c.Do("SET", "str", "I am a string")
-		c.Error("wrong kind","HDEL", "str", "key")
+		c.Error("wrong kind", "HDEL", "str", "key")
 
-		c.Error("wrong number","HEXISTS")
-		c.Error("wrong number","HEXISTS", "aap")
-		c.Error("wrong number","HEXISTS", "aap", "too", "many")
-		c.Error("wrong kind","HEXISTS", "str", "field")
+		c.Error("wrong number", "HEXISTS")
+		c.Error("wrong number", "HEXISTS", "aap")
+		c.Error("wrong number", "HEXISTS", "aap", "too", "many")
+		c.Error("wrong kind", "HEXISTS", "str", "field")
 	})
 }
 
@@ -109,10 +110,10 @@ func TestHashGetall(t *testing.T) {
 		c.Do("HGETALL", "nosuch")
 
 		// failure cases
-		c.Error("wrong number","HGETALL")
-		c.Error("wrong number","HGETALL", "too", "many")
+		c.Error("wrong number", "HGETALL")
+		c.Error("wrong number", "HGETALL", "too", "many")
 		c.Do("SET", "str", "I am a string")
-		c.Error("wrong kind","HGETALL", "str")
+		c.Error("wrong kind", "HGETALL", "str")
 	})
 
 	testRESP3(t, func(c *client) {
@@ -133,11 +134,11 @@ func TestHmset(t *testing.T) {
 		c.Do("HLEN", "aap")
 
 		// failure cases
-		c.Error("wrong number","HMSET", "aap")
-		c.Error("wrong number","HMSET", "aap", "key")
-		c.Error("wrong number","HMSET", "aap", "key", "value", "odd")
+		c.Error("wrong number", "HMSET", "aap")
+		c.Error("wrong number", "HMSET", "aap", "key")
+		c.Error("wrong number", "HMSET", "aap", "key", "value", "odd")
 		c.Do("SET", "str", "I am a string")
-		c.Error("wrong kind","HMSET", "str", "key", "value")
+		c.Error("wrong kind", "HMSET", "str", "key", "value")
 	})
 }
 
@@ -149,13 +150,13 @@ func TestHashIncr(t *testing.T) {
 		c.Do("HGET", "aap", "noot")
 
 		// Simple failure cases.
-		c.Error("wrong number","HINCRBY")
-		c.Error("wrong number","HINCRBY", "aap")
-		c.Error("wrong number","HINCRBY", "aap", "noot")
-		c.Error("not an integer","HINCRBY", "aap", "noot", "noint")
-		c.Error("wrong number","HINCRBY", "aap", "noot", "12", "toomany")
+		c.Error("wrong number", "HINCRBY")
+		c.Error("wrong number", "HINCRBY", "aap")
+		c.Error("wrong number", "HINCRBY", "aap", "noot")
+		c.Error("not an integer", "HINCRBY", "aap", "noot", "noint")
+		c.Error("wrong number", "HINCRBY", "aap", "noot", "12", "toomany")
 		c.Do("SET", "str", "value")
-		c.Error("wrong kind","HINCRBY", "str", "value", "12")
+		c.Error("wrong kind", "HINCRBY", "str", "value", "12")
 		c.Do("HINCRBY", "aap", "noot", "12")
 	})
 
@@ -166,13 +167,13 @@ func TestHashIncr(t *testing.T) {
 		c.Do("HGET", "aap", "noot")
 
 		// Simple failure cases.
-		c.Error("wrong number","HINCRBYFLOAT")
-		c.Error("wrong number","HINCRBYFLOAT", "aap")
-		c.Error("wrong number","HINCRBYFLOAT", "aap", "noot")
-		c.Error("not a valid float","HINCRBYFLOAT", "aap", "noot", "noint")
-		c.Error("wrong number","HINCRBYFLOAT", "aap", "noot", "12", "toomany")
+		c.Error("wrong number", "HINCRBYFLOAT")
+		c.Error("wrong number", "HINCRBYFLOAT", "aap")
+		c.Error("wrong number", "HINCRBYFLOAT", "aap", "noot")
+		c.Error("not a valid float", "HINCRBYFLOAT", "aap", "noot", "noint")
+		c.Error("wrong number", "HINCRBYFLOAT", "aap", "noot", "12", "toomany")
 		c.Do("SET", "str", "value")
-		c.Error("wrong kind","HINCRBYFLOAT", "str", "value", "12")
+		c.Error("wrong kind", "HINCRBYFLOAT", "str", "value", "12")
 		c.Do("HINCRBYFLOAT", "aap", "noot", "12")
 	})
 }
@@ -197,16 +198,16 @@ func TestHscan(t *testing.T) {
 		// c.Do("SCAN", "0")
 
 		// Error cases
-		c.Error("wrong number","HSCAN")
-		c.Error("wrong number","HSCAN", "noint")
-		c.Error("not an integer","HSCAN", "h", "0", "COUNT", "noint")
-		c.Error("syntax error","HSCAN", "h", "0", "COUNT")
-		c.Error("syntax error","HSCAN", "h", "0", "MATCH")
-		c.Error("syntax error","HSCAN", "h", "0", "garbage")
-		c.Error("syntax error","HSCAN", "h", "0", "COUNT", "12", "MATCH", "foo", "garbage")
+		c.Error("wrong number", "HSCAN")
+		c.Error("wrong number", "HSCAN", "noint")
+		c.Error("not an integer", "HSCAN", "h", "0", "COUNT", "noint")
+		c.Error("syntax error", "HSCAN", "h", "0", "COUNT")
+		c.Error("syntax error", "HSCAN", "h", "0", "MATCH")
+		c.Error("syntax error", "HSCAN", "h", "0", "garbage")
+		c.Error("syntax error", "HSCAN", "h", "0", "COUNT", "12", "MATCH", "foo", "garbage")
 		// c.Do("HSCAN", "nosuch", "0", "COUNT", "garbage")
 		c.Do("SET", "str", "1")
-		c.Error("wrong kind","HSCAN", "str", "0")
+		c.Error("wrong kind", "HSCAN", "str", "0")
 	})
 }
 
@@ -218,10 +219,10 @@ func TestHstrlen(t *testing.T) {
 		c.Do("HSTRLEN", "hash", "nosuch")
 		c.Do("HSTRLEN", "nosuch", "nosuch")
 
-		c.Error("wrong number","HSTRLEN")
-		c.Error("wrong number","HSTRLEN", "foo")
-		c.Error("wrong number","HSTRLEN", "foo", "baz", "bar")
+		c.Error("wrong number", "HSTRLEN")
+		c.Error("wrong number", "HSTRLEN", "foo")
+		c.Error("wrong number", "HSTRLEN", "foo", "baz", "bar")
 		c.Do("SET", "str", "1")
-		c.Error("wrong kind","HSTRLEN", "str", "bar")
+		c.Error("wrong kind", "HSTRLEN", "str", "bar")
 	})
 }

@@ -1,3 +1,4 @@
+//go:build int
 // +build int
 
 package main
@@ -10,7 +11,7 @@ func TestCluster(t *testing.T) {
 			// c.DoLoosly("CLUSTER", "SLOTS")
 			c.DoLoosely("CLUSTER", "KEYSLOT", "{test}")
 			c.DoLoosely("CLUSTER", "NODES")
-			c.Error("wrong number","CLUSTER")
+			c.Error("wrong number", "CLUSTER")
 		},
 	)
 }

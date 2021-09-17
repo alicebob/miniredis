@@ -1,3 +1,4 @@
+//go:build int
 // +build int
 
 package main
@@ -29,12 +30,12 @@ func TestServer(t *testing.T) {
 		c.Do("FLUSHALL", "AsYnC")
 
 		// Failure cases
-		c.Error("wrong number","DBSIZE", "foo")
-		c.Error("syntax error","FLUSHDB", "foo")
-		c.Error("syntax error","FLUSHALL", "foo")
-		c.Error("syntax error","FLUSHDB", "ASYNC", "foo")
-		c.Error("syntax error","FLUSHDB", "ASYNC", "ASYNC")
-		c.Error("syntax error","FLUSHALL", "ASYNC", "foo")
+		c.Error("wrong number", "DBSIZE", "foo")
+		c.Error("syntax error", "FLUSHDB", "foo")
+		c.Error("syntax error", "FLUSHALL", "foo")
+		c.Error("syntax error", "FLUSHDB", "ASYNC", "foo")
+		c.Error("syntax error", "FLUSHDB", "ASYNC", "ASYNC")
+		c.Error("syntax error", "FLUSHALL", "ASYNC", "foo")
 	})
 }
 
