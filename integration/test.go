@@ -1,3 +1,4 @@
+//go:build int
 // +build int
 
 package main
@@ -482,7 +483,7 @@ func (c *client) DoRounded(rounded int, cmd string, args ...string) {
 	}
 }
 
-// result must match, with floats rounded
+// result must be a single int, with value within threshold
 func (c *client) DoApprox(threshold int, cmd string, args ...string) {
 	c.t.Helper()
 
