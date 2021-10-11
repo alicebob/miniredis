@@ -776,8 +776,29 @@ func TestStreamTrim(t *testing.T) {
 		"XTRIM", "planets", "MAXLEN", "=", "3", proto.Int(3))
 
 	mustDo(t, c,
+		"XRANGE", "planets", "-", "+",
+		proto.Array(
+			proto.Array(proto.String("3-0"), proto.Strings("name", "Mars")),
+			proto.Array(proto.String("4-1"), proto.Strings("name", "Jupiter")),
+			proto.Array(proto.String("5-1"), proto.Strings("name", "Saturn")),
+		))
+
+	mustDo(t, c,
 		"XTRIM", "planets", "MINID", "~", "4", "LIMIT", "50", proto.Int(1))
 
 	mustDo(t, c,
+		"XRANGE", "planets", "-", "+",
+		proto.Array(
+			proto.Array(proto.String("4-1"), proto.Strings("name", "Jupiter")),
+			proto.Array(proto.String("5-1"), proto.Strings("name", "Saturn")),
+		))
+
+	mustDo(t, c,
 		"XTRIM", "planets", "MINID", "5", proto.Int(1))
+
+	mustDo(t, c,
+		"XRANGE", "planets", "-", "+",
+		proto.Array(
+			proto.Array(proto.String("5-1"), proto.Strings("name", "Saturn")),
+		))
 }
