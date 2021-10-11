@@ -737,3 +737,47 @@ func TestStreamXpending(t *testing.T) {
 		)
 	})
 }
+
+// Test XTRIM
+func TestStreamTrim(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := proto.Dial(s.Addr())
+	ok(t, err)
+	defer c.Close()
+
+	t.Run("error cases", func(t *testing.T) {
+		mustDo(t, c,
+			"XTRIM", "planets", "UNKNOWN_STRATEGY", "4",
+			proto.Error(msgXtrimInvalidStrategy))
+		mustDo(t, c,
+			"XTRIM", "planets",
+			proto.Error(errWrongNumber("xtrim")))
+		mustDo(t, c,
+			"XTRIM", "planets", "MAXLEN", "notANumber",
+			proto.Error(msgXtrimInvalidMaxLen))
+	})
+
+	_, err = c.Do("XADD", "planets", "0-1", "name", "Mercury")
+	ok(t, err)
+	_, err = c.Do("XADD", "planets", "1-0", "name", "Venus")
+	ok(t, err)
+	_, err = c.Do("XADD", "planets", "2-1", "name", "Earth")
+	ok(t, err)
+	_, err = c.Do("XADD", "planets", "3-0", "name", "Mars")
+	ok(t, err)
+	_, err = c.Do("XADD", "planets", "4-1", "name", "Jupiter")
+	ok(t, err)
+	_, err = c.Do("XADD", "planets", "5-1", "name", "Saturn")
+	ok(t, err)
+
+	mustDo(t, c,
+		"XTRIM", "planets", "MAXLEN", "=", "3", proto.Int(3))
+
+	mustDo(t, c,
+		"XTRIM", "planets", "MINID", "~", "4", "LIMIT", "50", proto.Int(1))
+
+	mustDo(t, c,
+		"XTRIM", "planets", "MINID", "5", proto.Int(1))
+}
