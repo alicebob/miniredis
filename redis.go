@@ -43,7 +43,7 @@ const (
 	msgXreadUnbalanced      = "ERR Unbalanced XREAD list of streams: for each stream key an ID or '$' must be specified."
 	msgXgroupKeyNotFound    = "ERR The XGROUP subcommand requires the key to exist. Note that for CREATE you may want to use the MKSTREAM option to create an empty stream automatically."
 	msgXtrimInvalidStrategy = "ERR unsupported XTRIM strategy. Please use MAXLEN, MINID"
-	msgXtrimInvalidMaxLen   = "ERR invalid maxlen in XTRIM"
+	msgXtrimInvalidMaxLen   = "ERR value is not an integer or out of range"
 )
 
 func errWrongNumber(cmd string) string {
