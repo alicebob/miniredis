@@ -11,7 +11,14 @@ import (
 	"github.com/alicebob/miniredis/v2/server"
 )
 
-func mkLuaFuncs(srv *server.Server, c *server.Peer) map[string]lua.LGFunction {
+var luaRedisConstants = map[string]lua.LValue{
+	"LOG_DEBUG":   lua.LNumber(0),
+	"LOG_VERBOSE": lua.LNumber(1),
+	"LOG_NOTICE":  lua.LNumber(2),
+	"LOG_WARNING": lua.LNumber(3),
+}
+
+func mkLua(srv *server.Server, c *server.Peer) (map[string]lua.LGFunction, map[string]lua.LValue) {
 	mkCall := func(failFast bool) func(l *lua.LState) int {
 		// one server.Ctx for a single Lua run
 		pCtx := &connCtx{}
@@ -107,6 +114,14 @@ func mkLuaFuncs(srv *server.Server, c *server.Peer) map[string]lua.LGFunction {
 			l.Push(res)
 			return 1
 		},
+		"log": func(l *lua.LState) int {
+			level := l.CheckInt(1)
+			msg := l.CheckString(2)
+			_, _ = level, msg
+			// do nothing by default. To see logs uncomment:
+			//   fmt.Printf("%v: %v", level, msg)
+			return 0
+		},
 		"status_reply": func(l *lua.LState) int {
 			v := l.Get(1)
 			msg, ok := v.(lua.LString)
@@ -133,7 +148,7 @@ func mkLuaFuncs(srv *server.Server, c *server.Peer) map[string]lua.LGFunction {
 			// ignored
 			return 1
 		},
-	}
+	}, luaRedisConstants
 }
 
 func luaToRedis(l *lua.LState, c *server.Peer, value lua.LValue) {

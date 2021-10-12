@@ -226,6 +226,17 @@ func TestCJSON(t *testing.T) {
 	)
 }
 
+func TestLog(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := proto.Dial(s.Addr())
+	ok(t, err)
+	defer c.Close()
+	mustNil(t, c,
+		"EVAL", "redis.log(redis.LOG_NOTICE, 'hello')", "0")
+}
+
 func TestSha1Hex(t *testing.T) {
 	s, err := Run()
 	ok(t, err)

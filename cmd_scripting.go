@@ -80,10 +80,13 @@ func (m *Miniredis) runLuaScript(c *server.Peer, script string, args []string) b
 	}
 	l.SetGlobal("ARGV", argvTable)
 
-	redisFuncs := mkLuaFuncs(m.srv, c)
+	redisFuncs, redisConstants := mkLua(m.srv, c)
 	// Register command handlers
 	l.Push(l.NewFunction(func(l *lua.LState) int {
 		mod := l.RegisterModule("redis", redisFuncs).(*lua.LTable)
+		for k, v := range redisConstants {
+			mod.RawSetString(k, v)
+		}
 		l.Push(mod)
 		return 1
 	}))
