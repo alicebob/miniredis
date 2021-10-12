@@ -26,6 +26,7 @@ func commandsStream(m *Miniredis) {
 	m.srv.Register("XACK", m.cmdXack)
 	m.srv.Register("XDEL", m.cmdXdel)
 	m.srv.Register("XPENDING", m.cmdXpending)
+	m.srv.Register("XTRIM", m.cmdXtrim)
 }
 
 // XADD
@@ -926,6 +927,82 @@ func writeXpending(
 		c.WriteInt(e.millis)
 		c.WriteInt(e.count)
 	}
+}
+
+// XTRIM
+func (m *Miniredis) cmdXtrim(c *server.Peer, cmd string, args []string) {
+	if len(args) < 3 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
+	}
+
+	stream, strategy, args := args[0], strings.ToUpper(args[1]), args[2:]
+
+	if strategy != "MAXLEN" && strategy != "MINID" {
+		setDirty(c)
+		c.WriteError(msgXtrimInvalidStrategy)
+		return
+	}
+
+	if args[0] == "=" || args[0] == "~" {
+		// Ignore nearly exact trimming parameter.
+		args = args[1:]
+	}
+
+	threshold := args[0]
+	var maxLen int
+	var err error
+	if strategy == "MAXLEN" {
+		maxLen, err = strconv.Atoi(threshold)
+		if err != nil {
+			setDirty(c)
+			c.WriteError(msgXtrimInvalidMaxLen)
+			return
+		}
+	}
+	args = args[1:]
+
+	if len(args) == 2 && strings.ToUpper(args[0]) == "LIMIT" {
+		// Ignore LIMIT.
+		args = args[2:]
+	}
+
+	if len(args) != 0 {
+		setDirty(c)
+		c.WriteError(fmt.Sprintf("ERR incorrect argument %s", args[0]))
+		return
+	}
+
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
+		db := m.db(ctx.selectedDB)
+		s, err := db.stream(stream)
+		if err != nil {
+			setDirty(c)
+			c.WriteError(err.Error())
+			return
+		}
+		if s == nil {
+			c.WriteInt(0)
+			return
+		}
+		if strategy == "MAXLEN" {
+			entriesBefore := len(s.entries)
+			s.trim(maxLen)
+			c.WriteInt(entriesBefore - len(s.entries))
+		} else if strategy == "MINID" {
+			var delete []string
+			for _, entry := range s.entries {
+				if entry.ID < threshold {
+					delete = append(delete, entry.ID)
+				} else {
+					break
+				}
+			}
+			s.delete(delete)
+			c.WriteInt(len(delete))
+		}
+	})
 }
 
 func parseBlock(cmd string, args []string, block *bool, timeout *time.Duration) error {

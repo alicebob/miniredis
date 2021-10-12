@@ -181,6 +181,7 @@ Implemented commands:
    - XREADGROUP
    - XREVRANGE
    - XPENDING
+   - XTRIM
  - Scripting
    - EVAL
    - EVALSHA

@@ -558,3 +558,52 @@ func TestStreamGroup(t *testing.T) {
 		c.DoLoosely("XINFO", "STREAM", "foo")
 	})
 }
+
+func TestStreamTrim(t *testing.T) {
+	t.Run("XTRIM MAXLEN", func(t *testing.T) {
+		testRaw(t, func(c *client) {
+			c.Do("XADD", "planets", "0-1", "name", "Mercury")
+			c.Do("XADD", "planets", "1-0", "name", "Venus")
+			c.Do("XADD", "planets", "2-1", "name", "Earth")
+			c.Do("XADD", "planets", "3-0", "name", "Mars")
+			c.Do("XADD", "planets", "4-1", "name", "Jupiter")
+
+			c.Do("XTRIM", "planets", "MAXLEN", "3")
+			c.Do("XRANGE", "planets", "-", "+")
+
+			c.Do("XTRIM", "planets", "MAXLEN", "=", "3")
+			c.Do("XRANGE", "planets", "-", "+")
+
+			c.Do("XTRIM", "planets", "MAXLEN", "2")
+			c.Do("XRANGE", "planets", "-", "+")
+
+			// error cases
+			c.Error("not an integer", "XTRIM", "planets", "MAXLEN", "abc")
+			c.Error("arguments", "XTRIM", "planets", "MAXLEN")
+		})
+	})
+
+	t.Run("XTRIM MINID", func(t *testing.T) {
+		testRaw(t, func(c *client) {
+			c.Do("XADD", "planets", "0-1", "name", "Mercury")
+			c.Do("XADD", "planets", "1-0", "name", "Venus")
+			c.Do("XADD", "planets", "2-1", "name", "Earth")
+			c.Do("XADD", "planets", "3-0", "name", "Mars")
+			c.Do("XADD", "planets", "4-1", "name", "Jupiter")
+
+			c.Do("XTRIM", "planets", "MINID", "1")
+			c.Do("XRANGE", "planets", "-", "+")
+
+			c.Do("XTRIM", "planets", "MINID", "=", "1")
+			c.Do("XRANGE", "planets", "-", "+")
+
+			c.Do("XTRIM", "planets", "MINID", "3")
+			c.Do("XRANGE", "planets", "-", "+")
+
+			// error cases
+			c.Error("arguments", "XTRIM", "planets", "MINID")
+			c.Error("arguments", "XTRIM", "planets")
+			c.Error("arguments", "XTRIM", "planets", "OTHER")
+		})
+	})
+}
