@@ -242,6 +242,7 @@ func TestLuaCall(t *testing.T) {
 		c.Do("GET", "foo")
 		c.Do("EVAL", `return redis.call("GET", "foo")`, "0")
 		c.Do("EVAL", `return redis.call("SET", "foo", 42)`, "0")
+		c.Do("EVAL", `redis.log(redis.LOG_NOTICE, "hello")`, "0")
 	})
 
 	// datatype errors

@@ -115,19 +115,11 @@ func mkLua(srv *server.Server, c *server.Peer) (map[string]lua.LGFunction, map[s
 			return 1
 		},
 		"log": func(l *lua.LState) int {
-			v := l.Get(1)
-			level, ok := v.(lua.LNumber)
-			if !ok {
-				l.Error(lua.LString("wrong type for the level"), 1)
-				return 0
-			}
-			v = l.Get(2)
-			msg, ok := v.(lua.LString)
-			if !ok {
-				l.Error(lua.LString("wrong number or type of arguments"), 1)
-				return 0
-			}
-			fmt.Printf("%v: %v", level, msg)
+			level := l.CheckInt(1)
+			msg := l.CheckString(2)
+			_, _ = level, msg
+			// do nothing by default. To see logs uncomment:
+			//   fmt.Printf("%v: %v", level, msg)
 			return 0
 		},
 		"status_reply": func(l *lua.LState) int {
