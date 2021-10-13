@@ -40,6 +40,7 @@ func commandsSortedSet(m *Miniredis) {
 	m.srv.Register("ZSCAN", m.cmdZscan)
 	m.srv.Register("ZPOPMAX", m.cmdZpopmax(true))
 	m.srv.Register("ZPOPMIN", m.cmdZpopmax(false))
+	m.srv.Register("ZRANDMEMBER", m.cmdZrandmember)
 }
 
 // ZADD
@@ -1462,4 +1463,105 @@ func (m *Miniredis) cmdZpopmax(reverse bool) server.Cmd {
 			}
 		})
 	}
+}
+
+// ZRANDMEMBER
+func (m *Miniredis) cmdZrandmember(c *server.Peer, cmd string, args []string) {
+	if len(args) < 1 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
+	}
+	if !m.handleAuth(c) {
+		return
+	}
+	if m.checkPubsub(c, cmd) {
+		return
+	}
+
+	var opts struct {
+		key        string
+		withCount  bool
+		count      int
+		withScores bool
+	}
+
+	opts.key = args[0]
+	args = args[1:]
+
+	if len(args) > 0 {
+		count := args[0]
+		args = args[1:]
+
+		n, err := strconv.Atoi(count)
+		if err != nil {
+			setDirty(c)
+			c.WriteError(msgInvalidInt)
+			return
+		}
+		opts.withCount = true
+		opts.count = n // can be negative
+	}
+
+	if len(args) > 0 && strings.ToUpper(args[0]) == "WITHSCORES" {
+		opts.withScores = true
+		args = args[1:]
+	}
+
+	if len(args) > 0 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
+	}
+
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
+		db := m.db(ctx.selectedDB)
+
+		if !db.exists(opts.key) {
+			c.WriteNull()
+			return
+		}
+
+		if db.t(opts.key) != "zset" {
+			c.WriteError(ErrWrongType.Error())
+			return
+		}
+
+		if !opts.withCount {
+			member := db.ssetRandomMember(opts.key)
+			if member == "" {
+				c.WriteNull()
+				return
+			}
+			c.WriteBulk(member)
+			return
+		}
+
+		var members []string
+		switch {
+		case opts.count == 0:
+			c.WriteStrings(nil)
+			return
+		case opts.count > 0:
+			allMembers := db.ssetMembers(opts.key)
+			db.master.shuffle(allMembers)
+			if len(allMembers) > opts.count {
+				allMembers = allMembers[:opts.count]
+			}
+			members = allMembers
+		case opts.count < 0:
+			for i := 0; i < -opts.count; i++ {
+				members = append(members, db.ssetRandomMember(opts.key))
+			}
+		}
+		if opts.withScores {
+			c.WriteLen(len(members) * 2)
+			for _, m := range members {
+				c.WriteBulk(m)
+				c.WriteFloat(db.ssetScore(opts.key, m))
+			}
+			return
+		}
+		c.WriteStrings(members)
+	})
 }

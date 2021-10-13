@@ -442,6 +442,14 @@ func (db *RedisDB) ssetElements(key string) ssElems {
 	return ss.byScore(asc)
 }
 
+func (db *RedisDB) ssetRandomMember(key string) string {
+	elems := db.ssetElements(key)
+	if len(elems) == 0 {
+		return ""
+	}
+	return elems[db.master.randIntn(len(elems))].member
+}
+
 // ssetCard is the sorted set cardinality.
 func (db *RedisDB) ssetCard(key string) int {
 	ss := db.sortedsetKeys[key]
