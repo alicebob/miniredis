@@ -938,10 +938,13 @@ func (m *Miniredis) cmdXtrim(c *server.Peer, cmd string, args []string) {
 	}
 
 	var opts struct {
-		stream    string
-		strategy  string
-		maxLen    int    // for MAXLEN
-		threshold string // for MINID
+		stream     string
+		strategy   string
+		maxLen     int    // for MAXLEN
+		threshold  string // for MINID
+		withLimit  bool   // "LIMIT"
+		withExact  bool   // "="
+		withNearly bool   // "~"
 	}
 
 	opts.stream, opts.strategy, args = args[0], strings.ToUpper(args[1]), args[2:]
@@ -952,8 +955,13 @@ func (m *Miniredis) cmdXtrim(c *server.Peer, cmd string, args []string) {
 		return
 	}
 
-	if args[0] == "=" || args[0] == "~" {
-		// Ignore nearly exact trimming parameter.
+	// Ignore nearly exact trimming parameters.
+	switch args[0] {
+	case "=":
+		opts.withExact = true
+		args = args[1:]
+	case "~":
+		opts.withNearly = true
 		args = args[1:]
 	}
 
@@ -973,12 +981,25 @@ func (m *Miniredis) cmdXtrim(c *server.Peer, cmd string, args []string) {
 
 	if len(args) == 2 && strings.ToUpper(args[0]) == "LIMIT" {
 		// Ignore LIMIT.
+		opts.withLimit = true
+		if _, err := strconv.Atoi(args[1]); err != nil {
+			setDirty(c)
+			c.WriteError(msgInvalidInt)
+			return
+		}
+
 		args = args[2:]
 	}
 
 	if len(args) != 0 {
 		setDirty(c)
 		c.WriteError(fmt.Sprintf("ERR incorrect argument %s", args[0]))
+		return
+	}
+
+	if opts.withLimit && !opts.withNearly {
+		setDirty(c)
+		c.WriteError(fmt.Sprintf(msgXtrimInvalidLimit))
 		return
 	}
 
@@ -994,6 +1015,7 @@ func (m *Miniredis) cmdXtrim(c *server.Peer, cmd string, args []string) {
 			c.WriteInt(0)
 			return
 		}
+
 		switch opts.strategy {
 		case "MAXLEN":
 			entriesBefore := len(s.entries)
