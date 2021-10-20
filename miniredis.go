@@ -589,7 +589,7 @@ func (m *Miniredis) randIntn(n int) int {
 	return m.rand.Intn(n)
 }
 
-// shuffle shuffles a string. Kinda.
+// shuffle shuffles a list of strings. Kinda.
 func (m *Miniredis) shuffle(l []string) {
 	for range l {
 		i := m.randIntn(len(l))

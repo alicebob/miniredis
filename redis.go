@@ -44,6 +44,7 @@ const (
 	msgXgroupKeyNotFound    = "ERR The XGROUP subcommand requires the key to exist. Note that for CREATE you may want to use the MKSTREAM option to create an empty stream automatically."
 	msgXtrimInvalidStrategy = "ERR unsupported XTRIM strategy. Please use MAXLEN, MINID"
 	msgXtrimInvalidMaxLen   = "ERR value is not an integer or out of range"
+	msgXtrimInvalidLimit    = "ERR syntax error, LIMIT cannot be used without the special ~ option"
 )
 
 func errWrongNumber(cmd string) string {

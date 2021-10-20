@@ -154,6 +154,7 @@ Implemented commands:
    - ZLEXCOUNT
    - ZPOPMIN
    - ZPOPMAX
+   - ZRANDMEMBER
    - ZRANGE
    - ZRANGEBYLEX
    - ZRANGEBYSCORE

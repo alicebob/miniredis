@@ -577,9 +577,13 @@ func TestStreamTrim(t *testing.T) {
 			c.Do("XTRIM", "planets", "MAXLEN", "2")
 			c.Do("XRANGE", "planets", "-", "+")
 
+			c.Do("XTRIM", "planets", "MAXLEN", "~", "2", "LIMIT", "99")
+			c.Do("XRANGE", "planets", "-", "+")
+
 			// error cases
 			c.Error("not an integer", "XTRIM", "planets", "MAXLEN", "abc")
 			c.Error("arguments", "XTRIM", "planets", "MAXLEN")
+			c.Error("without the special", "XTRIM", "planets", "MAXLEN", "3", "LIMIT", "1")
 		})
 	})
 
@@ -600,10 +604,15 @@ func TestStreamTrim(t *testing.T) {
 			c.Do("XTRIM", "planets", "MINID", "3")
 			c.Do("XRANGE", "planets", "-", "+")
 
+			c.Do("XTRIM", "planets", "MINID", "~", "3", "LIMIT", "1")
+			c.Do("XRANGE", "planets", "-", "+")
+
 			// error cases
 			c.Error("arguments", "XTRIM", "planets", "MINID")
 			c.Error("arguments", "XTRIM", "planets")
 			c.Error("arguments", "XTRIM", "planets", "OTHER")
+			c.Error("without the special", "XTRIM", "planets", "MINID", "3", "LIMIT", "1")
+			c.Error("out of range", "XTRIM", "planets", "MINID", "~", "3", "LIMIT", "one")
 		})
 	})
 }

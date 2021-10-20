@@ -708,3 +708,44 @@ func TestZpopminmax(t *testing.T) {
 		c.Error("syntax error", "ZPOPMIN", "set:zpop", "1", "h2")
 	})
 }
+
+func TestZrandmember(t *testing.T) {
+	testRaw(t, func(c *client) {
+		c.Do("ZADD", "q", "1.0", "key1")
+		c.Do("ZADD", "q", "2.0", "key2")
+		c.Do("ZADD", "q", "3.0", "key3")
+		c.Do("ZADD", "q", "4.0", "key4")
+		c.Do("ZADD", "q", "5.0", "key5")
+		c.Do("ZCARD", "q")
+
+		c.DoLoosely("ZRANDMEMBER", "q")
+
+		c.DoLoosely("ZRANDMEMBER", "q", "3")
+		c.DoLoosely("ZRANDMEMBER", "q", "4")
+		c.DoLoosely("ZRANDMEMBER", "q", "5")
+		c.DoLoosely("ZRANDMEMBER", "q", "6")
+		c.DoLoosely("ZRANDMEMBER", "q", "7")
+		c.DoLoosely("ZRANDMEMBER", "q", "12")
+		c.Do("ZRANDMEMBER", "q", "0")
+		c.DoLoosely("ZRANDMEMBER", "q", "-3")
+		c.DoLoosely("ZRANDMEMBER", "q", "-4")
+		c.DoLoosely("ZRANDMEMBER", "q", "-5")
+		c.DoLoosely("ZRANDMEMBER", "q", "-6")
+		c.DoLoosely("ZRANDMEMBER", "q", "-7")
+		c.DoLoosely("ZRANDMEMBER", "q", "-12")
+		c.Do("ZRANDMEMBER", "nosuch")
+		c.Do("ZRANDMEMBER", "nosuch", "4")
+		c.Do("ZRANDMEMBER", "nosuch", "-4")
+		c.DoLoosely("ZRANDMEMBER", "q", "2", "WITHSCORES")
+		c.DoLoosely("ZRANDMEMBER", "q", "0", "WITHSCORES")
+		c.DoLoosely("ZRANDMEMBER", "q", "-2", "WITHSCORES")
+		c.DoLoosely("ZRANDMEMBER", "nosuch", "2", "WITHSCORES")
+		c.DoLoosely("ZRANDMEMBER", "nosuch", "-2", "WITHSCORES")
+
+		// Wrong args
+		c.Error("wrong number", "ZRANDMEMBER")
+		c.Do("SET", "str", "1")
+		c.Error("wrong kind", "ZRANDMEMBER", "str")
+		c.Error("not an integer", "ZRANDMEMBER", "q", "two")
+	})
+}

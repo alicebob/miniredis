@@ -937,34 +937,57 @@ func (m *Miniredis) cmdXtrim(c *server.Peer, cmd string, args []string) {
 		return
 	}
 
-	stream, strategy, args := args[0], strings.ToUpper(args[1]), args[2:]
+	var opts struct {
+		stream     string
+		strategy   string
+		maxLen     int    // for MAXLEN
+		threshold  string // for MINID
+		withLimit  bool   // "LIMIT"
+		withExact  bool   // "="
+		withNearly bool   // "~"
+	}
 
-	if strategy != "MAXLEN" && strategy != "MINID" {
+	opts.stream, opts.strategy, args = args[0], strings.ToUpper(args[1]), args[2:]
+
+	if opts.strategy != "MAXLEN" && opts.strategy != "MINID" {
 		setDirty(c)
 		c.WriteError(msgXtrimInvalidStrategy)
 		return
 	}
 
-	if args[0] == "=" || args[0] == "~" {
-		// Ignore nearly exact trimming parameter.
+	// Ignore nearly exact trimming parameters.
+	switch args[0] {
+	case "=":
+		opts.withExact = true
+		args = args[1:]
+	case "~":
+		opts.withNearly = true
 		args = args[1:]
 	}
 
-	threshold := args[0]
-	var maxLen int
-	var err error
-	if strategy == "MAXLEN" {
-		maxLen, err = strconv.Atoi(threshold)
+	switch opts.strategy {
+	case "MAXLEN":
+		maxLen, err := strconv.Atoi(args[0])
 		if err != nil {
 			setDirty(c)
 			c.WriteError(msgXtrimInvalidMaxLen)
 			return
 		}
+		opts.maxLen = maxLen
+	case "MINID":
+		opts.threshold = args[0]
 	}
 	args = args[1:]
 
 	if len(args) == 2 && strings.ToUpper(args[0]) == "LIMIT" {
 		// Ignore LIMIT.
+		opts.withLimit = true
+		if _, err := strconv.Atoi(args[1]); err != nil {
+			setDirty(c)
+			c.WriteError(msgInvalidInt)
+			return
+		}
+
 		args = args[2:]
 	}
 
@@ -974,9 +997,15 @@ func (m *Miniredis) cmdXtrim(c *server.Peer, cmd string, args []string) {
 		return
 	}
 
+	if opts.withLimit && !opts.withNearly {
+		setDirty(c)
+		c.WriteError(fmt.Sprintf(msgXtrimInvalidLimit))
+		return
+	}
+
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
-		s, err := db.stream(stream)
+		s, err := db.stream(opts.stream)
 		if err != nil {
 			setDirty(c)
 			c.WriteError(err.Error())
@@ -986,14 +1015,16 @@ func (m *Miniredis) cmdXtrim(c *server.Peer, cmd string, args []string) {
 			c.WriteInt(0)
 			return
 		}
-		if strategy == "MAXLEN" {
+
+		switch opts.strategy {
+		case "MAXLEN":
 			entriesBefore := len(s.entries)
-			s.trim(maxLen)
+			s.trim(opts.maxLen)
 			c.WriteInt(entriesBefore - len(s.entries))
-		} else if strategy == "MINID" {
+		case "MINID":
 			var delete []string
 			for _, entry := range s.entries {
-				if entry.ID < threshold {
+				if entry.ID < opts.threshold {
 					delete = append(delete, entry.ID)
 				} else {
 					break
