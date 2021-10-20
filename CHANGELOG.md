@@ -1,6 +1,15 @@
 ## Changelog
 
 
+### v2.16.0
+
+- simplify some code (thanks @zonque)
+- support for EXAT/PXAT in SET
+- support for XTRIM (thanks @joseotoro)
+- support for ZRANDMEMBER
+- support for redis.log() in lua (thanks @dirkm)
+
+
 ### v2.15.2
 
 - Fix race condition in blocking code (thanks @zonque and @robx)
