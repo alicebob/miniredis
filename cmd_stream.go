@@ -168,10 +168,30 @@ func (m *Miniredis) makeCmdXrange(reverse bool) server.Cmd {
 		}
 
 		var (
-			key      = args[0]
-			startKey = args[1]
-			endKey   = args[2]
+			key            = args[0]
+			startKey       = args[1]
+			endKey         = args[2]
+			startExclusive bool
+			endExclusive   bool
 		)
+		if strings.HasPrefix(startKey, "(") {
+			startExclusive = true
+			startKey = startKey[1:]
+			if startKey == "-" || startKey == "+" {
+				setDirty(c)
+				c.WriteError(msgInvalidStreamID)
+				return
+			}
+		}
+		if strings.HasPrefix(endKey, "(") {
+			endExclusive = true
+			endKey = endKey[1:]
+			if endKey == "-" || endKey == "+" {
+				setDirty(c)
+				c.WriteError(msgInvalidStreamID)
+				return
+			}
+		}
 
 		countArg := "0"
 		if len(args) == 5 {
@@ -246,6 +266,15 @@ func (m *Miniredis) makeCmdXrange(reverse bool) server.Cmd {
 					if streamCmp(entry.ID, start) == 1 {
 						continue
 					}
+				}
+
+				// Continue if start exclusive and entry ID == start
+				if startExclusive && streamCmp(entry.ID, start) == 0 {
+					continue
+				}
+				// Continue if end exclusive and entry ID == end
+				if endExclusive && streamCmp(entry.ID, end) == 0 {
+					continue
 				}
 
 				returnedEntries = append(returnedEntries, entry)

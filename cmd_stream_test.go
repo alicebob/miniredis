@@ -289,6 +289,25 @@ func TestStreamRange(t *testing.T) {
 		)
 	})
 
+	t.Run("XRANGE exclusive ranges", func(t *testing.T) {
+		mustDo(t, c,
+			"XRANGE", "planets", "(1", "+",
+			proto.Array(
+				proto.Array(proto.String("2-1"), proto.Strings("name", "Earth", "greek-god", "", "idx", "3")),
+				proto.Array(proto.String("3-0"), proto.Strings("greek-god", "Ares", "name", "Mars", "idx", "4")),
+				proto.Array(proto.String("4-1"), proto.Strings("name", "Jupiter", "greek-god", "Dias", "idx", "5")),
+			),
+		)
+
+		mustDo(t, c,
+			"XREVRANGE", "planets", "3", "(1",
+			proto.Array(
+				proto.Array(proto.String("3-0"), proto.Strings("greek-god", "Ares", "name", "Mars", "idx", "4")),
+				proto.Array(proto.String("2-1"), proto.Strings("name", "Earth", "greek-god", "", "idx", "3")),
+			),
+		)
+	})
+
 	t.Run("error cases", func(t *testing.T) {
 		mustOK(t, c, "SET", "str", "value")
 		mustDo(t, c,
@@ -322,6 +341,14 @@ func TestStreamRange(t *testing.T) {
 		)
 		mustDo(t, c,
 			"XRANGE", "foo", "-", "noint",
+			proto.Error(msgInvalidStreamID),
+		)
+		mustDo(t, c,
+			"XRANGE", "foo", "(-", "+",
+			proto.Error(msgInvalidStreamID),
+		)
+		mustDo(t, c,
+			"XRANGE", "foo", "-", "(+",
 			proto.Error(msgInvalidStreamID),
 		)
 	})
