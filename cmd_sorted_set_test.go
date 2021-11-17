@@ -1550,6 +1550,7 @@ func TestZinterstore(t *testing.T) {
 	s.ZAdd("h2", 1.0, "field1")
 	s.ZAdd("h2", 2.0, "field2")
 	s.ZAdd("h2", 4.0, "field4")
+	s.SAdd("s2", "field1")
 
 	// Simple case
 	{
@@ -1585,6 +1586,18 @@ func TestZinterstore(t *testing.T) {
 		ss, err := s.SortedSet("aggr")
 		ok(t, err)
 		equals(t, map[string]float64{"field1": 1.0, "field2": 2.0}, ss)
+	}
+
+	// compatible set
+	{
+		mustDo(t, c,
+			"ZINTERSTORE", "cnew", "2", "h1", "s2",
+			proto.Int(1),
+		)
+
+		ss, err := s.SortedSet("cnew")
+		ok(t, err)
+		equals(t, map[string]float64{"field1": 2}, ss)
 	}
 
 	t.Run("errors", func(t *testing.T) {
