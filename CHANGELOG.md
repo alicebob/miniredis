@@ -1,6 +1,12 @@
 ## Changelog
 
 
+### v2.16.1
+
+- fix ZINTERSTORE with wets (thanks @lingjl2010 and @okhowang)
+- fix exclusive ranges in XRANGE (thanks @joseotoro)
+
+
 ### v2.16.0
 
 - simplify some code (thanks @zonque)
