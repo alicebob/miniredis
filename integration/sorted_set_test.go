@@ -661,6 +661,12 @@ func TestZinterstore(t *testing.T) {
 		c.Do("ZINTERSTORE", "asum", "2", "h1", "h2", "AGGREGATE", "sum")
 		c.Do("ZRANGE", "asum", "0", "-1", "WITHSCORES")
 
+		// normal set
+		c.Do("ZADD", "q1", "2", "f1")
+		c.Do("SADD", "q2", "f1")
+		c.Do("ZINTERSTORE", "dest", "2", "q1", "q2")
+		c.Do("ZRANGE", "dest", "0", "-1", "withscores")
+
 		// Error cases
 		c.Error("wrong number", "ZINTERSTORE")
 		c.Error("wrong number", "ZINTERSTORE", "h")
