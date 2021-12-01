@@ -4,8 +4,8 @@
 //
 // import "github.com/alicebob/miniredis/v2"
 //
-// Start a server with `s, err := miniredis.Run()`.
-// Stop it with `defer s.Close()`.
+// Start a server with `s := miniredis.RunT(t)`, it'll be shutdown via a t.Cleanup().
+// Or do everything manual: `s, err := miniredis.Run(); defer s.Close()`
 //
 // Point your Redis client to `s.Addr()` or `s.Host(), s.Port()`.
 //
@@ -124,6 +124,23 @@ func Run() (*Miniredis, error) {
 func RunTLS(cfg *tls.Config) (*Miniredis, error) {
 	m := NewMiniRedis()
 	return m, m.StartTLS(cfg)
+}
+
+// Tester is a minimal version of a testing.T
+type Tester interface {
+	Fatalf(string, ...interface{})
+	Cleanup(func())
+}
+
+// RunT start a new miniredis, pass it a testing.T. It also registers the cleanup after your test is done.
+func RunT(t Tester) *Miniredis {
+	m := NewMiniRedis()
+	if err := m.Start(); err != nil {
+		t.Fatalf("could not start miniredis: %s", err)
+		// not reached
+	}
+	t.Cleanup(m.Close)
+	return m
 }
 
 // Start starts a server. It listens on a random port on localhost. See also

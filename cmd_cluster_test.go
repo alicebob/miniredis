@@ -9,9 +9,7 @@ import (
 
 // Test CLUSTER *.
 func TestCluster(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()

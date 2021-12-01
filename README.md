@@ -246,11 +246,7 @@ import (
 )
 
 func TestSomething(t *testing.T) {
-	s, err := miniredis.Run()
-	if err != nil {
-		panic(err)
-	}
-	defer s.Close()
+	s := miniredis.RunT(t)
 
 	// Optionally set some keys your code expects:
 	s.Set("foo", "bar")
