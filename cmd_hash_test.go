@@ -8,9 +8,7 @@ import (
 )
 
 func TestHash(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -96,9 +94,7 @@ func TestHash(t *testing.T) {
 }
 
 func TestHashSetNX(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -120,9 +116,7 @@ func TestHashSetNX(t *testing.T) {
 }
 
 func TestHashMSet(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -155,9 +149,7 @@ func TestHashMSet(t *testing.T) {
 }
 
 func TestHashDel(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -188,9 +180,7 @@ func TestHashDel(t *testing.T) {
 }
 
 func TestHashExists(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -210,9 +200,7 @@ func TestHashExists(t *testing.T) {
 }
 
 func TestHashGetall(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -259,9 +247,7 @@ func TestHashGetall(t *testing.T) {
 }
 
 func TestHashKeys(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -301,9 +287,7 @@ func TestHashKeys(t *testing.T) {
 }
 
 func TestHashValues(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -329,9 +313,7 @@ func TestHashValues(t *testing.T) {
 }
 
 func TestHashLen(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -350,9 +332,7 @@ func TestHashLen(t *testing.T) {
 }
 
 func TestHashMget(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -387,9 +367,7 @@ func TestHashMget(t *testing.T) {
 }
 
 func TestHashIncrby(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -435,9 +413,7 @@ func TestHashIncrby(t *testing.T) {
 }
 
 func TestHashIncrbyfloat(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -508,9 +484,7 @@ func TestHashIncrbyfloat(t *testing.T) {
 }
 
 func TestHscan(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -601,9 +575,7 @@ func TestHscan(t *testing.T) {
 }
 
 func TestHstrlen(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()

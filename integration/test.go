@@ -20,14 +20,10 @@ import (
 func testRaw(t *testing.T, cb func(*client)) {
 	t.Helper()
 
-	sMini, err := miniredis.Run()
-	if err != nil {
-		t.Fatalf("unexpected miniredis error: %s", err.Error())
-	}
-	defer sMini.Close()
+	sMini := miniredis.RunT(t)
 
 	sReal, sRealAddr := Redis()
-	defer sReal.Close()
+	t.Cleanup(sReal.Close)
 
 	client := newClient(t, sRealAddr, sMini)
 
@@ -38,14 +34,10 @@ func testRaw(t *testing.T, cb func(*client)) {
 func testRaw2(t *testing.T, cb func(*client, *client)) {
 	t.Helper()
 
-	sMini, err := miniredis.Run()
-	if err != nil {
-		t.Fatalf("unexpected miniredis error: %s", err.Error())
-	}
-	defer sMini.Close()
+	sMini := miniredis.RunT(t)
 
 	sReal, sRealAddr := Redis()
-	defer sReal.Close()
+	t.Cleanup(sReal.Close)
 
 	client1 := newClient(t, sRealAddr, sMini)
 	client2 := newClient(t, sRealAddr, sMini)
@@ -57,14 +49,10 @@ func testRaw2(t *testing.T, cb func(*client, *client)) {
 func testMulti(t *testing.T, cbs ...func(*client)) {
 	t.Helper()
 
-	sMini, err := miniredis.Run()
-	if err != nil {
-		t.Fatalf("unexpected miniredis error: %s", err.Error())
-	}
-	defer sMini.Close()
+	sMini := miniredis.RunT(t)
 
 	sReal, sRealAddr := Redis()
-	defer sReal.Close()
+	t.Cleanup(sReal.Close)
 
 	var wg sync.WaitGroup
 	for _, cb := range cbs {
@@ -82,15 +70,11 @@ func testMulti(t *testing.T, cbs ...func(*client)) {
 func testAuth(t *testing.T, passwd string, cb func(*client)) {
 	t.Helper()
 
-	sMini, err := miniredis.Run()
-	if err != nil {
-		t.Fatalf("unexpected miniredis error: %s", err.Error())
-	}
-	defer sMini.Close()
+	sMini := miniredis.RunT(t)
 	sMini.RequireAuth(passwd)
 
 	sReal, sRealAddr := RedisAuth(passwd)
-	defer sReal.Close()
+	t.Cleanup(sReal.Close)
 
 	client := newClient(t, sRealAddr, sMini)
 
@@ -101,17 +85,13 @@ func testAuth(t *testing.T, passwd string, cb func(*client)) {
 func testUserAuth(t *testing.T, users map[string]string, cb func(*client)) {
 	t.Helper()
 
-	sMini, err := miniredis.Run()
-	if err != nil {
-		t.Fatalf("unexpected miniredis error: %s", err.Error())
-	}
-	defer sMini.Close()
+	sMini := miniredis.RunT(t)
 	for user, pass := range users {
 		sMini.RequireUserAuth(user, pass)
 	}
 
 	sReal, sRealAddr := RedisUserAuth(users)
-	defer sReal.Close()
+	t.Cleanup(sReal.Close)
 
 	client := newClient(t, sRealAddr, sMini)
 
@@ -122,14 +102,10 @@ func testUserAuth(t *testing.T, users map[string]string, cb func(*client)) {
 func testCluster(t *testing.T, cb func(*client)) {
 	t.Helper()
 
-	sMini, err := miniredis.Run()
-	if err != nil {
-		t.Fatalf("unexpected miniredis error: %s", err.Error())
-	}
-	defer sMini.Close()
+	sMini := miniredis.RunT(t)
 
 	sReal, sRealAddr := RedisCluster()
-	defer sReal.Close()
+	t.Cleanup(sReal.Close)
 
 	client := newClient(t, sRealAddr, sMini)
 
@@ -144,10 +120,10 @@ func testTLS(t *testing.T, cb func(*client)) {
 	if err := sMini.StartTLS(testServerTLS(t)); err != nil {
 		t.Fatalf("unexpected miniredis error: %s", err.Error())
 	}
-	defer sMini.Close()
+	t.Cleanup(sMini.Close)
 
 	sReal, sRealAddr := RedisTLS()
-	defer sReal.Close()
+	t.Cleanup(sReal.Close)
 
 	client := newClientTLS(t, sRealAddr, sMini)
 
@@ -158,14 +134,10 @@ func testTLS(t *testing.T, cb func(*client)) {
 func testRESP3(t *testing.T, cb func(*client)) {
 	t.Helper()
 
-	sMini, err := miniredis.Run()
-	if err != nil {
-		t.Fatalf("unexpected miniredis error: %s", err.Error())
-	}
-	defer sMini.Close()
+	sMini := miniredis.RunT(t)
 
 	sReal, sRealAddr := Redis()
-	defer sReal.Close()
+	t.Cleanup(sReal.Close)
 
 	client := newClientResp3(t, sRealAddr, sMini)
 
@@ -176,14 +148,10 @@ func testRESP3(t *testing.T, cb func(*client)) {
 func testRESP3Pair(t *testing.T, cb func(*client, *client)) {
 	t.Helper()
 
-	sMini, err := miniredis.Run()
-	if err != nil {
-		t.Fatalf("unexpected miniredis error: %s", err.Error())
-	}
-	defer sMini.Close()
+	sMini := miniredis.RunT(t)
 
 	sReal, sRealAddr := Redis()
-	defer sReal.Close()
+	t.Cleanup(sReal.Close)
 
 	client1 := newClientResp3(t, sRealAddr, sMini)
 	client2 := newClientResp3(t, sRealAddr, sMini)
