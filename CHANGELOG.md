@@ -1,6 +1,11 @@
 ## Changelog
 
 
+### v2.17.0
+
+- added miniredis.RunT(t)
+
+
 ### v2.16.1
 
 - fix ZINTERSTORE with wets (thanks @lingjl2010 and @okhowang)
