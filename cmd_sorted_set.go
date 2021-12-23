@@ -36,6 +36,7 @@ func commandsSortedSet(m *Miniredis) {
 	m.srv.Register("ZREVRANGEBYSCORE", m.makeCmdZrangebyscore(true))
 	m.srv.Register("ZREVRANK", m.makeCmdZrank(true))
 	m.srv.Register("ZSCORE", m.cmdZscore)
+	m.srv.Register("ZUNION", m.cmdZunion)
 	m.srv.Register("ZUNIONSTORE", m.cmdZunionstore)
 	m.srv.Register("ZSCAN", m.cmdZscan)
 	m.srv.Register("ZPOPMAX", m.cmdZpopmax(true))
@@ -1179,6 +1180,83 @@ func withLexRange(members []string, min string, minIncl bool, max string, maxInc
 	return members
 }
 
+// ZUNION
+func (m *Miniredis) cmdZunion(c *server.Peer, cmd string, args []string) {
+	if len(args) < 2 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
+	}
+
+	if !m.handleAuth(c) {
+		return
+	}
+	if m.checkPubsub(c, cmd) {
+		return
+	}
+
+	numKeys, err := strconv.Atoi(args[0])
+	if err != nil {
+		setDirty(c)
+		c.WriteError(msgInvalidInt)
+		return
+	}
+	args = args[1:]
+	if len(args) < numKeys {
+		setDirty(c)
+		c.WriteError(msgSyntaxError)
+		return
+	}
+	if numKeys <= 0 {
+		setDirty(c)
+		c.WriteError("ERR at least 1 input key is needed for ZUNION")
+		return
+	}
+	keys := args[:numKeys]
+	args = args[numKeys:]
+
+	withScores := false
+	if len(args) > 0 && strings.ToUpper(args[len(args)-1]) == "WITHSCORES" {
+		withScores = true
+		args = args[:len(args)-1]
+	}
+
+	opts := zunionOptions{
+		Keys:        keys,
+		WithWeights: false,
+		Weights:     []float64{},
+		Aggregate:   "sum",
+	}
+
+	if err := opts.parseArgs(args, numKeys); err != nil {
+		setDirty(c)
+		c.WriteError(err.Error())
+		return
+	}
+
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
+		db := m.db(ctx.selectedDB)
+
+		sset, err := executeZUnion(db, opts)
+		if err != nil {
+			c.WriteError(err.Error())
+			return
+		}
+
+		if withScores {
+			c.WriteLen(len(sset) * 2)
+		} else {
+			c.WriteLen(len(sset))
+		}
+		for _, el := range sset.byScore(desc) {
+			c.WriteBulk(el.member)
+			if withScores {
+				c.WriteFloat(el.score)
+			}
+		}
+	})
+}
+
 // ZUNIONSTORE
 func (m *Miniredis) cmdZunionstore(c *server.Peer, cmd string, args []string) {
 	if len(args) < 3 {
@@ -1214,48 +1292,17 @@ func (m *Miniredis) cmdZunionstore(c *server.Peer, cmd string, args []string) {
 	keys := args[:numKeys]
 	args = args[numKeys:]
 
-	withWeights := false
-	weights := []float64{}
-	aggregate := "sum"
-	for len(args) > 0 {
-		switch strings.ToLower(args[0]) {
-		case "weights":
-			if len(args) < numKeys+1 {
-				setDirty(c)
-				c.WriteError(msgSyntaxError)
-				return
-			}
-			for i := 0; i < numKeys; i++ {
-				f, err := strconv.ParseFloat(args[i+1], 64)
-				if err != nil {
-					setDirty(c)
-					c.WriteError("ERR weight value is not a float")
-					return
-				}
-				weights = append(weights, f)
-			}
-			withWeights = true
-			args = args[numKeys+1:]
-		case "aggregate":
-			if len(args) < 2 {
-				setDirty(c)
-				c.WriteError(msgSyntaxError)
-				return
-			}
-			aggregate = strings.ToLower(args[1])
-			switch aggregate {
-			default:
-				setDirty(c)
-				c.WriteError(msgSyntaxError)
-				return
-			case "sum", "min", "max":
-			}
-			args = args[2:]
-		default:
-			setDirty(c)
-			c.WriteError(msgSyntaxError)
-			return
-		}
+	opts := zunionOptions{
+		Keys:        keys,
+		WithWeights: false,
+		Weights:     []float64{},
+		Aggregate:   "sum",
+	}
+
+	if err := opts.parseArgs(args, numKeys); err != nil {
+		setDirty(c)
+		c.WriteError(err.Error())
+		return
 	}
 
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
@@ -1270,54 +1317,104 @@ func (m *Miniredis) cmdZunionstore(c *server.Peer, cmd string, args []string) {
 			db.del(destination, true)
 		}
 
-		sset := sortedSet{}
-		for i, key := range keys {
-			if !db.exists(key) {
-				continue
-			}
-
-			var set map[string]float64
-			switch db.t(key) {
-			case "set":
-				set = map[string]float64{}
-				for elem := range db.setKeys[key] {
-					set[elem] = 1.0
-				}
-			case "zset":
-				set = db.sortedSet(key)
-			default:
-				c.WriteError(msgWrongType)
-				return
-			}
-
-			for member, score := range set {
-				if withWeights {
-					score *= weights[i]
-				}
-				old, ok := sset[member]
-				if !ok {
-					sset[member] = score
-					continue
-				}
-				switch aggregate {
-				default:
-					panic("Invalid aggregate")
-				case "sum":
-					sset[member] += score
-				case "min":
-					if score < old {
-						sset[member] = score
-					}
-				case "max":
-					if score > old {
-						sset[member] = score
-					}
-				}
-			}
+		sset, err := executeZUnion(db, opts)
+		if err != nil {
+			c.WriteError(err.Error())
+			return
 		}
 		db.ssetSet(destination, sset)
 		c.WriteInt(sset.card())
 	})
+}
+
+type zunionOptions struct {
+	Keys        []string
+	WithWeights bool
+	Weights     []float64
+	Aggregate   string
+}
+
+func (opts *zunionOptions) parseArgs(args []string, numKeys int) error {
+	for len(args) > 0 {
+		switch strings.ToLower(args[0]) {
+		case "weights":
+			if len(args) < numKeys+1 {
+				return errors.New(msgSyntaxError)
+			}
+			for i := 0; i < numKeys; i++ {
+				f, err := strconv.ParseFloat(args[i+1], 64)
+				if err != nil {
+					return errors.New("ERR weight value is not a float")
+				}
+				opts.Weights = append(opts.Weights, f)
+			}
+			opts.WithWeights = true
+			args = args[numKeys+1:]
+		case "aggregate":
+			if len(args) < 2 {
+				return errors.New(msgSyntaxError)
+			}
+			opts.Aggregate = strings.ToLower(args[1])
+			switch opts.Aggregate {
+			default:
+				return errors.New(msgSyntaxError)
+			case "sum", "min", "max":
+			}
+			args = args[2:]
+		default:
+			return errors.New(msgSyntaxError)
+		}
+	}
+	return nil
+}
+
+func executeZUnion(db *RedisDB, opts zunionOptions) (sortedSet, error) {
+	sset := sortedSet{}
+	for i, key := range opts.Keys {
+		if !db.exists(key) {
+			continue
+		}
+
+		var set map[string]float64
+		switch db.t(key) {
+		case "set":
+			set = map[string]float64{}
+			for elem := range db.setKeys[key] {
+				set[elem] = 1.0
+			}
+		case "zset":
+			set = db.sortedSet(key)
+		default:
+			return nil, errors.New(msgWrongType)
+		}
+
+		for member, score := range set {
+			if opts.WithWeights {
+				score *= opts.Weights[i]
+			}
+			old, ok := sset[member]
+			if !ok {
+				sset[member] = score
+				continue
+			}
+			switch opts.Aggregate {
+			default:
+				panic("Invalid aggregate")
+			case "sum":
+				sset[member] += score
+			case "min":
+				if score < old {
+					sset[member] = score
+				}
+			case "max":
+				if score > old {
+					sset[member] = score
+				}
+			}
+		}
+	}
+
+	return sset, nil
 }
 
 // ZSCAN

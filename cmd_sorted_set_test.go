@@ -1536,6 +1536,103 @@ func TestZunionstore(t *testing.T) {
 	})
 }
 
+func TestZunion(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := proto.Dial(s.Addr())
+	ok(t, err)
+	defer c.Close()
+
+	s.ZAdd("h1", 1.0, "field1")
+	s.ZAdd("h1", 2.0, "field2")
+	s.ZAdd("h2", 1.0, "field1")
+	s.ZAdd("h2", 2.0, "field2")
+
+	t.Run("simple case", func(t *testing.T) {
+		mustDo(t, c,
+			"ZUNION", "2", "h1", "h2", proto.Strings("field2", "field1"),
+		)
+	})
+
+	t.Run("WITHSCORES", func(t *testing.T) {
+		mustDo(t, c,
+			"ZUNION", "2", "h1", "h2", "WITHSCORES", proto.Strings("field2", "4", "field1", "2"),
+		)
+	})
+
+	t.Run("WEIGHTS", func(t *testing.T) {
+		mustDo(t, c,
+			"ZUNION", "2", "h1", "h2", "WeiGHtS", "4.5", "12", "WITHSCORES",
+			proto.Strings("field2", "33", "field1", "16.5"),
+		)
+	})
+
+	t.Run("AGGREGATE", func(t *testing.T) {
+		mustDo(t, c,
+			"ZUNION", "2", "h1", "h2", "AgGrEgAtE", "min", "WITHSCORES",
+			proto.Strings("field2", "2", "field1", "1"),
+		)
+	})
+
+	t.Run("wrong usage", func(t *testing.T) {
+		mustDo(t, c,
+			"ZUNION",
+			proto.Error(errWrongNumber("zunion")),
+		)
+		mustDo(t, c,
+			"ZUNION", "2",
+			proto.Error(errWrongNumber("zunion")),
+		)
+		mustDo(t, c,
+			"ZUNION", "noint",
+			proto.Error(errWrongNumber("zunion")),
+		)
+		mustDo(t, c,
+			"ZUNION", "0", "key",
+			proto.Error("ERR at least 1 input key is needed for ZUNION"),
+		)
+		mustDo(t, c,
+			"ZUNION", "-1", "key",
+			proto.Error("ERR at least 1 input key is needed for ZUNION"),
+		)
+		mustDo(t, c,
+			"ZUNION", "1", "too", "many",
+			proto.Error(msgSyntaxError),
+		)
+		mustDo(t, c,
+			"ZUNION", "2", "key",
+			proto.Error(msgSyntaxError),
+		)
+
+		mustDo(t, c,
+			"ZUNION", "2", "k1", "k2", "WEIGHTS",
+			proto.Error(msgSyntaxError),
+		)
+		mustDo(t, c,
+			"ZUNION", "2", "k1", "k2", "WEIGHTS", "1", "2", "3",
+			proto.Error(msgSyntaxError),
+		)
+		mustDo(t, c,
+			"ZUNION", "2", "k1", "k2", "WEIGHTS", "1", "nof",
+			proto.Error("ERR weight value is not a float"),
+		)
+
+		mustDo(t, c,
+			"ZUNION", "2", "k1", "k2", "AGGREGATE",
+			proto.Error(msgSyntaxError),
+		)
+		mustDo(t, c,
+			"ZUNION", "2", "k1", "k2", "AGGREGATE", "foo",
+			proto.Error(msgSyntaxError),
+		)
+		mustDo(t, c,
+			"ZUNION", "2", "k1", "k2", "AGGREGATE", "sum", "foo",
+			proto.Error(msgSyntaxError),
+		)
+	})
+}
+
 func TestZinterstore(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
