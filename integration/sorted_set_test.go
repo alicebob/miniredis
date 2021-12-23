@@ -578,6 +578,54 @@ func TestZscan(t *testing.T) {
 	})
 }
 
+func TestZunion(t *testing.T) {
+	testRaw(t, func(c *client) {
+		// example from the docs https://redis.io/commands/ZUNION
+		c.Do("ZADD", "zset1", "1", "one")
+		c.Do("ZADD", "zset1", "2", "two")
+		c.Do("ZADD", "zset2", "1", "one")
+		c.Do("ZADD", "zset2", "2", "two")
+		c.Do("ZADD", "zset2", "3", "three")
+		c.Do("ZUNION", "2", "zset1", "zset2")
+		c.Do("ZUNION", "2", "zset1", "zset2", "WITHSCORES")
+	})
+	testRaw(t, func(c *client) {
+		c.Do("ZADD", "h1", "1.0", "key1")
+		c.Do("ZADD", "h1", "2.0", "key2")
+		c.Do("ZADD", "h2", "1.0", "key1")
+		c.Do("ZADD", "h2", "4.0", "key2")
+		c.Do("ZUNION", "2", "h1", "h2", "WITHSCORES")
+
+		c.Do("ZUNION", "2", "h1", "h2", "WEIGHTS", "2.0", "12", "WITHSCORES")
+		c.Do("ZUNION", "2", "h1", "h2", "WEIGHTS", "2", "-12", "WITHSCORES")
+
+		c.Do("ZUNION", "2", "h1", "h2", "AGGREGATE", "min", "WITHSCORES")
+		c.Do("ZUNION", "2", "h1", "h2", "AGGREGATE", "max", "WITHSCORES")
+		c.Do("ZUNION", "2", "h1", "h2", "AGGREGATE", "sum", "WITHSCORES")
+
+		// Error cases
+		c.Error("wrong number", "ZUNION")
+		c.Error("wrong number", "ZUNION", "noint")
+		c.Error("at least 1", "ZUNION", "0", "f")
+		c.Error("syntax error", "ZUNION", "2", "f")
+		c.Error("at least 1", "ZUNION", "-1", "f")
+		c.Error("syntax error", "ZUNION", "2", "f1", "f2", "f3")
+		c.Error("syntax error", "ZUNION", "2", "f1", "f2", "WEIGHTS")
+		c.Error("syntax error", "ZUNION", "2", "f1", "f2", "WEIGHTS", "1")
+		c.Error("syntax error", "ZUNION", "2", "f1", "f2", "WEIGHTS", "1", "2", "3")
+		c.Error("not a float", "ZUNION", "2", "f1", "f2", "WEIGHTS", "f", "2")
+		c.Error("syntax error", "ZUNION", "2", "f1", "f2", "AGGREGATE", "foo")
+		c.Do("SET", "str", "1")
+		c.Error("wrong kind", "ZUNION", "1", "str")
+	})
+	// not a sorted set, still fine
+	testRaw(t, func(c *client) {
+		c.Do("SADD", "super", "1", "2", "3")
+		c.Do("SADD", "exclude", "3")
+		c.Do("ZUNION", "2", "super", "exclude", "weights", "1", "0", "aggregate", "min", "withscores")
+	})
+}
+
 func TestZunionstore(t *testing.T) {
 	testRaw(t, func(c *client) {
 		c.Do("ZADD", "h1", "1.0", "key1")

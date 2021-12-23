@@ -1248,7 +1248,7 @@ func (m *Miniredis) cmdZunion(c *server.Peer, cmd string, args []string) {
 		} else {
 			c.WriteLen(len(sset))
 		}
-		for _, el := range sset.byScore(desc) {
+		for _, el := range sset.byScore(asc) {
 			c.WriteBulk(el.member)
 			if withScores {
 				c.WriteFloat(el.score)
