@@ -1551,27 +1551,27 @@ func TestZunion(t *testing.T) {
 
 	t.Run("simple case", func(t *testing.T) {
 		mustDo(t, c,
-			"ZUNION", "2", "h1", "h2", proto.Strings("field2", "field1"),
+			"ZUNION", "2", "h1", "h2", proto.Strings("field1", "field2"),
 		)
 	})
 
 	t.Run("WITHSCORES", func(t *testing.T) {
 		mustDo(t, c,
-			"ZUNION", "2", "h1", "h2", "WITHSCORES", proto.Strings("field2", "4", "field1", "2"),
+			"ZUNION", "2", "h1", "h2", "WITHSCORES", proto.Strings("field1", "2", "field2", "4"),
 		)
 	})
 
 	t.Run("WEIGHTS", func(t *testing.T) {
 		mustDo(t, c,
 			"ZUNION", "2", "h1", "h2", "WeiGHtS", "4.5", "12", "WITHSCORES",
-			proto.Strings("field2", "33", "field1", "16.5"),
+			proto.Strings("field1", "16.5", "field2", "33"),
 		)
 	})
 
 	t.Run("AGGREGATE", func(t *testing.T) {
 		mustDo(t, c,
 			"ZUNION", "2", "h1", "h2", "AgGrEgAtE", "min", "WITHSCORES",
-			proto.Strings("field2", "2", "field1", "1"),
+			proto.Strings("field1", "1", "field2", "2"),
 		)
 	})
 

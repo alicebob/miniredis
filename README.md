@@ -168,6 +168,7 @@ Implemented commands:
    - ZREVRANGEBYSCORE
    - ZREVRANK
    - ZSCORE
+   - ZUNION
    - ZUNIONSTORE
    - ZSCAN
  - Stream keys
