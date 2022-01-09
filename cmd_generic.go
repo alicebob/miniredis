@@ -35,6 +35,8 @@ func commandsGeneric(m *Miniredis) {
 	m.srv.Register("TTL", m.cmdTTL)
 	m.srv.Register("TYPE", m.cmdType)
 	m.srv.Register("SCAN", m.cmdScan)
+	// COPY
+	m.srv.Register("COPY", m.cmdCopy)
 }
 
 // generic expire command for EXPIRE, PEXPIRE, EXPIREAT, PEXPIREAT
@@ -539,5 +541,37 @@ func (m *Miniredis) cmdScan(c *server.Peer, cmd string, args []string) {
 		for _, k := range keys {
 			c.WriteBulk(k)
 		}
+	})
+}
+
+// COPY
+func (m *Miniredis) cmdCopy(c *server.Peer, cmd string, args []string) {
+	if len(args) != 2 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
+	}
+	if !m.handleAuth(c) {
+		return
+	}
+	if m.checkPubsub(c, cmd) {
+		return
+	}
+
+	from, to := args[0], args[1]
+
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
+		db := m.db(ctx.selectedDB)
+
+		if !db.exists(from) {
+			c.WriteInt(0)
+			return
+		}
+
+		if !db.copy(from, to) {
+			c.WriteInt(0)
+			return
+		}
+		c.WriteInt(1)
 	})
 }

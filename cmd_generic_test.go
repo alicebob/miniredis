@@ -762,3 +762,33 @@ func TestRenamenx(t *testing.T) {
 		)
 	})
 }
+
+func TestCopy(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := proto.Dial(s.Addr())
+	ok(t, err)
+	defer c.Close()
+
+	s.Set("key1", "value")
+	s.CheckGet(t, "key1", "value")
+	s.Copy("key1", "key2")
+	// should return 1 after a successful copy operation:
+	must1(t, c, "COPY", "key1", "key2")
+	s.CheckGet(t, "key2", "value")
+
+	// should return 0 when trying to copy a nonexistent key:
+	t.Run("nonexistent key", func(t *testing.T) {
+		must0(t, c, "COPY", "nosuch", "to")
+	})
+
+	// should return 0 when trying to overwrite an existing key:
+	t.Run("existing key", func(t *testing.T) {
+		s.Set("existingkey", "value")
+		s.Set("newkey", "newvalue")
+		must0(t, c, "COPY", "newkey", "existingkey")
+		// existing key value should remain unchanged:
+		s.CheckGet(t, "existingkey", "value")
+	})
+}
