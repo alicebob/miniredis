@@ -299,3 +299,16 @@ func TestPersist(t *testing.T) {
 		c.Do("TTL", "foo")
 	})
 }
+
+func TestCopy(t *testing.T) {
+	testRaw(t, func(c *client) {
+		c.Error("wrong number", "COPY")
+		c.Error("wrong number", "COPY", "a")
+
+		c.Do("SET", "a", "1")
+		c.Do("COPY", "a", "b") // returns 1 - successfully copied
+		c.Do("EXISTS", "b")
+		c.Do("COPY", "nonexistent", "c") // returns 1 - not successfully copied
+		c.Do("RENAME", "b", "c")         // rename the copied key
+	})
+}

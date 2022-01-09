@@ -793,3 +793,19 @@ func (db *RedisDB) HllMerge(destKey string, sourceKeys ...string) error {
 
 	return db.hllMerge(append([]string{destKey}, sourceKeys...))
 }
+
+func (m *Miniredis) Copy(src, dest string) (bool, error) {
+	return m.DB(m.selectedDB).Copy(src, dest)
+}
+
+func (db *RedisDB) Copy(src, dest string) (bool, error) {
+	db.master.Lock()
+	defer db.master.Unlock()
+	defer db.master.signal.Broadcast()
+
+	if !db.exists(src) {
+		return false, ErrKeyNotFound
+	}
+	// return db.copy(src, dest), nil
+	return true, nil
+}
