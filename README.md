@@ -123,6 +123,7 @@ Implemented commands:
    - RPOPLPUSH
    - RPUSH
    - RPUSHX
+   - LMOVE
  - Pub/Sub (complete)
    - PSUBSCRIBE
    - PUBLISH

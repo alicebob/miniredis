@@ -455,3 +455,52 @@ func TestBrpoplpush(t *testing.T) {
 		},
 	)
 }
+
+func TestLmove(t *testing.T) {
+	testRaw(t, func(c *client) {
+		c.Do("RPUSH", "src", "LR", "LL", "RR", "RL")
+		c.Do("LMOVE", "src", "dst", "LEFT", "RIGHT")
+		c.Do("LRANGE", "src", "0", "-1")
+		c.Do("LRANGE", "dst", "0", "-1")
+		c.Do("LMOVE", "src", "dst", "RIGHT", "LEFT")
+		c.Do("LMOVE", "src", "dst", "LEFT", "LEFT")
+		c.Do("LMOVE", "src", "dst", "RIGHT", "RIGHT") // now empty
+		c.Do("EXISTS", "src")
+		c.Do("LRANGE", "dst", "0", "-1")
+
+		// Cycle left to right
+		c.Do("RPUSH", "round", "aap", "noot", "mies")
+		c.Do("LMOVE", "round", "round", "LEFT", "RIGHT")
+		c.Do("LRANGE", "round", "0", "-1")
+		c.Do("LMOVE", "round", "round", "LEFT", "RIGHT")
+		c.Do("LMOVE", "round", "round", "LEFT", "RIGHT")
+		c.Do("LMOVE", "round", "round", "LEFT", "RIGHT")
+		c.Do("LMOVE", "round", "round", "LEFT", "RIGHT")
+		c.Do("LRANGE", "round", "0", "-1")
+		// Cycle right to left
+		c.Do("LMOVE", "round", "round", "RIGHT", "LEFT")
+		c.Do("LRANGE", "round", "0", "-1")
+		c.Do("LMOVE", "round", "round", "RIGHT", "LEFT")
+		c.Do("LMOVE", "round", "round", "RIGHT", "LEFT")
+		c.Do("LMOVE", "round", "round", "RIGHT", "LEFT")
+		c.Do("LMOVE", "round", "round", "RIGHT", "LEFT")
+		c.Do("LRANGE", "round", "0", "-1")
+		// Cycle same side
+		c.Do("LMOVE", "round", "round", "LEFT", "LEFT")
+		c.Do("LRANGE", "round", "0", "-1")
+		c.Do("LMOVE", "round", "round", "RIGHT", "RIGHT")
+		c.Do("LRANGE", "round", "0", "-1")
+
+		// failure cases
+		c.Do("RPUSH", "chk", "aap", "noot", "mies")
+		c.Error("wrong number", "LMOVE")
+		c.Error("wrong number", "LMOVE", "chk")
+		c.Error("wrong number", "LMOVE", "chk", "dst")
+		c.Error("wrong number", "LMOVE", "chk", "dst", "chk")
+		c.Error("wrong number", "LMOVE", "chk", "dst", "chk", "too", "many")
+		c.Do("SET", "str", "I am a string")
+		c.Error("wrong kind", "LMOVE", "chk", "str", "LEFT", "LEFT")
+		c.Error("wrong kind", "LMOVE", "str", "chk", "LEFT", "LEFT")
+		c.Do("LRANGE", "chk", "0", "-1")
+	})
+}

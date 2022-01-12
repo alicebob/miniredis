@@ -1274,3 +1274,134 @@ func TestBrpoplpushTimeout(t *testing.T) {
 		t.Error("BRPOPLPUSH took too long")
 	}
 }
+
+func TestLmove(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := proto.Dial(s.Addr())
+	ok(t, err)
+	defer c.Close()
+
+	s.Push("src", "LR", "LL", "RR", "RL")
+	s.Push("dst", "m1", "m2", "m3")
+	// RIGHT LEFT
+	{
+		mustDo(t, c,
+			"LMOVE", "src", "dst", "RIGHT", "LEFT",
+			proto.String("RL"),
+		)
+		s.CheckList(t, "src", "LR", "LL", "RR")
+		s.CheckList(t, "dst", "RL", "m1", "m2", "m3")
+	}
+	// LEFT RIGHT
+	{
+		mustDo(t, c,
+			"LMOVE", "src", "dst", "LEFT", "RIGHT",
+			proto.String("LR"),
+		)
+		s.CheckList(t, "src", "LL", "RR")
+		s.CheckList(t, "dst", "RL", "m1", "m2", "m3", "LR")
+	}
+	// RIGHT RIGHT
+	{
+		mustDo(t, c,
+			"LMOVE", "src", "dst", "RIGHT", "RIGHT",
+			proto.String("RR"),
+		)
+		s.CheckList(t, "src", "LL")
+		s.CheckList(t, "dst", "RL", "m1", "m2", "m3", "LR", "RR")
+	}
+	// LEFT LEFT
+	{
+		mustDo(t, c,
+			"LMOVE", "src", "dst", "LEFT", "LEFT",
+			proto.String("LL"),
+		)
+		assert(t, !s.Exists("src"), "src exists")
+		s.CheckList(t, "dst", "LL", "RL", "m1", "m2", "m3", "LR", "RR")
+	}
+
+	// Non exising lists
+	{
+		s.Push("ll", "aap", "noot", "mies")
+
+		mustDo(t, c,
+			"LMOVE", "ll", "nosuch", "RIGHT", "LEFT",
+			proto.String("mies"),
+		)
+		assert(t, s.Exists("nosuch"), "nosuch exists")
+		s.CheckList(t, "ll", "aap", "noot")
+		s.CheckList(t, "nosuch", "mies")
+
+		mustNil(t, c,
+			"LMOVE", "nosuch2", "ll", "RIGHT", "LEFT",
+		)
+	}
+
+	// Cycle
+	{
+		s.Push("cycle", "aap", "noot", "mies")
+
+		mustDo(t, c,
+			"LMOVE", "cycle", "cycle", "RIGHT", "LEFT",
+			proto.String("mies"),
+		)
+		s.CheckList(t, "cycle", "mies", "aap", "noot")
+
+		mustDo(t, c,
+			"LMOVE", "cycle", "cycle", "LEFT", "RIGHT",
+			proto.String("mies"),
+		)
+		s.CheckList(t, "cycle", "aap", "noot", "mies")
+	}
+
+	// Error cases
+	t.Run("errors", func(t *testing.T) {
+		s.Push("src", "aap", "noot", "mies")
+		s.Push("dst", "aap", "noot", "mies")
+		mustDo(t, c,
+			"LMOVE",
+			proto.Error(errWrongNumber("lmove")),
+		)
+		mustDo(t, c,
+			"LMOVE", "l",
+			proto.Error(errWrongNumber("lmove")),
+		)
+		mustDo(t, c,
+			"LMOVE", "l", "l",
+			proto.Error(errWrongNumber("lmove")),
+		)
+		mustDo(t, c,
+			"LMOVE", "l", "l", "l",
+			proto.Error(errWrongNumber("lmove")),
+		)
+		mustDo(t, c,
+			"LMOVE", "too", "many", "many", "many", "arguments",
+			proto.Error(errWrongNumber("lmove")),
+		)
+
+		s.Set("str", "string!")
+		mustDo(t, c,
+			"LMOVE", "str", "src", "left", "right",
+			proto.Error(msgWrongType),
+		)
+		mustDo(t, c,
+			"LMOVE", "src", "str", "left", "right",
+			proto.Error(msgWrongType),
+		)
+
+		mustDo(t, c,
+			"LMOVE", "src", "dst", "no", "good",
+			proto.Error("ERR syntax error"),
+		)
+		mustDo(t, c,
+			"LMOVE", "src", "dst", "invalid", "right",
+			proto.Error("ERR syntax error"),
+		)
+		mustDo(t, c,
+			"LMOVE", "src", "dst", "left", "invalid",
+			proto.Error("ERR syntax error"),
+		)
+	})
+}
