@@ -637,3 +637,62 @@ func (m *Miniredis) at(i int, d time.Duration) time.Duration {
 	now := m.effectiveNow()
 	return ts.Sub(now)
 }
+
+// copy does not mind if dst already exists.
+func (m *Miniredis) copy(
+	srcDB *RedisDB, src string,
+	destDB *RedisDB, dst string,
+) error {
+	if !srcDB.exists(src) {
+		return ErrKeyNotFound
+	}
+
+	switch srcDB.t(src) {
+	case "string":
+		destDB.stringKeys[dst] = srcDB.stringKeys[src]
+	case "hash":
+		destDB.hashKeys[dst] = copyHashKey(srcDB.hashKeys[src])
+	case "list":
+		destDB.listKeys[dst] = srcDB.listKeys[src]
+	case "set":
+		destDB.setKeys[dst] = copySetKey(srcDB.setKeys[src])
+	case "zset":
+		destDB.sortedsetKeys[dst] = copySortedSet(srcDB.sortedsetKeys[src])
+	case "stream":
+		destDB.streamKeys[dst] = srcDB.streamKeys[src].copy()
+	case "hll":
+		destDB.hllKeys[dst] = srcDB.hllKeys[src].copy()
+	default:
+		panic("missing case")
+	}
+	destDB.keys[dst] = srcDB.keys[src]
+	destDB.keyVersion[dst]++
+	if v, ok := srcDB.ttl[src]; ok {
+		destDB.ttl[dst] = v
+	}
+	return nil
+}
+
+func copyHashKey(orig hashKey) hashKey {
+	cpy := hashKey{}
+	for k, v := range orig {
+		cpy[k] = v
+	}
+	return cpy
+}
+
+func copySetKey(orig setKey) setKey {
+	cpy := setKey{}
+	for k, v := range orig {
+		cpy[k] = v
+	}
+	return cpy
+}
+
+func copySortedSet(orig sortedSet) sortedSet {
+	cpy := sortedSet{}
+	for k, v := range orig {
+		cpy[k] = v
+	}
+	return cpy
+}

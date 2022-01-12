@@ -34,3 +34,9 @@ func (h *hll) Bytes() []byte {
 	dataBytes, _ := h.inner.MarshalBinary()
 	return dataBytes
 }
+
+func (h *hll) copy() *hll {
+	return &hll{
+		inner: h.inner.Clone(),
+	}
+}

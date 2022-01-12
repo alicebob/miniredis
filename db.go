@@ -112,37 +112,6 @@ func (db *RedisDB) rename(from, to string) {
 	db.del(from, true)
 }
 
-func (db *RedisDB) copy(from, to string) bool {
-	if _, ok := db.keys[to]; ok {
-		return false
-	}
-	db.keys[to] = from
-	switch db.t(from) {
-	case "string":
-		db.stringKeys[to] = db.stringKeys[from]
-	case "hash":
-		db.hashKeys[to] = db.hashKeys[from]
-	case "list":
-		db.listKeys[to] = db.listKeys[from]
-	case "set":
-		db.setKeys[to] = db.setKeys[from]
-	case "zset":
-		db.sortedsetKeys[to] = db.sortedsetKeys[from]
-	case "stream":
-		db.streamKeys[to] = db.streamKeys[from]
-	case "hll":
-		db.hllKeys[to] = db.hllKeys[from]
-	default:
-		panic("missing case")
-	}
-	db.keys[to] = db.keys[from]
-	db.keyVersion[to]++
-	if v, ok := db.ttl[from]; ok {
-		db.ttl[to] = v
-	}
-	return true
-}
-
 func (db *RedisDB) del(k string, delTTL bool) {
 	if !db.exists(k) {
 		return

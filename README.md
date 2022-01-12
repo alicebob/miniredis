@@ -34,6 +34,7 @@ Implemented commands:
    - SWAPDB
    - QUIT
  - Key
+   - COPY
    - DEL
    - EXISTS
    - EXPIRE

@@ -771,12 +771,13 @@ func TestCopy(t *testing.T) {
 	ok(t, err)
 	defer c.Close()
 
-	s.Set("key1", "value")
-	s.CheckGet(t, "key1", "value")
-	s.Copy("key1", "key2")
-	// should return 1 after a successful copy operation:
-	must1(t, c, "COPY", "key1", "key2")
-	s.CheckGet(t, "key2", "value")
+	t.Run("basic", func(t *testing.T) {
+		s.Set("key1", "value")
+		// should return 1 after a successful copy operation:
+		must1(t, c, "COPY", "key1", "key2")
+		s.CheckGet(t, "key2", "value")
+		equals(t, "string", s.Type("key2"))
+	})
 
 	// should return 0 when trying to copy a nonexistent key:
 	t.Run("nonexistent key", func(t *testing.T) {
@@ -790,5 +791,41 @@ func TestCopy(t *testing.T) {
 		must0(t, c, "COPY", "newkey", "existingkey")
 		// existing key value should remain unchanged:
 		s.CheckGet(t, "existingkey", "value")
+	})
+
+	t.Run("destination db", func(t *testing.T) {
+		s.Set("akey1", "value")
+		must1(t, c, "COPY", "akey1", "akey2", "DB", "2")
+		s.Select(2)
+		s.CheckGet(t, "akey2", "value")
+		equals(t, "string", s.Type("akey2"))
+	})
+	s.Select(0)
+
+	t.Run("replace", func(t *testing.T) {
+		s.Set("rkey1", "value")
+		s.Set("rkey2", "another")
+		must1(t, c, "COPY", "rkey1", "rkey2", "REPLACE")
+		s.CheckGet(t, "rkey2", "value")
+		equals(t, "string", s.Type("rkey2"))
+	})
+
+	t.Run("direct", func(t *testing.T) {
+		s.Set("d1", "value")
+		ok(t, s.Copy(0, "d1", 0, "d2"))
+		equals(t, "string", s.Type("d2"))
+		s.CheckGet(t, "d2", "value")
+	})
+
+	t.Run("errors", func(t *testing.T) {
+		mustDo(t, c, "COPY",
+			proto.Error(errWrongNumber("copy")),
+		)
+		mustDo(t, c, "COPY", "foo",
+			proto.Error(errWrongNumber("copy")),
+		)
+		mustDo(t, c, "COPY", "foo", "bar", "baz",
+			proto.Error(msgSyntaxError),
+		)
 	})
 }

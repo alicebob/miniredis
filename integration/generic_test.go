@@ -304,11 +304,123 @@ func TestCopy(t *testing.T) {
 	testRaw(t, func(c *client) {
 		c.Error("wrong number", "COPY")
 		c.Error("wrong number", "COPY", "a")
+		c.Error("syntax", "COPY", "a", "b", "c")
+		c.Error("syntax", "COPY", "a", "b", "DB")
+		c.Error("range", "COPY", "a", "b", "DB", "-1")
+		c.Error("integer", "COPY", "a", "b", "DB", "foo")
+		c.Error("syntax", "COPY", "a", "b", "DB", "1", "REPLACE", "foo")
 
 		c.Do("SET", "a", "1")
 		c.Do("COPY", "a", "b") // returns 1 - successfully copied
 		c.Do("EXISTS", "b")
+		c.Do("GET", "b")
+		c.Do("TYPE", "b")
+
 		c.Do("COPY", "nonexistent", "c") // returns 1 - not successfully copied
 		c.Do("RENAME", "b", "c")         // rename the copied key
+
+		t.Run("replace option", func(t *testing.T) {
+			c.Do("SET", "fromme", "1")
+			c.Do("HSET", "replaceme", "foo", "bar")
+			c.Do("COPY", "fromme", "replaceme", "REPLACE")
+			c.Do("TYPE", "replaceme")
+			c.Do("GET", "replaceme")
+		})
+
+		t.Run("different DB", func(t *testing.T) {
+			c.Do("SELECT", "2")
+			c.Do("SET", "fromme", "1")
+			c.Do("COPY", "fromme", "replaceme", "DB", "3")
+			c.Do("EXISTS", "replaceme") // your value is in another db
+			c.Do("SELECT", "3")
+			c.Do("EXISTS", "replaceme")
+			c.Do("TYPE", "replaceme")
+			c.Do("GET", "replaceme")
+		})
+		c.Do("SELECT", "0")
+
+		t.Run("copy to self", func(t *testing.T) {
+			// copy to self is never allowed
+			c.Do("SET", "double", "1")
+			c.Error("the same", "COPY", "double", "double")
+			c.Error("the same", "COPY", "double", "double", "REPLACE")
+			c.Do("COPY", "double", "double", "DB", "2") // different DB is fine
+			c.Do("SELECT", "2")
+			c.Do("TYPE", "double")
+
+			c.Error("the same", "COPY", "noexisting", "noexisting") // "copy to self?" check comes before key check
+		})
+		c.Do("SELECT", "0")
+
+		// deep copies?
+		t.Run("hash", func(t *testing.T) {
+			c.Do("HSET", "temp", "paris", "12")
+			c.Do("HSET", "temp", "oslo", "-5")
+			c.Do("COPY", "temp", "temp2")
+			c.Do("TYPE", "temp2")
+			c.Do("HGET", "temp2", "oslo")
+			c.Do("HSET", "temp2", "oslo", "-7")
+			c.Do("HGET", "temp", "oslo")
+			c.Do("HGET", "temp2", "oslo")
+		})
+
+		t.Run("list", func(t *testing.T) {
+			c.Do("LPUSH", "list", "aap", "noot", "mies")
+			c.Do("COPY", "list", "list2")
+			c.Do("TYPE", "list2")
+			c.Do("LPUSH", "list", "vuur")
+			c.Do("LRANGE", "list", "0", "-1")
+			c.Do("LRANGE", "list2", "0", "-1")
+		})
+
+		t.Run("set", func(t *testing.T) {
+			c.Do("SADD", "set", "aap", "noot", "mies")
+			c.Do("COPY", "set", "set2")
+			c.Do("TYPE", "set2")
+			c.DoSorted("SMEMBERS", "set2")
+			c.Do("SADD", "set", "vuur")
+			c.DoSorted("SMEMBERS", "set")
+			c.DoSorted("SMEMBERS", "set2")
+		})
+
+		t.Run("sorted set", func(t *testing.T) {
+			c.Do("ZADD", "zset", "1", "aap", "2", "noot", "3", "mies")
+			c.Do("COPY", "zset", "zset2")
+			c.Do("TYPE", "zset2")
+			c.Do("ZCARD", "zset")
+			c.Do("ZCARD", "zset2")
+			c.Do("ZADD", "zset", "4", "vuur")
+			c.Do("ZCARD", "zset")
+			c.Do("ZCARD", "zset2")
+		})
+
+		t.Run("stream", func(t *testing.T) {
+			c.Do("XADD",
+				"planets",
+				"0-1",
+				"name", "Mercury",
+			)
+			c.Do("COPY", "planets", "planets2")
+			c.Do("XLEN", "planets2")
+			c.Do("TYPE", "planets2")
+
+			c.Do("XADD",
+				"planets",
+				"18446744073709551000-0",
+				"name", "Earth",
+			)
+			c.Do("XLEN", "planets")
+			c.Do("XLEN", "planets2")
+		})
+
+		t.Run("stream", func(t *testing.T) {
+			c.Do("PFADD", "hlog", "42")
+			c.DoApprox(2, "PFCOUNT", "hlog")
+			c.Do("COPY", "hlog", "hlog2")
+			// c.Do("TYPE", "hlog2") broken
+			c.Do("PFADD", "hlog", "44")
+			c.Do("PFCOUNT", "hlog")
+			c.Do("PFCOUNT", "hlog2")
+		})
 	})
 }
