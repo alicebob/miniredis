@@ -35,6 +35,7 @@ func commandsGeneric(m *Miniredis) {
 	m.srv.Register("TTL", m.cmdTTL)
 	m.srv.Register("TYPE", m.cmdType)
 	m.srv.Register("SCAN", m.cmdScan)
+	m.srv.Register("COPY", m.cmdCopy)
 }
 
 // generic expire command for EXPIRE, PEXPIRE, EXPIREAT, PEXPIREAT
@@ -539,5 +540,88 @@ func (m *Miniredis) cmdScan(c *server.Peer, cmd string, args []string) {
 		for _, k := range keys {
 			c.WriteBulk(k)
 		}
+	})
+}
+
+// COPY
+func (m *Miniredis) cmdCopy(c *server.Peer, cmd string, args []string) {
+	if len(args) < 2 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
+	}
+	if !m.handleAuth(c) {
+		return
+	}
+	if m.checkPubsub(c, cmd) {
+		return
+	}
+
+	var opts = struct {
+		from          string
+		to            string
+		destinationDB int
+		replace       bool
+	}{
+		destinationDB: -1,
+	}
+
+	opts.from, opts.to, args = args[0], args[1], args[2:]
+	for len(args) > 0 {
+		switch strings.ToLower(args[0]) {
+		case "db":
+			if len(args) < 2 {
+				setDirty(c)
+				c.WriteError(msgSyntaxError)
+				return
+			}
+			db, err := strconv.Atoi(args[1])
+			if err != nil {
+				setDirty(c)
+				c.WriteError(msgInvalidInt)
+				return
+			}
+			if db < 0 {
+				setDirty(c)
+				c.WriteError(msgDBIndexOutOfRange)
+				return
+			}
+			opts.destinationDB = db
+			args = args[2:]
+		case "replace":
+			opts.replace = true
+			args = args[1:]
+		default:
+			setDirty(c)
+			c.WriteError(msgSyntaxError)
+			return
+		}
+	}
+
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
+		fromDB, toDB := ctx.selectedDB, opts.destinationDB
+		if toDB == -1 {
+			toDB = fromDB
+		}
+
+		if fromDB == toDB && opts.from == opts.to {
+			c.WriteError("ERR source and destination objects are the same")
+			return
+		}
+
+		if !m.db(fromDB).exists(opts.from) {
+			c.WriteInt(0)
+			return
+		}
+
+		if !opts.replace {
+			if m.db(toDB).exists(opts.to) {
+				c.WriteInt(0)
+				return
+			}
+		}
+
+		m.copy(m.db(fromDB), opts.from, m.db(toDB), opts.to)
+		c.WriteInt(1)
 	})
 }

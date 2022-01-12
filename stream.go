@@ -71,6 +71,20 @@ func (s *streamKey) lastID() string {
 	return s.entries[len(s.entries)-1].ID
 }
 
+func (s *streamKey) copy() *streamKey {
+	cpy := &streamKey{
+		entries: s.entries,
+	}
+	groups := map[string]*streamGroup{}
+	for k, v := range s.groups {
+		gr := v.copy()
+		gr.stream = cpy
+		groups[k] = gr
+	}
+	cpy.groups = groups
+	return cpy
+}
+
 func parseStreamID(id string) ([2]uint64, error) {
 	var (
 		res [2]uint64
@@ -346,4 +360,17 @@ func (g *streamGroup) pendingCount(consumer string) int {
 		}
 	}
 	return n
+}
+
+func (g *streamGroup) copy() *streamGroup {
+	cns := map[string]consumer{}
+	for k, v := range g.consumers {
+		cns[k] = v
+	}
+	return &streamGroup{
+		// don't copy stream
+		lastID:    g.lastID,
+		pending:   g.pending,
+		consumers: cns,
+	}
 }

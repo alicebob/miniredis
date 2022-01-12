@@ -45,6 +45,7 @@ const (
 	msgXtrimInvalidStrategy = "ERR unsupported XTRIM strategy. Please use MAXLEN, MINID"
 	msgXtrimInvalidMaxLen   = "ERR value is not an integer or out of range"
 	msgXtrimInvalidLimit    = "ERR syntax error, LIMIT cannot be used without the special ~ option"
+	msgDBIndexOutOfRange    = "ERR DB index is out of range"
 )
 
 func errWrongNumber(cmd string) string {

@@ -793,3 +793,11 @@ func (db *RedisDB) HllMerge(destKey string, sourceKeys ...string) error {
 
 	return db.hllMerge(append([]string{destKey}, sourceKeys...))
 }
+
+// Copy a value.
+// Needs the IDs of both the source and dest DBs (which can differ).
+// Returns ErrKeyNotFound if src does not exist.
+// Overwrites dest if it already exists (unlike the redis command, which needs a flag to allow that).
+func (m *Miniredis) Copy(srcDB int, src string, destDB int, dest string) error {
+	return m.copy(m.DB(srcDB), src, m.DB(destDB), dest)
+}

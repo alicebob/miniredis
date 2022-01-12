@@ -227,7 +227,7 @@ func (m *Miniredis) cmdSelect(c *server.Peer, cmd string, args []string) {
 			return
 		}
 		if id < 0 {
-			c.WriteError("ERR DB index is out of range")
+			c.WriteError(msgDBIndexOutOfRange)
 			setDirty(c)
 			return
 		}
@@ -262,7 +262,7 @@ func (m *Miniredis) cmdSwapdb(c *server.Peer, cmd string, args []string) {
 			return
 		}
 		if id1 < 0 || id2 < 0 {
-			c.WriteError("ERR DB index is out of range")
+			c.WriteError(msgDBIndexOutOfRange)
 			setDirty(c)
 			return
 		}
