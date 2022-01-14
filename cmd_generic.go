@@ -3,6 +3,7 @@
 package miniredis
 
 import (
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -483,9 +484,14 @@ func (m *Miniredis) cmdScan(c *server.Peer, cmd string, args []string) {
 	}
 	args = args[1:]
 
-	// MATCH and COUNT options
-	var withMatch bool
-	var match string
+	// MATCH, COUNT and TYPE options
+	var (
+		withMatch bool
+		match     string
+		withType  bool
+		_type     string
+	)
+
 	for len(args) > 0 {
 		if strings.ToLower(args[0]) == "count" {
 			// we do nothing with count
@@ -512,6 +518,16 @@ func (m *Miniredis) cmdScan(c *server.Peer, cmd string, args []string) {
 			match, args = args[1], args[2:]
 			continue
 		}
+		if strings.ToLower(args[0]) == "type" {
+			if len(args) < 2 {
+				setDirty(c)
+				c.WriteError(msgSyntaxError)
+				return
+			}
+			withType = true
+			_type, args = strings.ToLower(args[1]), args[2:]
+			continue
+		}
 		setDirty(c)
 		c.WriteError(msgSyntaxError)
 		return
@@ -529,7 +545,21 @@ func (m *Miniredis) cmdScan(c *server.Peer, cmd string, args []string) {
 			return
 		}
 
-		keys := db.allKeys()
+		var keys []string
+
+		if withType {
+			keys = make([]string, 0)
+			for k, t := range db.keys {
+				// type must be given exactly; no pattern matching is performed
+				if t == _type {
+					keys = append(keys, k)
+				}
+			}
+			sort.Strings(keys) // To make things deterministic.
+		} else {
+			keys = db.allKeys()
+		}
+
 		if withMatch {
 			keys, _ = matchKeys(keys, match)
 		}
