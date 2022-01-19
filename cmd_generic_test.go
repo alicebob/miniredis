@@ -682,6 +682,29 @@ func TestScan(t *testing.T) {
 		)
 	})
 
+	t.Run("type", func(t *testing.T) {
+		s.SAdd("typetest", "value")
+
+		mustDo(t, c,
+			"SCAN", "0", "TYPE", "set",
+			proto.Array(
+				proto.String("0"),
+				proto.Array(
+					proto.String("typetest"),
+				),
+			),
+		)
+
+		// types aren't checked, they just return an empty array
+		mustDo(t, c,
+			"SCAN", "0", "TYPE", "not-a-type",
+			proto.Array(
+				proto.String("0"),
+				proto.Array(),
+			),
+		)
+	})
+
 	t.Run("errors", func(t *testing.T) {
 		mustDo(t, c,
 			"SCAN",
@@ -702,6 +725,14 @@ func TestScan(t *testing.T) {
 		mustDo(t, c,
 			"SCAN", "1", "COUNT", "noint",
 			proto.Error("ERR value is not an integer or out of range"),
+		)
+		mustDo(t, c,
+			"SCAN", "1", "TYPE",
+			proto.Error("ERR syntax error"),
+		)
+		mustDo(t, c,
+			"SCAN", "1", "not-an-option",
+			proto.Error("ERR syntax error"),
 		)
 	})
 }

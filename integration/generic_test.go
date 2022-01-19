@@ -152,6 +152,14 @@ func TestScan(t *testing.T) {
 		c.Do("SCAN", "0", "MATCH", "anoth*", "COUNT", "100")
 		c.Do("SCAN", "0", "COUNT", "100", "MATCH", "anoth*")
 
+		c.Do("SADD", "setkey", "setitem")
+		c.Do("SCAN", "0", "TYPE", "set")
+		c.Do("SCAN", "0", "tYpE", "sEt")
+		c.Do("SCAN", "0", "TYPE", "not-a-type")
+		c.Do("SCAN", "0", "TYPE", "set", "MATCH", "setkey")
+		c.Do("SCAN", "0", "TYPE", "set", "COUNT", "100")
+		c.Do("SCAN", "0", "TYPE", "set", "MATCH", "setkey", "COUNT", "100")
+
 		// Can't really test multiple keys.
 		// c.Do("SET", "key2", "value2")
 		// c.Do("SCAN", "0")
@@ -164,6 +172,7 @@ func TestScan(t *testing.T) {
 		c.Error("syntax error", "SCAN", "0", "MATCH")
 		c.Error("syntax error", "SCAN", "0", "garbage")
 		c.Error("syntax error", "SCAN", "0", "COUNT", "12", "MATCH", "foo", "garbage")
+		c.Error("syntax error", "SCAN", "0", "TYPE")
 	})
 }
 
