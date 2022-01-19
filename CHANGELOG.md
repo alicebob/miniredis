@@ -1,6 +1,13 @@
 ## Changelog
 
 
+### v2.18.0
+
+- support for ZUNION (thanks @propan)
+- support for COPY (thanks @matiasinsaurralde and @rockitbaby)
+- support for LMOVE (thanks @btwear)
+
+
 ### v2.17.0
 
 - added miniredis.RunT(t)
