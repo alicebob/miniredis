@@ -529,11 +529,19 @@ func (db *RedisDB) setDiff(keys []string) (setKey, error) {
 }
 
 // setInter implements the logic behind SINTER*
+// len keys needs to be > 0
 func (db *RedisDB) setInter(keys []string) (setKey, error) {
+	// all keys must either not exist, or be of type "set".
+	for _, key := range keys {
+		if db.exists(key) && db.t(key) != "set" {
+			return nil, ErrWrongType
+		}
+	}
+
 	key := keys[0]
 	keys = keys[1:]
 	if !db.exists(key) {
-		return setKey{}, nil
+		return nil, nil
 	}
 	if db.t(key) != "set" {
 		return nil, ErrWrongType

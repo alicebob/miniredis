@@ -1624,7 +1624,11 @@ func (m *Miniredis) cmdZrandmember(c *server.Peer, cmd string, args []string) {
 		db := m.db(ctx.selectedDB)
 
 		if !db.exists(opts.key) {
-			c.WriteNull()
+			if opts.withCount {
+				c.WriteLen(0)
+			} else {
+				c.WriteNull()
+			}
 			return
 		}
 
