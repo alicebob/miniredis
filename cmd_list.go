@@ -36,6 +36,7 @@ func commandsList(m *Miniredis) {
 	m.srv.Register("RPOPLPUSH", m.cmdRpoplpush)
 	m.srv.Register("RPUSH", m.cmdRpush)
 	m.srv.Register("RPUSHX", m.cmdRpushx)
+	m.srv.Register("LMOVE", m.cmdLmove)
 }
 
 // BLPOP
@@ -770,4 +771,53 @@ func (m *Miniredis) cmdBrpoplpush(c *server.Peer, cmd string, args []string) {
 			c.WriteLen(-1)
 		},
 	)
+}
+
+// LMOVE
+func (m *Miniredis) cmdLmove(c *server.Peer, cmd string, args []string) {
+	if len(args) != 4 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
+	}
+	if !m.handleAuth(c) {
+		return
+	}
+	if m.checkPubsub(c, cmd) {
+		return
+	}
+
+	src, dst, srcDir, dstDir := args[0], args[1], strings.ToLower(args[2]), strings.ToLower(args[3])
+
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
+		db := m.db(ctx.selectedDB)
+
+		if !db.exists(src) {
+			c.WriteNull()
+			return
+		}
+		if db.t(src) != "list" || (db.exists(dst) && db.t(dst) != "list") {
+			c.WriteError(msgWrongType)
+			return
+		}
+		var elem string
+		if srcDir == "left" {
+			elem = db.listLpop(src)
+		} else if srcDir == "right" {
+			elem = db.listPop(src)
+		} else {
+			c.WriteError(msgSyntaxError)
+			return
+		}
+
+		if dstDir == "left" {
+			db.listLpush(dst, elem)
+		} else if dstDir == "right" {
+			db.listPush(dst, elem)
+		} else {
+			c.WriteError(msgSyntaxError)
+			return
+		}
+		c.WriteBulk(elem)
+	})
 }
