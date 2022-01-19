@@ -2030,7 +2030,7 @@ func TestSortedSetRandmember(t *testing.T) {
 
 		mustDo(t, c,
 			"ZRANDMEMBER", "nosuch", "40",
-			proto.Nil,
+			proto.Array(),
 		)
 	})
 
@@ -2058,12 +2058,12 @@ func TestSortedSetRandmember(t *testing.T) {
 
 		mustDo(t, c,
 			"ZRANDMEMBER", "nosuch", "-33",
-			proto.Nil,
+			proto.Array(),
 		)
 
 		mustDo(t, c,
 			"ZRANDMEMBER", "nosuch", "-33", "WITHSCORES",
-			proto.Nil,
+			proto.Array(),
 		)
 	})
 

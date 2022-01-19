@@ -263,7 +263,7 @@ func TestSetSinter(t *testing.T) {
 		// Wrong type
 		c.Do("SET", "str", "I am a string")
 		c.Error("wrong kind", "SINTER", "s1", "str")
-		c.Do("SINTER", "nosuch", "str") // SINTER succeeds if an input type is wrong as long as the preceding inputs result in an empty set
+		c.Error("wrong kind", "SINTER", "nosuch", "str")
 		c.Error("wrong kind", "SINTER", "str", "nosuch")
 		c.Error("wrong kind", "SINTER", "str", "s1")
 		c.Error("wrong kind", "SINTERSTORE", "res", "str", "s1")
