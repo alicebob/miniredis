@@ -3,6 +3,7 @@ package miniredis
 import (
 	"context"
 	"fmt"
+	"math"
 	"math/big"
 	"strings"
 	"sync"
@@ -215,7 +216,9 @@ func redisRange(l, start, end int, stringSymantics bool) (int, int) {
 			}
 		}
 	}
-	end++ // end argument is inclusive in Redis.
+	if end < math.MaxInt {
+		end++ // end argument is inclusive in Redis.
+	}
 	if end > l {
 		end = l
 	}
