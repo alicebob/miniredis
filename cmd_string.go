@@ -846,38 +846,40 @@ func (m *Miniredis) cmdBitcount(c *server.Peer, cmd string, args []string) {
 		return
 	}
 
-	var (
-		useRange   = false
-		start, end = 0, 0
-		key        = args[0]
-	)
-	args = args[1:]
+	var opts struct {
+		useRange   bool
+		start, end int
+		key        string
+	}
+	opts.key, args = args[0], args[1:]
 	if len(args) >= 2 {
-		useRange = true
+		opts.useRange = true
 		var err error
-		start, err = strconv.Atoi(args[0])
+		n, err := strconv.Atoi(args[0])
 		if err != nil {
 			setDirty(c)
 			c.WriteError(msgInvalidInt)
 			return
 		}
-		end, err = strconv.Atoi(args[1])
+		opts.start = n
+		n, err = strconv.Atoi(args[1])
 		if err != nil {
 			setDirty(c)
 			c.WriteError(msgInvalidInt)
 			return
 		}
+		opts.end = n
 		args = args[2:]
 	}
 
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
-		if !db.exists(key) {
+		if !db.exists(opts.key) {
 			c.WriteInt(0)
 			return
 		}
-		if db.t(key) != "string" {
+		if db.t(opts.key) != "string" {
 			c.WriteError(msgWrongType)
 			return
 		}
@@ -888,9 +890,9 @@ func (m *Miniredis) cmdBitcount(c *server.Peer, cmd string, args []string) {
 			return
 		}
 
-		v := db.stringKeys[key]
-		if useRange {
-			v = withRange(v, start, end)
+		v := db.stringKeys[opts.key]
+		if opts.useRange {
+			v = withRange(v, opts.start, opts.end)
 		}
 
 		c.WriteInt(countBits([]byte(v)))

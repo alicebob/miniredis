@@ -353,6 +353,12 @@ func TestBitcount(t *testing.T) {
 		c.Do("BITCOUNT", "str", "-2", "-12")
 		c.Do("BITCOUNT", "utf8", "0", "0")
 
+		c.Do("SETBIT", "A", "10", "1")
+		c.Do("BITCOUNT", "A", "0", "100000")
+		c.Do("BITCOUNT", "A", "0", "9223372036854775806")
+		c.Do("BITCOUNT", "A", "0", "9223372036854775807") // max int64
+		c.Error("out of range", "BITCOUNT", "A", "0", "9223372036854775808")
+
 		c.Error("wrong number", "BITCOUNT")
 		c.Do("BITCOUNT", "wrong", "arguments")
 		c.Error("syntax error", "BITCOUNT", "str", "4", "2", "2", "2", "2")
