@@ -86,6 +86,8 @@ func mkLua(srv *server.Server, c *server.Peer) (map[string]lua.LGFunction, map[s
 					l.Push(lua.LString(string(r)))
 				case []interface{}:
 					l.Push(redisToLua(l, r))
+				case server.Simple:
+					l.Push(luaStatusReply(string(r)))
 				case string:
 					l.Push(lua.LString(r))
 				case error:
@@ -129,8 +131,7 @@ func mkLua(srv *server.Server, c *server.Peer) (map[string]lua.LGFunction, map[s
 				l.Error(lua.LString("wrong number or type of arguments"), 1)
 				return 0
 			}
-			res := &lua.LTable{}
-			res.RawSetString("ok", lua.LString(msg))
+			res := luaStatusReply(string(msg))
 			l.Push(res)
 			return 1
 		},
@@ -170,11 +171,7 @@ func luaToRedis(l *lua.LState, c *server.Peer, value lua.LValue) {
 		c.WriteInt(int(lua.LVAsNumber(value)))
 	case lua.LString:
 		s := lua.LVAsString(value)
-		if s == "OK" {
-			c.WriteInline(s)
-		} else {
-			c.WriteBulk(s)
-		}
+		c.WriteBulk(s)
 	case *lua.LTable:
 		// special case for tables with an 'err' or 'ok' field
 		// note: according to the docs this only counts when 'err' or 'ok' is
@@ -236,4 +233,10 @@ func redisToLua(l *lua.LState, res []interface{}) *lua.LTable {
 		l.RawSet(rettb, lua.LNumber(rettb.Len()+1), v)
 	}
 	return rettb
+}
+
+func luaStatusReply(msg string) *lua.LTable {
+	tab := &lua.LTable{}
+	tab.RawSetString("ok", lua.LString(msg))
+	return tab
 }
