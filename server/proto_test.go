@@ -131,7 +131,7 @@ func TestParseReply(t *testing.T) {
 	for i, c := range []cas{
 		{
 			payload: "+hello world\r\n",
-			res:     "hello world",
+			res:     Simple("hello world"),
 		},
 		{
 			payload: "-some error\r\n",

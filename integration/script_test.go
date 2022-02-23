@@ -243,6 +243,15 @@ func TestLuaCall(t *testing.T) {
 		c.Do("EVAL", `return redis.call("GET", "foo")`, "0")
 		c.Do("EVAL", `return redis.call("SET", "foo", 42)`, "0")
 		c.Do("EVAL", `redis.log(redis.LOG_NOTICE, "hello")`, "0")
+		c.Do("EVAL", `local res = redis.call("GET", "foo"); return res['ok']`, "0")
+	})
+
+	testRaw(t, func(c *client) {
+		script := `
+			local result = redis.call('SET', 'mykey', 'myvalue', 'NX');
+			return result['ok'];
+		`
+		c.Do("EVAL", script, "0")
 	})
 
 	// datatype errors
