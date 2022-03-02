@@ -486,21 +486,30 @@ func (m *Miniredis) makeCmdZrange(reverse bool) server.Cmd {
 			return
 		}
 
-		key := args[0]
+		var opts struct {
+			Key        string
+			Start      int
+			End        int
+			WithScores bool
+		}
+
+		opts.Key = args[0]
 		start, err := strconv.Atoi(args[1])
 		if err != nil {
 			setDirty(c)
 			c.WriteError(msgInvalidInt)
 			return
 		}
+		opts.Start = start
+
 		end, err := strconv.Atoi(args[2])
 		if err != nil {
 			setDirty(c)
 			c.WriteError(msgInvalidInt)
 			return
 		}
+		opts.End = end
 
-		withScores := false
 		if len(args) > 4 {
 			c.WriteError(msgSyntaxError)
 			return
@@ -511,36 +520,36 @@ func (m *Miniredis) makeCmdZrange(reverse bool) server.Cmd {
 				c.WriteError(msgSyntaxError)
 				return
 			}
-			withScores = true
+			opts.WithScores = true
 		}
 
 		withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 			db := m.db(ctx.selectedDB)
 
-			if !db.exists(key) {
+			if !db.exists(opts.Key) {
 				c.WriteLen(0)
 				return
 			}
 
-			if db.t(key) != "zset" {
+			if db.t(opts.Key) != "zset" {
 				c.WriteError(ErrWrongType.Error())
 				return
 			}
 
-			members := db.ssetMembers(key)
+			members := db.ssetMembers(opts.Key)
 			if reverse {
 				reverseSlice(members)
 			}
-			rs, re := redisRange(len(members), start, end, false)
-			if withScores {
+			rs, re := redisRange(len(members), opts.Start, opts.End, false)
+			if opts.WithScores {
 				c.WriteLen((re - rs) * 2)
 			} else {
 				c.WriteLen(re - rs)
 			}
 			for _, el := range members[rs:re] {
 				c.WriteBulk(el)
-				if withScores {
-					c.WriteFloat(db.ssetScore(key, el))
+				if opts.WithScores {
+					c.WriteFloat(db.ssetScore(opts.Key, el))
 				}
 			}
 		})
@@ -1075,7 +1084,7 @@ func parseFloatRange(s string) (float64, bool, error) {
 	return f, inclusive, err
 }
 
-// parseLexrange handles ZRANGEBYLEX ranges. They start with '[', '(', or are
+// parseLexrange handles ZRANGE{,BYLEX} ranges. They start with '[', '(', or are
 // '+' or '-'.
 // Returns range, inclusive, error.
 // On '+' or '-' that's just returned.
