@@ -11,10 +11,6 @@ import (
 	"github.com/alicebob/miniredis/v2/server"
 )
 
-var (
-	errInvalidRangeItem = errors.New(msgInvalidRangeItem)
-)
-
 // commandsSortedSet handles all sorted set operations.
 func commandsSortedSet(m *Miniredis) {
 	m.srv.Register("ZADD", m.cmdZadd)
@@ -435,37 +431,39 @@ func (m *Miniredis) cmdZlexcount(c *server.Peer, cmd string, args []string) {
 		return
 	}
 
-	key := args[0]
-	min, minIncl, err := parseLexrange(args[1])
-	if err != nil {
-		setDirty(c)
-		c.WriteError(err.Error())
+	var opts struct {
+		Key     string
+		Min     string
+		MinIncl bool
+		Max     string
+		MaxIncl bool
+	}
+
+	opts.Key = args[0]
+	if ok := optLexrange(c, args[1], &opts.Min, &opts.MinIncl); !ok {
 		return
 	}
-	max, maxIncl, err := parseLexrange(args[2])
-	if err != nil {
-		setDirty(c)
-		c.WriteError(err.Error())
+	if ok := optLexrange(c, args[2], &opts.Max, &opts.MaxIncl); !ok {
 		return
 	}
 
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
-		if !db.exists(key) {
+		if !db.exists(opts.Key) {
 			c.WriteInt(0)
 			return
 		}
 
-		if db.t(key) != "zset" {
+		if db.t(opts.Key) != "zset" {
 			c.WriteError(ErrWrongType.Error())
 			return
 		}
 
-		members := db.ssetMembers(key)
+		members := db.ssetMembers(opts.Key)
 		// Just key sort. If scores are not the same we don't care.
 		sort.Strings(members)
-		members = withLexRange(members, min, minIncl, max, maxIncl)
+		members = withLexRange(members, opts.Min, opts.MinIncl, opts.Max, opts.MaxIncl)
 
 		c.WriteInt(len(members))
 	})
@@ -561,69 +559,69 @@ func (m *Miniredis) makeCmdZrangebylex(reverse bool) server.Cmd {
 			return
 		}
 
-		key := args[0]
-		min, minIncl, err := parseLexrange(args[1])
-		if err != nil {
-			setDirty(c)
-			c.WriteError(err.Error())
+		var opts struct {
+			Key        string
+			Min        string
+			MinIncl    bool
+			Max        string
+			MaxIncl    bool
+			WithLimit  bool
+			LimitStart int
+			LimitEnd   int
+		}
+
+		opts.Key = args[0]
+		if ok := optLexrange(c, args[1], &opts.Min, &opts.MinIncl); !ok {
 			return
 		}
-		max, maxIncl, err := parseLexrange(args[2])
-		if err != nil {
-			setDirty(c)
-			c.WriteError(err.Error())
+		if ok := optLexrange(c, args[2], &opts.Max, &opts.MaxIncl); !ok {
 			return
 		}
 		args = args[3:]
 
-		withLimit := false
-		limitStart := 0
-		limitEnd := 0
 		for len(args) > 0 {
-			if strings.ToLower(args[0]) == "limit" {
-				withLimit = true
+			switch strings.ToLower(args[0]) {
+			case "limit":
+				opts.WithLimit = true
 				args = args[1:]
 				if len(args) < 2 {
 					c.WriteError(msgSyntaxError)
 					return
 				}
-				limitStart, err = strconv.Atoi(args[0])
-				if err != nil {
-					setDirty(c)
-					c.WriteError(msgInvalidInt)
+				if ok := optInt(c, args[0], &opts.LimitStart); !ok {
 					return
 				}
-				limitEnd, err = strconv.Atoi(args[1])
-				if err != nil {
-					setDirty(c)
-					c.WriteError(msgInvalidInt)
+				if ok := optInt(c, args[1], &opts.LimitEnd); !ok {
 					return
 				}
 				args = args[2:]
 				continue
+			default:
+				// Syntax error
+				setDirty(c)
+				c.WriteError(msgSyntaxError)
+				return
 			}
-			// Syntax error
-			setDirty(c)
-			c.WriteError(msgSyntaxError)
-			return
 		}
 
 		withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 			db := m.db(ctx.selectedDB)
 
-			if !db.exists(key) {
+			if !db.exists(opts.Key) {
 				c.WriteLen(0)
 				return
 			}
 
-			if db.t(key) != "zset" {
+			if db.t(opts.Key) != "zset" {
 				c.WriteError(ErrWrongType.Error())
 				return
 			}
 
-			members := db.ssetMembers(key)
+			members := db.ssetMembers(opts.Key)
 			// Just key sort. If scores are not the same we don't care.
 			sort.Strings(members)
+			min, max := opts.Min, opts.Max
+			minIncl, maxIncl := opts.MinIncl, opts.MaxIncl
 			if reverse {
 				min, max = max, min
 				minIncl, maxIncl = maxIncl, minIncl
@@ -634,19 +632,19 @@ func (m *Miniredis) makeCmdZrangebylex(reverse bool) server.Cmd {
 			}
 
 			// Apply LIMIT ranges. That's <start> <elements>. Unlike RANGE.
-			if withLimit {
-				if limitStart < 0 {
+			if opts.WithLimit {
+				if opts.LimitStart < 0 {
 					members = nil
 				} else {
-					if limitStart < len(members) {
-						members = members[limitStart:]
+					if opts.LimitStart < len(members) {
+						members = members[opts.LimitStart:]
 					} else {
 						// out of range
 						members = nil
 					}
-					if limitEnd >= 0 {
-						if len(members) > limitEnd {
-							members = members[:limitEnd]
+					if opts.LimitEnd >= 0 {
+						if len(members) > opts.LimitEnd {
+							members = members[:opts.LimitEnd]
 						}
 					}
 				}
@@ -881,40 +879,42 @@ func (m *Miniredis) cmdZremrangebylex(c *server.Peer, cmd string, args []string)
 		return
 	}
 
-	key := args[0]
-	min, minIncl, err := parseLexrange(args[1])
-	if err != nil {
-		setDirty(c)
-		c.WriteError(err.Error())
+	var opts struct {
+		Key     string
+		Min     string
+		MinIncl bool
+		Max     string
+		MaxIncl bool
+	}
+
+	opts.Key = args[0]
+	if ok := optLexrange(c, args[1], &opts.Min, &opts.MinIncl); !ok {
 		return
 	}
-	max, maxIncl, err := parseLexrange(args[2])
-	if err != nil {
-		setDirty(c)
-		c.WriteError(err.Error())
+	if ok := optLexrange(c, args[2], &opts.Max, &opts.MaxIncl); !ok {
 		return
 	}
 
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
-		if !db.exists(key) {
+		if !db.exists(opts.Key) {
 			c.WriteInt(0)
 			return
 		}
 
-		if db.t(key) != "zset" {
+		if db.t(opts.Key) != "zset" {
 			c.WriteError(ErrWrongType.Error())
 			return
 		}
 
-		members := db.ssetMembers(key)
+		members := db.ssetMembers(opts.Key)
 		// Just key sort. If scores are not the same we don't care.
 		sort.Strings(members)
-		members = withLexRange(members, min, minIncl, max, maxIncl)
+		members = withLexRange(members, opts.Min, opts.MinIncl, opts.Max, opts.MaxIncl)
 
 		for _, el := range members {
-			db.ssetRem(key, el)
+			db.ssetRem(opts.Key, el)
 		}
 		c.WriteInt(len(members))
 	})
@@ -1072,27 +1072,6 @@ func parseFloatRange(s string) (float64, bool, error) {
 	}
 	f, err := strconv.ParseFloat(s, 64)
 	return f, inclusive, err
-}
-
-// parseLexrange handles ZRANGE{,BYLEX} ranges. They start with '[', '(', or are
-// '+' or '-'.
-// Returns range, inclusive, error.
-// On '+' or '-' that's just returned.
-func parseLexrange(s string) (string, bool, error) {
-	if len(s) == 0 {
-		return "", false, errInvalidRangeItem
-	}
-	if s == "+" || s == "-" {
-		return s, false, nil
-	}
-	switch s[0] {
-	case '(':
-		return s[1:], false, nil
-	case '[':
-		return s[1:], true, nil
-	default:
-		return "", false, errInvalidRangeItem
-	}
 }
 
 // withSSRange limits a list of sorted set elements by the ZRANGEBYSCORE range
