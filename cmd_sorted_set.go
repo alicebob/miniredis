@@ -494,33 +494,23 @@ func (m *Miniredis) makeCmdZrange(reverse bool) server.Cmd {
 		}
 
 		opts.Key = args[0]
-		start, err := strconv.Atoi(args[1])
-		if err != nil {
-			setDirty(c)
-			c.WriteError(msgInvalidInt)
+		if ok := optInt(c, args[1], &opts.Start); !ok {
 			return
 		}
-		opts.Start = start
+		if ok := optInt(c, args[2], &opts.End); !ok {
+			return
+		}
+		args = args[3:]
 
-		end, err := strconv.Atoi(args[2])
-		if err != nil {
-			setDirty(c)
-			c.WriteError(msgInvalidInt)
-			return
-		}
-		opts.End = end
-
-		if len(args) > 4 {
-			c.WriteError(msgSyntaxError)
-			return
-		}
-		if len(args) == 4 {
-			if strings.ToLower(args[3]) != "withscores" {
-				setDirty(c)
+		for len(args) > 0 {
+			switch strings.ToLower(args[0]) {
+			case "withscores":
+				opts.WithScores = true
+				args = args[1:]
+			default:
 				c.WriteError(msgSyntaxError)
 				return
 			}
-			opts.WithScores = true
 		}
 
 		withTx(m, c, func(c *server.Peer, ctx *connCtx) {
