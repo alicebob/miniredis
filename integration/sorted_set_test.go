@@ -171,7 +171,7 @@ func TestSortedSetRange(t *testing.T) {
 			"-Inf", "big bang",
 		)
 		c.Do("ZRANGE", "z", "0", "-1")
-		c.Do("ZRANGE", "z", "0", "-1", "WITHSCORES")
+		c.Do("ZRANGE", "z", "0", "-1", "WITHSCORES", "WITHSCORES")
 		c.Do("ZRANGE", "z", "0", "-1", "WiThScOrEs")
 		c.Do("ZRANGE", "z", "0", "-2")
 		c.Do("ZRANGE", "z", "0", "-1000")
@@ -180,6 +180,7 @@ func TestSortedSetRange(t *testing.T) {
 		c.Do("ZRANGE", "z", "300", "-110")
 		c.Do("ZREVRANGE", "z", "0", "-1")
 		c.Do("ZREVRANGE", "z", "0", "-1", "WITHSCORES")
+		c.Do("ZREVRANGE", "z", "0", "-1", "WITHSCORES", "WITHSCORES", "WITHSCORES")
 		c.Do("ZREVRANGE", "z", "0", "-1", "WiThScOrEs")
 		c.Do("ZREVRANGE", "z", "0", "-2")
 		c.Do("ZREVRANGE", "z", "0", "-1000")

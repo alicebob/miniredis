@@ -19,7 +19,7 @@ func commandsSortedSet(m *Miniredis) {
 	m.srv.Register("ZINCRBY", m.cmdZincrby)
 	m.srv.Register("ZINTERSTORE", m.cmdZinterstore)
 	m.srv.Register("ZLEXCOUNT", m.cmdZlexcount)
-	m.srv.Register("ZRANGE", m.makeCmdZrange(false))
+	m.srv.Register("ZRANGE", m.cmdZrange)
 	m.srv.Register("ZRANGEBYLEX", m.makeCmdZrangebylex(false))
 	m.srv.Register("ZRANGEBYSCORE", m.makeCmdZrangebyscore(false))
 	m.srv.Register("ZRANK", m.makeCmdZrank(false))
@@ -27,7 +27,7 @@ func commandsSortedSet(m *Miniredis) {
 	m.srv.Register("ZREMRANGEBYLEX", m.cmdZremrangebylex)
 	m.srv.Register("ZREMRANGEBYRANK", m.cmdZremrangebyrank)
 	m.srv.Register("ZREMRANGEBYSCORE", m.cmdZremrangebyscore)
-	m.srv.Register("ZREVRANGE", m.makeCmdZrange(true))
+	m.srv.Register("ZREVRANGE", m.cmdZrevrange)
 	m.srv.Register("ZREVRANGEBYLEX", m.makeCmdZrangebylex(true))
 	m.srv.Register("ZREVRANGEBYSCORE", m.makeCmdZrangebyscore(true))
 	m.srv.Register("ZREVRANK", m.makeCmdZrank(true))
@@ -469,79 +469,152 @@ func (m *Miniredis) cmdZlexcount(c *server.Peer, cmd string, args []string) {
 	})
 }
 
-// ZRANGE and ZREVRANGE
-func (m *Miniredis) makeCmdZrange(reverse bool) server.Cmd {
-	return func(c *server.Peer, cmd string, args []string) {
-		if len(args) < 3 {
-			setDirty(c)
-			c.WriteError(errWrongNumber(cmd))
-			return
-		}
-		if !m.handleAuth(c) {
-			return
-		}
-		if m.checkPubsub(c, cmd) {
-			return
-		}
-
-		var opts struct {
-			Key        string
-			Start      int
-			End        int
-			WithScores bool
-		}
-
-		opts.Key = args[0]
-		if ok := optInt(c, args[1], &opts.Start); !ok {
-			return
-		}
-		if ok := optInt(c, args[2], &opts.End); !ok {
-			return
-		}
-		args = args[3:]
-
-		for len(args) > 0 {
-			switch strings.ToLower(args[0]) {
-			case "withscores":
-				opts.WithScores = true
-				args = args[1:]
-			default:
-				c.WriteError(msgSyntaxError)
-				return
-			}
-		}
-
-		withTx(m, c, func(c *server.Peer, ctx *connCtx) {
-			db := m.db(ctx.selectedDB)
-
-			if !db.exists(opts.Key) {
-				c.WriteLen(0)
-				return
-			}
-
-			if db.t(opts.Key) != "zset" {
-				c.WriteError(ErrWrongType.Error())
-				return
-			}
-
-			members := db.ssetMembers(opts.Key)
-			if reverse {
-				reverseSlice(members)
-			}
-			rs, re := redisRange(len(members), opts.Start, opts.End, false)
-			if opts.WithScores {
-				c.WriteLen((re - rs) * 2)
-			} else {
-				c.WriteLen(re - rs)
-			}
-			for _, el := range members[rs:re] {
-				c.WriteBulk(el)
-				if opts.WithScores {
-					c.WriteFloat(db.ssetScore(opts.Key, el))
-				}
-			}
-		})
+// ZRANGE
+func (m *Miniredis) cmdZrange(c *server.Peer, cmd string, args []string) {
+	if len(args) < 3 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
 	}
+	if !m.handleAuth(c) {
+		return
+	}
+	if m.checkPubsub(c, cmd) {
+		return
+	}
+
+	var opts struct {
+		Key        string
+		Start      int
+		End        int
+		WithScores bool
+		Reverse    bool
+	}
+
+	opts.Key = args[0]
+	if ok := optInt(c, args[1], &opts.Start); !ok {
+		return
+	}
+	if ok := optInt(c, args[2], &opts.End); !ok {
+		return
+	}
+	args = args[3:]
+
+	for len(args) > 0 {
+		switch strings.ToLower(args[0]) {
+		case "withscores":
+			opts.WithScores = true
+			args = args[1:]
+		default:
+			c.WriteError(msgSyntaxError)
+			return
+		}
+	}
+
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
+		db := m.db(ctx.selectedDB)
+
+		if !db.exists(opts.Key) {
+			c.WriteLen(0)
+			return
+		}
+
+		if db.t(opts.Key) != "zset" {
+			c.WriteError(ErrWrongType.Error())
+			return
+		}
+
+		members := db.ssetMembers(opts.Key)
+		if opts.Reverse {
+			reverseSlice(members)
+		}
+		rs, re := redisRange(len(members), opts.Start, opts.End, false)
+		if opts.WithScores {
+			c.WriteLen((re - rs) * 2)
+		} else {
+			c.WriteLen(re - rs)
+		}
+		for _, el := range members[rs:re] {
+			c.WriteBulk(el)
+			if opts.WithScores {
+				c.WriteFloat(db.ssetScore(opts.Key, el))
+			}
+		}
+	})
+}
+
+// ZREVRANGE
+func (m *Miniredis) cmdZrevrange(c *server.Peer, cmd string, args []string) {
+	reverse := true
+	if len(args) < 3 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
+	}
+	if !m.handleAuth(c) {
+		return
+	}
+	if m.checkPubsub(c, cmd) {
+		return
+	}
+
+	var opts struct {
+		Key        string
+		Start      int
+		End        int
+		WithScores bool
+	}
+
+	opts.Key = args[0]
+	if ok := optInt(c, args[1], &opts.Start); !ok {
+		return
+	}
+	if ok := optInt(c, args[2], &opts.End); !ok {
+		return
+	}
+	args = args[3:]
+
+	for len(args) > 0 {
+		switch strings.ToLower(args[0]) {
+		case "withscores":
+			opts.WithScores = true
+			args = args[1:]
+		default:
+			c.WriteError(msgSyntaxError)
+			return
+		}
+	}
+
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
+		db := m.db(ctx.selectedDB)
+
+		if !db.exists(opts.Key) {
+			c.WriteLen(0)
+			return
+		}
+
+		if db.t(opts.Key) != "zset" {
+			c.WriteError(ErrWrongType.Error())
+			return
+		}
+
+		members := db.ssetMembers(opts.Key)
+		if reverse {
+			reverseSlice(members)
+		}
+		rs, re := redisRange(len(members), opts.Start, opts.End, false)
+		if opts.WithScores {
+			c.WriteLen((re - rs) * 2)
+		} else {
+			c.WriteLen(re - rs)
+		}
+		for _, el := range members[rs:re] {
+			c.WriteBulk(el)
+			if opts.WithScores {
+				c.WriteFloat(db.ssetScore(opts.Key, el))
+			}
+		}
+	})
 }
 
 // ZRANGEBYLEX and ZREVRANGEBYLEX

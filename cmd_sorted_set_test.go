@@ -282,9 +282,7 @@ func TestSortedSetAdd(t *testing.T) {
 	})
 }
 
-// Test ZRANGE and ZREVRANGE
 func TestSortedSetRange(t *testing.T) {
-	// ZREVRANGE is the same code as ZRANGE
 	s, err := Run()
 	ok(t, err)
 	defer s.Close()
@@ -299,84 +297,52 @@ func TestSortedSetRange(t *testing.T) {
 	s.ZAdd("z", 3, "drei")
 	s.ZAdd("z", math.Inf(+1), "inf")
 
-	{
+	t.Run("basic", func(t *testing.T) {
 		mustDo(t, c,
 			"ZRANGE", "z", "0", "-1",
 			proto.Strings("one", "two", "zwei", "drei", "three", "inf"),
 		)
-
-		mustDo(t, c,
-			"ZREVRANGE", "z", "0", "-1",
-			proto.Strings("inf", "three", "drei", "zwei", "two", "one"),
-		)
-	}
-	{
 		mustDo(t, c,
 			"ZRANGE", "z", "0", "1",
 			proto.Strings("one", "two"),
 		)
-
-		mustDo(t, c,
-			"ZREVRANGE", "z", "0", "1",
-			proto.Strings("inf", "three"),
-		)
-	}
-	{
 		mustDo(t, c,
 			"ZRANGE", "z", "-1", "-1",
 			proto.Strings("inf"),
 		)
-
+		// weird cases.
 		mustDo(t, c,
-			"ZREVRANGE", "z", "-1", "-1",
-			proto.Strings("one"),
+			"ZRANGE", "z", "-100", "-100",
+			proto.Strings(),
 		)
-	}
+		mustDo(t, c,
+			"ZRANGE", "z", "100", "400",
+			proto.Strings(),
+		)
 
-	// weird cases.
-	mustDo(t, c,
-		"ZRANGE", "z", "-100", "-100",
-		proto.Strings(),
-	)
-	mustDo(t, c,
-		"ZRANGE", "z", "100", "400",
-		proto.Strings(),
-	)
+		// Nonexistent key
+		mustDo(t, c,
+			"ZRANGE", "nosuch", "1", "4",
+			proto.Strings(),
+		)
+	})
 
-	// Nonexistent key
-	mustDo(t, c,
-		"ZRANGE", "nosuch", "1", "4",
-		proto.Strings(),
-	)
-
-	// With scores
-	{
+	t.Run("withscores", func(t *testing.T) {
 		mustDo(t, c,
 			"ZRANGE", "z", "1", "2", "WITHSCORES",
 			proto.Strings("two", "2", "zwei", "2"),
 		)
-
-		mustDo(t, c,
-			"ZREVRANGE", "z", "1", "2", "WITHSCORES",
-			proto.Strings("three", "3", "drei", "3"),
-		)
-	}
-	// INF in WITHSCORES
-	{
+		// INF in WITHSCORES
 		mustDo(t, c,
 			"ZRANGE", "z", "4", "-1", "WITHSCORES",
 			proto.Strings("three", "3", "inf", "inf"),
 		)
-	}
+	})
 
 	t.Run("errors", func(t *testing.T) {
 		mustDo(t, c,
 			"ZRANGE",
 			proto.Error(errWrongNumber("zrange")),
-		)
-		mustDo(t, c,
-			"ZREVRANGE",
-			proto.Error(errWrongNumber("zrevrange")),
 		)
 		mustDo(t, c,
 			"ZRANGE", "set",
@@ -402,6 +368,91 @@ func TestSortedSetRange(t *testing.T) {
 		s.Set("str", "value")
 		mustDo(t, c,
 			"ZRANGE", "str", "1", "2",
+			proto.Error(msgWrongType),
+		)
+	})
+}
+
+// Test ZREVRANGE
+func TestSortedSetRevRange(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := proto.Dial(s.Addr())
+	ok(t, err)
+	defer c.Close()
+
+	s.ZAdd("z", 1, "one")
+	s.ZAdd("z", 2, "two")
+	s.ZAdd("z", 2, "zwei")
+	s.ZAdd("z", 3, "three")
+	s.ZAdd("z", 3, "drei")
+	s.ZAdd("z", math.Inf(+1), "inf")
+
+	mustDo(t, c,
+		"ZREVRANGE", "z", "0", "-1",
+		proto.Strings("inf", "three", "drei", "zwei", "two", "one"),
+	)
+	mustDo(t, c,
+		"ZREVRANGE", "z", "0", "1",
+		proto.Strings("inf", "three"),
+	)
+	mustDo(t, c,
+		"ZREVRANGE", "z", "-1", "-1",
+		proto.Strings("one"),
+	)
+
+	// weird cases.
+	mustDo(t, c,
+		"ZREVRANGE", "z", "-100", "-100",
+		proto.Strings(),
+	)
+	mustDo(t, c,
+		"ZREVRANGE", "z", "100", "400",
+		proto.Strings(),
+	)
+
+	// Nonexistent key
+	mustDo(t, c,
+		"ZREVRANGE", "nosuch", "1", "4",
+		proto.Strings(),
+	)
+
+	// With scores
+	mustDo(t, c,
+		"ZREVRANGE", "z", "1", "2", "WITHSCORES",
+		proto.Strings("three", "3", "drei", "3"),
+	)
+
+	t.Run("errors", func(t *testing.T) {
+		mustDo(t, c,
+			"ZREVRANGE",
+			proto.Error(errWrongNumber("zrevrange")),
+		)
+		mustDo(t, c,
+			"ZREVRANGE", "set",
+			proto.Error(errWrongNumber("zrevrange")),
+		)
+		mustDo(t, c,
+			"ZREVRANGE", "set", "1",
+			proto.Error(errWrongNumber("zrevrange")),
+		)
+		mustDo(t, c,
+			"ZREVRANGE", "set", "noint", "1",
+			proto.Error(msgInvalidInt),
+		)
+		mustDo(t, c,
+			"ZREVRANGE", "set", "1", "noint",
+			proto.Error(msgInvalidInt),
+		)
+		mustDo(t, c,
+			"ZREVRANGE", "set", "1", "2", "toomany",
+			proto.Error(msgSyntaxError),
+		)
+		// Wrong type of key
+		s.Set("str", "value")
+		mustDo(t, c,
+			"ZREVRANGE", "str", "1", "2",
 			proto.Error(msgWrongType),
 		)
 	})
