@@ -170,23 +170,61 @@ func TestSortedSetRange(t *testing.T) {
 			"+Inf", "more stars",
 			"-Inf", "big bang",
 		)
-		c.Do("ZRANGE", "z", "0", "-1")
-		c.Do("ZRANGE", "z", "0", "-1", "WITHSCORES", "WITHSCORES")
-		c.Do("ZRANGE", "z", "0", "-1", "WiThScOrEs")
-		c.Do("ZRANGE", "z", "0", "-2")
-		c.Do("ZRANGE", "z", "0", "-1000")
-		c.Do("ZRANGE", "z", "2", "-2")
-		c.Do("ZRANGE", "z", "400", "-1")
-		c.Do("ZRANGE", "z", "300", "-110")
-		c.Do("ZREVRANGE", "z", "0", "-1")
-		c.Do("ZREVRANGE", "z", "0", "-1", "WITHSCORES")
-		c.Do("ZREVRANGE", "z", "0", "-1", "WITHSCORES", "WITHSCORES", "WITHSCORES")
-		c.Do("ZREVRANGE", "z", "0", "-1", "WiThScOrEs")
-		c.Do("ZREVRANGE", "z", "0", "-2")
-		c.Do("ZREVRANGE", "z", "0", "-1000")
-		c.Do("ZREVRANGE", "z", "2", "-2")
-		c.Do("ZREVRANGE", "z", "400", "-1")
-		c.Do("ZREVRANGE", "z", "300", "-110")
+		c.Do("ZADD", "zs",
+			"5", "berlin",
+			"5", "lisbon",
+			"5", "manila",
+			"5", "budapest",
+			"5", "london",
+			"5", "singapore",
+			"5", "amsterdam",
+		)
+
+		t.Run("plain", func(t *testing.T) {
+			c.Do("ZRANGE", "z", "0", "-1")
+			c.Do("ZRANGE", "z", "0", "10", "WITHSCORES", "WITHSCORES")
+			c.Do("ZRANGE", "z", "0", "-1", "WiThScOrEs")
+			c.Do("ZRANGE", "z", "0", "10")
+			c.Do("ZRANGE", "z", "0", "2")
+			c.Do("ZRANGE", "z", "2", "20")
+			c.Do("ZRANGE", "z", "0", "-4")
+			c.Do("ZRANGE", "z", "2", "-4")
+			c.Do("ZRANGE", "z", "400", "-1")
+			c.Do("ZRANGE", "z", "300", "-110")
+			c.Do("ZRANGE", "z", "0", "-1", "REV")
+			c.Error("not an integer", "ZRANGE", "z", "(0", "-1")
+			c.Error("not an integer", "ZRANGE", "z", "0", "(-1")
+			c.Error("combination", "ZRANGE", "z", "0", "-1", "LIMIT", "1", "2")
+		})
+
+		t.Run("byscore", func(t *testing.T) {
+			c.Do("ZRANGE", "z", "0", "-1", "BYSCORE")
+			c.Do("ZRANGE", "z", "0", "1000", "BYSCORE")
+			c.Do("ZRANGE", "z", "1", "2", "BYSCORE")
+			c.Do("ZRANGE", "z", "1", "(2", "BYSCORE")
+			c.Do("ZRANGE", "z", "-inf", "+inf", "BYSCORE")
+			c.Do("ZRANGE", "z", "-inf", "+inf", "BYSCORE", "REV")
+			c.Do("ZRANGE", "z", "-inf", "+inf", "BYSCORE", "LIMIT", "0", "1")
+			c.Do("ZRANGE", "z", "-inf", "+inf", "BYSCORE", "LIMIT", "1", "2")
+			c.Do("ZRANGE", "z", "-inf", "+inf", "BYSCORE", "LIMIT", "0", "-1")
+			c.Do("ZRANGE", "z", "-inf", "+inf", "BYSCORE", "REV", "LIMIT", "0", "1")
+			c.Error("not a float", "ZRANGE", "z", "[1", "2", "BYSCORE")
+		})
+
+		t.Run("bylex", func(t *testing.T) {
+			c.Do("ZRANGE", "zs", "[be", "(ma", "BYLEX")
+			c.Do("ZRANGE", "zs", "[be", "+", "BYLEX")
+			c.Do("ZRANGE", "zs", "-", "(ma", "BYLEX")
+			c.Do("ZRANGE", "zs", "-", "+", "BYLEX")
+			c.Do("ZRANGE", "zs", "[be", "(ma", "BYLEX", "REV")
+			c.Do("ZRANGE", "zs", "-", "+", "BYLEX", "LIMIT", "0", "1")
+			c.Do("ZRANGE", "zs", "-", "+", "BYLEX", "LIMIT", "1", "3")
+			c.Do("ZRANGE", "zs", "-", "+", "BYLEX", "LIMIT", "1", "-1")
+			c.Do("ZRANGE", "zs", "-", "+", "BYLEX", "LIMIT", "1", "-1", "REV")
+			c.Error("syntax error", "ZRANGE", "z", "[be", "[ma", "BYSCORE", "BYLEX")
+			c.Error("range item", "ZRANGE", "z", "be", "(ma", "BYLEX")
+			c.Error("range item", "ZRANGE", "z", "(be", "ma", "BYLEX")
+		})
 
 		c.Do("ZADD", "zz",
 			"0", "aap",
@@ -207,8 +245,34 @@ func TestSortedSetRange(t *testing.T) {
 		c.Error("not an integer", "ZRANGE", "foo", "2", "noint")
 		c.Do("SET", "str", "I am a string")
 		c.Error("wrong kind", "ZRANGE", "str", "300", "-110")
+	})
+}
 
+func TestSortedSetRevRange(t *testing.T) {
+	testRaw(t, func(c *client) {
+		c.Do("ZADD", "z",
+			"1", "aap",
+			"2", "noot",
+			"3", "mies",
+			"2", "nootagain",
+			"3", "miesagain",
+			"+Inf", "the stars",
+			"+Inf", "more stars",
+			"-Inf", "big bang",
+		)
+		c.Do("ZREVRANGE", "z", "0", "-1")
+		c.Do("ZREVRANGE", "z", "0", "-1", "WITHSCORES")
+		c.Do("ZREVRANGE", "z", "0", "-1", "WITHSCORES", "WITHSCORES", "WITHSCORES")
+		c.Do("ZREVRANGE", "z", "0", "-1", "WiThScOrEs")
+		c.Do("ZREVRANGE", "z", "0", "-2")
+		c.Do("ZREVRANGE", "z", "0", "-1000")
+		c.Do("ZREVRANGE", "z", "2", "-2")
+		c.Do("ZREVRANGE", "z", "400", "-1")
+		c.Do("ZREVRANGE", "z", "300", "-110")
+		c.Error("syntax", "ZREVRANGE", "z", "300", "-110", "REV")
+		// failure cases
 		c.Error("wrong number", "ZREVRANGE")
+		c.Do("SET", "str", "I am a string")
 		c.Error("wrong kind", "ZREVRANGE", "str", "300", "-110")
 	})
 }

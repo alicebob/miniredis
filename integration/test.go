@@ -508,10 +508,9 @@ func (c *client) Error(msg string, cmd string, args ...string) {
 		return
 	}
 
-	// c.t.Logf("real:%q mini:%q", string(resReal), string(resMini))
-
 	mini, err := proto.ReadError(resMini)
 	if err != nil {
+		c.t.Logf("real:%q mini:%q", string(resReal), string(resMini))
 		c.t.Errorf("parse error miniredis: %s", err)
 		return
 	}

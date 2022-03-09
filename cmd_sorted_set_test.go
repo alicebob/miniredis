@@ -339,6 +339,28 @@ func TestSortedSetRange(t *testing.T) {
 		)
 	})
 
+	t.Run("reverse", func(t *testing.T) {
+		mustDo(t, c,
+			"ZRANGE", "z", "0", "-1", "REV",
+			proto.Strings("inf", "three", "drei", "zwei", "two", "one"),
+		)
+	})
+
+	t.Run("limit", func(t *testing.T) {
+		mustDo(t, c,
+			"ZRANGE", "z", "0", "+inf", "BYSCORE", "LIMIT", "1", "2",
+			proto.Strings("two", "zwei"),
+		)
+		mustDo(t, c,
+			"ZRANGE", "z", "0", "+inf", "BYSCORE", "LIMIT", "1", "-1",
+			proto.Strings("two", "zwei", "drei", "three", "inf"),
+		)
+		mustDo(t, c,
+			"ZRANGE", "z", "0", "+inf", "BYSCORE", "LIMIT", "1", "9999",
+			proto.Strings("two", "zwei", "drei", "three", "inf"),
+		)
+	})
+
 	t.Run("errors", func(t *testing.T) {
 		mustDo(t, c,
 			"ZRANGE",
@@ -363,6 +385,10 @@ func TestSortedSetRange(t *testing.T) {
 		mustDo(t, c,
 			"ZRANGE", "set", "1", "2", "toomany",
 			proto.Error(msgSyntaxError),
+		)
+		mustDo(t, c,
+			"ZRANGE", "set", "1", "2", "LIMIT", "1", "2",
+			proto.Error(msgLimitCombination),
 		)
 		// Wrong type of key
 		s.Set("str", "value")
@@ -642,20 +668,20 @@ func TestSortedSetRangeByScore(t *testing.T) {
 			proto.Error(msgSyntaxError),
 		)
 		mustDo(t, c,
-			"ZRANGEBYSCORE", "set", "[1", "2", "toomany",
+			"ZRANGEBYSCORE", "set", "[1", "2",
 			proto.Error("ERR min or max is not a float"),
 		)
 		mustDo(t, c,
-			"ZRANGEBYSCORE", "set", "1", "[2", "toomany",
+			"ZRANGEBYSCORE", "set", "1", "[2",
 			proto.Error("ERR min or max is not a float"),
 		)
 		mustDo(t, c,
 			"ZRANGEBYSCORE", "set", "[1", "2", "LIMIT", "noint", "1",
-			proto.Error("ERR min or max is not a float"),
+			proto.Error(msgInvalidInt),
 		)
 		mustDo(t, c,
 			"ZRANGEBYSCORE", "set", "[1", "2", "LIMIT", "1", "noint",
-			proto.Error("ERR min or max is not a float"),
+			proto.Error(msgInvalidInt),
 		)
 		// Wrong type of key
 		s.Set("str", "value")
