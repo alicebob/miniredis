@@ -1,6 +1,14 @@
 ## Changelog
 
 
+### v2.19.0
+
+- support for TYPE in SCAN (thanks @0xDiddi)
+- update BITPOS (thanks @dirkm)
+- fix a lua redis.call() return value (thanks @mpetronic)
+- update ZRANGE (thanks @valdemarpereira)
+
+
 ### v2.18.0
 
 - support for ZUNION (thanks @propan)
