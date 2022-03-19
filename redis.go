@@ -217,7 +217,7 @@ func redisRange(l, start, end int, stringSymantics bool) (int, int) {
 			}
 		}
 	}
-	if end < math.MaxInt {
+	if end < math.MaxInt32 {
 		end++ // end argument is inclusive in Redis.
 	}
 	if end > l {
