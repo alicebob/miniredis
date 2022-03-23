@@ -1,6 +1,11 @@
 ## Changelog
 
 
+### v2.20.0
+
+- back to support Go >= 1.14 (thanks @ajatprabha and @marcind)
+
+
 ### v2.19.0
 
 - support for TYPE in SCAN (thanks @0xDiddi)
