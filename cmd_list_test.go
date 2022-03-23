@@ -419,7 +419,7 @@ func TestLindex(t *testing.T) {
 
 	mustNil(t, c, "LINDEX", "l", "-400") // Too big
 
-	// Non exising key
+	// Non existing key
 	mustNil(t, c, "LINDEX", "nonexisting", "400")
 
 	t.Run("errors", func(t *testing.T) {
@@ -458,7 +458,7 @@ func TestLlen(t *testing.T) {
 		proto.Int(4),
 	)
 
-	// Non exising key
+	// Non existing key
 	must0(t, c,
 		"LLEN", "nonexisting",
 	)
@@ -500,7 +500,7 @@ func TestLtrim(t *testing.T) {
 		equals(t, false, s.Exists("l"))
 	}
 
-	// Not exising key
+	// Not existing key
 	mustOK(t, c, "LTRIM", "nonexisting", "0", "1")
 
 	// Wrong type of key
@@ -602,7 +602,7 @@ func TestLrem(t *testing.T) {
 		equals(t, false, s.Exists("l5"))
 	}
 
-	// Non exising key
+	// Non existing key
 	must0(t, c,
 		"LREM", "nonexisting", "0", "aap",
 	)
@@ -673,7 +673,7 @@ func TestLset(t *testing.T) {
 		proto.Error("ERR index out of range"),
 	)
 
-	// Non exising key
+	// Non existing key
 	mustDo(t, c,
 		"LSET", "nonexisting", "0", "aap",
 		proto.Error("ERR no such key"),
@@ -762,13 +762,13 @@ func TestLinsert(t *testing.T) {
 		equals(t, []string{"[", "aap", "!", "noot", "?", "mies", "vuur", "noot", "end", "]"}, l)
 	}
 
-	// Non exising pivot
+	// Non existing pivot
 	mustDo(t, c,
 		"LINSERT", "l", "before", "nosuch", "noot",
 		proto.Int(-1),
 	)
 
-	// Non exising key
+	// Non existing key
 	must0(t, c,
 		"LINSERT", "nonexisting", "before", "aap", "noot",
 	)
@@ -844,7 +844,7 @@ func TestRpoplpush(t *testing.T) {
 		s.CheckList(t, "l2", "aap", "noot", "mies", "vuur", "noot", "end")
 	}
 
-	// Non exising lists
+	// Non existing lists
 	{
 		s.Push("ll", "aap", "noot", "mies")
 
@@ -1322,7 +1322,7 @@ func TestLmove(t *testing.T) {
 		s.CheckList(t, "dst", "LL", "RL", "m1", "m2", "m3", "LR", "RR")
 	}
 
-	// Non exising lists
+	// Non existing lists
 	{
 		s.Push("ll", "aap", "noot", "mies")
 
