@@ -76,6 +76,7 @@ Implemented commands:
    - GETRANGE
    - GETSET
    - GETDEL
+   - GETEX
    - INCR
    - INCRBY
    - INCRBYFLOAT

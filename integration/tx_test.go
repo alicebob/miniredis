@@ -75,6 +75,7 @@ func TestTx(t *testing.T) {
 	testRaw(t, func(c *client) {
 		c.Do("MULTI")
 		c.Do("GET", "str")
+		c.Do("GETEX", "str")
 		c.Do("SET", "str", "bar")
 		c.Do("SETNX", "str", "bar")
 		c.Do("GETSET", "str", "bar")

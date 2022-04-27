@@ -21,6 +21,7 @@ func commandsString(m *Miniredis) {
 	m.srv.Register("DECR", m.cmdDecr)
 	m.srv.Register("GETBIT", m.cmdGetbit)
 	m.srv.Register("GET", m.cmdGet)
+	m.srv.Register("GETEX", m.cmdGetex)
 	m.srv.Register("GETRANGE", m.cmdGetrange)
 	m.srv.Register("GETSET", m.cmdGetset)
 	m.srv.Register("GETDEL", m.cmdGetdel)
@@ -391,6 +392,93 @@ func (m *Miniredis) cmdGet(c *server.Peer, cmd string, args []string) {
 		}
 
 		c.WriteBulk(db.stringGet(key))
+	})
+}
+
+// GETEX
+func (m *Miniredis) cmdGetex(c *server.Peer, cmd string, args []string) {
+	if len(args) < 1 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
+	}
+	if !m.handleAuth(c) {
+		return
+	}
+	if m.checkPubsub(c, cmd) {
+		return
+	}
+
+	var opts struct {
+		key     string
+		ttl     time.Duration
+		persist bool // remove existing TTL on the key.
+	}
+
+	opts.key, args = args[0], args[1:]
+	if len(args) > 0 {
+		timeUnit := time.Second
+		switch arg := strings.ToUpper(args[0]); arg {
+		case "PERSIST":
+			if len(args) > 1 {
+				setDirty(c)
+				c.WriteError(msgSyntaxError)
+				return
+			}
+			opts.persist = true
+		case "PX", "PXAT":
+			timeUnit = time.Millisecond
+			fallthrough
+		case "EX", "EXAT":
+			if len(args) != 2 {
+				setDirty(c)
+				c.WriteError(msgSyntaxError)
+				return
+			}
+			expire, err := strconv.Atoi(args[1])
+			if err != nil {
+				setDirty(c)
+				c.WriteError(msgInvalidInt)
+				return
+			}
+			if expire <= 0 {
+				setDirty(c)
+				c.WriteError(msgInvalidSETime)
+				return
+			}
+
+			if arg == "PXAT" || arg == "EXAT" {
+				opts.ttl = m.at(expire, timeUnit)
+			} else {
+				opts.ttl = time.Duration(expire) * timeUnit
+			}
+		default:
+			setDirty(c)
+			c.WriteError(msgSyntaxError)
+			return
+		}
+	}
+
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
+		db := m.db(ctx.selectedDB)
+
+		if !db.exists(opts.key) {
+			c.WriteNull()
+			return
+		}
+		switch {
+		case opts.persist:
+			delete(db.ttl, opts.key)
+		case opts.ttl != 0:
+			db.ttl[opts.key] = opts.ttl
+		}
+
+		if db.t(opts.key) != "string" {
+			c.WriteError(msgWrongType)
+			return
+		}
+
+		c.WriteBulk(db.stringGet(opts.key))
 	})
 }
 
