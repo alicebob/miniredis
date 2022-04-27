@@ -74,6 +74,35 @@ func TestStringGetSet(t *testing.T) {
 	})
 }
 
+func TestStringGetex(t *testing.T) {
+	testRaw(t, func(c *client) {
+		c.Do("GETEX", "missing")
+
+		c.Do("SET", "foo", "bar")
+		c.Do("GETEX", "foo")
+		c.Do("TTL", "foo")
+
+		c.Do("GETEX", "foo", "EX", "10")
+		c.Do("TTL", "foo")
+
+		// Failure cases
+		c.Error("wrong number", "GETEX")
+		c.Error("syntax error", "GETEX", "foo", "bar")
+		c.Error("syntax error", "GETEX", "foo", "EX", "10", "PERSIST")
+		c.Error("syntax error", "GETEX", "foo", "EX", "10", "PX", "10")
+		c.Error("not an integer", "GETEX", "foo", "EX", "ten")
+
+		// Wrong type
+		c.Do("HSET", "hash", "key", "value")
+		c.Error("wrong kind", "GETEX", "hash")
+
+		c.Do("SET", "hittl", "bar")
+		c.Do("PEXPIRE", "hittl", "999999")
+		c.Do("GETEX", "hittl", "PERSIST")
+		c.Do("TTL", "hittl")
+	})
+}
+
 func TestStringGetdel(t *testing.T) {
 	testRaw(t, func(c *client) {
 		c.Do("GETDEL", "missing")

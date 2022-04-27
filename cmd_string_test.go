@@ -762,6 +762,86 @@ func TestDecr(t *testing.T) {
 	}
 }
 
+func TestGetex(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := proto.Dial(s.Addr())
+	ok(t, err)
+	defer c.Close()
+
+	t.Run("basic", func(t *testing.T) {
+		// Missing key
+		mustNil(t, c, "GETEX", "basic")
+
+		// Existing key
+		s.Set("basic", "bar")
+		mustDo(t, c, "GETEX", "basic", proto.String("bar"))
+		equals(t, time.Duration(0), s.TTL("basic"))
+	})
+
+	t.Run("EX", func(t *testing.T) {
+		// Missing key
+		mustNil(t, c, "GETEX", "withex", "EX", "123")
+
+		// Existing key
+		s.Set("withex", "bar")
+		mustDo(t, c, "GETEX", "withex", "EX", "123", proto.String("bar"))
+		equals(t, 123*time.Second, s.TTL("withex"))
+	})
+
+	t.Run("PX", func(t *testing.T) {
+		// Missing key
+		mustNil(t, c, "GETEX", "withpx", "PX", "123")
+
+		// Existing key
+		s.Set("withpx", "bar")
+		mustDo(t, c, "GETEX", "withpx", "PX", "123", proto.String("bar"))
+		equals(t, 123*time.Millisecond, s.TTL("withpx"))
+	})
+
+	t.Run("EXAT", func(t *testing.T) {
+		s.SetTime(time.Unix(100, 0))
+
+		// Missing key
+		mustNil(t, c, "GETEX", "withexat", "EXAT", "123")
+
+		// Existing key
+		s.Set("withexat", "bar")
+		mustDo(t, c, "GETEX", "withexat", "EXAT", "123", proto.String("bar"))
+		equals(t, 23*time.Second, s.TTL("withexat"))
+	})
+
+	t.Run("PXAT", func(t *testing.T) {
+		s.SetTime(time.Unix(0, 100_000_000))
+
+		// Missing key
+		mustNil(t, c, "GETEX", "withpxat", "PXAT", "123")
+
+		// Existing key
+		s.Set("withpxat", "bar")
+		mustDo(t, c, "GETEX", "withpxat", "PXAT", "123", proto.String("bar"))
+		equals(t, 23*time.Millisecond, s.TTL("withpxat"))
+	})
+
+	t.Run("PERSIST", func(t *testing.T) {
+		// Missing key
+		mustNil(t, c, "GETEX", "foo", "PERSIST")
+
+		// Existing key with TTL
+		mustOK(t, c, "SETEX", "foo", "123", "bar")
+		mustDo(t, c, "GETEX", "foo", "PERSIST", proto.String("bar"))
+		equals(t, time.Duration(0), s.TTL("foo"))
+	})
+
+	t.Run("errors", func(t *testing.T) {
+		mustDo(t, c,
+			"GETEX", "one", "two",
+			proto.Error(msgSyntaxError),
+		)
+	})
+}
+
 func TestGetSet(t *testing.T) {
 	s, err := Run()
 	ok(t, err)

@@ -257,6 +257,7 @@ func TestPubsubMode(t *testing.T) {
 			c.Error("are allowed", "FLUSHALL")
 			c.Error("are allowed", "FLUSHDB")
 			c.Error("are allowed", "GET", "foo")
+			c.Error("are allowed", "GETEX", "foo")
 			c.Error("are allowed", "GETBIT", "foo", "12")
 			c.Error("are allowed", "GETRANGE", "foo", "12", "12")
 			c.Error("are allowed", "GETSET", "foo", "bar")
