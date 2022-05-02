@@ -153,6 +153,14 @@ func TestSortedSetAdd(t *testing.T) {
 		c.Error("syntax error", "ZADD", "z", "INCR", "-12", "aap", "NX")
 	})
 
+	testRaw(t, func(c *client) {
+		c.Do("ZADD", "z", "1", "score")
+		c.Do("ZADD", "z", "GT", "2", "score")
+		c.Do("ZADD", "z", "LT", "1", "score")
+
+		c.Error("ERR GT, LT, and/or NX options at the same time are not compatible", "ZADD", "z", "GT", "LT", "1", "score")
+	})
+
 	testRESP3(t, func(c *client) {
 		c.Do("ZADD", "z", "INCR", "1", "aap")
 	})
