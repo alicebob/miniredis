@@ -59,6 +59,8 @@ func (m *Miniredis) cmdZadd(c *server.Peer, cmd string, args []string) {
 	var (
 		nx    = false
 		xx    = false
+		gt    = false
+		lt    = false
 		ch    = false
 		incr  = false
 		elems = map[string]float64{}
@@ -73,6 +75,14 @@ outer:
 			continue
 		case "XX":
 			xx = true
+			args = args[1:]
+			continue
+		case "GT":
+			gt = true
+			args = args[1:]
+			continue
+		case "LT":
+			lt = true
 			args = args[1:]
 			continue
 		case "CH":
@@ -107,6 +117,14 @@ outer:
 	if xx && nx {
 		setDirty(c)
 		c.WriteError(msgXXandNX)
+		return
+	}
+
+	if gt && lt ||
+		gt && nx ||
+		lt && nx {
+		setDirty(c)
+		c.WriteError(msgGTLTandNX)
 		return
 	}
 
@@ -149,6 +167,12 @@ outer:
 				continue
 			}
 			old := db.ssetScore(key, member)
+			if gt && score <= old {
+				continue
+			}
+			if lt && score >= old {
+				continue
+			}
 			if db.ssetAdd(key, score, member) {
 				res++
 			} else {
