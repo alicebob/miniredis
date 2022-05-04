@@ -182,6 +182,14 @@ func TestSortedSetAdd(t *testing.T) {
 			"ZADD", "z", "NX", "1", "one", "2.2", "two", "3", "three",
 		)
 
+		must0(t, c,
+			"ZADD", "z", "GT", "1", "one",
+		)
+
+		must0(t, c,
+			"ZADD", "z", "GT", "2", "one",
+		)
+
 		must1(t, c,
 			"ZADD", "z", "NX", "1", "one", "4", "four",
 		)
@@ -270,6 +278,10 @@ func TestSortedSetAdd(t *testing.T) {
 		mustDo(t, c,
 			"ZADD", "set", "INCR", "1.0", "foo", "2.3", "bar",
 			proto.Error("ERR INCR option supports a single increment-element pair"),
+		)
+		mustDo(t, c,
+			"ZADD", "set", "GT", "LT", "1.0", "foo",
+			proto.Error(msgGTLTandNX),
 		)
 	})
 
