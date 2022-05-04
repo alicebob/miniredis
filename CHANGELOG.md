@@ -1,6 +1,13 @@
 ## Changelog
 
 
+### v2.21.0
+
+- support for GETEX (thanks @dntj)
+- support for GT and LT in ZADD (thanks @lsgndln)
+- support for XAUTOCLAIM (thanks @randall-fulton)
+
+
 ### v2.20.0
 
 - back to support Go >= 1.14 (thanks @ajatprabha and @marcind)
