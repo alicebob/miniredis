@@ -177,6 +177,7 @@ Implemented commands:
  - Stream keys
    - XACK
    - XADD
+   - XAUTOCLAIM
    - XDEL
    - XGROUP CREATE
    - XINFO STREAM -- partly

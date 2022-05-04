@@ -27,6 +27,7 @@ func commandsStream(m *Miniredis) {
 	m.srv.Register("XDEL", m.cmdXdel)
 	m.srv.Register("XPENDING", m.cmdXpending)
 	m.srv.Register("XTRIM", m.cmdXtrim)
+	m.srv.Register("XAUTOCLAIM", m.cmdXautoclaim)
 }
 
 // XADD
@@ -1063,6 +1064,143 @@ func (m *Miniredis) cmdXtrim(c *server.Peer, cmd string, args []string) {
 			c.WriteInt(len(delete))
 		}
 	})
+}
+
+// XAUTOCLAIM
+func (m *Miniredis) cmdXautoclaim(c *server.Peer, cmd string, args []string) {
+	// XAUTOCLAIM key group consumer min-idle-time start
+	if len(args) < 5 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
+	}
+
+	key, group, consumer := args[0], args[1], args[2]
+
+	minIdleTime, err := strconv.Atoi(args[3])
+	if err != nil {
+		setDirty(c)
+		c.WriteError("ERR Invalid min-idle-time argument for XAUTOCLAIM")
+		return
+	}
+	if minIdleTime != 0 {
+		setDirty(c)
+		c.WriteError("ERR IDLE is unsupported")
+		return
+	}
+
+	start_, err := formatStreamRangeBound(args[4], true, false)
+	if err != nil {
+		c.WriteError(msgInvalidStreamID)
+		return
+	}
+	start := start_
+
+	args = args[5:]
+
+	count := 100
+	var justId bool
+parsing:
+	for len(args) > 0 {
+		switch strings.ToUpper(args[0]) {
+		case "COUNT":
+			if len(args) < 2 {
+				err = errors.New(errWrongNumber(cmd))
+				break parsing
+			}
+
+			count, err = strconv.Atoi(args[1])
+			if err != nil {
+				break parsing
+			}
+
+			args = args[2:]
+		case "JUSTID":
+			args = args[1:]
+			justId = true
+		default:
+			err = errors.New(msgSyntaxError)
+			break parsing
+		}
+	}
+
+	if err != nil {
+		setDirty(c)
+		c.WriteError(err.Error())
+		return
+	}
+
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
+		db := m.db(ctx.selectedDB)
+		g, err := db.streamGroup(key, group)
+		if err != nil {
+			c.WriteError(err.Error())
+			return
+		}
+		if g == nil {
+			c.WriteError(errReadgroup(key, group).Error())
+			return
+		}
+
+		nextCallId, entries := xautoclaim(m.effectiveNow(), *g, start, count, consumer)
+		writeXautoclaim(c, nextCallId, entries, justId)
+	})
+}
+
+func xautoclaim(
+	now time.Time,
+	g streamGroup,
+	start string,
+	count int,
+	consumerID string,
+) (string, []StreamEntry) {
+	nextCallId := "0-0"
+	if len(g.pending) == 0 || count < 0 {
+		return nextCallId, nil
+	}
+
+	msgs := g.pendingAfter(start)
+	var res []StreamEntry
+	for i, p := range msgs {
+		g.consumers[consumerID] = consumer{}
+		p.consumer = consumerID
+		_, entry := g.stream.get(p.id)
+		// not found. Weird?
+		if entry == nil {
+			continue
+		}
+		p.deliveryCount += 1
+		p.lastDelivery = now
+		msgs[i] = p
+		res = append(res, *entry)
+
+		if len(res) >= count {
+			if len(msgs) > i+1 {
+				nextCallId = msgs[i+1].id
+			}
+			break
+		}
+	}
+	return nextCallId, res
+}
+
+func writeXautoclaim(c *server.Peer, nextCallId string, res []StreamEntry, justId bool) {
+	c.WriteLen(2)
+	c.WriteBulk(nextCallId)
+	c.WriteLen(len(res))
+	for _, entry := range res {
+		if justId {
+			c.WriteBulk(entry.ID)
+			continue
+		}
+
+		c.WriteLen(2)
+		c.WriteBulk(entry.ID)
+		c.WriteLen(len(entry.Values))
+		for _, v := range entry.Values {
+			c.WriteBulk(v)
+		}
+	}
 }
 
 func parseBlock(cmd string, args []string, block *bool, timeout *time.Duration) error {

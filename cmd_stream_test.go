@@ -829,3 +829,54 @@ func TestStreamTrim(t *testing.T) {
 			proto.Array(proto.String("5-1"), proto.Strings("name", "Saturn")),
 		))
 }
+
+func TestStreamAutoClaim(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := proto.Dial(s.Addr())
+	ok(t, err)
+	defer c.Close()
+
+	mustDo(t, c,
+		"XAUTOCLAIM", "planets", "processing", "alice", "0", "0",
+		proto.Error("NOGROUP No such key 'planets' or consumer group 'processing'"),
+	)
+
+	mustOK(t, c,
+		"XGROUP", "CREATE", "planets", "processing", "$", "MKSTREAM",
+	)
+
+	mustDo(t, c,
+		"XAUTOCLAIM", "planets", "processing", "alice", "0", "0",
+		proto.Array(
+			proto.String("0-0"),
+			proto.Array(),
+		),
+	)
+
+	mustDo(t, c,
+		"XADD", "planets", "0-1", "name", "Mercury",
+		proto.String("0-1"),
+	)
+
+	must1(t, c,
+		"XLEN", "planets",
+	)
+
+	mustDo(t, c,
+		"XREADGROUP", "GROUP", "processing", "alice", "STREAMS", "planets", ">",
+		proto.Array(
+			proto.Array(proto.String("planets"), proto.Array(proto.Array(proto.String("0-1"), proto.Strings("name", "Mercury")))),
+		),
+	)
+
+	// Read message already claimed
+	mustDo(t, c,
+		"XAUTOCLAIM", "planets", "processing", "alice", "0", "0",
+		proto.Array(
+			proto.String("0-0"),
+			proto.Array(proto.Array(proto.String("0-1"), proto.Strings("name", "Mercury"))),
+		),
+	)
+}

@@ -562,6 +562,48 @@ func TestStreamGroup(t *testing.T) {
 		})
 	})
 
+	t.Run("XAUTOCLAIM", func(t *testing.T) {
+		// justid mode
+		testRaw(t, func(c *client) {
+			c.Do("XGROUP", "CREATE", "colors", "pr", "$", "MKSTREAM")
+			c.Do("XAUTOCLAIM", "colors", "pr", "alice", "0", "0", "JUSTID")
+			c.Do("XADD", "colors", "42-2", "name", "Green")
+			c.Do("XADD", "colors", "42-3", "name", "Blue")
+			c.Do("XREADGROUP", "GROUP", "pr", "alice", "STREAMS", "colors", ">")
+			c.Do("XAUTOCLAIM", "colors", "pr", "alice", "0", "0", "JUSTID")
+			c.Do("XREADGROUP", "GROUP", "pr", "alice", "STREAMS", "colors", ">")
+			c.Do("XAUTOCLAIM", "colors", "pr", "alice", "0", "0", "JUSTID")
+			c.Do("XAUTOCLAIM", "colors", "pr", "alice", "0", "0", "COUNT", "1", "JUSTID")
+			c.Do("XPENDING", "colors", "pr")
+
+			c.Do("XAUTOCLAIM", "colors", "pr", "eve", "0", "0", "JUSTID")
+			c.Do("XPENDING", "colors", "pr")
+
+			c.Error("syntax error", "XAUTOCLAIM", "colors", "pr", "alice", "0", "0", "JUSTID", "foo")
+			c.Error("No such key", "XAUTOCLAIM", "colors", "foo", "alice", "0", "0", "JUSTID")
+			c.Error("No such key", "XAUTOCLAIM", "foo", "pr", "alice", "0", "0", "JUSTID")
+			c.Error("Invalid min-idle-time", "XAUTOCLAIM", "colors", "pr", "alice", "foo", "0", "JUSTID")
+			c.Error("Invalid stream ID", "XAUTOCLAIM", "colors", "pr", "alice", "0", "foo", "JUSTID")
+			c.Error("Invalid stream ID", "XAUTOCLAIM", "colors", "pr", "alice", "0", "-1", "JUSTID")
+		})
+
+		// regular mode
+		testRaw(t, func(c *client) {
+			c.Do("XGROUP", "CREATE", "colors", "pr", "$", "MKSTREAM")
+			c.Do("XAUTOCLAIM", "colors", "pr", "alice", "0", "0")
+			c.Do("XADD", "colors", "42-2", "name", "Green")
+			c.Do("XADD", "colors", "42-3", "name", "Blue")
+			c.Do("XREADGROUP", "GROUP", "pr", "alice", "STREAMS", "colors", ">")
+			c.Do("XAUTOCLAIM", "colors", "pr", "alice", "0", "0")
+			c.Do("XREADGROUP", "GROUP", "pr", "alice", "STREAMS", "colors", ">")
+			c.Do("XAUTOCLAIM", "colors", "pr", "alice", "0", "0")
+			c.Do("XAUTOCLAIM", "colors", "pr", "alice", "0", "0", "COUNT", "1")
+
+			c.Do("XAUTOCLAIM", "colors", "pr", "eve", "0", "0")
+			c.Do("XPENDING", "colors", "pr")
+		})
+	})
+
 	testRESP3(t, func(c *client) {
 		c.DoLoosely("XINFO", "STREAM", "foo")
 	})
