@@ -37,6 +37,7 @@ func commandsList(m *Miniredis) {
 	m.srv.Register("RPUSH", m.cmdRpush)
 	m.srv.Register("RPUSHX", m.cmdRpushx)
 	m.srv.Register("LMOVE", m.cmdLmove)
+	m.srv.Register("BLMOVE", m.cmdBlmove)
 }
 
 // BLPOP
@@ -820,4 +821,88 @@ func (m *Miniredis) cmdLmove(c *server.Peer, cmd string, args []string) {
 		}
 		c.WriteBulk(elem)
 	})
+}
+
+// BLMOVE
+func (m *Miniredis) cmdBlmove(c *server.Peer, cmd string, args []string) {
+	if len(args) != 5 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
+	}
+	if !m.handleAuth(c) {
+		return
+	}
+	if m.checkPubsub(c, cmd) {
+		return
+	}
+
+	src := args[0]
+	dst := args[1]
+
+	srcDir := strings.ToLower(args[2])
+	if srcDir != "left" && srcDir != "right" {
+		setDirty(c)
+		c.WriteError(msgSyntaxError)
+		return
+	}
+
+	dstDir := strings.ToLower(args[3])
+	if dstDir != "left" && dstDir != "right" {
+		setDirty(c)
+		c.WriteError(msgSyntaxError)
+		return
+	}
+
+	timeout, err := strconv.Atoi(args[4])
+	if err != nil {
+		setDirty(c)
+		c.WriteError(msgInvalidTimeout)
+		return
+	}
+	if timeout < 0 {
+		setDirty(c)
+		c.WriteError(msgNegTimeout)
+		return
+	}
+
+	blocking(
+		m,
+		c,
+		time.Duration(timeout)*time.Second,
+		func(c *server.Peer, ctx *connCtx) bool {
+			db := m.db(ctx.selectedDB)
+
+			if !db.exists(src) {
+				return false
+			}
+			if db.t(src) != "list" || (db.exists(dst) && db.t(dst) != "list") {
+				c.WriteError(msgWrongType)
+				return true
+			}
+			if len(db.listKeys[src]) == 0 {
+				return false
+			}
+
+			var elem string
+			if srcDir == "right" {
+				elem = db.listPop(src)
+			} else {
+				elem = db.listLpop(src)
+			}
+
+			if dstDir == "right" {
+				db.listPush(dst, elem)
+			} else {
+				db.listLpush(dst, elem)
+			}
+
+			c.WriteBulk(elem)
+			return true
+		},
+		func(c *server.Peer) {
+			// timeout
+			c.WriteLen(-1)
+		},
+	)
 }

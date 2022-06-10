@@ -1,3 +1,5 @@
+Current repo was forked to introduce BLMOVE operation for Carted internal testing purpose. 
+
 # Miniredis
 
 Pure Go Redis test server, used in Go unittests.
@@ -125,6 +127,7 @@ Implemented commands:
    - RPUSH
    - RPUSHX
    - LMOVE
+   - BLMOVE
  - Pub/Sub (complete)
    - PSUBSCRIBE
    - PUBLISH

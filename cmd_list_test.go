@@ -1405,3 +1405,110 @@ func TestLmove(t *testing.T) {
 		)
 	})
 }
+
+func TestBlmove(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := proto.Dial(s.Addr())
+	ok(t, err)
+	defer c.Close()
+
+	// Simple case right left
+	{
+		s.Push("l1", "aap", "noot", "mies")
+		mustDo(t, c,
+			"BLMOVE", "l1", "l2", "right", "left", "1",
+			proto.String("mies"),
+		)
+
+		lv, err := s.List("l2")
+		ok(t, err)
+		equals(t, []string{"mies"}, lv)
+	}
+
+	// Simple case left right
+	{
+		s.Push("l3", "aap", "noot", "mies")
+		mustDo(t, c,
+			"BLMOVE", "l3", "l4", "left", "right", "1",
+			proto.String("aap"),
+		)
+
+		lv, err := s.List("l4")
+		ok(t, err)
+		equals(t, []string{"aap"}, lv)
+	}
+
+	// Simple case 2 left right
+	{
+		s.Push("l5", "aap", "noot", "mies")
+		s.Push("l6", "bca")
+		mustDo(t, c,
+			"BLMOVE", "l5", "l6", "left", "right", "1",
+			proto.String("aap"),
+		)
+
+		lv, err := s.List("l6")
+		ok(t, err)
+		equals(t, []string{"bca", "aap"}, lv)
+	}
+
+	t.Run("errors", func(t *testing.T) {
+		mustDo(t, c,
+			"BLMOVE",
+			proto.Error(errWrongNumber("blmove")),
+		)
+		mustDo(t, c,
+			"BLMOVE", "key",
+			proto.Error(errWrongNumber("blmove")),
+		)
+		mustDo(t, c,
+			"BLMOVE", "key", "bar",
+			proto.Error(errWrongNumber("blmove")),
+		)
+		mustDo(t, c,
+			"BLMOVE", "key", "foo", "right", "left", "-1",
+			proto.Error("ERR timeout is negative"),
+		)
+		mustDo(t, c,
+			"BLMOVE", "key", "foo", "right", "left", "inf",
+			proto.Error("ERR timeout is not a float or out of range"),
+		)
+		mustDo(t, c,
+			"BLMOVE", "key", "foo", "right", "left", "1", "baz",
+			proto.Error(errWrongNumber("blmove")),
+		)
+	})
+}
+
+func TestBlmoveSimple(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := proto.Dial(s.Addr())
+	ok(t, err)
+	defer c.Close()
+
+	got := goStrings(t, s, "BLMOVE", "from", "to", "right", "left", "1")
+	time.Sleep(30 * time.Millisecond)
+
+	mustDo(t, c,
+		"RPUSH", "from", "e1", "e2", "e3",
+		proto.Int(3),
+	)
+
+	select {
+	case have := <-got:
+		equals(t, proto.String("e3"), have)
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("BLMOVE took too long")
+	}
+
+	lv, err := s.List("from")
+	ok(t, err)
+	equals(t, []string{"e1", "e2"}, lv)
+	lv, err = s.List("to")
+	ok(t, err)
+	equals(t, []string{"e3"}, lv)
+}

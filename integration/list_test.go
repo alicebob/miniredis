@@ -504,3 +504,55 @@ func TestLmove(t *testing.T) {
 		c.Do("LRANGE", "chk", "0", "-1")
 	})
 }
+
+func TestBlmove(t *testing.T) {
+	testRaw(t, func(c *client) {
+		c.Do("LPUSH", "l", "one")
+		c.Do("BLMOVE", "l", "l2", "RIGHT", "LEFT", "1")
+		c.Do("EXISTS", "l")
+		c.Do("EXISTS", "l2")
+		c.Do("LRANGE", "l", "0", "-1")
+		c.Do("LRANGE", "l2", "0", "-1")
+
+		// failure cases
+		c.Error("wrong number", "BLMOVE")
+		c.Error("wrong number", "BLMOVE", "l")
+		c.Error("wrong number", "BLMOVE", "l", "x")
+		c.Error("wrong number", "BLMOVE", "1")
+		c.Error("negative", "BLMOVE", "from", "to", "RIGHT", "LEFT", "-1")
+		c.Error("wrong number", "BLMOVE", "from", "to", "RIGHT", "LEFT", "-1", "xxx")
+	})
+
+	// left right
+	testRaw(t, func(c *client) {
+		c.Do("LPUSH", "l", "three")
+		c.Do("LPUSH", "l", "two")
+		c.Do("LPUSH", "l", "one")
+		c.Do("BLMOVE", "l", "l2", "LEFT", "RIGHT", "1")
+		c.Do("EXISTS", "l")
+		c.Do("EXISTS", "l2")
+		c.Do("LRANGE", "l", "0", "-1")
+		c.Do("LRANGE", "l2", "0", "-1")
+	})
+
+	wg := &sync.WaitGroup{}
+	wg.Add(1)
+	testMulti(t,
+		func(c *client) {
+			c.Do("BLMOVE", "from", "to", "RIGHT", "LEFT", "1")
+			c.Do("BLMOVE", "from", "to", "RIGHT", "LEFT", "1")
+			c.Do("BLMOVE", "from", "to", "RIGHT", "LEFT", "1")
+			c.Do("BLMOVE", "from", "to", "RIGHT", "LEFT", "1")
+			c.Do("BLMOVE", "from", "to", "RIGHT", "LEFT", "1") // will timeout
+			wg.Done()
+		},
+		func(c *client) {
+			c.Do("LPUSH", "from", "aap", "noot", "mies")
+			time.Sleep(20 * time.Millisecond)
+			c.Do("LPUSH", "from", "toon")
+			wg.Wait()
+			c.Do("LRANGE", "from", "0", "-1")
+			c.Do("LRANGE", "to", "0", "-1")
+		},
+	)
+}
