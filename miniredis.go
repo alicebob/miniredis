@@ -194,7 +194,6 @@ func (m *Miniredis) start(s *server.Server) error {
 	commandsScripting(m)
 	commandsGeo(m)
 	commandsCluster(m)
-	commandsCommand(m)
 	commandsHll(m)
 
 	return nil
@@ -431,6 +430,18 @@ func (m *Miniredis) SetError(msg string) {
 		}
 	}
 	m.srv.SetPreHook(cb)
+}
+
+// isValidCMD returns true if command is valid and can be executed.
+func (m *Miniredis) isValidCMD(c *server.Peer, cmd string) bool {
+	if !m.handleAuth(c) {
+		return false
+	}
+	if m.checkPubsub(c, cmd) {
+		return false
+	}
+
+	return true
 }
 
 // handleAuth returns false if connection has no access. It sends the reply.

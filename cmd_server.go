@@ -14,6 +14,9 @@ func commandsServer(m *Miniredis) {
 	m.srv.Register("FLUSHALL", m.cmdFlushall)
 	m.srv.Register("FLUSHDB", m.cmdFlushdb)
 	m.srv.Register("TIME", m.cmdTime)
+
+	commandsCommand(m)
+	commandsInfo(m)
 }
 
 // DBSIZE

@@ -1,6 +1,9 @@
 package miniredis
 
 import (
+	"bufio"
+	"bytes"
+	"github.com/alicebob/miniredis/v2/server"
 	"strings"
 	"testing"
 	"time"
@@ -255,3 +258,59 @@ func TestPool(t *testing.T) {
 	c.Close()
 }
 */
+
+func TestMiniredis_isValidCMD(t *testing.T) {
+	testCases := []struct {
+		name         string
+		isAuthorized bool
+		isInPUBSUB   bool
+		wantResult   bool
+	}{
+		{
+			name:         "Client is not authorized, no PUBSUB mode",
+			isAuthorized: false,
+			isInPUBSUB:   false,
+			wantResult:   false,
+		},
+		{
+			name:         "Client is not authorized, PUBSUB mode",
+			isAuthorized: false,
+			isInPUBSUB:   true,
+			wantResult:   false,
+		},
+		{
+			name:         "Client is authorized, PUBSUB mode",
+			isAuthorized: true,
+			isInPUBSUB:   true,
+			wantResult:   false,
+		},
+		{
+			name:         "Client is authorized, no PUBSUB mode",
+			isAuthorized: true,
+			isInPUBSUB:   false,
+			wantResult:   true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			m := &Miniredis{
+				passwords: map[string]string{
+					"example_username": "example_password",
+				},
+			}
+			c := server.NewPeer(bufio.NewWriter(&bytes.Buffer{}))
+			c.Ctx = &connCtx{
+				authenticated: tc.isAuthorized,
+			}
+			if tc.isInPUBSUB {
+				c.Ctx = &connCtx{
+					authenticated: tc.isAuthorized,
+					subscriber:    newSubscriber(),
+				}
+			}
+
+			assert(t, tc.wantResult == m.isValidCMD(c, "example_cmd"), "fail")
+		})
+	}
+}

@@ -64,6 +64,8 @@ Implemented commands:
    - FLUSHALL
    - FLUSHDB
    - TIME -- returns time.Now() or value set by SetTime()
+   - COMMAND -- partly
+   - INFO -- partly, returns only "clients" section with one field "connected_clients"
  - String keys (complete)
    - APPEND
    - BITCOUNT
@@ -203,8 +205,6 @@ Implemented commands:
    - GEORADIUS_RO
    - GEORADIUSBYMEMBER
    - GEORADIUSBYMEMBER_RO
- - Server
-   - COMMAND -- partly
  - Cluster
    - CLUSTER SLOTS
    - CLUSTER KEYSLOT
@@ -302,7 +302,6 @@ Commands which will probably not be implemented:
     - ~~CLIENT *~~
     - ~~CONFIG *~~
     - ~~DEBUG *~~
-    - ~~INFO~~
     - ~~LASTSAVE~~
     - ~~MONITOR~~
     - ~~ROLE~~
