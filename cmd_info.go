@@ -1,9 +1,10 @@
-// Command 'COMMAND' from https://redis.io/commands#server
+// Command 'INFO' from https://redis.io/commands/info/
 
 package miniredis
 
 import (
 	"fmt"
+
 	"github.com/alicebob/miniredis/v2/server"
 )
 
