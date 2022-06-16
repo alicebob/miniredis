@@ -3,11 +3,11 @@ package miniredis
 import (
 	"bufio"
 	"bytes"
-	"github.com/alicebob/miniredis/v2/server"
 	"strings"
 	"testing"
 	"time"
-
+	
+	"github.com/alicebob/miniredis/v2/server"
 	"github.com/alicebob/miniredis/v2/proto"
 )
 
