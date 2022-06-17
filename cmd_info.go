@@ -33,7 +33,7 @@ func (m *Miniredis) cmdInfo(c *server.Peer, cmd string, args []string) {
 			clientsSectionContent = "# Clients\nconnected_clients:%d\r\n"
 		)
 
-		var result = make([]string, 0, 1)
+		var result string
 
 		for _, key := range args {
 			if key != clientsSectionName {
@@ -42,8 +42,8 @@ func (m *Miniredis) cmdInfo(c *server.Peer, cmd string, args []string) {
 				return
 			}
 		}
-		result = append(result, fmt.Sprintf(clientsSectionContent, m.Server().TotalConnections()))
+		result = fmt.Sprintf(clientsSectionContent, m.Server().TotalConnections())
 
-		c.WriteStrings(result)
+		c.WriteBulk(result)
 	})
 }
