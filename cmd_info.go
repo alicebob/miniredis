@@ -1,5 +1,3 @@
-// Command 'INFO' from https://redis.io/commands/info/
-
 package miniredis
 
 import (
@@ -8,14 +6,7 @@ import (
 	"github.com/alicebob/miniredis/v2/server"
 )
 
-func commandsInfo(m *Miniredis) {
-	const cmdName = "INFO"
-
-	if err := m.srv.Register(cmdName, m.cmdInfo); err != nil {
-		panic(fmt.Errorf("register command (%s) failed with error: %s", cmdName, err.Error()))
-	}
-}
-
+// Command 'INFO' from https://redis.io/commands/info/
 func (m *Miniredis) cmdInfo(c *server.Peer, cmd string, args []string) {
 	if !m.isValidCMD(c, cmd) {
 		return
@@ -42,7 +33,7 @@ func (m *Miniredis) cmdInfo(c *server.Peer, cmd string, args []string) {
 				return
 			}
 		}
-		result = fmt.Sprintf(clientsSectionContent, m.Server().TotalConnections())
+		result = fmt.Sprintf(clientsSectionContent, m.Server().ClientsLen())
 
 		c.WriteBulk(result)
 	})

@@ -108,9 +108,6 @@ func (s *Server) ServeConn(conn net.Conn) {
 	go func() {
 		defer s.wg.Done()
 		defer conn.Close()
-		defer func() {
-			s.infoConns--
-		}()
 
 		s.servePeer(conn)
 
