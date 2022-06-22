@@ -1,8 +1,10 @@
 package miniredis
 
 import (
-	"github.com/alicebob/miniredis/v2/proto"
 	"testing"
+	"time"
+
+	"github.com/alicebob/miniredis/v2/proto"
 )
 
 func TestMiniredis_cmdInfo(t *testing.T) {
@@ -41,6 +43,8 @@ func TestMiniredis_cmdInfo(t *testing.T) {
 			proto.String("# Clients\nconnected_clients:2\r\n"),
 		)
 		c2.Close()
+
+		time.Sleep(10 * time.Millisecond)
 
 		c3, err := proto.Dial(s.Addr())
 		ok(t, err)
