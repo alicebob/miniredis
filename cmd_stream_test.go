@@ -838,6 +838,9 @@ func TestStreamAutoClaim(t *testing.T) {
 	ok(t, err)
 	defer c.Close()
 
+	now := time.Now()
+	s.SetTime(now)
+
 	mustDo(t, c,
 		"XAUTOCLAIM", "planets", "processing", "alice", "0", "0",
 		proto.Error("NOGROUP No such key 'planets' or consumer group 'processing'"),
@@ -877,6 +880,64 @@ func TestStreamAutoClaim(t *testing.T) {
 		proto.Array(
 			proto.String("0-0"),
 			proto.Array(proto.Array(proto.String("0-1"), proto.Strings("name", "Mercury"))),
+		),
+	)
+
+	// Add an additional item to pending
+	s.SetTime(now.Add(5000 * time.Millisecond))
+	mustDo(t, c,
+		"XADD", "planets", "0-2", "name", "Venus",
+		proto.String("0-2"),
+	)
+	mustDo(t, c,
+		"XREADGROUP", "GROUP", "processing", "alice", "STREAMS", "planets", ">",
+		proto.Array(
+			proto.Array(proto.String("planets"), proto.Array(proto.Array(proto.String("0-2"), proto.Strings("name", "Venus")))),
+		),
+	)
+
+	// Autoclaim with a min idle time that should not catch any items
+	s.SetTime(now.Add(10000 * time.Millisecond))
+	mustDo(t, c,
+		"XAUTOCLAIM", "planets", "processing", "alice", "15000", "0",
+		proto.Array(
+			proto.String("0-0"),
+			proto.Array(),
+		),
+	)
+
+	// Set time further in the future where autoclaim with min idle time should
+	// return only one result
+	s.SetTime(now.Add(15000 * time.Millisecond))
+	mustDo(t, c,
+		"XAUTOCLAIM", "planets", "processing", "alice", "15000", "0",
+		proto.Array(
+			proto.String("0-0"),
+			proto.Array(proto.Array(proto.String("0-1"), proto.Strings("name", "Mercury"))),
+		),
+	)
+
+	// Further in the future we should return Venus but not Mercury since it is
+	// claimed more recently
+	s.SetTime(now.Add(25000 * time.Millisecond))
+	mustDo(t, c,
+		"XAUTOCLAIM", "planets", "processing", "alice", "15000", "0",
+		proto.Array(
+			proto.String("0-0"),
+			proto.Array(proto.Array(proto.String("0-2"), proto.Strings("name", "Venus"))),
+		),
+	)
+
+	// Even further in the future we should return both
+	s.SetTime(now.Add(40000 * time.Millisecond))
+	mustDo(t, c,
+		"XAUTOCLAIM", "planets", "processing", "alice", "15000", "0",
+		proto.Array(
+			proto.String("0-0"),
+			proto.Array(
+				proto.Array(proto.String("0-1"), proto.Strings("name", "Mercury")),
+				proto.Array(proto.String("0-2"), proto.Strings("name", "Venus")),
+			),
 		),
 	)
 }
