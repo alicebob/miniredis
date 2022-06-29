@@ -1077,12 +1077,13 @@ func (m *Miniredis) cmdXautoclaim(c *server.Peer, cmd string, args []string) {
 
 	key, group, consumer := args[0], args[1], args[2]
 
-	minIdleTime, err := strconv.Atoi(args[3])
+	n, err := strconv.Atoi(args[3])
 	if err != nil {
 		setDirty(c)
 		c.WriteError("ERR Invalid min-idle-time argument for XAUTOCLAIM")
 		return
 	}
+	minIdleTime := time.Millisecond * time.Duration(n)
 
 	start_, err := formatStreamRangeBound(args[4], true, false)
 	if err != nil {
@@ -1137,8 +1138,7 @@ parsing:
 			return
 		}
 
-		nextCallId, entries := xautoclaim(m.effectiveNow(), *g, minIdleTime,
-			start, count, consumer)
+		nextCallId, entries := xautoclaim(m.effectiveNow(), *g, minIdleTime, start, count, consumer)
 		writeXautoclaim(c, nextCallId, entries, justId)
 	})
 }
@@ -1146,7 +1146,7 @@ parsing:
 func xautoclaim(
 	now time.Time,
 	g streamGroup,
-	minIdleTime int,
+	minIdleTime time.Duration,
 	start string,
 	count int,
 	consumerID string,
@@ -1159,7 +1159,7 @@ func xautoclaim(
 	msgs := g.pendingAfter(start)
 	var res []StreamEntry
 	for i, p := range msgs {
-		if minIdleTime > 0 && now.Before(p.lastDelivery.Add(time.Duration(minIdleTime)*time.Millisecond)) {
+		if minIdleTime > 0 && now.Before(p.lastDelivery.Add(minIdleTime)) {
 			continue
 		}
 		g.consumers[consumerID] = consumer{}
