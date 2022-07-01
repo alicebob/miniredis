@@ -609,17 +609,21 @@ func (m *Miniredis) cmdSscan(c *server.Peer, cmd string, args []string) {
 		return
 	}
 
-	key := args[0]
-	cursor, err := strconv.Atoi(args[1])
-	if err != nil {
-		setDirty(c)
-		c.WriteError(msgInvalidCursor)
+	var opts struct {
+		key       string
+		value     int
+		cursor    int
+		withMatch bool
+		match     string
+	}
+
+	opts.key = args[0]
+	if ok := optIntErr(c, args[1], &opts.cursor, msgInvalidCursor); !ok {
 		return
 	}
 	args = args[2:]
+
 	// MATCH and COUNT options
-	var withMatch bool
-	var match string
 	for len(args) > 0 {
 		if strings.ToLower(args[0]) == "count" {
 			if len(args) < 2 {
@@ -643,8 +647,8 @@ func (m *Miniredis) cmdSscan(c *server.Peer, cmd string, args []string) {
 				c.WriteError(msgSyntaxError)
 				return
 			}
-			withMatch = true
-			match = args[1]
+			opts.withMatch = true
+			opts.match = args[1]
 			args = args[2:]
 			continue
 		}
@@ -657,21 +661,21 @@ func (m *Miniredis) cmdSscan(c *server.Peer, cmd string, args []string) {
 		db := m.db(ctx.selectedDB)
 		// return _all_ (matched) keys every time
 
-		if cursor != 0 {
+		if opts.cursor != 0 {
 			// invalid cursor
 			c.WriteLen(2)
 			c.WriteBulk("0") // no next cursor
 			c.WriteLen(0)    // no elements
 			return
 		}
-		if db.exists(key) && db.t(key) != "set" {
+		if db.exists(opts.key) && db.t(opts.key) != "set" {
 			c.WriteError(ErrWrongType.Error())
 			return
 		}
 
-		members := db.setMembers(key)
-		if withMatch {
-			members, _ = matchKeys(members, match)
+		members := db.setMembers(opts.key)
+		if opts.withMatch {
+			members, _ = matchKeys(members, opts.match)
 		}
 
 		c.WriteLen(2)

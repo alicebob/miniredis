@@ -100,8 +100,8 @@ func (m *Miniredis) cmdTime(c *server.Peer, cmd string, args []string) {
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		now := m.effectiveNow()
 		nanos := now.UnixNano()
-		seconds := nanos / 1000000000
-		microseconds := (nanos / 1000) % 1000000
+		seconds := nanos / 1_000_000_000
+		microseconds := (nanos / 1_000) % 1_000_000
 
 		c.WriteLen(2)
 		c.WriteBulk(strconv.FormatInt(seconds, 10))
