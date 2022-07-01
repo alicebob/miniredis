@@ -471,35 +471,35 @@ func (m *Miniredis) cmdLrange(c *server.Peer, cmd string, args []string) {
 		return
 	}
 
-	key := args[0]
-	start, err := strconv.Atoi(args[1])
-	if err != nil {
-		setDirty(c)
-		c.WriteError(msgInvalidInt)
+	opts := struct {
+		key   string
+		start int
+		end   int
+	}{
+		key: args[0],
+	}
+	if ok := optInt(c, args[1], &opts.start); !ok {
 		return
 	}
-	end, err := strconv.Atoi(args[2])
-	if err != nil {
-		setDirty(c)
-		c.WriteError(msgInvalidInt)
+	if ok := optInt(c, args[2], &opts.end); !ok {
 		return
 	}
 
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
-		if t, ok := db.keys[key]; ok && t != "list" {
+		if t, ok := db.keys[opts.key]; ok && t != "list" {
 			c.WriteError(msgWrongType)
 			return
 		}
 
-		l := db.listKeys[key]
+		l := db.listKeys[opts.key]
 		if len(l) == 0 {
 			c.WriteLen(0)
 			return
 		}
 
-		rs, re := redisRange(len(l), start, end, false)
+		rs, re := redisRange(len(l), opts.start, opts.end, false)
 		c.WriteLen(re - rs)
 		for _, el := range l[rs:re] {
 			c.WriteBulk(el)
@@ -521,42 +521,44 @@ func (m *Miniredis) cmdLrem(c *server.Peer, cmd string, args []string) {
 		return
 	}
 
-	key := args[0]
-	count, err := strconv.Atoi(args[1])
-	if err != nil {
-		setDirty(c)
-		c.WriteError(msgInvalidInt)
+	var opts struct {
+		key   string
+		count int
+		value string
+	}
+	opts.key = args[0]
+	if ok := optInt(c, args[1], &opts.count); !ok {
 		return
 	}
-	value := args[2]
+	opts.value = args[2]
 
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
-		if !db.exists(key) {
+		if !db.exists(opts.key) {
 			c.WriteInt(0)
 			return
 		}
-		if db.t(key) != "list" {
+		if db.t(opts.key) != "list" {
 			c.WriteError(msgWrongType)
 			return
 		}
 
-		l := db.listKeys[key]
-		if count < 0 {
+		l := db.listKeys[opts.key]
+		if opts.count < 0 {
 			reverseSlice(l)
 		}
 		deleted := 0
 		newL := []string{}
 		toDelete := len(l)
-		if count < 0 {
-			toDelete = -count
+		if opts.count < 0 {
+			toDelete = -opts.count
 		}
-		if count > 0 {
-			toDelete = count
+		if opts.count > 0 {
+			toDelete = opts.count
 		}
 		for _, el := range l {
-			if el == value {
+			if el == opts.value {
 				if toDelete > 0 {
 					deleted++
 					toDelete--
@@ -565,14 +567,14 @@ func (m *Miniredis) cmdLrem(c *server.Peer, cmd string, args []string) {
 			}
 			newL = append(newL, el)
 		}
-		if count < 0 {
+		if opts.count < 0 {
 			reverseSlice(newL)
 		}
 		if len(newL) == 0 {
-			db.del(key, true)
+			db.del(opts.key, true)
 		} else {
-			db.listKeys[key] = newL
-			db.keyVersion[key]++
+			db.listKeys[opts.key] = newL
+			db.keyVersion[opts.key]++
 		}
 
 		c.WriteInt(deleted)
@@ -593,28 +595,31 @@ func (m *Miniredis) cmdLset(c *server.Peer, cmd string, args []string) {
 		return
 	}
 
-	key := args[0]
-	index, err := strconv.Atoi(args[1])
-	if err != nil {
-		setDirty(c)
-		c.WriteError(msgInvalidInt)
+	var opts struct {
+		key   string
+		index int
+		value string
+	}
+	opts.key = args[0]
+	if ok := optInt(c, args[1], &opts.index); !ok {
 		return
 	}
-	value := args[2]
+	opts.value = args[2]
 
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
-		if !db.exists(key) {
+		if !db.exists(opts.key) {
 			c.WriteError(msgKeyNotFound)
 			return
 		}
-		if db.t(key) != "list" {
+		if db.t(opts.key) != "list" {
 			c.WriteError(msgWrongType)
 			return
 		}
 
-		l := db.listKeys[key]
+		l := db.listKeys[opts.key]
+		index := opts.index
 		if index < 0 {
 			index = len(l) + index
 		}
@@ -622,8 +627,8 @@ func (m *Miniredis) cmdLset(c *server.Peer, cmd string, args []string) {
 			c.WriteError(msgOutOfRange)
 			return
 		}
-		l[index] = value
-		db.keyVersion[key]++
+		l[index] = opts.value
+		db.keyVersion[opts.key]++
 
 		c.WriteOK()
 	})
@@ -643,24 +648,24 @@ func (m *Miniredis) cmdLtrim(c *server.Peer, cmd string, args []string) {
 		return
 	}
 
-	key := args[0]
-	start, err := strconv.Atoi(args[1])
-	if err != nil {
-		setDirty(c)
-		c.WriteError(msgInvalidInt)
+	var opts struct {
+		key   string
+		start int
+		end   int
+	}
+
+	opts.key = args[0]
+	if ok := optInt(c, args[1], &opts.start); !ok {
 		return
 	}
-	end, err := strconv.Atoi(args[2])
-	if err != nil {
-		setDirty(c)
-		c.WriteError(msgInvalidInt)
+	if ok := optInt(c, args[2], &opts.end); !ok {
 		return
 	}
 
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
-		t, ok := db.keys[key]
+		t, ok := db.keys[opts.key]
 		if !ok {
 			c.WriteOK()
 			return
@@ -670,14 +675,14 @@ func (m *Miniredis) cmdLtrim(c *server.Peer, cmd string, args []string) {
 			return
 		}
 
-		l := db.listKeys[key]
-		rs, re := redisRange(len(l), start, end, false)
+		l := db.listKeys[opts.key]
+		rs, re := redisRange(len(l), opts.start, opts.end, false)
 		l = l[rs:re]
 		if len(l) == 0 {
-			db.del(key, true)
+			db.del(opts.key, true)
 		} else {
-			db.listKeys[key] = l
-			db.keyVersion[key]++
+			db.listKeys[opts.key] = l
+			db.keyVersion[opts.key]++
 		}
 		c.WriteOK()
 	})
@@ -730,15 +735,17 @@ func (m *Miniredis) cmdBrpoplpush(c *server.Peer, cmd string, args []string) {
 		return
 	}
 
-	src := args[0]
-	dst := args[1]
-	timeout, err := strconv.Atoi(args[2])
-	if err != nil {
-		setDirty(c)
-		c.WriteError(msgInvalidTimeout)
+	var opts struct {
+		src     string
+		dst     string
+		timeout int
+	}
+	opts.src = args[0]
+	opts.dst = args[1]
+	if ok := optIntErr(c, args[2], &opts.timeout, msgInvalidTimeout); !ok {
 		return
 	}
-	if timeout < 0 {
+	if opts.timeout < 0 {
 		setDirty(c)
 		c.WriteError(msgNegTimeout)
 		return
@@ -747,22 +754,22 @@ func (m *Miniredis) cmdBrpoplpush(c *server.Peer, cmd string, args []string) {
 	blocking(
 		m,
 		c,
-		time.Duration(timeout)*time.Second,
+		time.Duration(opts.timeout)*time.Second,
 		func(c *server.Peer, ctx *connCtx) bool {
 			db := m.db(ctx.selectedDB)
 
-			if !db.exists(src) {
+			if !db.exists(opts.src) {
 				return false
 			}
-			if db.t(src) != "list" || (db.exists(dst) && db.t(dst) != "list") {
+			if db.t(opts.src) != "list" || (db.exists(opts.dst) && db.t(opts.dst) != "list") {
 				c.WriteError(msgWrongType)
 				return true
 			}
-			if len(db.listKeys[src]) == 0 {
+			if len(db.listKeys[opts.src]) == 0 {
 				return false
 			}
-			elem := db.listPop(src)
-			db.listLpush(dst, elem)
+			elem := db.listPop(opts.src)
+			db.listLpush(opts.dst, elem)
 			c.WriteBulk(elem)
 			return true
 		},
@@ -787,34 +794,46 @@ func (m *Miniredis) cmdLmove(c *server.Peer, cmd string, args []string) {
 		return
 	}
 
-	src, dst, srcDir, dstDir := args[0], args[1], strings.ToLower(args[2]), strings.ToLower(args[3])
+	opts := struct {
+		src    string
+		dst    string
+		srcDir string
+		dstDir string
+	}{
+		src:    args[0],
+		dst:    args[1],
+		srcDir: strings.ToLower(args[2]),
+		dstDir: strings.ToLower(args[3]),
+	}
 
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
-		if !db.exists(src) {
+		if !db.exists(opts.src) {
 			c.WriteNull()
 			return
 		}
-		if db.t(src) != "list" || (db.exists(dst) && db.t(dst) != "list") {
+		if db.t(opts.src) != "list" || (db.exists(opts.dst) && db.t(opts.dst) != "list") {
 			c.WriteError(msgWrongType)
 			return
 		}
 		var elem string
-		if srcDir == "left" {
-			elem = db.listLpop(src)
-		} else if srcDir == "right" {
-			elem = db.listPop(src)
-		} else {
+		switch opts.srcDir {
+		case "left":
+			elem = db.listLpop(opts.src)
+		case "right":
+			elem = db.listPop(opts.src)
+		default:
 			c.WriteError(msgSyntaxError)
 			return
 		}
 
-		if dstDir == "left" {
-			db.listLpush(dst, elem)
-		} else if dstDir == "right" {
-			db.listPush(dst, elem)
-		} else {
+		switch opts.dstDir {
+		case "left":
+			db.listLpush(opts.dst, elem)
+		case "right":
+			db.listPush(opts.dst, elem)
+		default:
 			c.WriteError(msgSyntaxError)
 			return
 		}
