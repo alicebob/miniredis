@@ -168,26 +168,30 @@ func (m *Miniredis) makeCmdXrange(reverse bool) server.Cmd {
 			return
 		}
 
-		var (
-			key            = args[0]
-			startKey       = args[1]
-			endKey         = args[2]
+		opts := struct {
+			key            string
+			startKey       string
 			startExclusive bool
+			endKey         string
 			endExclusive   bool
-		)
-		if strings.HasPrefix(startKey, "(") {
-			startExclusive = true
-			startKey = startKey[1:]
-			if startKey == "-" || startKey == "+" {
+		}{
+			key:      args[0],
+			startKey: args[1],
+			endKey:   args[2],
+		}
+		if strings.HasPrefix(opts.startKey, "(") {
+			opts.startExclusive = true
+			opts.startKey = opts.startKey[1:]
+			if opts.startKey == "-" || opts.startKey == "+" {
 				setDirty(c)
 				c.WriteError(msgInvalidStreamID)
 				return
 			}
 		}
-		if strings.HasPrefix(endKey, "(") {
-			endExclusive = true
-			endKey = endKey[1:]
-			if endKey == "-" || endKey == "+" {
+		if strings.HasPrefix(opts.endKey, "(") {
+			opts.endExclusive = true
+			opts.endKey = opts.endKey[1:]
+			if opts.endKey == "-" || opts.endKey == "+" {
 				setDirty(c)
 				c.WriteError(msgInvalidStreamID)
 				return
@@ -205,12 +209,12 @@ func (m *Miniredis) makeCmdXrange(reverse bool) server.Cmd {
 		}
 
 		withTx(m, c, func(c *server.Peer, ctx *connCtx) {
-			start, err := formatStreamRangeBound(startKey, true, reverse)
+			start, err := formatStreamRangeBound(opts.startKey, true, reverse)
 			if err != nil {
 				c.WriteError(msgInvalidStreamID)
 				return
 			}
-			end, err := formatStreamRangeBound(endKey, false, reverse)
+			end, err := formatStreamRangeBound(opts.endKey, false, reverse)
 			if err != nil {
 				c.WriteError(msgInvalidStreamID)
 				return
@@ -223,17 +227,17 @@ func (m *Miniredis) makeCmdXrange(reverse bool) server.Cmd {
 
 			db := m.db(ctx.selectedDB)
 
-			if !db.exists(key) {
+			if !db.exists(opts.key) {
 				c.WriteLen(0)
 				return
 			}
 
-			if db.t(key) != "stream" {
+			if db.t(opts.key) != "stream" {
 				c.WriteError(ErrWrongType.Error())
 				return
 			}
 
-			var entries = db.streamKeys[key].entries
+			var entries = db.streamKeys[opts.key].entries
 			if reverse {
 				entries = reversedStreamEntries(entries)
 			}
@@ -270,11 +274,11 @@ func (m *Miniredis) makeCmdXrange(reverse bool) server.Cmd {
 				}
 
 				// Continue if start exclusive and entry ID == start
-				if startExclusive && streamCmp(entry.ID, start) == 0 {
+				if opts.startExclusive && streamCmp(entry.ID, start) == 0 {
 					continue
 				}
 				// Continue if end exclusive and entry ID == end
-				if endExclusive && streamCmp(entry.ID, end) == 0 {
+				if opts.endExclusive && streamCmp(entry.ID, end) == 0 {
 					continue
 				}
 
@@ -360,7 +364,6 @@ func (m *Miniredis) cmdXinfo(c *server.Peer, cmd string, args []string) {
 			subCmd,
 		))
 	}
-
 }
 
 // XINFO STREAM
@@ -372,6 +375,7 @@ func (m *Miniredis) cmdXinfoStream(c *server.Peer, args []string) {
 		return
 	}
 	key := args[0]
+
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
@@ -638,14 +642,16 @@ func (m *Miniredis) cmdXread(c *server.Peer, cmd string, args []string) {
 		return
 	}
 
-	var opts struct {
-		count        int
-		streams      []string
-		ids          []string
-		block        bool
-		blockTimeout time.Duration
-	}
-	var err error
+	var (
+		opts struct {
+			count        int
+			streams      []string
+			ids          []string
+			block        bool
+			blockTimeout time.Duration
+		}
+		err error
+	)
 
 parsing:
 	for len(args) > 0 {
@@ -797,45 +803,49 @@ func (m *Miniredis) cmdXpending(c *server.Peer, cmd string, args []string) {
 		return
 	}
 
-	key, group, args := args[0], args[1], args[2:]
-	summary := true
+	var opts struct {
+		key        string
+		group      string
+		summary    bool
+		start, end string
+		count      int
+		consumer   *string
+	}
+
+	opts.key, opts.group, args = args[0], args[1], args[2:]
+	opts.summary = true
 	if len(args) > 0 && strings.ToUpper(args[0]) == "IDLE" {
 		setDirty(c)
 		c.WriteError("ERR IDLE is unsupported")
 		return
 	}
-	var (
-		start, end string
-		count      int
-		consumer   *string
-	)
 	if len(args) >= 3 {
-		summary = false
+		opts.summary = false
 
 		start_, err := formatStreamRangeBound(args[0], true, false)
 		if err != nil {
 			c.WriteError(msgInvalidStreamID)
 			return
 		}
-		start = start_
+		opts.start = start_
 		end_, err := formatStreamRangeBound(args[1], false, false)
 		if err != nil {
 			c.WriteError(msgInvalidStreamID)
 			return
 		}
-		end = end_
+		opts.end = end_
 		n, err := strconv.Atoi(args[2]) // negative is allowed
 		if err != nil {
 			c.WriteError(msgInvalidInt)
 			return
 		}
-		count = n
+		opts.count = n
 		args = args[3:]
 
 		if len(args) == 1 {
 			var c string
 			c, args = args[0], args[1:]
-			consumer = &c
+			opts.consumer = &c
 		}
 	}
 	if len(args) != 0 {
@@ -846,21 +856,21 @@ func (m *Miniredis) cmdXpending(c *server.Peer, cmd string, args []string) {
 
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
-		g, err := db.streamGroup(key, group)
+		g, err := db.streamGroup(opts.key, opts.group)
 		if err != nil {
 			c.WriteError(err.Error())
 			return
 		}
 		if g == nil {
-			c.WriteError(errReadgroup(key, group).Error())
+			c.WriteError(errReadgroup(opts.key, opts.group).Error())
 			return
 		}
 
-		if summary {
+		if opts.summary {
 			writeXpendingSummary(c, *g)
 			return
 		}
-		writeXpending(m.effectiveNow(), c, *g, start, end, count, consumer)
+		writeXpending(m.effectiveNow(), c, *g, opts.start, opts.end, opts.count, opts.consumer)
 	})
 }
 
@@ -1075,27 +1085,35 @@ func (m *Miniredis) cmdXautoclaim(c *server.Peer, cmd string, args []string) {
 		return
 	}
 
-	key, group, consumer := args[0], args[1], args[2]
+	var opts struct {
+		key         string
+		group       string
+		consumer    string
+		minIdleTime time.Duration
+		start       string
+		justId      bool
+		count       int
+	}
 
+	opts.key, opts.group, opts.consumer = args[0], args[1], args[2]
 	n, err := strconv.Atoi(args[3])
 	if err != nil {
 		setDirty(c)
 		c.WriteError("ERR Invalid min-idle-time argument for XAUTOCLAIM")
 		return
 	}
-	minIdleTime := time.Millisecond * time.Duration(n)
+	opts.minIdleTime = time.Millisecond * time.Duration(n)
 
 	start_, err := formatStreamRangeBound(args[4], true, false)
 	if err != nil {
 		c.WriteError(msgInvalidStreamID)
 		return
 	}
-	start := start_
+	opts.start = start_
 
 	args = args[5:]
 
-	count := 100
-	var justId bool
+	opts.count = 100
 parsing:
 	for len(args) > 0 {
 		switch strings.ToUpper(args[0]) {
@@ -1105,7 +1123,7 @@ parsing:
 				break parsing
 			}
 
-			count, err = strconv.Atoi(args[1])
+			opts.count, err = strconv.Atoi(args[1])
 			if err != nil {
 				break parsing
 			}
@@ -1113,7 +1131,7 @@ parsing:
 			args = args[2:]
 		case "JUSTID":
 			args = args[1:]
-			justId = true
+			opts.justId = true
 		default:
 			err = errors.New(msgSyntaxError)
 			break parsing
@@ -1128,18 +1146,18 @@ parsing:
 
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
-		g, err := db.streamGroup(key, group)
+		g, err := db.streamGroup(opts.key, opts.group)
 		if err != nil {
 			c.WriteError(err.Error())
 			return
 		}
 		if g == nil {
-			c.WriteError(errReadgroup(key, group).Error())
+			c.WriteError(errReadgroup(opts.key, opts.group).Error())
 			return
 		}
 
-		nextCallId, entries := xautoclaim(m.effectiveNow(), *g, minIdleTime, start, count, consumer)
-		writeXautoclaim(c, nextCallId, entries, justId)
+		nextCallId, entries := xautoclaim(m.effectiveNow(), *g, opts.minIdleTime, opts.start, opts.count, opts.consumer)
+		writeXautoclaim(c, nextCallId, entries, opts.justId)
 	})
 }
 
