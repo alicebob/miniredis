@@ -28,6 +28,7 @@ func commandsStream(m *Miniredis) {
 	m.srv.Register("XPENDING", m.cmdXpending)
 	m.srv.Register("XTRIM", m.cmdXtrim)
 	m.srv.Register("XAUTOCLAIM", m.cmdXautoclaim)
+	m.srv.Register("XCLAIM", m.cmdXclaim)
 }
 
 // XADD
@@ -300,19 +301,44 @@ func (m *Miniredis) makeCmdXrange(reverse bool) server.Cmd {
 
 // XGROUP
 func (m *Miniredis) cmdXgroup(c *server.Peer, cmd string, args []string) {
-	if (len(args) == 4 || len(args) == 5) && strings.ToUpper(args[0]) == "CREATE" {
+	if len(args) == 0 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
+	}
+
+	subCmd, args := strings.ToUpper(args[0]), args[1:]
+	switch subCmd {
+	case "CREATE":
 		m.cmdXgroupCreate(c, cmd, args)
-	} else {
-		j := strings.Join(args, " ")
-		err := fmt.Sprintf("ERR 'XGROUP %s' not supported", j)
+	case "DESTROY":
+		m.cmdXgroupDestroy(c, cmd, args)
+	case "CREATECONSUMER":
+		m.cmdXgroupCreateconsumer(c, cmd, args)
+	case "DELCONSUMER":
+		m.cmdXgroupDelconsumer(c, cmd, args)
+	case "HELP",
+		"SETID":
+		err := fmt.Sprintf("ERR 'XGROUP %s' not supported", subCmd)
 		setDirty(c)
 		c.WriteError(err)
+	default:
+		setDirty(c)
+		c.WriteError(fmt.Sprintf(
+			"ERR Unknown subcommand or wrong number of arguments for '%s'. Try XGROUP HELP.",
+			subCmd,
+		))
 	}
 }
 
 // XGROUP CREATE
 func (m *Miniredis) cmdXgroupCreate(c *server.Peer, cmd string, args []string) {
-	stream, group, id := args[1], args[2], args[3]
+	if len(args) != 3 && len(args) != 4 {
+		setDirty(c)
+		c.WriteError(errWrongNumber("CREATE"))
+		return
+	}
+	stream, group, id := args[0], args[1], args[2]
 
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
@@ -322,7 +348,7 @@ func (m *Miniredis) cmdXgroupCreate(c *server.Peer, cmd string, args []string) {
 			c.WriteError(err.Error())
 			return
 		}
-		if s == nil && len(args) == 5 && strings.ToUpper(args[4]) == "MKSTREAM" {
+		if s == nil && len(args) == 4 && strings.ToUpper(args[3]) == "MKSTREAM" {
 			if s, err = db.newStream(stream); err != nil {
 				c.WriteError(err.Error())
 				return
@@ -342,6 +368,124 @@ func (m *Miniredis) cmdXgroupCreate(c *server.Peer, cmd string, args []string) {
 	})
 }
 
+// XGROUP DESTROY
+func (m *Miniredis) cmdXgroupDestroy(c *server.Peer, cmd string, args []string) {
+	if len(args) != 2 {
+		setDirty(c)
+		c.WriteError(errWrongNumber("DESTROY"))
+		return
+	}
+	stream, groupName := args[0], args[1]
+
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
+		db := m.db(ctx.selectedDB)
+
+		s, err := db.stream(stream)
+		if err != nil {
+			c.WriteError(err.Error())
+			return
+		}
+		if s == nil {
+			c.WriteError(msgXgroupKeyNotFound)
+			return
+		}
+
+		if _, ok := s.groups[groupName]; !ok {
+			c.WriteInt(0)
+			return
+		}
+		delete(s.groups, groupName)
+		c.WriteInt(1)
+	})
+}
+
+// XGROUP CREATECONSUMER
+func (m *Miniredis) cmdXgroupCreateconsumer(c *server.Peer, cmd string, args []string) {
+	if len(args) != 3 {
+		setDirty(c)
+		c.WriteError(errWrongNumber("CREATECONSUMER"))
+		return
+	}
+	key, groupName, consumerName := args[0], args[1], args[2]
+
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
+		db := m.db(ctx.selectedDB)
+
+		s, err := db.stream(key)
+		if err != nil {
+			c.WriteError(err.Error())
+			return
+		}
+		if s == nil {
+			c.WriteError(msgXgroupKeyNotFound)
+			return
+		}
+
+		g, ok := s.groups[groupName]
+		if !ok {
+			err := fmt.Sprintf("NOGROUP No such consumer group '%s' for key name '%s'", groupName, key)
+			c.WriteError(err)
+			return
+		}
+
+		if _, ok = g.consumers[consumerName]; ok {
+			c.WriteInt(0)
+			return
+		}
+		g.consumers[consumerName] = &consumer{}
+		c.WriteInt(1)
+	})
+}
+
+// XGROUP DELCONSUMER
+func (m *Miniredis) cmdXgroupDelconsumer(c *server.Peer, cmd string, args []string) {
+	if len(args) != 3 {
+		setDirty(c)
+		c.WriteError(errWrongNumber("DELCONSUMER"))
+		return
+	}
+	key, groupName, consumerName := args[0], args[1], args[2]
+
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
+		db := m.db(ctx.selectedDB)
+
+		s, err := db.stream(key)
+		if err != nil {
+			c.WriteError(err.Error())
+			return
+		}
+		if s == nil {
+			c.WriteError(msgXgroupKeyNotFound)
+			return
+		}
+
+		g, ok := s.groups[groupName]
+		if !ok {
+			err := fmt.Sprintf("NOGROUP No such consumer group '%s' for key name '%s'", groupName, key)
+			c.WriteError(err)
+			return
+		}
+
+		consumer, ok := g.consumers[consumerName]
+		if !ok {
+			c.WriteInt(0)
+			return
+		}
+		defer delete(g.consumers, consumerName)
+
+		if consumer.numPendingEntries > 0 {
+			newPending := make([]pendingEntry, 0)
+			for _, entry := range g.pending {
+				if entry.consumer != consumerName {
+					newPending = append(newPending, entry)
+				}
+			}
+			g.pending = newPending
+		}
+		c.WriteInt(consumer.numPendingEntries)
+	})
+}
+
 // XINFO
 func (m *Miniredis) cmdXinfo(c *server.Peer, cmd string, args []string) {
 	if len(args) < 1 {
@@ -353,7 +497,11 @@ func (m *Miniredis) cmdXinfo(c *server.Peer, cmd string, args []string) {
 	switch subCmd {
 	case "STREAM":
 		m.cmdXinfoStream(c, args)
-	case "CONSUMERS", "GROUPS", "HELP":
+	case "CONSUMERS":
+		m.cmdXinfoConsumers(c, args)
+	case "GROUPS":
+		m.cmdXinfoGroups(c, args)
+	case "HELP":
 		err := fmt.Sprintf("'XINFO %s' not supported", strings.Join(args, " "))
 		setDirty(c)
 		c.WriteError(err)
@@ -371,7 +519,7 @@ func (m *Miniredis) cmdXinfo(c *server.Peer, cmd string, args []string) {
 func (m *Miniredis) cmdXinfoStream(c *server.Peer, args []string) {
 	if len(args) < 1 {
 		setDirty(c)
-		c.WriteError(errWrongNumber("XINFO"))
+		c.WriteError(errWrongNumber("STREAM"))
 		return
 	}
 	key := args[0]
@@ -392,6 +540,100 @@ func (m *Miniredis) cmdXinfoStream(c *server.Peer, args []string) {
 		c.WriteMapLen(1)
 		c.WriteBulk("length")
 		c.WriteInt(len(s.entries))
+	})
+}
+
+// XINFO GROUPS
+func (m *Miniredis) cmdXinfoGroups(c *server.Peer, args []string) {
+	if len(args) != 1 {
+		setDirty(c)
+		c.WriteError(errWrongNumber("GROUPS"))
+		return
+	}
+	key := args[0]
+
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
+		db := m.db(ctx.selectedDB)
+
+		s, err := db.stream(key)
+		if err != nil {
+			c.WriteError(err.Error())
+			return
+		}
+		if s == nil {
+			c.WriteError(msgKeyNotFound)
+			return
+		}
+
+		c.WriteLen(len(s.groups))
+		for name, g := range s.groups {
+			c.WriteMapLen(4)
+
+			c.WriteBulk("name")
+			c.WriteBulk(name)
+
+			c.WriteBulk("consumers")
+			c.WriteInt(len(g.consumers))
+
+			c.WriteBulk("pending")
+			c.WriteInt(len(g.pending))
+
+			c.WriteBulk("last-delivered-id")
+			c.WriteBulk(g.lastID)
+		}
+	})
+}
+
+// XINFO CONSUMERS
+// Please note that this is only a partial implementation, for it does not
+// return each consumer's "idle" value, which indicates "the number of
+// milliseconds that have passed since the consumer last interacted with the
+// server."
+func (m *Miniredis) cmdXinfoConsumers(c *server.Peer, args []string) {
+	if len(args) != 2 {
+		setDirty(c)
+		c.WriteError(errWrongNumber("CONSUMERS"))
+		return
+	}
+	key := args[0]
+	groupName := args[1]
+
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
+		db := m.db(ctx.selectedDB)
+
+		s, err := db.stream(key)
+		if err != nil {
+			c.WriteError(err.Error())
+			return
+		}
+		if s == nil {
+			c.WriteError(msgKeyNotFound)
+			return
+		}
+
+		g, ok := s.groups[groupName]
+		if !ok {
+			err := fmt.Sprintf("NOGROUP No such consumer group '%s' for key name '%s'", groupName, key)
+			c.WriteError(err)
+			return
+		}
+
+		consumerNames := make([]string, 0)
+		for name := range g.consumers {
+			consumerNames = append(consumerNames, name)
+		}
+		sort.Strings(consumerNames)
+
+		c.WriteLen(len(consumerNames))
+		for _, name := range consumerNames {
+			c.WriteMapLen(2)
+
+			c.WriteBulk("name")
+			c.WriteBulk(name)
+
+			c.WriteBulk("pending")
+			c.WriteInt(g.consumers[name].numPendingEntries)
+		}
 	})
 }
 
@@ -807,6 +1049,7 @@ func (m *Miniredis) cmdXpending(c *server.Peer, cmd string, args []string) {
 		key        string
 		group      string
 		summary    bool
+		idle       time.Duration
 		start, end string
 		count      int
 		consumer   *string
@@ -814,38 +1057,49 @@ func (m *Miniredis) cmdXpending(c *server.Peer, cmd string, args []string) {
 
 	opts.key, opts.group, args = args[0], args[1], args[2:]
 	opts.summary = true
-	if len(args) > 0 && strings.ToUpper(args[0]) == "IDLE" {
-		setDirty(c)
-		c.WriteError("ERR IDLE is unsupported")
-		return
-	}
 	if len(args) >= 3 {
 		opts.summary = false
 
-		start_, err := formatStreamRangeBound(args[0], true, false)
+		if strings.ToUpper(args[0]) == "IDLE" {
+			idleMs, err := strconv.ParseInt(args[1], 10, 64)
+			if err != nil {
+				setDirty(c)
+				c.WriteError(msgInvalidInt)
+				return
+			}
+			opts.idle = time.Duration(idleMs) * time.Millisecond
+
+			args = args[2:]
+			if len(args) < 3 {
+				setDirty(c)
+				c.WriteError(msgSyntaxError)
+				return
+			}
+		}
+
+		var err error
+		opts.start, err = formatStreamRangeBound(args[0], true, false)
 		if err != nil {
+			setDirty(c)
 			c.WriteError(msgInvalidStreamID)
 			return
 		}
-		opts.start = start_
-		end_, err := formatStreamRangeBound(args[1], false, false)
+		opts.end, err = formatStreamRangeBound(args[1], false, false)
 		if err != nil {
+			setDirty(c)
 			c.WriteError(msgInvalidStreamID)
 			return
 		}
-		opts.end = end_
-		n, err := strconv.Atoi(args[2]) // negative is allowed
+		opts.count, err = strconv.Atoi(args[2]) // negative is allowed
 		if err != nil {
+			setDirty(c)
 			c.WriteError(msgInvalidInt)
 			return
 		}
-		opts.count = n
 		args = args[3:]
 
 		if len(args) == 1 {
-			var c string
-			c, args = args[0], args[1:]
-			opts.consumer = &c
+			opts.consumer, args = &args[0], args[1:]
 		}
 	}
 	if len(args) != 0 {
@@ -870,7 +1124,7 @@ func (m *Miniredis) cmdXpending(c *server.Peer, cmd string, args []string) {
 			writeXpendingSummary(c, *g)
 			return
 		}
-		writeXpending(m.effectiveNow(), c, *g, opts.start, opts.end, opts.count, opts.consumer)
+		writeXpending(m.effectiveNow(), c, *g, opts.idle, opts.start, opts.end, opts.count, opts.consumer)
 	})
 }
 
@@ -917,6 +1171,7 @@ func writeXpending(
 	now time.Time,
 	c *server.Peer,
 	g streamGroup,
+	idle time.Duration,
 	start,
 	end string,
 	count int,
@@ -952,12 +1207,19 @@ func writeXpending(
 		if streamCmp(p.id, end) > 0 {
 			continue
 		}
-		res = append(res, entry{
-			id:       p.id,
-			consumer: p.consumer,
-			millis:   int(now.Sub(p.lastDelivery).Milliseconds()),
-			count:    p.deliveryCount,
-		})
+		timeSinceLastDelivery := now.Sub(p.lastDelivery)
+		if timeSinceLastDelivery >= idle {
+			res = append(res, entry{
+				id:       p.id,
+				consumer: p.consumer,
+				millis:   int(timeSinceLastDelivery.Milliseconds()),
+				count:    p.deliveryCount,
+			})
+		}
+	}
+	if len(res) == 0 {
+		c.WriteLen(-1)
+		return
 	}
 	c.WriteLen(len(res))
 	for _, e := range res {
@@ -1180,8 +1442,13 @@ func xautoclaim(
 		if minIdleTime > 0 && now.Before(p.lastDelivery.Add(minIdleTime)) {
 			continue
 		}
-		g.consumers[consumerID] = consumer{}
+
+		prevConsumerID := p.consumer
+		if _, ok := g.consumers[consumerID]; !ok {
+			g.consumers[consumerID] = &consumer{}
+		}
 		p.consumer = consumerID
+
 		_, entry := g.stream.get(p.id)
 		// not found. Weird?
 		if entry == nil {
@@ -1190,8 +1457,13 @@ func xautoclaim(
 			// (Introduced in Redis 7.0)
 			continue
 		}
+
 		p.deliveryCount += 1
 		p.lastDelivery = now
+
+		g.consumers[prevConsumerID].numPendingEntries--
+		g.consumers[consumerID].numPendingEntries++
+
 		msgs[i] = p
 		res = append(res, *entry)
 
@@ -1224,6 +1496,192 @@ func writeXautoclaim(c *server.Peer, nextCallId string, res []StreamEntry, justI
 	}
 }
 
+// XCLAIM
+func (m *Miniredis) cmdXclaim(c *server.Peer, cmd string, args []string) {
+	if len(args) < 5 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
+	}
+
+	var opts struct {
+		key             string
+		groupName       string
+		consumerName    string
+		minIdleTime     time.Duration
+		newLastDelivery time.Time
+		ids             []string
+		retryCount      *int
+		force           bool
+		justId          bool
+	}
+
+	opts.key, opts.groupName, opts.consumerName = args[0], args[1], args[2]
+
+	minIdleTimeMillis, err := strconv.Atoi(args[3])
+	if err != nil {
+		setDirty(c)
+		c.WriteError("ERR Invalid min-idle-time argument for XCLAIM")
+		return
+	}
+	opts.minIdleTime = time.Millisecond * time.Duration(minIdleTimeMillis)
+
+	opts.newLastDelivery = m.effectiveNow()
+	opts.ids = append(opts.ids, args[4])
+
+	args = args[5:]
+	for len(args) > 0 {
+		arg := strings.ToUpper(args[0])
+		if arg == "IDLE" ||
+			arg == "TIME" ||
+			arg == "RETRYCOUNT" ||
+			arg == "FORCE" ||
+			arg == "JUSTID" {
+			break
+		}
+		opts.ids = append(opts.ids, arg)
+		args = args[1:]
+	}
+
+	for len(args) > 0 {
+		arg := strings.ToUpper(args[0])
+		switch arg {
+		case "IDLE":
+			idleMs, err := strconv.ParseInt(args[1], 10, 64)
+			if err != nil {
+				setDirty(c)
+				c.WriteError("ERR Invalid IDLE option argument for XCLAIM")
+				return
+			}
+			if idleMs < 0 {
+				idleMs = 0
+			}
+			opts.newLastDelivery = m.effectiveNow().Add(time.Millisecond * time.Duration(-idleMs))
+			args = args[2:]
+		case "TIME":
+			timeMs, err := strconv.ParseInt(args[1], 10, 64)
+			if err != nil {
+				setDirty(c)
+				c.WriteError("ERR Invalid TIME option argument for XCLAIM")
+				return
+			}
+			opts.newLastDelivery = unixMilli(timeMs)
+			args = args[2:]
+		case "RETRYCOUNT":
+			retryCount, err := strconv.Atoi(args[1])
+			if err != nil {
+				setDirty(c)
+				c.WriteError("ERR Invalid RETRYCOUNT option argument for XCLAIM")
+				return
+			}
+			opts.retryCount = &retryCount
+			args = args[2:]
+		case "FORCE":
+			opts.force = true
+			args = args[1:]
+		case "JUSTID":
+			opts.justId = true
+			args = args[1:]
+		default:
+			setDirty(c)
+			c.WriteError(fmt.Sprintf("ERR Unrecognized XCLAIM option '%s'", args[0]))
+			return
+		}
+	}
+
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
+		db := m.db(ctx.selectedDB)
+
+		g, err := db.streamGroup(opts.key, opts.groupName)
+		if err != nil {
+			c.WriteError(err.Error())
+			return
+		}
+		if g == nil {
+			c.WriteError(errReadgroup(opts.key, opts.groupName).Error())
+			return
+		}
+
+		claimedEntryIDs := m.xclaim(g, opts.consumerName, opts.minIdleTime, opts.newLastDelivery, opts.ids, opts.retryCount, opts.force)
+		writeXclaim(c, g.stream, claimedEntryIDs, opts.justId)
+	})
+}
+
+func (m *Miniredis) xclaim(
+	group *streamGroup,
+	consumerName string,
+	minIdleTime time.Duration,
+	newLastDelivery time.Time,
+	ids []string,
+	retryCount *int,
+	force bool,
+) (claimedEntryIDs []string) {
+	for _, id := range ids {
+		pelPos, pelEntry := group.searchPending(id)
+		if pelEntry == nil {
+			if !force {
+				continue
+			}
+
+			if pelPos < len(group.pending) {
+				group.pending = append(group.pending[:pelPos+1], group.pending[pelPos:]...)
+			} else {
+				group.pending = append(group.pending, pendingEntry{})
+			}
+			pelEntry = &group.pending[pelPos]
+
+			*pelEntry = pendingEntry{
+				id:            id,
+				consumer:      consumerName,
+				deliveryCount: 1,
+			}
+		} else {
+			group.consumers[pelEntry.consumer].numPendingEntries--
+			pelEntry.consumer = consumerName
+		}
+
+		if retryCount != nil {
+			pelEntry.deliveryCount = *retryCount
+		} else {
+			pelEntry.deliveryCount++
+		}
+		pelEntry.lastDelivery = newLastDelivery
+
+		claimedEntryIDs = append(claimedEntryIDs, id)
+	}
+	if len(claimedEntryIDs) == 0 {
+		return
+	}
+
+	if _, ok := group.consumers[consumerName]; !ok {
+		group.consumers[consumerName] = &consumer{}
+	}
+	consumer := group.consumers[consumerName]
+	consumer.numPendingEntries += len(claimedEntryIDs)
+
+	return
+}
+
+func writeXclaim(c *server.Peer, stream *streamKey, claimedEntryIDs []string, justId bool) {
+	c.WriteLen(len(claimedEntryIDs))
+	for _, id := range claimedEntryIDs {
+		if justId {
+			c.WriteBulk(id)
+			continue
+		}
+
+		_, entry := stream.get(id)
+		if entry == nil {
+			c.WriteNull()
+			continue
+		}
+
+		c.WriteLen(2)
+		c.WriteBulk(entry.ID)
+		c.WriteStrings(entry.Values)
+	}
+}
+
 func parseBlock(cmd string, args []string, block *bool, timeout *time.Duration) error {
 	if len(args) < 2 {
 		return errors.New(errWrongNumber(cmd))
@@ -1238,4 +1696,9 @@ func parseBlock(cmd string, args []string, block *bool, timeout *time.Duration) 
 	}
 	(*timeout) = time.Millisecond * time.Duration(ms)
 	return nil
+}
+
+// taken from Go's time package. Can be dropped if miniredis supports >= 1.17
+func unixMilli(msec int64) time.Time {
+	return time.Unix(msec/1e3, (msec%1e3)*1e6)
 }

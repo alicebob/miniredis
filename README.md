@@ -180,9 +180,15 @@ Implemented commands:
    - XACK
    - XADD
    - XAUTOCLAIM
+   - XCLAIM
    - XDEL
    - XGROUP CREATE
+   - XGROUP CREATECONSUMER
+   - XGROUP DESTROY
+   - XGROUP DELCONSUMER
    - XINFO STREAM -- partly
+   - XINFO GROUPS
+   - XINFO CONSUMERS -- partly
    - XLEN
    - XRANGE
    - XREAD
