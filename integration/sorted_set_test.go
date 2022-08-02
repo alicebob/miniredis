@@ -823,17 +823,17 @@ func TestZpopminmax(t *testing.T) {
 		c.Do("ZPOPMIN", "set:zpop")
 		c.Do("ZPOPMIN", "set:zpop", "2")
 		c.Do("ZPOPMIN", "set:zpop", "100")
-		c.Do("ZPOPMIN", "set:zpop", "-100")
+		c.Error("out of range", "ZPOPMIN", "set:zpop", "-100")
 
 		c.Do("ZPOPMAX", "set:zpop")
 		c.Do("ZPOPMAX", "set:zpop", "2")
 		c.Do("ZPOPMAX", "set:zpop", "100")
-		c.Do("ZPOPMAX", "set:zpop", "-100")
+		c.Error("out of range", "ZPOPMAX", "set:zpop", "-100")
 		c.Do("ZPOPMAX", "nosuch", "1")
 
 		// Wrong args
 		c.Error("wrong number", "ZPOPMIN")
-		c.Error("not an integer", "ZPOPMIN", "set:zpop", "h1")
+		c.Error("out of range", "ZPOPMIN", "set:zpop", "h1")
 		c.Error("syntax error", "ZPOPMIN", "set:zpop", "1", "h2")
 	})
 }
