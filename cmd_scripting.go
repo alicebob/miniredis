@@ -228,7 +228,7 @@ func (m *Miniredis) cmdScript(c *server.Peer, cmd string, args []string) {
 			c.WriteOK()
 
 		default:
-			c.WriteError(fmt.Sprintf(msgFScriptUsage, strings.ToUpper(subcmd)))
+			c.WriteError(fmt.Sprintf(msgFScriptUsageSimple, strings.ToUpper(subcmd)))
 		}
 	})
 }

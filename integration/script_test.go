@@ -57,7 +57,7 @@ func TestScript(t *testing.T) {
 			c.Error("wrong number", "SCRIPT", "LOAD")
 			c.Error("only support", "SCRIPT", "FLUSH", "foo")
 			c.Error("only support", "SCRIPT", "FLUSH", "ASYNC", "foo")
-			c.Error("wrong number", "SCRIPT", "FOO")
+			c.Error("unknown subcommand", "SCRIPT", "FOO")
 		})
 	})
 

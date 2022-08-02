@@ -121,7 +121,7 @@ func TestPublish(t *testing.T) {
 func TestPubSub(t *testing.T) {
 	testRaw(t, func(c *client) {
 		c.Error("wrong number", "PUBSUB")
-		c.Error("wrong number", "PUBSUB", "FOO")
+		c.Error("subcommand", "PUBSUB", "FOO")
 
 		c.Do("PUBSUB", "CHANNELS")
 		c.Do("PUBSUB", "CHANNELS", "foo")

@@ -598,10 +598,10 @@ func TestPubSubBadArgs(t *testing.T) {
 	)
 	mustDo(t, c,
 		"PUBSUB", "FOOBAR",
-		proto.Error("ERR Unknown subcommand or wrong number of arguments for 'FOOBAR'. Try PUBSUB HELP."),
+		proto.Error("ERR unknown subcommand 'FOOBAR'. Try PUBSUB HELP."),
 	)
 	mustDo(t, c,
 		"PUBSUB", "CHANNELS", "FOOBAR1", "FOOBAR2",
-		proto.Error("ERR Unknown subcommand or wrong number of arguments for 'CHANNELS'. Try PUBSUB HELP."),
+		proto.Error("ERR unknown subcommand or wrong number of arguments for 'CHANNELS'. Try PUBSUB HELP."),
 	)
 }

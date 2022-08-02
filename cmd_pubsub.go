@@ -212,7 +212,9 @@ func (m *Miniredis) cmdPubSub(c *server.Peer, cmd string, args []string) {
 	case "NUMPAT":
 		argsOk = len(subargs) == 0
 	default:
-		argsOk = false
+		setDirty(c)
+		c.WriteError(fmt.Sprintf(msgFPubsubUsageSimple, subcommand))
+		return
 	}
 
 	if !argsOk {
