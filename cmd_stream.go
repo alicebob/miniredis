@@ -360,7 +360,7 @@ func (m *Miniredis) cmdXinfo(c *server.Peer, cmd string, args []string) {
 	default:
 		setDirty(c)
 		c.WriteError(fmt.Sprintf(
-			"ERR Unknown subcommand or wrong number of arguments for '%s'. Try XINFO HELP.",
+			"ERR unknown subcommand or wrong number of arguments for '%s'. Try XINFO HELP.",
 			subCmd,
 		))
 	}

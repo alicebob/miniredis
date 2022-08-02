@@ -154,7 +154,7 @@ func TestStream(t *testing.T) {
 			c.Do("XADD", "planets", "0-1", "name", "Mercury")
 			// c.DoLoosely("XINFO", "STREAM", "planets")
 
-			c.Error("Unknown subcommand", "XINFO", "STREAMMM")
+			c.Error("unknown subcommand", "XINFO", "STREAMMM")
 			c.Error("no such key", "XINFO", "STREAM", "foo")
 			c.Error("wrong number", "XINFO")
 			c.Do("SET", "scalar", "foo")
