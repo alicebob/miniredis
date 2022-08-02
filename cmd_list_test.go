@@ -241,12 +241,12 @@ func TestLpop(t *testing.T) {
 
 		mustDo(t, c,
 			"LPOP", "l2", "99",
-			proto.Nil,
+			proto.NilList,
 		)
 
 		mustDo(t, c,
 			"LPOP", "l2", "0",
-			proto.Nil,
+			proto.NilList,
 		)
 
 		// Last element has been popped. Key is gone.
