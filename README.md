@@ -324,5 +324,4 @@ If you want to test Redis Sentinel have a look at [minisentinel](https://github.
 
 A changelog is kept at [CHANGELOG.md](https://github.com/alicebob/miniredis/blob/master/CHANGELOG.md).
 
-[![Build Status](https://travis-ci.com/alicebob/miniredis.svg?branch=master)](https://travis-ci.com/alicebob/miniredis)
 [![Go Reference](https://pkg.go.dev/badge/github.com/alicebob/miniredis/v2.svg)](https://pkg.go.dev/github.com/alicebob/miniredis/v2)
