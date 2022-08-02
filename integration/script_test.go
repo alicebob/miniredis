@@ -43,7 +43,7 @@ func TestScript(t *testing.T) {
 			c.Do("SCRIPT", "EXISTS", "1fa00e76656cc152ad327c13fe365858fd7be306")
 			c.Do("SCRIPT", "EXISTS", "0", "1fa00e76656cc152ad327c13fe365858fd7be306")
 			c.Do("SCRIPT", "EXISTS", "0")
-			c.Do("SCRIPT", "EXISTS")
+			c.Error("wrong number", "SCRIPT", "EXISTS")
 
 			c.Do("SCRIPT", "FLUSH")
 			c.Do("SCRIPT", "EXISTS", "1fa00e76656cc152ad327c13fe365858fd7be306")
@@ -419,8 +419,10 @@ func TestScriptTx(t *testing.T) {
 	testRaw(t, func(c *client) {
 		c.Do("MULTI")
 		c.Do("SCRIPT", "LOAD", "return {")
-		c.Do("SCRIPT", "FOO")
 		c.Do("EVALSHA", "aaaa", "0")
 		c.DoLoosely("EXEC")
+
+		c.Do("MULTI")
+		c.Error("unknown subcommand", "SCRIPT", "FOO")
 	})
 }

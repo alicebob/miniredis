@@ -182,23 +182,56 @@ func (m *Miniredis) cmdScript(c *server.Peer, cmd string, args []string) {
 		return
 	}
 
-	subcmd, args := args[0], args[1:]
+	var opts struct {
+		subcmd string
+		script string
+	}
+
+	opts.subcmd, args = args[0], args[1:]
+
+	switch strings.ToLower(opts.subcmd) {
+	case "load":
+		if len(args) != 1 {
+			setDirty(c)
+			c.WriteError(fmt.Sprintf(msgFScriptUsage, "LOAD"))
+			return
+		}
+		opts.script = args[0]
+	case "exists":
+		if len(args) == 0 {
+			setDirty(c)
+			c.WriteError(errWrongNumber("script|exists"))
+			return
+		}
+	case "flush":
+		if len(args) == 1 {
+			switch strings.ToUpper(args[0]) {
+			case "SYNC", "ASYNC":
+				args = args[1:]
+			default:
+			}
+		}
+		if len(args) != 0 {
+			setDirty(c)
+			c.WriteError(msgScriptFlush)
+			return
+		}
+
+	default:
+		setDirty(c)
+		c.WriteError(fmt.Sprintf(msgFScriptUsageSimple, strings.ToUpper(opts.subcmd)))
+		return
+	}
 
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
-		switch strings.ToLower(subcmd) {
+		switch strings.ToLower(opts.subcmd) {
 		case "load":
-			if len(args) != 1 {
-				c.WriteError(fmt.Sprintf(msgFScriptUsage, "LOAD"))
-				return
-			}
-			script := args[0]
-
-			if _, err := parse.Parse(strings.NewReader(script), "user_script"); err != nil {
+			if _, err := parse.Parse(strings.NewReader(opts.script), "user_script"); err != nil {
 				c.WriteError(errLuaParseError(err))
 				return
 			}
-			sha := sha1Hex(script)
-			m.scripts[sha] = script
+			sha := sha1Hex(opts.script)
+			m.scripts[sha] = opts.script
 			c.WriteBulk(sha)
 
 		case "exists":
@@ -212,23 +245,9 @@ func (m *Miniredis) cmdScript(c *server.Peer, cmd string, args []string) {
 			}
 
 		case "flush":
-			if len(args) == 1 {
-				switch strings.ToUpper(args[0]) {
-				case "SYNC", "ASYNC":
-					args = args[1:]
-				default:
-				}
-			}
-			if len(args) != 0 {
-				c.WriteError(msgScriptFlush)
-				return
-			}
-
 			m.scripts = map[string]string{}
 			c.WriteOK()
 
-		default:
-			c.WriteError(fmt.Sprintf(msgFScriptUsageSimple, strings.ToUpper(subcmd)))
 		}
 	})
 }
