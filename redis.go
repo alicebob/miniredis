@@ -20,6 +20,7 @@ const (
 	msgInvalidMinMax        = "ERR min or max is not a float"
 	msgInvalidRangeItem     = "ERR min or max not valid string range item"
 	msgInvalidTimeout       = "ERR timeout is not a float or out of range"
+	msgInvalidRange         = "ERR value is out of range, must be positive"
 	msgSyntaxError          = "ERR syntax error"
 	msgKeyNotFound          = "ERR no such key"
 	msgOutOfRange           = "ERR index out of range"

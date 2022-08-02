@@ -1958,12 +1958,6 @@ func TestSortedSetPopMin(t *testing.T) {
 		proto.Strings("zwei", "2"),
 	)
 
-	// weird cases.
-	mustDo(t, c,
-		"ZPOPMIN", "z", "-100",
-		proto.Strings(),
-	)
-
 	// Nonexistent key
 	mustDo(t, c,
 		"ZPOPMIN", "nosuch", "1",
@@ -1982,8 +1976,12 @@ func TestSortedSetPopMin(t *testing.T) {
 			proto.Error(errWrongNumber("zpopmin")),
 		)
 		mustDo(t, c,
+			"ZPOPMIN", "z", "-100",
+			proto.Error(msgInvalidRange),
+		)
+		mustDo(t, c,
 			"ZPOPMIN", "set", "noint",
-			proto.Error(msgInvalidInt),
+			proto.Error(msgInvalidRange),
 		)
 		mustDo(t, c,
 			"ZPOPMIN", "set", "1", "toomany",
@@ -2025,12 +2023,6 @@ func TestSortedSetPopMax(t *testing.T) {
 		proto.Strings("drei", "3"),
 	)
 
-	// weird cases.
-	mustDo(t, c,
-		"ZPOPMAX", "z", "-100",
-		proto.Strings(),
-	)
-
 	// Nonexistent key
 	mustDo(t, c,
 		"ZPOPMAX", "nosuch", "1",
@@ -2050,8 +2042,13 @@ func TestSortedSetPopMax(t *testing.T) {
 		)
 
 		mustDo(t, c,
+			"ZPOPMAX", "z", "-100",
+			proto.Error(msgInvalidRange),
+		)
+
+		mustDo(t, c,
 			"ZPOPMAX", "set", "noint",
-			proto.Error(msgInvalidInt),
+			proto.Error(msgInvalidRange),
 		)
 		mustDo(t, c,
 			"ZPOPMAX", "set", "1", "toomany",
