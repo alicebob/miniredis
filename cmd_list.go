@@ -297,18 +297,14 @@ func (m *Miniredis) cmdXpop(c *server.Peer, cmd string, args []string, lr leftri
 
 	opts.key, args = args[0], args[1:]
 	if len(args) > 0 {
-		v, err := strconv.Atoi(args[0])
-		if err != nil {
-			setDirty(c)
-			c.WriteError(msgInvalidInt)
+		if ok := optInt(c, args[0], &opts.count); !ok {
 			return
 		}
-		if v < 0 {
+		if opts.count < 0 {
 			setDirty(c)
 			c.WriteError(msgOutOfRange)
 			return
 		}
-		opts.count = v
 		opts.withCount = true
 		args = args[1:]
 	}
