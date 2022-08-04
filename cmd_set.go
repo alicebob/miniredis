@@ -3,6 +3,7 @@
 package miniredis
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -613,6 +614,7 @@ func (m *Miniredis) cmdSscan(c *server.Peer, cmd string, args []string) {
 		key       string
 		value     int
 		cursor    int
+		count     int
 		withMatch bool
 		match     string
 	}
@@ -631,13 +633,18 @@ func (m *Miniredis) cmdSscan(c *server.Peer, cmd string, args []string) {
 				c.WriteError(msgSyntaxError)
 				return
 			}
-			_, err := strconv.Atoi(args[1])
-			if err != nil {
+			count, err := strconv.Atoi(args[1])
+			if err != nil || count < 0 {
 				setDirty(c)
 				c.WriteError(msgInvalidInt)
 				return
 			}
-			// We do nothing with count.
+			if count == 0 {
+				setDirty(c)
+				c.WriteError(msgSyntaxError)
+				return
+			}
+			opts.count = count
 			args = args[2:]
 			continue
 		}
@@ -660,29 +667,38 @@ func (m *Miniredis) cmdSscan(c *server.Peer, cmd string, args []string) {
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 		// return _all_ (matched) keys every time
-
-		if opts.cursor != 0 {
+		if db.exists(opts.key) && db.t(opts.key) != "set" {
+			c.WriteError(ErrWrongType.Error())
+			return
+		}
+		members := db.setMembers(opts.key)
+		if opts.withMatch {
+			members, _ = matchKeys(members, opts.match)
+		}
+		low := opts.cursor
+		high := low + opts.count
+		// validate high is correct
+		if high > len(members) || high == 0 {
+			high = len(members)
+		}
+		if opts.cursor > high {
 			// invalid cursor
 			c.WriteLen(2)
 			c.WriteBulk("0") // no next cursor
 			c.WriteLen(0)    // no elements
 			return
 		}
-		if db.exists(opts.key) && db.t(opts.key) != "set" {
-			c.WriteError(ErrWrongType.Error())
-			return
+		cursorValue := low + opts.count
+		if cursorValue > len(members) {
+			cursorValue = 0 // no next cursor
 		}
-
-		members := db.setMembers(opts.key)
-		if opts.withMatch {
-			members, _ = matchKeys(members, opts.match)
-		}
-
+		members = members[low:high]
 		c.WriteLen(2)
-		c.WriteBulk("0") // no next cursor
+		c.WriteBulk(fmt.Sprintf("%d", cursorValue))
 		c.WriteLen(len(members))
 		for _, k := range members {
 			c.WriteBulk(k)
 		}
+
 	})
 }
