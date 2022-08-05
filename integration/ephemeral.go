@@ -10,6 +10,7 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"time"
 )
@@ -68,7 +69,11 @@ func runRedis(extraConfig string) (*ephemeral, string) {
 	port := arbitraryPort()
 
 	// we prefer the executable from ./redis_src, if any. See ./get_redis.sh
-	os.Setenv("PATH", fmt.Sprintf("%s:%s", localSrc, os.Getenv("PATH")))
+	absSrc, err := filepath.Abs(localSrc)
+	if err != nil {
+		panic(err)
+	}
+	os.Setenv("PATH", fmt.Sprintf("%s:%s", absSrc, os.Getenv("PATH")))
 
 	c := exec.Command(executable, "-")
 	stdin, err := c.StdinPipe()
