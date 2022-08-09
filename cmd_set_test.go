@@ -750,7 +750,6 @@ func TestSscan(t *testing.T) {
 	// We cheat with sscan. It always returns everything.
 
 	s.SetAdd("set", "value1", "value2")
-
 	// No problem
 	mustDo(t, c,
 		"SSCAN", "set", "0",
@@ -818,7 +817,15 @@ func TestSscan(t *testing.T) {
 			proto.Error(msgSyntaxError),
 		)
 		mustDo(t, c,
+			"SSCAN", "set", "0", "COUNT", "0",
+			proto.Error(msgSyntaxError),
+		)
+		mustDo(t, c,
 			"SSCAN", "set", "0", "COUNT", "noint",
+			proto.Error(msgInvalidInt),
+		)
+		mustDo(t, c,
+			"SSCAN", "set", "0", "COUNT", "-3",
 			proto.Error(msgInvalidInt),
 		)
 		s.Set("str", "value")
@@ -827,4 +834,38 @@ func TestSscan(t *testing.T) {
 			proto.Error(msgWrongType),
 		)
 	})
+
+	s.SetAdd("largeset", "v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8")
+	mustDo(t, c,
+		"SSCAN", "largeset", "0", "COUNT", "3",
+		proto.Array(
+			proto.String("3"),
+			proto.Array(
+				proto.String("v1"),
+				proto.String("v2"),
+				proto.String("v3"),
+			),
+		),
+	)
+	mustDo(t, c,
+		"SSCAN", "largeset", "3", "COUNT", "3",
+		proto.Array(
+			proto.String("6"),
+			proto.Array(
+				proto.String("v4"),
+				proto.String("v5"),
+				proto.String("v6"),
+			),
+		),
+	)
+	mustDo(t, c,
+		"SSCAN", "largeset", "6", "COUNT", "3",
+		proto.Array(
+			proto.String("0"),
+			proto.Array(
+				proto.String("v7"),
+				proto.String("v8"),
+			),
+		),
+	)
 }
