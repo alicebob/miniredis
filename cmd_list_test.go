@@ -443,6 +443,264 @@ func TestLindex(t *testing.T) {
 	})
 }
 
+func TestLpos(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := proto.Dial(s.Addr())
+	ok(t, err)
+	defer c.Close()
+
+	s.Push("l", "aap", "noot", "aap", "mies", "aap", "vuur", "aap", "aap")
+
+	// Simple LPOS.
+	// [aap, noot, aap, mies, aap, vuur, aap, aap]
+	mustDo(t, c,
+		"LPOS", "l", "aap",
+		proto.Int(0),
+	)
+	mustDo(t, c,
+		"LPOS", "l", "noot",
+		proto.Int(1),
+	)
+	mustDo(t, c,
+		"LPOS", "l", "mies",
+		proto.Int(3),
+	)
+	mustDo(t, c,
+		"LPOS", "l", "vuur",
+		proto.Int(5),
+	)
+	mustNil(t, c, "LPOS", "l", "wim")
+
+	// LPOS with RANK option.
+	// [aap, noot, aap, mies, aap, vuur, aap, aap]
+	mustDo(t, c,
+		"LPOS", "l", "aap", "RANK", "1",
+		proto.Int(0),
+	)
+	mustDo(t, c,
+		"LPOS", "l", "aap", "RANK", "4",
+		proto.Int(6),
+	)
+	mustDo(t, c,
+		"LPOS", "l", "aap", "RANK", "5",
+		proto.Int(7),
+	)
+	mustNil(t, c, "LPOS", "l", "aap", "RANK", "6")
+	mustDo(t, c,
+		"LPOS", "l", "aap", "RANK", "-1",
+		proto.Int(7),
+	)
+	mustDo(t, c,
+		"LPOS", "l", "aap", "RANK", "-3",
+		proto.Int(4),
+	)
+	mustDo(t, c,
+		"LPOS", "l", "aap", "RANK", "-5",
+		proto.Int(0),
+	)
+	mustNil(t, c, "LPOS", "l", "aap", "RANK", "-6")
+
+	// LPOS with COUNT
+	// When COUNT is specified always return a list.
+	// [aap, noot, aap, mies, aap, vuur, aap, aap]
+	mustDo(t, c,
+		"LPOS", "l", "wim", "COUNT", "1",
+		proto.Ints())
+	mustDo(t, c,
+		"LPOS", "l", "aap", "COUNT", "1",
+		proto.Ints(0),
+	)
+	mustDo(t, c,
+		"LPOS", "l", "aap", "COUNT", "3",
+		proto.Ints(0, 2, 4),
+	)
+	mustDo(t, c,
+		"LPOS", "l", "aap", "COUNT", "5",
+		proto.Ints(0, 2, 4, 6, 7),
+	)
+	mustDo(t, c,
+		"LPOS", "l", "aap", "COUNT", "100",
+		proto.Ints(0, 2, 4, 6, 7),
+	)
+	mustDo(t, c,
+		// COUNT 0 means "unlimited".
+		"LPOS", "l", "aap", "COUNT", "0",
+		proto.Ints(0, 2, 4, 6, 7),
+	)
+
+	// LPOS with RANK and COUNT
+	// [aap, noot, aap, mies, aap, vuur, aap, aap]
+	mustDo(t, c,
+		"LPOS", "l", "aap", "RANK", "3", "COUNT", "2",
+		proto.Ints(4, 6),
+	)
+	mustDo(t, c,
+		"LPOS", "l", "aap", "RANK", "3", "COUNT", "3",
+		proto.Ints(4, 6, 7),
+	)
+	mustDo(t, c,
+		"LPOS", "l", "aap", "RANK", "5", "COUNT", "100",
+		proto.Ints(7),
+	)
+	mustDo(t, c,
+		"LPOS", "l", "aap", "RANK", "-3", "COUNT", "2",
+		proto.Ints(4, 2),
+	)
+	mustDo(t, c,
+		"LPOS", "l", "aap", "RANK", "-3", "COUNT", "3",
+		proto.Ints(4, 2, 0),
+	)
+	mustDo(t, c,
+		"LPOS", "l", "aap", "RANK", "-5", "COUNT", "100",
+		proto.Ints(0),
+	)
+
+	// LPOS with RANK and MAXLEN
+	// [aap, noot, aap, mies, aap, vuur, aap, aap]
+	mustNil(t, c, "LPOS", "l", "aap", "RANK", "4", "MAXLEN", "6")
+	mustDo(t, c,
+		"LPOS", "l", "aap", "RANK", "4", "MAXLEN", "7",
+		proto.Int(6),
+	)
+	mustNil(t, c, "LPOS", "l", "aap", "RANK", "-4", "MAXLEN", "5")
+	mustDo(t, c,
+		"LPOS", "l", "aap", "RANK", "-4", "MAXLEN", "6",
+		proto.Int(2),
+	)
+
+	// LPOS with COUNT and MAXLEN
+	// [aap, noot, aap, mies, aap, vuur, aap, aap]
+	mustDo(t, c,
+		"LPOS", "l", "aap", "COUNT", "0", "MAXLEN", "1",
+		proto.Ints(0),
+	)
+	mustDo(t, c,
+		"LPOS", "l", "aap", "COUNT", "0", "MAXLEN", "4",
+		proto.Ints(0, 2),
+	)
+	mustDo(t, c,
+		"LPOS", "l", "aap", "COUNT", "0", "MAXLEN", "7",
+		proto.Ints(0, 2, 4, 6),
+	)
+	mustDo(t, c,
+		"LPOS", "l", "aap", "COUNT", "0", "MAXLEN", "8",
+		proto.Ints(0, 2, 4, 6, 7),
+	)
+	mustDo(t, c,
+		// MAXLEN 0 means "unlimited".
+		"LPOS", "l", "aap", "COUNT", "0", "MAXLEN", "0",
+		proto.Ints(0, 2, 4, 6, 7),
+	)
+	mustDo(t, c,
+		"LPOS", "l", "aap", "COUNT", "2", "MAXLEN", "0",
+		proto.Ints(0, 2),
+	)
+	mustDo(t, c,
+		"LPOS", "l", "aap", "COUNT", "1", "MAXLEN", "0",
+		proto.Ints(0),
+	)
+
+	// LPOS with RANK, COUNT, and MAXLEN
+	// [aap, noot, aap, mies, aap, vuur, aap, aap]
+	mustDo(t, c,
+		"LPOS", "l", "aap", "RANK", "4", "COUNT", "2", "MAXLEN", "0",
+		proto.Ints(6, 7))
+	mustDo(t, c,
+		"LPOS", "l", "aap", "RANK", "4", "COUNT", "2", "MAXLEN", "7",
+		proto.Ints(6))
+	mustDo(t, c,
+		"LPOS", "l", "aap", "RANK", "4", "COUNT", "2", "MAXLEN", "6",
+		proto.Ints())
+	mustDo(t, c,
+		"LPOS", "l", "aap", "RANK", "-3", "COUNT", "2", "MAXLEN", "0",
+		proto.Ints(4, 2))
+	mustDo(t, c,
+		"LPOS", "l", "aap", "RANK", "-3", "COUNT", "2", "MAXLEN", "4",
+		proto.Ints(4))
+	mustDo(t, c,
+		"LPOS", "l", "aap", "RANK", "-3", "COUNT", "2", "MAXLEN", "3",
+		proto.Ints())
+
+	t.Run("errors", func(t *testing.T) {
+		// Wrong type of key.
+		mustOK(t, c, "SET", "str", "value")
+		mustDo(t, c,
+			"LPOS", "str", "value",
+			proto.Error(msgWrongType),
+		)
+
+		// Wrong number of arguments.
+		mustDo(t, c,
+			"LPOS", "l",
+			proto.Error("ERR wrong number of arguments for 'lpos' command"),
+		)
+
+		// Wrong number of options.
+		mustDo(t, c,
+			"LPOS", "l", "aap", "RANK",
+			proto.Error("ERR syntax error"),
+		)
+		mustDo(t, c,
+			"LPOS", "l", "aap", "RANK", "1", "COUNT",
+			proto.Error("ERR syntax error"),
+		)
+		mustDo(t, c,
+			"LPOS", "l", "aap", "RANK", "1", "COUNT", "1", "MAXLEN",
+			proto.Error("ERR syntax error"),
+		)
+		mustDo(t, c,
+			"LPOS", "l", "aap", "RANK", "1", "COUNT", "1", "MAXLEN", "1", "RANK",
+			proto.Error("ERR syntax error"),
+		)
+
+		// Invalid options.
+		mustDo(t, c,
+			"LPOS", "l", "aap", "RANKS", "1",
+			proto.Error("ERR syntax error"))
+		mustDo(t, c,
+			"LPOS", "l", "aap", "RANK", "1", "COUNTING", "1",
+			proto.Error("ERR syntax error"))
+		mustDo(t, c,
+			"LPOS", "l", "aap", "RANK", "1", "MAXLENGTH", "1",
+			proto.Error("ERR syntax error"))
+
+		// Invalid option values.
+		mustDo(t, c,
+			"LPOS", "l", "aap", "RANK", "not_an_int",
+			proto.Error("ERR value is not an integer or out of range"))
+		mustDo(t, c,
+			"LPOS", "l", "aap", "RANK", "0",
+			proto.Error("ERR RANK can't be zero: use 1 to start from the first match, 2 from the second ... or use negative to start from the end of the list"))
+		mustDo(t, c,
+			"LPOS", "l", "aap", "COUNT", "-1",
+			proto.Error("ERR COUNT can't be negative"))
+		mustDo(t, c,
+			"LPOS", "l", "aap", "COUNT", "not_an_int",
+			// Redis (incorrectly?) reports this as a negative number.
+			proto.Error("ERR COUNT can't be negative"))
+		mustDo(t, c,
+			"LPOS", "l", "aap", "MAXLEN", "-1",
+			proto.Error("ERR MAXLEN can't be negative"))
+		mustDo(t, c,
+			"LPOS", "l", "aap", "MAXLEN", "not_an_int",
+			// Redis (incorrectly?) reports this as a negative number.
+			proto.Error("ERR MAXLEN can't be negative"))
+
+		// First invalid option encountered reports the error.
+		mustDo(t, c,
+			"LPOS", "l", "aap", "MAXLEN", "-1", "RANK", "not_an_int", "COUNT", "-1",
+			proto.Error("ERR MAXLEN can't be negative"))
+		mustDo(t, c,
+			"LPOS", "l", "aap", "RANK", "not_an_int", "COUNT", "-1", "MAXLEN", "-1",
+			proto.Error("ERR value is not an integer or out of range"))
+		mustDo(t, c,
+			"LPOS", "l", "aap", "COUNT", "-1", "MAXLEN", "-1", "RANK", "not_an_int",
+			proto.Error("ERR COUNT can't be negative"))
+	})
+}
+
 func TestLlen(t *testing.T) {
 	s, err := Run()
 	ok(t, err)

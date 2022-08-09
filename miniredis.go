@@ -13,7 +13,6 @@
 //
 // For direct use you can select a Redis database with either `s.Select(12);
 // s.Get("foo")` or `s.DB(12).Get("foo")`.
-//
 package miniredis
 
 import (
@@ -346,9 +345,9 @@ func (m *Miniredis) Server() *server.Server {
 // Dump limits the maximum length of each key:value to "DumpMaxLineLen" characters.
 // To increase that, call something like:
 //
-//	    miniredis.DumpMaxLineLen = 1024
-//      mr, _ = miniredis.Run()
-// 		mr.Dump()
+//	miniredis.DumpMaxLineLen = 1024
+//	mr, _ = miniredis.Run()
+//	mr.Dump()
 func (m *Miniredis) Dump() string {
 	m.Lock()
 	defer m.Unlock()
@@ -418,8 +417,10 @@ func (m *Miniredis) SetTime(t time.Time) {
 }
 
 // make every command return this message. For example:
-//   LOADING Redis is loading the dataset in memory
-//   MASTERDOWN Link with MASTER is down and replica-serve-stale-data is set to 'no'.
+//
+//	LOADING Redis is loading the dataset in memory
+//	MASTERDOWN Link with MASTER is down and replica-serve-stale-data is set to 'no'.
+//
 // Clear it with an empty string. Don't add newlines.
 func (m *Miniredis) SetError(msg string) {
 	cb := server.Hook(nil)
