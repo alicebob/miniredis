@@ -159,6 +159,11 @@ func TestStream(t *testing.T) {
 			c.Error("wrong number", "XINFO")
 			c.Do("SET", "scalar", "foo")
 			c.Error("wrong kind", "XINFO", "STREAM", "scalar")
+
+			c.Error("no such key", "XINFO", "GROUPS", "foo")
+			c.Do("XINFO", "GROUPS", "planets")
+
+			c.Error("no such key", "XINFO", "CONSUMERS", "foo", "bar")
 		})
 	})
 
@@ -374,7 +379,20 @@ func TestStreamGroup(t *testing.T) {
 			c.Error("to exist", "XGROUP", "CREATE", "planets", "processing", "$")
 			c.Do("XADD", "planets", "123-500", "foo", "bar")
 			c.Do("XGROUP", "CREATE", "planets", "processing", "$")
+			c.Do("XINFO", "GROUPS", "planets")
 			c.Error("already exist", "XGROUP", "CREATE", "planets", "processing", "$")
+			c.Error("to exist", "XGROUP", "DESTROY", "foo", "bar")
+			c.Do("XGROUP", "DESTROY", "planets", "bar")
+			c.Error("No such consumer group", "XGROUP", "DELCONSUMER", "planets", "foo", "bar")
+			c.Do("XGROUP", "CREATECONSUMER", "planets", "processing", "alice")
+			c.Do("XINFO", "GROUPS", "planets")
+			c.Do("XGROUP", "DELCONSUMER", "planets", "processing", "foo")
+			c.Do("XGROUP", "DELCONSUMER", "planets", "processing", "alice")
+			c.Do("XINFO", "CONSUMERS", "planets", "processing")
+			c.Do("XGROUP", "DESTROY", "planets", "processing")
+			c.Do("XINFO", "GROUPS", "planets")
+			c.Error("wrong number of arguments", "XGROUP")
+			c.Error("wrong number of arguments", "XGROUP", "foo")
 		})
 	})
 
@@ -521,6 +539,9 @@ func TestStreamGroup(t *testing.T) {
 			c.Do("XREADGROUP", "GROUP", "processing", "eve", "COUNT", "1", "STREAMS", "planets", ">")
 			c.Do("XPENDING", "planets", "processing")
 
+			c.Do("XGROUP", "DELCONSUMER", "planets", "processing", "alice")
+			c.Do("XPENDING", "planets", "processing")
+
 			c.Error("consumer group", "XPENDING", "foo", "processing")
 			c.Error("consumer group", "XPENDING", "planets", "foo")
 
@@ -528,6 +549,7 @@ func TestStreamGroup(t *testing.T) {
 			c.Error("wrong number", "XPENDING")
 			c.Error("wrong number", "XPENDING", "planets")
 			c.Error("syntax", "XPENDING", "planets", "processing", "too many")
+			c.Error("syntax", "XPENDING", "planets", "processing", "IDLE", "10")
 		})
 
 		// full mode
@@ -545,12 +567,14 @@ func TestStreamGroup(t *testing.T) {
 			c.DoLoosely("XPENDING", "planets", "processing", "-", "+", "1")
 			c.DoLoosely("XPENDING", "planets", "processing", "-", "+", "0")
 			c.DoLoosely("XPENDING", "planets", "processing", "-", "+", "-1")
+			c.DoLoosely("XPENDING", "planets", "processing", "IDLE", "10", "-", "+", "999")
 
 			c.Do("XADD", "planets", "4000-5", "name", "Earth")
 			c.Do("XREADGROUP", "GROUP", "processing", "bob", "STREAMS", "planets", ">")
 			c.DoLoosely("XPENDING", "planets", "processing", "-", "+", "999")
 			c.DoLoosely("XPENDING", "planets", "processing", "-", "+", "999", "bob")
 			c.DoLoosely("XPENDING", "planets", "processing", "-", "+", "999", "eve")
+			c.DoLoosely("XPENDING", "planets", "processing", "IDLE", "10", "-", "+", "999", "eve")
 
 			// update delivery counts (which we can't test thanks to the time field)
 			c.Do("XREADGROUP", "GROUP", "processing", "bob", "STREAMS", "planets", "99")
@@ -559,6 +583,7 @@ func TestStreamGroup(t *testing.T) {
 			c.Error("Invalid", "XPENDING", "planets", "processing", "foo", "+", "999")
 			c.Error("Invalid", "XPENDING", "planets", "processing", "-", "foo", "999")
 			c.Error("not an integer", "XPENDING", "planets", "processing", "-", "+", "foo")
+			c.Error("not an integer", "XPENDING", "planets", "processing", "IDLE", "abc", "-", "+", "999")
 		})
 	})
 
@@ -601,6 +626,58 @@ func TestStreamGroup(t *testing.T) {
 
 			c.Do("XAUTOCLAIM", "colors", "pr", "eve", "0", "0")
 			c.Do("XPENDING", "colors", "pr")
+		})
+	})
+
+	t.Run("XCLAIM", func(t *testing.T) {
+		testRaw(t, func(c *client) {
+			c.Error("No such key", "XCLAIM", "planets", "processing", "alice", "0", "0-0")
+			c.Do("XGROUP", "CREATE", "planets", "processing", "$", "MKSTREAM")
+			c.Error("No such key", "XCLAIM", "planets", "foo", "alice", "0", "0-0")
+			c.Do("XCLAIM", "planets", "processing", "alice", "0", "0-0")
+			c.Do("XINFO", "CONSUMERS", "planets", "processing")
+
+			c.Do("XADD", "planets", "0-1", "name", "Mercury")
+			c.Do("XADD", "planets", "0-2", "name", "Venus")
+
+			c.Do("XCLAIM", "planets", "processing", "alice", "0", "0-1")
+			c.Do("XINFO", "CONSUMERS", "planets", "processing")
+
+			c.Do("XCLAIM", "planets", "processing", "alice", "0", "0-1", "0-2", "FORCE")
+			c.Do("XINFO", "GROUPS", "planets")
+			c.Do("XPENDING", "planets", "processing")
+
+			c.Do("XDEL", "planets", "0-1")
+			c.Do("XCLAIM", "planets", "processing", "bob", "0", "0-1")
+			c.Do("XINFO", "GROUPS", "planets")
+			c.Do("XPENDING", "planets", "processing")
+
+			c.Do("XADD", "planets", "0-3", "name", "Mercury")
+			c.Do("XADD", "planets", "0-4", "name", "Venus")
+
+			c.Do("XCLAIM", "planets", "processing", "bob", "0", "0-4", "FORCE")
+			c.Do("XCLAIM", "planets", "processing", "bob", "0", "0-4")
+			c.Do("XPENDING", "planets", "processing")
+
+			c.Do("XREADGROUP", "GROUP", "processing", "alice", "COUNT", "1", "STREAMS", "planets", ">")
+			c.Do("XPENDING", "planets", "processing")
+			c.Do("XREADGROUP", "GROUP", "processing", "alice", "STREAMS", "planets", ">")
+			c.Do("XPENDING", "planets", "processing")
+
+			c.Do("XCLAIM", "planets", "processing", "alice", "0", "0-3", "RETRYCOUNT", "10", "IDLE", "5000", "JUSTID")
+			c.Do("XCLAIM", "planets", "processing", "alice", "0", "0-1", "0-2", "RETRYCOUNT", "1", "TIME", "1", "JUSTID")
+			c.Do("XCLAIM", "planets", "processing", "alice", "0", "0-1", "0-4", "RETRYCOUNT", "1", "TIME", "1", "justid")
+			c.Do("XPENDING", "planets", "processing")
+
+			c.Do("XACK", "planets", "processing", "0-1", "0-2", "0-3", "0-4")
+			c.Do("XPENDING", "planets", "processing")
+
+			c.Error("Unrecognized XCLAIM option", "XCLAIM", "planets", "processing", "alice", "0", "0-3", "RETRYCOUNT", "10", "0-4", "IDLE", "0")
+			c.Error("Unrecognized XCLAIM option", "XCLAIM", "planets", "processing", "alice", "0", "0-3", "RETRYCOUNT", "10", "IDLE", "0", "0-4")
+			c.Error("Invalid min-idle-time", "XCLAIM", "planets", "processing", "alice", "foo", "0-1", "JUSTID")
+			c.Error("Invalid IDLE", "XCLAIM", "planets", "processing", "alice", "0", "0-1", "JUSTID", "IDLE", "foo")
+			c.Error("Invalid TIME", "XCLAIM", "planets", "processing", "alice", "0", "0-1", "JUSTID", "TIME", "foo")
+			c.Error("Invalid RETRYCOUNT", "XCLAIM", "planets", "processing", "alice", "0", "0-1", "JUSTID", "RETRYCOUNT", "foo")
 		})
 	})
 

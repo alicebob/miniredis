@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"regexp"
+	"strconv"
 	"testing"
 	"time"
 
@@ -482,6 +483,28 @@ func TestStreamInfo(t *testing.T) {
 		"XINFO", "STREAM", "planets",
 		proto.Array(proto.String("length"), proto.Int(1)),
 	)
+
+	mustDo(t, c,
+		"XINFO", "GROUPS", "planets", "foo", "bar",
+		proto.Error("ERR wrong number of arguments for 'groups' command"),
+	)
+	mustDo(t, c,
+		"XINFO", "GROUPS", "foo",
+		proto.Error("ERR no such key"),
+	)
+	mustDo(t, c,
+		"XINFO", "GROUPS", "planets",
+		proto.Array(),
+	)
+
+	mustDo(t, c,
+		"XINFO", "CONSUMERS", "foo", "bar",
+		proto.Error("ERR no such key"),
+	)
+	mustDo(t, c,
+		"XINFO", "CONSUMERS", "planets", "processing",
+		proto.Error("NOGROUP No such consumer group 'processing' for key name 'planets'"),
+	)
 }
 
 // Test XGROUP
@@ -497,14 +520,118 @@ func TestStreamGroup(t *testing.T) {
 		"XGROUP", "CREATE", "s", "processing", "$",
 		proto.Error(msgXgroupKeyNotFound),
 	)
+	mustDo(t, c,
+		"XGROUP", "DESTROY", "s", "processing",
+		proto.Error(msgXgroupKeyNotFound),
+	)
+	mustDo(t, c,
+		"XGROUP", "DELCONSUMER", "s", "processing", "foo",
+		proto.Error(msgXgroupKeyNotFound),
+	)
 
 	mustOK(t, c,
 		"XGROUP", "CREATE", "s", "processing", "$", "MKSTREAM",
 	)
+	mustDo(t, c,
+		"XGROUP", "DESTROY", "s", "foo",
+		proto.Int(0),
+	)
 
+	mustDo(t, c,
+		"XINFO", "GROUPS", "s",
+		proto.Array(
+			proto.Array(
+				proto.String("name"), proto.String("processing"),
+				proto.String("consumers"), proto.Int(0),
+				proto.String("pending"), proto.Int(0),
+				proto.String("last-delivered-id"), proto.String("0-0"),
+			),
+		),
+	)
+	mustDo(t, c,
+		"XINFO", "CONSUMERS", "s", "processing",
+		proto.Array(),
+	)
+
+	mustDo(t, c,
+		"XGROUP", "CREATECONSUMER", "s", "processing", "alice",
+		proto.Int(1),
+	)
+	mustDo(t, c,
+		"XINFO", "GROUPS", "s",
+		proto.Array(
+			proto.Array(
+				proto.String("name"), proto.String("processing"),
+				proto.String("consumers"), proto.Int(1),
+				proto.String("pending"), proto.Int(0),
+				proto.String("last-delivered-id"), proto.String("0-0"),
+			),
+		),
+	)
+	mustDo(t, c,
+		"XINFO", "CONSUMERS", "s", "processing",
+		proto.Array(
+			proto.Array(
+				proto.String("name"), proto.String("alice"),
+				proto.String("pending"), proto.Int(0),
+			),
+		),
+	)
+
+	mustDo(t, c,
+		"XGROUP", "DELCONSUMER", "s", "processing", "foo",
+		proto.Int(0),
+	)
+	mustDo(t, c,
+		"XGROUP", "DELCONSUMER", "s", "processing", "alice",
+		proto.Int(0),
+	)
+	mustDo(t, c,
+		"XINFO", "GROUPS", "s",
+		proto.Array(
+			proto.Array(
+				proto.String("name"), proto.String("processing"),
+				proto.String("consumers"), proto.Int(0),
+				proto.String("pending"), proto.Int(0),
+				proto.String("last-delivered-id"), proto.String("0-0"),
+			),
+		),
+	)
+	mustDo(t, c,
+		"XINFO", "CONSUMERS", "s", "processing",
+		proto.Array(),
+	)
+
+	mustDo(t, c,
+		"XGROUP", "DESTROY", "s", "processing",
+		proto.Int(1),
+	)
 	must0(t, c,
 		"XLEN", "s",
 	)
+	mustDo(t, c,
+		"XINFO", "GROUPS", "s",
+		proto.Array(),
+	)
+
+	t.Run("errors", func(t *testing.T) {
+		mustDo(t, c,
+			"XGROUP",
+			proto.Error("ERR wrong number of arguments for 'xgroup' command"),
+		)
+		mustDo(t, c,
+			"XGROUP", "HELP",
+			proto.Error("ERR 'XGROUP HELP' not supported"),
+		)
+		mustDo(t, c,
+			"XGROUP", "foo",
+			proto.Error("ERR Unknown subcommand or wrong number of arguments for 'FOO'. Try XGROUP HELP."),
+		)
+		mustDo(t, c,
+			"XGROUP", "SETID",
+			proto.Error("ERR 'XGROUP SETID' not supported"),
+		)
+	})
 }
 
 // Test XREADGROUP
@@ -530,6 +657,23 @@ func TestStreamReadGroup(t *testing.T) {
 	)
 
 	mustDo(t, c,
+		"XINFO", "GROUPS", "planets",
+		proto.Array(
+			proto.Array(
+				proto.String("name"), proto.String("processing"),
+				proto.String("consumers"), proto.Int(0),
+				proto.String("pending"), proto.Int(0),
+				proto.String("last-delivered-id"), proto.String("0-0"),
+			),
+		),
+	)
+
+	mustDo(t, c,
+		"XINFO", "CONSUMERS", "planets", "processing",
+		proto.Array(),
+	)
+
+	mustDo(t, c,
 		"XADD", "planets", "0-1", "name", "Mercury",
 		proto.String("0-1"),
 	)
@@ -542,6 +686,28 @@ func TestStreamReadGroup(t *testing.T) {
 		"XREADGROUP", "GROUP", "processing", "alice", "STREAMS", "planets", ">",
 		proto.Array(
 			proto.Array(proto.String("planets"), proto.Array(proto.Array(proto.String("0-1"), proto.Strings("name", "Mercury")))),
+		),
+	)
+
+	mustDo(t, c,
+		"XINFO", "GROUPS", "planets",
+		proto.Array(
+			proto.Array(
+				proto.String("name"), proto.String("processing"),
+				proto.String("consumers"), proto.Int(1),
+				proto.String("pending"), proto.Int(1),
+				proto.String("last-delivered-id"), proto.String("0-1"),
+			),
+		),
+	)
+
+	mustDo(t, c,
+		"XINFO", "CONSUMERS", "planets", "processing",
+		proto.Array(
+			proto.Array(
+				proto.String("name"), proto.String("alice"),
+				proto.String("pending"), proto.Int(1),
+			),
 		),
 	)
 
@@ -652,6 +818,32 @@ func TestStreamAck(t *testing.T) {
 			),
 		),
 	)
+	mustDo(t, c,
+		"XINFO", "GROUPS", "planets",
+		proto.Array(
+			proto.Array(
+				proto.String("name"), proto.String("processing"),
+				proto.String("consumers"), proto.Int(1),
+				proto.String("pending"), proto.Int(0),
+				proto.String("last-delivered-id"), proto.String("0-1"),
+			),
+		),
+	)
+
+	mustDo(t, c,
+		"XINFO", "CONSUMERS", "planets", "processing",
+		proto.Array(
+			proto.Array(
+				proto.String("name"), proto.String("alice"),
+				proto.String("pending"), proto.Int(0),
+			),
+		),
+	)
+
+	mustDo(t, c,
+		"XGROUP", "DELCONSUMER", "planets", "processing", "alice",
+		proto.Int(0),
+	)
 }
 
 // Test XPENDING
@@ -739,6 +931,35 @@ func TestStreamXpending(t *testing.T) {
 				),
 			),
 		)
+
+		mustDo(t, c,
+			"XPENDING", "planets", "processing", "IDLE", "5000", "-", "+", "999",
+			proto.NilList,
+		)
+		mustDo(t, c,
+			"XPENDING", "planets", "processing", "-", "+", "999", "bob",
+			proto.NilList,
+		)
+		mustDo(t, c,
+			"XPENDING", "planets", "processing", "IDLE", "4000", "-", "+", "999", "alice",
+			proto.Array(
+				proto.Array(
+					proto.String("99-1"),
+					proto.String("alice"),
+					proto.Int(4000),
+					proto.Int(2),
+				),
+			),
+		)
+
+		mustDo(t, c,
+			"XGROUP", "DELCONSUMER", "planets", "processing", "alice",
+			proto.Int(1),
+		)
+		mustDo(t, c,
+			"XPENDING", "planets", "processing", "-", "+", "999",
+			proto.NilList,
+		)
 	})
 
 	t.Run("errors", func(t *testing.T) {
@@ -752,6 +973,10 @@ func TestStreamXpending(t *testing.T) {
 		)
 		mustDo(t, c,
 			"XPENDING", "planets", "processing", "toomany",
+			proto.Error("ERR syntax error"),
+		)
+		mustDo(t, c,
+			"XPENDING", "planets", "processing", "IDLE", "1000",
 			proto.Error("ERR syntax error"),
 		)
 		mustDo(t, c,
@@ -857,6 +1082,10 @@ func TestStreamAutoClaim(t *testing.T) {
 			proto.Array(),
 		),
 	)
+	mustDo(t, c,
+		"XINFO", "CONSUMERS", "planets", "processing",
+		proto.Array(),
+	)
 
 	mustDo(t, c,
 		"XADD", "planets", "0-1", "name", "Mercury",
@@ -882,6 +1111,15 @@ func TestStreamAutoClaim(t *testing.T) {
 			proto.Array(proto.Array(proto.String("0-1"), proto.Strings("name", "Mercury"))),
 		),
 	)
+	mustDo(t, c,
+		"XINFO", "CONSUMERS", "planets", "processing",
+		proto.Array(
+			proto.Array(
+				proto.String("name"), proto.String("alice"),
+				proto.String("pending"), proto.Int(1),
+			),
+		),
+	)
 
 	// Add an additional item to pending
 	s.SetTime(now.Add(5000 * time.Millisecond))
@@ -893,6 +1131,15 @@ func TestStreamAutoClaim(t *testing.T) {
 		"XREADGROUP", "GROUP", "processing", "alice", "STREAMS", "planets", ">",
 		proto.Array(
 			proto.Array(proto.String("planets"), proto.Array(proto.Array(proto.String("0-2"), proto.Strings("name", "Venus")))),
+		),
+	)
+	mustDo(t, c,
+		"XINFO", "CONSUMERS", "planets", "processing",
+		proto.Array(
+			proto.Array(
+				proto.String("name"), proto.String("alice"),
+				proto.String("pending"), proto.Int(2),
+			),
 		),
 	)
 
@@ -939,5 +1186,397 @@ func TestStreamAutoClaim(t *testing.T) {
 				proto.Array(proto.String("0-2"), proto.Strings("name", "Venus")),
 			),
 		),
+	)
+
+	mustDo(t, c,
+		"XINFO", "CONSUMERS", "planets", "processing",
+		proto.Array(
+			proto.Array(
+				proto.String("name"), proto.String("alice"),
+				proto.String("pending"), proto.Int(2),
+			),
+		),
+	)
+
+	s.SetTime(now.Add(60000 * time.Millisecond))
+	mustDo(t, c,
+		"XAUTOCLAIM", "planets", "processing", "bob", "15000", "0",
+		proto.Array(
+			proto.String("0-0"),
+			proto.Array(
+				proto.Array(proto.String("0-1"), proto.Strings("name", "Mercury")),
+				proto.Array(proto.String("0-2"), proto.Strings("name", "Venus")),
+			),
+		),
+	)
+	mustDo(t, c,
+		"XINFO", "CONSUMERS", "planets", "processing",
+		proto.Array(
+			proto.Array(
+				proto.String("name"), proto.String("alice"),
+				proto.String("pending"), proto.Int(0),
+			),
+			proto.Array(
+				proto.String("name"), proto.String("bob"),
+				proto.String("pending"), proto.Int(2),
+			),
+		),
+	)
+
+	s.SetTime(now.Add(80000 * time.Millisecond))
+	mustDo(t, c,
+		"XAUTOCLAIM", "planets", "processing", "alice", "15000", "0", "COUNT", "1",
+		proto.Array(
+			proto.String("0-2"),
+			proto.Array(
+				proto.Array(proto.String("0-1"), proto.Strings("name", "Mercury")),
+			),
+		),
+	)
+	mustDo(t, c,
+		"XINFO", "CONSUMERS", "planets", "processing",
+		proto.Array(
+			proto.Array(
+				proto.String("name"), proto.String("alice"),
+				proto.String("pending"), proto.Int(1),
+			),
+			proto.Array(
+				proto.String("name"), proto.String("bob"),
+				proto.String("pending"), proto.Int(1),
+			),
+		),
+	)
+
+	mustDo(t, c,
+		"XGROUP", "DELCONSUMER", "planets", "processing", "alice",
+		proto.Int(1),
+	)
+	mustDo(t, c,
+		"XPENDING", "planets", "processing", "-", "+", "999",
+		proto.Array(
+			proto.Array(
+				proto.String("0-2"),
+				proto.String("bob"),
+				proto.Int(20000),
+				proto.Int(4),
+			),
+		),
+	)
+
+	mustDo(t, c,
+		"XGROUP", "DELCONSUMER", "planets", "processing", "bob",
+		proto.Int(1),
+	)
+	mustDo(t, c,
+		"XINFO", "CONSUMERS", "planets", "processing",
+		proto.Array(),
+	)
+	mustDo(t, c,
+		"XINFO", "GROUPS", "planets",
+		proto.Array(
+			proto.Array(
+				proto.String("name"), proto.String("processing"),
+				proto.String("consumers"), proto.Int(0),
+				proto.String("pending"), proto.Int(0),
+				proto.String("last-delivered-id"), proto.String("0-2"),
+			),
+		),
+	)
+}
+
+func TestStreamClaim(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := proto.Dial(s.Addr())
+	ok(t, err)
+	defer c.Close()
+
+	now := time.Now()
+	s.SetTime(now)
+
+	mustDo(t, c,
+		"XCLAIM", "planets", "processing", "alice", "0", "0-0",
+		proto.Error("NOGROUP No such key 'planets' or consumer group 'processing'"),
+	)
+
+	mustOK(t, c,
+		"XGROUP", "CREATE", "planets", "processing", "$", "MKSTREAM",
+	)
+	mustDo(t, c,
+		"XINFO", "CONSUMERS", "planets", "processing",
+		proto.Array(),
+	)
+
+	mustDo(t, c,
+		"XCLAIM", "planets", "processing", "alice", "0", "0-0",
+		proto.Array(),
+	)
+	mustDo(t, c,
+		"XINFO", "CONSUMERS", "planets", "processing",
+		proto.Array(),
+	)
+
+	mustDo(t, c,
+		"XADD", "planets", "0-1", "name", "Mercury",
+		proto.String("0-1"),
+	)
+	mustDo(t, c,
+		"XADD", "planets", "0-2", "name", "Venus",
+		proto.String("0-2"),
+	)
+
+	mustDo(t, c,
+		"XCLAIM", "planets", "processing", "alice", "0", "0-1",
+		proto.Array(),
+	)
+	mustDo(t, c,
+		"XPENDING", "planets", "processing", "-", "+", "999",
+		proto.NilList,
+	)
+
+	mustDo(t, c,
+		"XCLAIM", "planets", "processing", "alice", "0", "0-1", "0-2", "FORCE",
+		proto.Array(
+			proto.Array(proto.String("0-1"), proto.Strings("name", "Mercury")),
+			proto.Array(proto.String("0-2"), proto.Strings("name", "Venus")),
+		),
+	)
+	mustDo(t, c,
+		"XINFO", "GROUPS", "planets",
+		proto.Array(
+			proto.Array(
+				proto.String("name"), proto.String("processing"),
+				proto.String("consumers"), proto.Int(1),
+				proto.String("pending"), proto.Int(2),
+				proto.String("last-delivered-id"), proto.String("0-0"),
+			),
+		),
+	)
+	mustDo(t, c,
+		"XINFO", "CONSUMERS", "planets", "processing",
+		proto.Array(
+			proto.Array(
+				proto.String("name"), proto.String("alice"),
+				proto.String("pending"), proto.Int(2),
+			),
+		),
+	)
+	mustDo(t, c,
+		"XPENDING", "planets", "processing", "-", "+", "999",
+		proto.Array(
+			proto.Array(
+				proto.String("0-1"),
+				proto.String("alice"),
+				proto.Int(0),
+				proto.Int(2),
+			),
+			proto.Array(
+				proto.String("0-2"),
+				proto.String("alice"),
+				proto.Int(0),
+				proto.Int(2),
+			),
+		),
+	)
+
+	s.SetTime(now.Add(20000 * time.Millisecond))
+	mustDo(t, c,
+		"XDEL", "planets", "0-1",
+		proto.Int(1),
+	)
+	mustDo(t, c,
+		"XCLAIM", "planets", "processing", "bob", "0", "0-1",
+		proto.Array(proto.Nil),
+	)
+	mustDo(t, c,
+		"XINFO", "GROUPS", "planets",
+		proto.Array(
+			proto.Array(
+				proto.String("name"), proto.String("processing"),
+				proto.String("consumers"), proto.Int(2),
+				proto.String("pending"), proto.Int(2),
+				proto.String("last-delivered-id"), proto.String("0-0"),
+			),
+		),
+	)
+	mustDo(t, c,
+		"XINFO", "CONSUMERS", "planets", "processing",
+		proto.Array(
+			proto.Array(
+				proto.String("name"), proto.String("alice"),
+				proto.String("pending"), proto.Int(1),
+			),
+			proto.Array(
+				proto.String("name"), proto.String("bob"),
+				proto.String("pending"), proto.Int(1),
+			),
+		),
+	)
+	mustDo(t, c,
+		"XPENDING", "planets", "processing", "-", "+", "999",
+		proto.Array(
+			proto.Array(
+				proto.String("0-1"),
+				proto.String("bob"),
+				proto.Int(0),
+				proto.Int(3),
+			),
+			proto.Array(
+				proto.String("0-2"),
+				proto.String("alice"),
+				proto.Int(20000),
+				proto.Int(2),
+			),
+		),
+	)
+
+	mustDo(t, c,
+		"XADD", "planets", "0-3", "name", "Earth",
+		proto.String("0-3"),
+	)
+	mustDo(t, c,
+		"XADD", "planets", "0-4", "name", "Mars",
+		proto.String("0-4"),
+	)
+	mustDo(t, c,
+		"XCLAIM", "planets", "processing", "bob", "0", "0-4", "FORCE",
+		proto.Array(
+			proto.Array(proto.String("0-4"), proto.Strings("name", "Mars")),
+		),
+	)
+	mustDo(t, c,
+		"XCLAIM", "planets", "processing", "bob", "0", "0-4",
+		proto.Array(
+			proto.Array(proto.String("0-4"), proto.Strings("name", "Mars")),
+		),
+	)
+	mustDo(t, c,
+		"XPENDING", "planets", "processing", "-", "+", "999",
+		proto.Array(
+			proto.Array(
+				proto.String("0-1"),
+				proto.String("bob"),
+				proto.Int(0),
+				proto.Int(3),
+			),
+			proto.Array(
+				proto.String("0-2"),
+				proto.String("alice"),
+				proto.Int(20000),
+				proto.Int(2),
+			),
+			proto.Array(
+				proto.String("0-4"),
+				proto.String("bob"),
+				proto.Int(0),
+				proto.Int(3),
+			),
+		),
+	)
+
+	mustDo(t, c,
+		"XREADGROUP", "GROUP", "processing", "alice", "STREAMS", "planets", ">",
+		proto.Array(
+			proto.Array(
+				proto.String("planets"),
+				proto.Array(
+					proto.Array(proto.String("0-2"), proto.Strings("name", "Venus")),
+					proto.Array(proto.String("0-3"), proto.Strings("name", "Earth")),
+					proto.Array(proto.String("0-4"), proto.Strings("name", "Mars")),
+				),
+			),
+		),
+	)
+	mustDo(t, c,
+		"XPENDING", "planets", "processing", "-", "+", "999",
+		proto.Array(
+			proto.Array(
+				proto.String("0-1"),
+				proto.String("bob"),
+				proto.Int(0),
+				proto.Int(3),
+			),
+			proto.Array(
+				proto.String("0-2"),
+				proto.String("alice"),
+				proto.Int(0),
+				proto.Int(1),
+			),
+			proto.Array(
+				proto.String("0-3"),
+				proto.String("alice"),
+				proto.Int(0),
+				proto.Int(1),
+			),
+			proto.Array(
+				proto.String("0-4"),
+				proto.String("alice"),
+				proto.Int(0),
+				proto.Int(1),
+			),
+		),
+	)
+	mustDo(t, c,
+		"XINFO", "CONSUMERS", "planets", "processing",
+		proto.Array(
+			proto.Array(
+				proto.String("name"), proto.String("alice"),
+				proto.String("pending"), proto.Int(3),
+			),
+			proto.Array(
+				proto.String("name"), proto.String("bob"),
+				proto.String("pending"), proto.Int(1),
+			),
+		),
+	)
+
+	mustDo(t, c,
+		"XCLAIM", "planets", "processing", "alice", "0", "0-3", "RETRYCOUNT", "10", "IDLE", "5000", "JUSTID",
+		proto.Array(proto.String("0-3")),
+	)
+	newTime := s.effectiveNow().Add(time.Millisecond * time.Duration(-10000))
+	newTimeString := strconv.FormatInt(newTime.UnixNano()/time.Millisecond.Nanoseconds(), 10)
+	mustDo(t, c,
+		"XCLAIM", "planets", "processing", "alice", "0", "0-1", "RETRYCOUNT", "1", "TIME", newTimeString, "JUSTID",
+		proto.Array(proto.String("0-1")),
+	)
+	mustDo(t, c,
+		"XPENDING", "planets", "processing", "-", "+", "999",
+		proto.Array(
+			proto.Array(
+				proto.String("0-1"),
+				proto.String("alice"),
+				proto.Int(10000),
+				proto.Int(1),
+			),
+			proto.Array(
+				proto.String("0-2"),
+				proto.String("alice"),
+				proto.Int(0),
+				proto.Int(1),
+			),
+			proto.Array(
+				proto.String("0-3"),
+				proto.String("alice"),
+				proto.Int(5000),
+				proto.Int(10),
+			),
+			proto.Array(
+				proto.String("0-4"),
+				proto.String("alice"),
+				proto.Int(0),
+				proto.Int(1),
+			),
+		),
+	)
+
+	mustDo(t, c,
+		"XACK", "planets", "processing", "0-1", "0-2", "0-3", "0-4",
+		proto.Int(4),
+	)
+	mustDo(t, c,
+		"XPENDING", "planets", "processing", "-", "+", "999",
+		proto.NilList,
 	)
 }
