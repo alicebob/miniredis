@@ -314,6 +314,8 @@ func TestSscan(t *testing.T) {
 		c.Do("SSCAN", "set", "0", "MATCH", "anoth*")
 		c.Do("SSCAN", "set", "0", "MATCH", "anoth*", "COUNT", "100")
 		c.Do("SSCAN", "set", "0", "COUNT", "100", "MATCH", "anoth*")
+		// c.DoLoosely("SSCAN", "set", "0", "COUNT", "1") // cursor differs // unstable test
+		c.DoLoosely("SSCAN", "set", "0", "COUNT", "2") // cursor differs
 
 		// Can't really test multiple keys.
 		// c.Do("SET", "key2", "value2")
@@ -323,6 +325,7 @@ func TestSscan(t *testing.T) {
 		c.Error("wrong number", "SSCAN")
 		c.Error("wrong number", "SSCAN", "noint")
 		c.Error("not an integer", "SSCAN", "set", "0", "COUNT", "noint")
+		c.Error("syntax error", "SSCAN", "set", "0", "COUNT", "0")
 		c.Error("syntax error", "SSCAN", "set", "0", "COUNT")
 		c.Error("syntax error", "SSCAN", "set", "0", "MATCH")
 		c.Error("syntax error", "SSCAN", "set", "0", "garbage")

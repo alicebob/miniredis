@@ -1,6 +1,15 @@
 ## Changelog
 
 
+### v2.23.0
+
+- basic INFO support (thanks @kirill-a-belov)
+- support COUNT in SSCAN (thanks @Abdi-dd)
+- test and support Go 1.19
+- support LPOS (thanks @ianstarz)
+- support XPENDING, XGROUP {CREATECONSUMER,DESTROY,DELCONSUMER}, XINFO {CONSUMERS,GROUPS}, XCLAIM (thanks @sandyharvie)
+
+
 ### v2.22.0
 
 - set miniredis.DumpMaxLineLen to get more Dump() info (thanks @afjoseph)
