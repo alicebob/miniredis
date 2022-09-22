@@ -924,11 +924,14 @@ parsing:
 			}
 
 			opts.streams, opts.ids = args[0:len(args)/2], args[len(args)/2:]
-			for _, id := range opts.ids {
+			for i, id := range opts.ids {
 				if _, err := parseStreamID(id); id != `$` && err != nil {
 					setDirty(c)
 					c.WriteError(msgInvalidStreamID)
 					return
+				} else if id == "$" {
+					db := m.DB(getCtx(c).selectedDB)
+					opts.ids[i] = db.streamKeys[opts.streams[i]].lastID()
 				}
 			}
 			args = nil
