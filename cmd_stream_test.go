@@ -5,6 +5,7 @@ import (
 	"math"
 	"regexp"
 	"strconv"
+	"sync"
 	"testing"
 	"time"
 
@@ -418,28 +419,33 @@ func TestStreamRead(t *testing.T) {
 			),
 		)
 
-		// XREAD blocking test using latest ID
-		go t.Run("XREAD_blocking_async", func(t *testing.T) {
-			mustDo(t, c,
-				"XREAD", "BLOCK", "0", "STREAMS", "planets", "$",
-				proto.Array(
-					proto.Array(proto.String("planets"),
-						proto.Array(
-							proto.Array(proto.String("5-1"), proto.Strings("name", "block", "idx", "6")),
+		t.Run("blocking async", func(t *testing.T) {
+			// XREAD blocking test using latest ID
+			var wg sync.WaitGroup
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				mustDo(t, c,
+					"XREAD", "BLOCK", "0", "STREAMS", "planets", "$",
+					proto.Array(
+						proto.Array(proto.String("planets"),
+							proto.Array(
+								proto.Array(proto.String("5-1"), proto.Strings("name", "block", "idx", "6")),
+							),
 						),
 					),
-				),
-			)
+				)
+			}()
+
+			// Wait for the blocking XREAD to start and then run XADD
+			xaddClient, err := proto.Dial(s.Addr())
+			ok(t, err)
+			defer xaddClient.Close()
+
+			_, err = xaddClient.Do("XADD", "planets", "5-1", "name", "block", "idx", "6")
+			ok(t, err)
+			wg.Wait()
 		})
-
-		// Wait for the blocking XREAD to start and then run XADD
-		xaddClient, err := proto.Dial(s.Addr())
-		ok(t, err)
-		defer xaddClient.Close()
-
-		time.Sleep(time.Second)
-		_, err = xaddClient.Do("XADD", "planets", "5-1", "name", "block", "idx", "6")
-		ok(t, err)
 	})
 
 	t.Run("error cases", func(t *testing.T) {
