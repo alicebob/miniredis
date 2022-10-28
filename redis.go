@@ -137,6 +137,10 @@ func blocking(
 	m.Lock()
 	defer m.Unlock()
 	for {
+		if c.Closed() {
+			return
+		}
+
 		if m.Ctx.Err() != nil {
 			return
 		}
