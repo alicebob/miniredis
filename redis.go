@@ -137,15 +137,14 @@ func blocking(
 	m.Lock()
 	defer m.Unlock()
 	for {
-		if m.Ctx.Err() != nil {
-			return
-		}
-
 		done := cb(c, ctx)
 		if done {
 			return
 		}
 
+		if m.Ctx.Err() != nil {
+			return
+		}
 		if timedOut {
 			onTimeout(c)
 			return
