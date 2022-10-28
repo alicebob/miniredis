@@ -137,6 +137,10 @@ func blocking(
 	m.Lock()
 	defer m.Unlock()
 	for {
+		if c.Closed() {
+			return
+		}
+
 		done := cb(c, ctx)
 		if done {
 			return
