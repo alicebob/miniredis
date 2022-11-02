@@ -421,6 +421,16 @@ func TestCmdEvalReply(t *testing.T) {
 		),
 	)
 
+	mustOK(t, c,
+		"EVAL", `return redis.call("XGROUP", "CREATE", KEYS[1], ARGV[1], "$", "MKSTREAM")`,
+		"1", "stream", "group",
+	)
+	mustDo(t, c,
+		"EVAL", `return redis.call("XPENDING", KEYS[1], ARGV[1], "-", "+", 1, ARGV[2])`,
+		"1", "stream", "group", "consumer",
+		proto.Array(),
+	)
+
 	mustDo(t, c,
 		"EVAL", `return {err="broken"}`, "0",
 		proto.Error("broken"),
