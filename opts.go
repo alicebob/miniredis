@@ -1,7 +1,9 @@
 package miniredis
 
 import (
+	"math"
 	"strconv"
+	"time"
 
 	"github.com/alicebob/miniredis/v2/server"
 )
@@ -21,5 +23,22 @@ func optIntErr(c *server.Peer, src string, dest *int, errMsg string) bool {
 		return false
 	}
 	*dest = n
+	return true
+}
+
+func optDuration(c *server.Peer, src string, dest *time.Duration) bool {
+	n, err := strconv.ParseFloat(src, 64)
+	if err != nil {
+		setDirty(c)
+		c.WriteError(msgInvalidTimeout)
+		return false
+	}
+	if n < 0 || math.IsInf(n, 0) {
+		setDirty(c)
+		c.WriteError(msgNegTimeout)
+		return false
+	}
+
+	*dest = time.Duration(n*1_000_000) * time.Microsecond
 	return true
 }
