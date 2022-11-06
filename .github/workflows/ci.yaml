@@ -1,13 +1,10 @@
 name: CI
-
 on:
   push:
     branches: [ master ]
   pull_request:
     branches: [ master ]
-
 jobs:
-
   build:
     runs-on: ubuntu-latest
     strategy:
@@ -15,15 +12,13 @@ jobs:
         go: [ '1.14', '1.17', '1.18', '1.19' ]
     name: Go ${{ matrix.go }}
     steps:
-    - uses: actions/checkout@v2
-
-    - name: Set up Go
-      uses: actions/setup-go@v2
+    - uses: actions/checkout@v3
+    - name: Go
+      uses: actions/setup-go@v3
       with:
         go-version: ${{ matrix.go }}
-
+        cache: true
     - name: Install Redis
       run: (cd ./integration && ./get_redis.sh)
-
     - name: Test
       run: make test testrace int
