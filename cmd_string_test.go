@@ -421,6 +421,22 @@ func TestSetnx(t *testing.T) {
 		equals(t, ErrWrongType, err)
 		equals(t, "baz", s.HGet("foo", "bar"))
 	}
+
+	// set key value ex 3s. auto expire.
+	{
+		c.Do("set", "buff", "100", "ex", "3")
+		time.Sleep(3100 * time.Millisecond)
+		equals(t, false, s.Exists("buff"))
+		must1(t, c, "SETNX", "buff", "200")
+	}
+
+	// set key value px 3000ms. auto expire.
+	{
+		c.Do("set", "buff", "100", "px", "3000")
+		time.Sleep(3100 * time.Millisecond)
+		equals(t, false, s.Exists("buff"))
+		must1(t, c, "SETNX", "buff", "200")
+	}
 }
 
 func TestIncr(t *testing.T) {
