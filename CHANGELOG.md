@@ -1,6 +1,13 @@
 ## Changelog
 
 
+### v2.23.1
+- resolve $ to latest ID in XREAD (thanks @josh-hook)
+- handle disconnect in blocking functions (thanks @jgirtakovskis)
+- fix type conversion bug in redisToLua (thanks Sandy Harvie)
+- BRPOP{LPUSH} timeout can be float since 6.0
+
+
 ### v2.23.0
 
 - basic INFO support (thanks @kirill-a-belov)

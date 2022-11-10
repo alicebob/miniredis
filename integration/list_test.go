@@ -406,6 +406,8 @@ func TestBrpop(t *testing.T) {
 	testRaw(t, func(c *client) {
 		c.Do("LPUSH", "l", "one")
 		c.Do("BRPOP", "l", "1")
+		c.Do("BRPOP", "l", "0.1")
+		c.Error("negative", "BRPOP", "l", "inf")
 		c.Do("EXISTS", "l")
 
 		// transaction
@@ -487,7 +489,7 @@ func TestBlpop(t *testing.T) {
 func TestBrpoplpush(t *testing.T) {
 	testRaw(t, func(c *client) {
 		c.Do("LPUSH", "l", "one")
-		c.Do("BRPOPLPUSH", "l", "l2", "1")
+		c.Do("BRPOPLPUSH", "l", "l2", "0.1")
 		c.Do("EXISTS", "l")
 		c.Do("EXISTS", "l2")
 		c.Do("LRANGE", "l", "0", "-1")
@@ -499,6 +501,7 @@ func TestBrpoplpush(t *testing.T) {
 		c.Error("wrong number", "BRPOPLPUSH", "l", "x")
 		c.Error("wrong number", "BRPOPLPUSH", "1")
 		c.Error("negative", "BRPOPLPUSH", "from", "to", "-1")
+		c.Error("negative", "BRPOPLPUSH", "from", "to", "inf")
 		c.Error("wrong number", "BRPOPLPUSH", "from", "to", "-1", "xxx")
 	})
 

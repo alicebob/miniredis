@@ -1254,7 +1254,7 @@ func TestBrpop(t *testing.T) {
 		)
 		mustDo(t, c,
 			"BRPOP", "key", "inf",
-			proto.Error("ERR timeout is not a float or out of range"),
+			proto.Error("ERR timeout is negative"),
 		)
 	})
 }
@@ -1320,11 +1320,11 @@ func TestBrpopTimeout(t *testing.T) {
 	ok(t, err)
 	defer c.Close()
 
-	got := goStrings(t, s, "BRPOP", "l1", "1")
+	got := goStrings(t, s, "BRPOP", "l1", "0.1")
 	select {
 	case have := <-got:
 		equals(t, proto.NilList, have)
-	case <-time.After(1500 * time.Millisecond):
+	case <-time.After(200 * time.Millisecond):
 		t.Error("BRPOP took too long")
 	}
 }
@@ -1416,7 +1416,7 @@ func TestBlpop(t *testing.T) {
 		)
 		mustDo(t, c,
 			"BLPOP", "key", "inf",
-			proto.Error("ERR timeout is not a float or out of range"),
+			proto.Error("ERR timeout is negative"),
 		)
 	})
 }
@@ -1479,7 +1479,7 @@ func TestBrpoplpush(t *testing.T) {
 		)
 		mustDo(t, c,
 			"BRPOPLPUSH", "key", "foo", "inf",
-			proto.Error("ERR timeout is not a float or out of range"),
+			proto.Error("ERR timeout is negative"),
 		)
 		mustDo(t, c,
 			"BRPOPLPUSH", "key", "foo", "1", "baz",
@@ -1524,11 +1524,11 @@ func TestBrpoplpushTimeout(t *testing.T) {
 	ok(t, err)
 	defer s.Close()
 
-	got := goStrings(t, s, "BRPOPLPUSH", "l1", "l2", "1")
+	got := goStrings(t, s, "BRPOPLPUSH", "l1", "l2", "0.1")
 	select {
 	case have := <-got:
 		equals(t, proto.NilList, have)
-	case <-time.After(1500 * time.Millisecond):
+	case <-time.After(200 * time.Millisecond):
 		t.Error("BRPOPLPUSH took too long")
 	}
 }
