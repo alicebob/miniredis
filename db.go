@@ -43,6 +43,7 @@ func (db *RedisDB) flush() {
 	db.hllKeys = map[string]*hll{}
 	db.sortedsetKeys = map[string]sortedSet{}
 	db.ttl = map[string]time.Duration{}
+	db.expires = map[string]int64{}
 	db.streamKeys = map[string]*streamKey{}
 }
 
@@ -79,6 +80,9 @@ func (db *RedisDB) move(key string, to *RedisDB) bool {
 	if v, ok := db.ttl[key]; ok {
 		to.ttl[key] = v
 	}
+	if v, ok := db.expires[key]; ok {
+		to.expires[key] = v
+	}
 	db.del(key, true)
 	return true
 }
@@ -108,7 +112,9 @@ func (db *RedisDB) rename(from, to string) {
 	if v, ok := db.ttl[from]; ok {
 		db.ttl[to] = v
 	}
-
+	if v, ok := db.expires[from]; ok {
+		db.expires[to] = v
+	}
 	db.del(from, true)
 }
 
@@ -121,6 +127,7 @@ func (db *RedisDB) del(k string, delTTL bool) {
 	db.keyVersion[k]++
 	if delTTL {
 		delete(db.ttl, k)
+		delete(db.expires, k)
 	}
 	switch t {
 	case "string":

@@ -47,6 +47,7 @@ type RedisDB struct {
 	sortedsetKeys map[string]sortedSet     // ZADD &c. keys
 	streamKeys    map[string]*streamKey    // XADD &c. keys
 	ttl           map[string]time.Duration // effective TTL values
+	expires       map[string]int64         // expired key
 	keyVersion    map[string]uint          // used to watch values
 }
 
@@ -111,6 +112,7 @@ func newRedisDB(id int, m *Miniredis) RedisDB {
 		sortedsetKeys: map[string]sortedSet{},
 		streamKeys:    map[string]*streamKey{},
 		ttl:           map[string]time.Duration{},
+		expires:       map[string]int64{},
 		keyVersion:    map[string]uint{},
 	}
 }
@@ -151,6 +153,12 @@ func (m *Miniredis) Start() error {
 	if err != nil {
 		return err
 	}
+	opts := []server.ServerOption{
+		server.WithRedis(m),
+	}
+	for _, opt := range opts {
+		opt(s)
+	}
 	return m.start(s)
 }
 
@@ -159,6 +167,12 @@ func (m *Miniredis) StartTLS(cfg *tls.Config) error {
 	s, err := server.NewServerTLS(fmt.Sprintf("127.0.0.1:%d", m.port), cfg)
 	if err != nil {
 		return err
+	}
+	opts := []server.ServerOption{
+		server.WithRedis(m),
+	}
+	for _, opt := range opts {
+		opt(s)
 	}
 	return m.start(s)
 }
@@ -644,6 +658,31 @@ func (m *Miniredis) effectiveNow() time.Time {
 	return time.Now().UTC()
 }
 
+// ExpireIfNeeded check whether the key is expired.
+func (m *Miniredis) ExpireIfNeeded(key string) {
+	db := m.db(m.selectedDB)
+	expireFunc := func(key string) {
+		if t, ok := db.expires[key]; ok && m.isExpired(t) {
+			db.del(key, true)
+		}
+	}
+	if key == "*" {
+		for k := range db.keys {
+			expireFunc(k)
+		}
+	} else {
+		expireFunc(key)
+	}
+}
+
+func (m *Miniredis) isExpired(t int64) bool {
+	return (time.Now().UnixNano() / int64(time.Millisecond)) > t
+}
+
+func (m *Miniredis) milliExpireAt(d time.Duration) int64 {
+	return time.Now().Add(d).UnixNano() / int64(time.Millisecond)
+}
+
 // convert a unixtimestamp to a duration, to use an absolute time as TTL.
 // d can be either time.Second or time.Millisecond.
 func (m *Miniredis) at(i int, d time.Duration) time.Duration {
@@ -691,6 +730,9 @@ func (m *Miniredis) copy(
 	destDB.keyVersion[dst]++
 	if v, ok := srcDB.ttl[src]; ok {
 		destDB.ttl[dst] = v
+	}
+	if v, ok := srcDB.expires[src]; ok {
+		destDB.expires[dst] = v
 	}
 	return nil
 }

@@ -42,6 +42,9 @@ func (db *RedisDB) Keys() []string {
 	db.master.Lock()
 	defer db.master.Unlock()
 
+	for k := range db.keys {
+		db.master.ExpireIfNeeded(k)
+	}
 	return db.allKeys()
 }
 
@@ -84,6 +87,7 @@ func (db *RedisDB) Get(k string) (string, error) {
 	db.master.Lock()
 	defer db.master.Unlock()
 
+	db.master.ExpireIfNeeded(k)
 	if !db.exists(k) {
 		return "", ErrKeyNotFound
 	}
@@ -124,6 +128,7 @@ func (db *RedisDB) Incr(k string, delta int) (int, error) {
 	defer db.master.Unlock()
 	defer db.master.signal.Broadcast()
 
+	db.master.ExpireIfNeeded(k)
 	if db.exists(k) && db.t(k) != "string" {
 		return 0, ErrWrongType
 	}
@@ -148,6 +153,7 @@ func (db *RedisDB) Incrfloat(k string, delta float64) (float64, error) {
 	defer db.master.Unlock()
 	defer db.master.signal.Broadcast()
 
+	db.master.ExpireIfNeeded(k)
 	if db.exists(k) && db.t(k) != "string" {
 		return 0, ErrWrongType
 	}
@@ -174,6 +180,7 @@ func (db *RedisDB) List(k string) ([]string, error) {
 	db.master.Lock()
 	defer db.master.Unlock()
 
+	db.master.ExpireIfNeeded(k)
 	if !db.exists(k) {
 		return nil, ErrKeyNotFound
 	}
@@ -194,6 +201,7 @@ func (db *RedisDB) Lpush(k, v string) (int, error) {
 	defer db.master.Unlock()
 	defer db.master.signal.Broadcast()
 
+	db.master.ExpireIfNeeded(k)
 	if db.exists(k) && db.t(k) != "list" {
 		return 0, ErrWrongType
 	}
@@ -211,6 +219,7 @@ func (db *RedisDB) Lpop(k string) (string, error) {
 	defer db.master.Unlock()
 	defer db.master.signal.Broadcast()
 
+	db.master.ExpireIfNeeded(k)
 	if !db.exists(k) {
 		return "", ErrKeyNotFound
 	}
@@ -237,6 +246,7 @@ func (db *RedisDB) Push(k string, v ...string) (int, error) {
 	defer db.master.Unlock()
 	defer db.master.signal.Broadcast()
 
+	db.master.ExpireIfNeeded(k)
 	if db.exists(k) && db.t(k) != "list" {
 		return 0, ErrWrongType
 	}
@@ -259,6 +269,7 @@ func (db *RedisDB) Pop(k string) (string, error) {
 	defer db.master.Unlock()
 	defer db.master.signal.Broadcast()
 
+	db.master.ExpireIfNeeded(k)
 	if !db.exists(k) {
 		return "", ErrKeyNotFound
 	}
@@ -286,6 +297,7 @@ func (db *RedisDB) SetAdd(k string, elems ...string) (int, error) {
 	defer db.master.Unlock()
 	defer db.master.signal.Broadcast()
 
+	db.master.ExpireIfNeeded(k)
 	if db.exists(k) && db.t(k) != "set" {
 		return 0, ErrWrongType
 	}
@@ -308,6 +320,7 @@ func (db *RedisDB) Members(k string) ([]string, error) {
 	db.master.Lock()
 	defer db.master.Unlock()
 
+	db.master.ExpireIfNeeded(k)
 	if !db.exists(k) {
 		return nil, ErrKeyNotFound
 	}
@@ -333,6 +346,7 @@ func (db *RedisDB) IsMember(k, v string) (bool, error) {
 	db.master.Lock()
 	defer db.master.Unlock()
 
+	db.master.ExpireIfNeeded(k)
 	if !db.exists(k) {
 		return false, ErrKeyNotFound
 	}
@@ -352,6 +366,7 @@ func (db *RedisDB) HKeys(key string) ([]string, error) {
 	db.master.Lock()
 	defer db.master.Unlock()
 
+	db.master.ExpireIfNeeded(key)
 	if !db.exists(key) {
 		return nil, ErrKeyNotFound
 	}
@@ -421,6 +436,7 @@ func (db *RedisDB) SetTTL(k string, ttl time.Duration) {
 	defer db.master.signal.Broadcast()
 
 	db.ttl[k] = ttl
+	db.expires[k] = db.master.milliExpireAt(ttl)
 	db.keyVersion[k]++
 }
 
@@ -434,6 +450,7 @@ func (db *RedisDB) Type(k string) string {
 	db.master.Lock()
 	defer db.master.Unlock()
 
+	db.master.ExpireIfNeeded(k)
 	return db.t(k)
 }
 
@@ -447,6 +464,7 @@ func (db *RedisDB) Exists(k string) bool {
 	db.master.Lock()
 	defer db.master.Unlock()
 
+	db.master.ExpireIfNeeded(k)
 	return db.exists(k)
 }
 
@@ -464,6 +482,7 @@ func (db *RedisDB) HGet(k, f string) string {
 	db.master.Lock()
 	defer db.master.Unlock()
 
+	db.master.ExpireIfNeeded(k)
 	h, ok := db.hashKeys[k]
 	if !ok {
 		return ""
@@ -484,6 +503,7 @@ func (db *RedisDB) HSet(k string, fv ...string) {
 	defer db.master.Unlock()
 	defer db.master.signal.Broadcast()
 
+	db.master.ExpireIfNeeded(k)
 	db.hashSet(k, fv...)
 }
 
@@ -498,6 +518,7 @@ func (db *RedisDB) HDel(k, f string) {
 	defer db.master.Unlock()
 	defer db.master.signal.Broadcast()
 
+	db.master.ExpireIfNeeded(k)
 	db.hdel(k, f)
 }
 
@@ -525,6 +546,7 @@ func (db *RedisDB) HIncr(k, f string, delta int) (int, error) {
 	defer db.master.Unlock()
 	defer db.master.signal.Broadcast()
 
+	db.master.ExpireIfNeeded(k)
 	return db.hashIncr(k, f, delta)
 }
 
@@ -544,6 +566,7 @@ func (db *RedisDB) HIncrfloat(k, f string, delta float64) (float64, error) {
 	defer db.master.Unlock()
 	defer db.master.signal.Broadcast()
 
+	db.master.ExpireIfNeeded(k)
 	v, err := db.hashIncrfloat(k, f, big.NewFloat(delta))
 	if err != nil {
 		return 0, err
@@ -563,6 +586,7 @@ func (db *RedisDB) SRem(k string, fields ...string) (int, error) {
 	defer db.master.Unlock()
 	defer db.master.signal.Broadcast()
 
+	db.master.ExpireIfNeeded(k)
 	if !db.exists(k) {
 		return 0, ErrKeyNotFound
 	}
@@ -583,6 +607,7 @@ func (db *RedisDB) ZAdd(k string, score float64, member string) (bool, error) {
 	defer db.master.Unlock()
 	defer db.master.signal.Broadcast()
 
+	db.master.ExpireIfNeeded(k)
 	if db.exists(k) && db.t(k) != "zset" {
 		return false, ErrWrongType
 	}
@@ -599,6 +624,7 @@ func (db *RedisDB) ZMembers(k string) ([]string, error) {
 	db.master.Lock()
 	defer db.master.Unlock()
 
+	db.master.ExpireIfNeeded(k)
 	if !db.exists(k) {
 		return nil, ErrKeyNotFound
 	}
@@ -618,6 +644,7 @@ func (db *RedisDB) SortedSet(k string) (map[string]float64, error) {
 	db.master.Lock()
 	defer db.master.Unlock()
 
+	db.master.ExpireIfNeeded(k)
 	if !db.exists(k) {
 		return nil, ErrKeyNotFound
 	}
@@ -638,6 +665,7 @@ func (db *RedisDB) ZRem(k, member string) (bool, error) {
 	defer db.master.Unlock()
 	defer db.master.signal.Broadcast()
 
+	db.master.ExpireIfNeeded(k)
 	if !db.exists(k) {
 		return false, ErrKeyNotFound
 	}
@@ -657,6 +685,7 @@ func (db *RedisDB) ZScore(k, member string) (float64, error) {
 	db.master.Lock()
 	defer db.master.Unlock()
 
+	db.master.ExpireIfNeeded(k)
 	if !db.exists(k) {
 		return 0, ErrKeyNotFound
 	}
@@ -681,6 +710,7 @@ func (db *RedisDB) XAdd(k string, id string, values []string) (string, error) {
 	defer db.master.Unlock()
 	defer db.master.signal.Broadcast()
 
+	db.master.ExpireIfNeeded(k)
 	s, err := db.stream(k)
 	if err != nil {
 		return "", err
@@ -702,6 +732,7 @@ func (db *RedisDB) Stream(key string) ([]StreamEntry, error) {
 	db.master.Lock()
 	defer db.master.Unlock()
 
+	db.master.ExpireIfNeeded(key)
 	s, err := db.stream(key)
 	if err != nil {
 		return nil, err
@@ -762,6 +793,7 @@ func (db *RedisDB) HllAdd(k string, elems ...string) (int, error) {
 	db.master.Lock()
 	defer db.master.Unlock()
 
+	db.master.ExpireIfNeeded(k)
 	if db.exists(k) && db.t(k) != "hll" {
 		return 0, ErrWrongType
 	}
@@ -778,6 +810,9 @@ func (db *RedisDB) HllCount(keys ...string) (int, error) {
 	db.master.Lock()
 	defer db.master.Unlock()
 
+	for _, key := range keys {
+		db.master.ExpireIfNeeded(key)
+	}
 	return db.hllCount(keys)
 }
 

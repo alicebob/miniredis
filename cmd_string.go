@@ -62,6 +62,7 @@ func (m *Miniredis) cmdSet(c *server.Peer, cmd string, args []string) {
 		keepttl bool // set keepttl
 		ttlSet  bool
 		ttl     time.Duration
+		expire  int64
 		get     bool
 	}
 
@@ -114,6 +115,7 @@ func (m *Miniredis) cmdSet(c *server.Peer, cmd string, args []string) {
 				opts.ttl = time.Duration(expire) * timeUnit
 			}
 			opts.ttlSet = true
+			opts.expire = m.milliExpireAt(time.Duration(expire) * timeUnit)
 
 			args = args[2:]
 			continue
@@ -146,6 +148,7 @@ func (m *Miniredis) cmdSet(c *server.Peer, cmd string, args []string) {
 		if opts.keepttl {
 			if val, ok := db.ttl[opts.key]; ok {
 				opts.ttl = val
+				opts.expire = m.milliExpireAt(val)
 			}
 		}
 		if opts.get {
@@ -162,6 +165,7 @@ func (m *Miniredis) cmdSet(c *server.Peer, cmd string, args []string) {
 		}
 		if opts.ttl != 0 {
 			db.ttl[opts.key] = opts.ttl
+			db.expires[opts.key] = opts.expire
 		}
 		if opts.get {
 			if !existed {
@@ -209,6 +213,7 @@ func (m *Miniredis) cmdSetex(c *server.Peer, cmd string, args []string) {
 		db.del(key, true) // Clear any existing keys.
 		db.stringSet(key, value)
 		db.ttl[key] = time.Duration(ttl) * time.Second
+		db.expires[key] = m.milliExpireAt(time.Duration(ttl) * time.Second)
 		c.WriteOK()
 	})
 }
@@ -250,6 +255,7 @@ func (m *Miniredis) cmdPsetex(c *server.Peer, cmd string, args []string) {
 		db.del(opts.key, true) // Clear any existing keys.
 		db.stringSet(opts.key, opts.value)
 		db.ttl[opts.key] = time.Duration(opts.ttl) * time.Millisecond
+		db.expires[opts.key] = m.milliExpireAt(time.Duration(opts.ttl) * time.Millisecond)
 		c.WriteOK()
 	})
 }
@@ -415,6 +421,7 @@ func (m *Miniredis) cmdGetex(c *server.Peer, cmd string, args []string) {
 	var opts struct {
 		key     string
 		ttl     time.Duration
+		expire  int64
 		persist bool // remove existing TTL on the key.
 	}
 
@@ -455,6 +462,7 @@ func (m *Miniredis) cmdGetex(c *server.Peer, cmd string, args []string) {
 			} else {
 				opts.ttl = time.Duration(expire) * timeUnit
 			}
+			opts.expire = m.milliExpireAt(time.Duration(expire) * timeUnit)
 		default:
 			setDirty(c)
 			c.WriteError(msgSyntaxError)
@@ -472,8 +480,10 @@ func (m *Miniredis) cmdGetex(c *server.Peer, cmd string, args []string) {
 		switch {
 		case opts.persist:
 			delete(db.ttl, opts.key)
+			delete(db.expires, opts.key)
 		case opts.ttl != 0:
 			db.ttl[opts.key] = opts.ttl
+			db.expires[opts.key] = opts.expire
 		}
 
 		if db.t(opts.key) != "string" {
@@ -513,6 +523,7 @@ func (m *Miniredis) cmdGetset(c *server.Peer, cmd string, args []string) {
 		db.stringSet(key, value)
 		// a GETSET clears the ttl
 		delete(db.ttl, key)
+		delete(db.expires, key)
 
 		if !ok {
 			c.WriteNull()

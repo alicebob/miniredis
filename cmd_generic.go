@@ -78,6 +78,7 @@ func makeCmdExpire(m *Miniredis, unix bool, d time.Duration) func(*server.Peer, 
 			} else {
 				db.ttl[opts.key] = time.Duration(opts.value) * d
 			}
+			db.expires[opts.key] = m.milliExpireAt(time.Duration(opts.value) * d)
 			db.keyVersion[opts.key]++
 			db.checkTTL(opts.key)
 			c.WriteInt(1)
@@ -214,6 +215,7 @@ func (m *Miniredis) cmdPersist(c *server.Peer, cmd string, args []string) {
 			return
 		}
 		delete(db.ttl, key)
+		delete(db.expires, key)
 		db.keyVersion[key]++
 		c.WriteInt(1)
 	})
