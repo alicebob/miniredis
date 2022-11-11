@@ -30,6 +30,13 @@ type DisconnectHandler func(c *Peer)
 // Hook is can be added to run before every cmd. Return true if the command is done.
 type Hook func(*Peer, string, ...string) bool
 
+// ServerOption allows for functional options to adjust behaviour.
+type ServerOption func(s *Server)
+
+type Redis interface {
+	ExpireIfNeeded(key string)
+}
+
 // Server is a simple redis server
 type Server struct {
 	l         net.Listener
@@ -40,6 +47,7 @@ type Server struct {
 	wg        sync.WaitGroup
 	infoConns int
 	infoCmds  int
+	redis     Redis
 }
 
 // NewServer makes a server listening on addr. Close with .Close().
