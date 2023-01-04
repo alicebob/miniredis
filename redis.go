@@ -44,7 +44,6 @@ const (
 	msgStreamIDZero         = "ERR The ID specified in XADD must be greater than 0-0"
 	msgNoScriptFound        = "NOSCRIPT No matching script. Please use EVAL."
 	msgUnsupportedUnit      = "ERR unsupported unit provided. please use m, km, ft, mi"
-	msgNotFromScripts       = "This Redis command is not allowed from scripts"
 	msgXreadUnbalanced      = "ERR Unbalanced XREAD list of streams: for each stream key an ID or '$' must be specified."
 	msgXgroupKeyNotFound    = "ERR The XGROUP subcommand requires the key to exist. Note that for CREATE you may want to use the MKSTREAM option to create an empty stream automatically."
 	msgXtrimInvalidStrategy = "ERR unsupported XTRIM strategy. Please use MAXLEN, MINID"
@@ -71,6 +70,10 @@ func errReadgroup(key, group string) error {
 
 func errXreadgroup(key, group string) error {
 	return fmt.Errorf("NOGROUP No such key '%s' or consumer group '%s' in XREADGROUP with GROUP option", key, group)
+}
+
+func msgNotFromScripts(sha string) string {
+	return fmt.Sprintf("This Redis command is not allowed from script script: %s, &c", sha)
 }
 
 // withTx wraps the non-argument-checking part of command handling code in

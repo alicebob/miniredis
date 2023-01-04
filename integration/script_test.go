@@ -314,13 +314,13 @@ func TestLuaCall(t *testing.T) {
 	testRaw(t, func(c *client) {
 		c.Do("SET", "foo", "1")
 		c.Error(
-			"Lua redis() command arguments must be strings or integers",
+			"Lua redis lib command arguments must be strings or integers script: 66acd1fa6589521219d0b0dc3c1965f4b11a3422,",
 			"EVAL", `local foo = redis.pcall("HGET", "foo"); redis.call("SET", "res", foo)`, "0",
 		)
 		c.Do("GET", "foo")
 		c.Do("GET", "res")
 		c.Error(
-			"Lua redis() command arguments must be strings or integers",
+			"Lua redis lib command arguments must be strings or integers script: 5b67bc50d5e0ed20baae44ca5a735efa6a3e5243,",
 			"EVAL", `local foo = redis.pcall("HGET", "foo", "bar"); redis.call("SET", "res", foo)`, "0",
 		)
 		c.Do("GET", "foo")
@@ -332,47 +332,47 @@ func TestLuaCall(t *testing.T) {
 		c.Do("SET", "foo", "1")
 
 		c.Error(
-			"This Redis command is not allowed from scripts",
+			"This Redis command is not allowed from script script: a17bb9f079d9b5202346e82ccaa50f3b9553172b,",
 			"EVAL", `redis.call("MULTI")`, "0",
 		)
 		c.Error(
-			"This Redis command is not allowed from scripts",
+			"This Redis command is not allowed from script script: 56569e2c63cf8996b64922e5a26e23c60fe9f1aa,",
 			"EVAL", `redis.call("EXEC")`, "0",
 		)
 		c.Error(
-			"This Redis command is not allowed from scripts",
+			"This Redis command is not allowed from script script: a2457385c7980996400fc4315534dcf332d54f46,",
 			"EVAL", `redis.call("EVAL", "redis.call(\"GET\", \"foo\")", 0)`, "0",
 		)
 		c.Error(
-			"This Redis command is not allowed from scripts",
+			"This Redis command is not allowed from script script: ac613210b61b9f3339fd677969291675b9b703d3,",
 			"EVAL", `redis.call("SCRIPT", "LOAD", "return 42")`, "0",
 		)
 		c.Error(
-			"This Redis command is not allowed from scripts",
+			"This Redis command is not allowed from script script: 888b717177e29e998baf4bac6116c2a4787b4c70,",
 			"EVAL", `redis.call("EVALSHA", "123", "0")`, "0",
 		)
 		c.Error(
-			"This Redis command is not allowed from scripts",
+			"This Redis command is not allowed from script script: 508bef3f1ab46859dee541a8bc3b0f368ae1844f,",
 			"EVAL", `redis.call("AUTH", "foobar")`, "0",
 		)
 		c.Error(
-			"This Redis command is not allowed from scripts",
+			"This Redis command is not allowed from script script: 62b5d652eb4d90746a5672a450ed9e3627521df1,",
 			"EVAL", `redis.call("WATCH", "foobar")`, "0",
 		)
 		c.Error(
-			"This Redis command is not allowed from scripts",
+			"This Redis command is not allowed from script script: 65ea661820802737ade33d7a70582838a09fcf8d,",
 			"EVAL", `redis.call("SUBSCRIBE", "foo")`, "0",
 		)
 		c.Error(
-			"This Redis command is not allowed from scripts",
+			"This Redis command is not allowed from script script: 1af9ab7e7d8aa211959de33824dc075ee816ab1a,",
 			"EVAL", `redis.call("UNSUBSCRIBE", "foo")`, "0",
 		)
 		c.Error(
-			"This Redis command is not allowed from scripts",
+			"This Redis command is not allowed from script script: 0610e3628fbdca44e6d49736d5b59be8bab5047d,",
 			"EVAL", `redis.call("PSUBSCRIBE", "foo")`, "0",
 		)
 		c.Error(
-			"This Redis command is not allowed from scripts",
+			"This Redis command is not allowed from script script: ba7f784eaff4e747e31a39abd5386c432aac3140,",
 			"EVAL", `redis.call("PUNSUBSCRIBE", "foo")`, "0",
 		)
 		c.Do("EVAL", `redis.pcall("EXEC")`, "0")

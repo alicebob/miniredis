@@ -26,6 +26,7 @@ func mkLua(srv *server.Server, c *server.Peer, sha string) (map[string]lua.LGFun
 			pCtx.authenticated = true
 		}
 		pCtx.nested = true
+		pCtx.nestedSHA = sha
 		pCtx.selectedDB = getCtx(c).selectedDB
 
 		return func(l *lua.LState) int {
@@ -47,7 +48,7 @@ func mkLua(srv *server.Server, c *server.Peer, sha string) (map[string]lua.LGFun
 				}
 			}
 			if len(args) == 0 {
-				l.Error(lua.LString(msgNotFromScripts), 1)
+				l.Error(lua.LString(msgNotFromScripts(sha)), 1)
 				return 0
 			}
 

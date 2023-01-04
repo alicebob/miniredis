@@ -117,9 +117,9 @@ func (m *Miniredis) cmdEval(c *server.Peer, cmd string, args []string) {
 	if m.checkPubsub(c, cmd) {
 		return
 	}
-
-	if getCtx(c).nested {
-		c.WriteError(msgNotFromScripts)
+	ctx := getCtx(c)
+	if ctx.nested {
+		c.WriteError(msgNotFromScripts(ctx.nestedSHA))
 		return
 	}
 
@@ -146,8 +146,9 @@ func (m *Miniredis) cmdEvalsha(c *server.Peer, cmd string, args []string) {
 	if m.checkPubsub(c, cmd) {
 		return
 	}
-	if getCtx(c).nested {
-		c.WriteError(msgNotFromScripts)
+	ctx := getCtx(c)
+	if ctx.nested {
+		c.WriteError(msgNotFromScripts(ctx.nestedSHA))
 		return
 	}
 
@@ -177,8 +178,9 @@ func (m *Miniredis) cmdScript(c *server.Peer, cmd string, args []string) {
 		return
 	}
 
-	if getCtx(c).nested {
-		c.WriteError(msgNotFromScripts)
+	ctx := getCtx(c)
+	if ctx.nested {
+		c.WriteError(msgNotFromScripts(ctx.nestedSHA))
 		return
 	}
 
