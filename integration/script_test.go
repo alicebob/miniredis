@@ -257,41 +257,41 @@ func TestLuaCall(t *testing.T) {
 	// datatype errors
 	testRaw(t, func(c *client) {
 		c.Error(
-			"Please specify at least one argument for redis.call()",
+			"Please specify at least one argument for this redis lib call script: 23251039f40992dadef496cbfe3f3d23a6d314ce",
 			"EVAL", `redis.call()`, "0",
 		)
 		c.Error(
-			"Lua redis() command arguments must be strings or integers",
+			"Lua redis lib command arguments must be strings or integers script: 2c79b56ef55f7dc96da28dddb6ba551017fb1480,",
 			"EVAL", `redis.call({})`, "0",
 		)
 		c.Error(
-			"Unknown Redis command called from Lua script",
+			"Unknown Redis command called from script script: 1f422cead4ec560a2473e39974d64f965b99b8b0",
 			"EVAL", `redis.call(1)`, "0",
 		)
 		c.Error(
-			"Unknown Redis command called from Lua script",
+			"Unknown Redis command called from script script: cd72c3c55975da213448de4e59a8674b8b21c486",
 			"EVAL", `redis.call("1")`, "0",
 		)
 		c.Error(
-			"Lua redis() command arguments must be strings or integers",
+			"Lua redis lib command arguments must be strings or integers script: 40286a2418d06fc20cf71762ed4c52b5348b4bb0",
 			"EVAL", `redis.call("ECHO", true)`, "0",
 		)
 		c.Error(
-			"Lua redis() command arguments must be strings or integers",
+			"Lua redis lib command arguments must be strings or integers script: d2f4e1eb2935fe53669068a377a3dc4b923eb669,",
 			"EVAL", `redis.call("ECHO", false)`, "0",
 		)
 		c.Error(
-			"Lua redis() command arguments must be strings or integers",
+			"Lua redis lib command arguments must be strings or integers script: 33462f69402788110bccac05df6a8ac9c7429304,",
 			"EVAL", `redis.call("ECHO", nil)`, "0",
 		)
 		c.Error(
-			"Lua redis() command arguments must be strings or integers",
+			"Lua redis lib command arguments must be strings or integers script: 180500c268449fd1a24ea520d39a4aa76d6693c2,",
 			"EVAL", `redis.call("HELLO", {})`, "0",
 		)
 		// c.Error("Error", "EVAL", `redis.call("HELLO", 1)`, "0")
 		// c.Error("Redis command", "EVAL", `redis.call("HELLO", 3.14)`, "0")
 		c.Error(
-			"Lua redis() command arguments must be strings or integers",
+			"Lua redis lib command arguments must be strings or integers script: 32c9afc7bcb832809c41272b7a5525020b3e8bf5,",
 			"EVAL", `redis.call("GET", {})`, "0",
 		)
 	})

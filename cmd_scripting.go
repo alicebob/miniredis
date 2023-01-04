@@ -23,7 +23,7 @@ func commandsScripting(m *Miniredis) {
 
 // Execute lua. Needs to run m.Lock()ed, from within withTx().
 // Returns true if the lua was OK (and hence should be cached).
-func (m *Miniredis) runLuaScript(c *server.Peer, script string, args []string) bool {
+func (m *Miniredis) runLuaScript(c *server.Peer, sha, script string, args []string) bool {
 	l := lua.NewState(lua.Options{SkipOpenLibs: true})
 	defer l.Close()
 
@@ -80,7 +80,7 @@ func (m *Miniredis) runLuaScript(c *server.Peer, script string, args []string) b
 	}
 	l.SetGlobal("ARGV", argvTable)
 
-	redisFuncs, redisConstants := mkLua(m.srv, c)
+	redisFuncs, redisConstants := mkLua(m.srv, c, sha)
 	// Register command handlers
 	l.Push(l.NewFunction(func(l *lua.LState) int {
 		mod := l.RegisterModule("redis", redisFuncs).(*lua.LTable)
@@ -126,9 +126,9 @@ func (m *Miniredis) cmdEval(c *server.Peer, cmd string, args []string) {
 	script, args := args[0], args[1:]
 
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
-		ok := m.runLuaScript(c, script, args)
+		sha := sha1Hex(script)
+		ok := m.runLuaScript(c, sha, script, args)
 		if ok {
-			sha := sha1Hex(script)
 			m.scripts[sha] = script
 		}
 	})
@@ -160,7 +160,7 @@ func (m *Miniredis) cmdEvalsha(c *server.Peer, cmd string, args []string) {
 			return
 		}
 
-		m.runLuaScript(c, script, args)
+		m.runLuaScript(c, sha, script, args)
 	})
 }
 
