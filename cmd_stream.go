@@ -1653,6 +1653,11 @@ func (m *Miniredis) xclaim(
 		}
 		pelEntry.lastDelivery = newLastDelivery
 
+		// redis7: don't report entries which are deleted by now
+		if _, e := group.stream.get(id); e == nil {
+			continue
+		}
+
 		claimedEntryIDs = append(claimedEntryIDs, id)
 	}
 	if len(claimedEntryIDs) == 0 {

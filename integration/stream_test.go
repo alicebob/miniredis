@@ -644,7 +644,7 @@ func TestStreamGroup(t *testing.T) {
 			c.Do("XINFO", "CONSUMERS", "planets", "processing")
 
 			c.Do("XCLAIM", "planets", "processing", "alice", "0", "0-1", "0-2", "FORCE")
-			c.Do("XINFO", "GROUPS", "planets")
+			c.DoLoosely("XINFO", "GROUPS", "planets") // "lag" is different
 			c.Do("XPENDING", "planets", "processing")
 
 			c.Do("XDEL", "planets", "0-1")
