@@ -2,7 +2,7 @@
 
 set -eu
 
-VERSION=7.0.3
+VERSION=7.0.7
 
 rm -rf ./redis_src/
 mkdir -p ./redis_src/
