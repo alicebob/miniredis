@@ -574,13 +574,13 @@ func (m *Miniredis) cmdXinfoGroups(c *server.Peer, args []string) {
 			c.WriteBulk("consumers")
 			c.WriteInt(len(g.consumers))
 			c.WriteBulk("pending")
-			c.WriteInt(len(g.pending))
+			c.WriteInt(len(g.activePending()))
 			c.WriteBulk("last-delivered-id")
 			c.WriteBulk(g.lastID)
 			c.WriteBulk("entries-read")
 			c.WriteNull()
 			c.WriteBulk("lag")
-			c.WriteInt(0)
+			c.WriteInt(len(g.stream.entries))
 		}
 	})
 }
@@ -1133,7 +1133,8 @@ func (m *Miniredis) cmdXpending(c *server.Peer, cmd string, args []string) {
 }
 
 func writeXpendingSummary(c *server.Peer, g streamGroup) {
-	if len(g.pending) == 0 {
+	pend := g.activePending()
+	if len(pend) == 0 {
 		c.WriteLen(4)
 		c.WriteInt(0)
 		c.WriteNull()
@@ -1148,9 +1149,9 @@ func writeXpendingSummary(c *server.Peer, g streamGroup) {
 	//  - highest ID
 	//  - all consumers with > 0 pending items
 	c.WriteLen(4)
-	c.WriteInt(len(g.pending))
-	c.WriteBulk(g.pending[0].id)
-	c.WriteBulk(g.pending[len(g.pending)-1].id)
+	c.WriteInt(len(pend))
+	c.WriteBulk(pend[0].id)
+	c.WriteBulk(pend[len(pend)-1].id)
 	cons := map[string]int{}
 	for id := range g.consumers {
 		cnt := g.pendingCount(id)
