@@ -307,25 +307,25 @@ func (m *Miniredis) cmdXgroup(c *server.Peer, cmd string, args []string) {
 		return
 	}
 
-	subCmd, args := strings.ToUpper(args[0]), args[1:]
+	subCmd, args := strings.ToLower(args[0]), args[1:]
 	switch subCmd {
-	case "CREATE":
+	case "create":
 		m.cmdXgroupCreate(c, cmd, args)
-	case "DESTROY":
+	case "destroy":
 		m.cmdXgroupDestroy(c, cmd, args)
-	case "CREATECONSUMER":
+	case "createconsumer":
 		m.cmdXgroupCreateconsumer(c, cmd, args)
-	case "DELCONSUMER":
+	case "delconsumer":
 		m.cmdXgroupDelconsumer(c, cmd, args)
-	case "HELP",
-		"SETID":
+	case "help",
+		"setid":
 		err := fmt.Sprintf("ERR 'XGROUP %s' not supported", subCmd)
 		setDirty(c)
 		c.WriteError(err)
 	default:
 		setDirty(c)
 		c.WriteError(fmt.Sprintf(
-			"ERR Unknown subcommand or wrong number of arguments for '%s'. Try XGROUP HELP.",
+			"ERR unknown subcommand '%s'. Try XGROUP HELP.",
 			subCmd,
 		))
 	}
@@ -567,19 +567,20 @@ func (m *Miniredis) cmdXinfoGroups(c *server.Peer, args []string) {
 
 		c.WriteLen(len(s.groups))
 		for name, g := range s.groups {
-			c.WriteMapLen(4)
+			c.WriteMapLen(6)
 
 			c.WriteBulk("name")
 			c.WriteBulk(name)
-
 			c.WriteBulk("consumers")
 			c.WriteInt(len(g.consumers))
-
 			c.WriteBulk("pending")
 			c.WriteInt(len(g.pending))
-
 			c.WriteBulk("last-delivered-id")
 			c.WriteBulk(g.lastID)
+			c.WriteBulk("entries-read")
+			c.WriteNull()
+			c.WriteBulk("lag")
+			c.WriteInt(0)
 		}
 	})
 }

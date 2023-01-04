@@ -392,7 +392,7 @@ func TestStreamGroup(t *testing.T) {
 			c.Do("XGROUP", "DESTROY", "planets", "processing")
 			c.Do("XINFO", "GROUPS", "planets")
 			c.Error("wrong number of arguments", "XGROUP")
-			c.Error("wrong number of arguments", "XGROUP", "foo")
+			c.Error("unknown subcommand 'foo'", "XGROUP", "foo")
 		})
 	})
 
