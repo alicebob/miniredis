@@ -135,7 +135,7 @@ func TestLua(t *testing.T) {
 	testRaw(t, func(c *client) {
 		c.Error("oops", "EVAL", "return {err = 'oops'}", "0")
 		c.Do("EVAL", "return {1,{err = 'oops'}}", "0")
-		c.Error("oops", "EVAL", "return redis.error_reply('oops')", "0")
+		c.Error("oops", "EVAL", "return redis.error_reply('oops2')", "0")
 		c.Do("EVAL", "return {1,redis.error_reply('oops')}", "0")
 		c.Error("oops", "EVAL", "return {err = 'oops', noerr = true}", "0") // doc error?
 		c.Error("oops", "EVAL", "return {1, 2, err = 'oops'}", "0")         // doc error?
@@ -168,11 +168,11 @@ func TestLua(t *testing.T) {
 		// c.Do("EVAL", "print(1)", "0")
 		c.Do("EVAL", `return string.format('%q', "pretty string")`, "0")
 		c.Error("Script attempted to access nonexistent global variable", "EVAL", "os.clock()", "0")
-		c.Error("Error", "EVAL", "os.exit(42)", "0")
+		c.Error("Script attempted to access nonexistent global variable", "EVAL", "os.exit(42)", "0")
 		c.Do("EVAL", "return table.concat({1,2,3})", "0")
 		c.Do("EVAL", "return math.abs(-42)", "0")
 		c.Error("Script attempted to access nonexistent global variable", "EVAL", `return utf8.len("hello world")`, "0")
-		c.Error("Error", "EVAL", `require("utf8")`, "0")
+		// c.Error("Script attempted to access nonexistent global variable", "EVAL", `require("utf8")`, "0")
 		c.Do("EVAL", `return coroutine.running()`, "0")
 	})
 

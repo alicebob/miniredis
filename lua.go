@@ -112,7 +112,7 @@ func mkLua(srv *server.Server, c *server.Peer) (map[string]lua.LGFunction, map[s
 				return 0
 			}
 			res := &lua.LTable{}
-			res.RawSetString("err", lua.LString(msg))
+			res.RawSetString("err", lua.LString("ERR "+msg))
 			l.Push(res)
 			return 1
 		},

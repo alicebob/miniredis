@@ -438,7 +438,7 @@ func TestCmdEvalReply(t *testing.T) {
 
 	mustDo(t, c,
 		"EVAL", `return redis.error_reply("broken")`, "0",
-		proto.Error("broken"),
+		proto.Error("ERR broken"),
 	)
 
 	mustDo(t, c,
