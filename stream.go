@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -17,6 +18,7 @@ type streamKey struct {
 	entries         []StreamEntry
 	groups          map[string]*streamGroup
 	lastAllocatedID string
+	mu              sync.Mutex
 }
 
 // a StreamEntry is an entry in a stream. The ID is always of the form
@@ -52,6 +54,7 @@ func newStreamKey() *streamKey {
 	}
 }
 
+// generateID doesn't lock the mutex
 func (s *streamKey) generateID(now time.Time) string {
 	ts := uint64(now.UnixNano()) / 1_000_000
 
@@ -61,7 +64,7 @@ func (s *streamKey) generateID(now time.Time) string {
 		next = fmt.Sprintf("%d-%d", last[0], last[1]+1)
 	}
 
-	lastID := s.lastID()
+	lastID := s.lastIDUnlocked()
 	if streamCmp(lastID, next) >= 0 {
 		last, _ := parseStreamID(lastID)
 		next = fmt.Sprintf("%d-%d", last[0], last[1]+1)
@@ -71,7 +74,16 @@ func (s *streamKey) generateID(now time.Time) string {
 	return next
 }
 
+// lastID locks the mutex
 func (s *streamKey) lastID() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	return s.lastIDUnlocked()
+}
+
+// lastID doesn't lock the mutex
+func (s *streamKey) lastIDUnlocked() string {
 	if len(s.entries) == 0 {
 		return "0-0"
 	}
@@ -80,6 +92,9 @@ func (s *streamKey) lastID() string {
 }
 
 func (s *streamKey) copy() *streamKey {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	cpy := &streamKey{
 		entries: s.entries,
 	}
@@ -194,12 +209,15 @@ func reversedStreamEntries(o []StreamEntry) []StreamEntry {
 }
 
 func (s *streamKey) createGroup(group, id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	if _, ok := s.groups[group]; ok {
 		return errors.New("BUSYGROUP Consumer Group name already exists")
 	}
 
 	if id == "$" {
-		id = s.lastID()
+		id = s.lastIDUnlocked()
 	}
 	s.groups[group] = &streamGroup{
 		stream:    s,
@@ -213,6 +231,9 @@ func (s *streamKey) createGroup(group, id string) error {
 // If id is empty or "*" the ID will be generated automatically.
 // `values` should have an even length.
 func (s *streamKey) add(entryID string, values []string, now time.Time) (string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	if entryID == "" || entryID == "*" {
 		entryID = s.generateID(now)
 	}
@@ -224,7 +245,7 @@ func (s *streamKey) add(entryID string, values []string, now time.Time) (string,
 	if entryID == "0-0" {
 		return "", errors.New(msgStreamIDZero)
 	}
-	if streamCmp(s.lastID(), entryID) != -1 {
+	if streamCmp(s.lastIDUnlocked(), entryID) != -1 {
 		return "", errors.New(msgStreamIDTooSmall)
 	}
 
@@ -236,6 +257,9 @@ func (s *streamKey) add(entryID string, values []string, now time.Time) (string,
 }
 
 func (s *streamKey) trim(n int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	if len(s.entries) > n {
 		s.entries = s.entries[len(s.entries)-n:]
 	}
@@ -243,6 +267,9 @@ func (s *streamKey) trim(n int) {
 
 // all entries after "id"
 func (s *streamKey) after(id string) []StreamEntry {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	pos := sort.Search(len(s.entries), func(i int) bool {
 		return streamCmp(id, s.entries[i].ID) < 0
 	})
@@ -252,6 +279,9 @@ func (s *streamKey) after(id string) []StreamEntry {
 // get a stream entry by ID
 // Also returns the position in the entries slice, if found.
 func (s *streamKey) get(id string) (int, *StreamEntry) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	pos := sort.Search(len(s.entries), func(i int) bool {
 		return streamCmp(id, s.entries[i].ID) <= 0
 	})

@@ -63,28 +63,23 @@ func (m *Miniredis) cmdBXpop(c *server.Peer, cmd string, args []string, lr leftr
 		return
 	}
 
-	timeoutS := args[len(args)-1]
-	keys := args[:len(args)-1]
+	var opts struct {
+		keys    []string
+		timeout time.Duration
+	}
 
-	timeout, err := strconv.Atoi(timeoutS)
-	if err != nil {
-		setDirty(c)
-		c.WriteError(msgInvalidTimeout)
+	if ok := optDuration(c, args[len(args)-1], &opts.timeout); !ok {
 		return
 	}
-	if timeout < 0 {
-		setDirty(c)
-		c.WriteError(msgNegTimeout)
-		return
-	}
+	opts.keys = args[:len(args)-1]
 
 	blocking(
 		m,
 		c,
-		time.Duration(timeout)*time.Second,
+		opts.timeout,
 		func(c *server.Peer, ctx *connCtx) bool {
 			db := m.db(ctx.selectedDB)
-			for _, key := range keys {
+			for _, key := range opts.keys {
 				if !db.exists(key) {
 					continue
 				}
@@ -883,23 +878,18 @@ func (m *Miniredis) cmdBrpoplpush(c *server.Peer, cmd string, args []string) {
 	var opts struct {
 		src     string
 		dst     string
-		timeout int
+		timeout time.Duration
 	}
 	opts.src = args[0]
 	opts.dst = args[1]
-	if ok := optIntErr(c, args[2], &opts.timeout, msgInvalidTimeout); !ok {
-		return
-	}
-	if opts.timeout < 0 {
-		setDirty(c)
-		c.WriteError(msgNegTimeout)
+	if ok := optDuration(c, args[2], &opts.timeout); !ok {
 		return
 	}
 
 	blocking(
 		m,
 		c,
-		time.Duration(opts.timeout)*time.Second,
+		opts.timeout,
 		func(c *server.Peer, ctx *connCtx) bool {
 			db := m.db(ctx.selectedDB)
 

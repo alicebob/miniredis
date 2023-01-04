@@ -1,10 +1,12 @@
 package miniredis
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"regexp"
 	"strconv"
+	"sync"
 	"testing"
 	"time"
 
@@ -417,6 +419,41 @@ func TestStreamRead(t *testing.T) {
 				),
 			),
 		)
+
+		t.Run("blocking async", func(t *testing.T) {
+			// XREAD blocking test using latest ID
+			ctx, cancel := context.WithCancel(context.Background())
+			var wg sync.WaitGroup
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				xaddClient, err := proto.Dial(s.Addr())
+				ok(t, err)
+				defer xaddClient.Close()
+				for {
+					select {
+					case <-time.After(10 * time.Millisecond):
+					case <-ctx.Done():
+						return
+					}
+					_, err = xaddClient.Do("XADD", "planets", "5-1", "name", "block", "idx", "6")
+					ok(t, err)
+				}
+			}()
+
+			mustDo(t, c,
+				"XREAD", "BLOCK", "0", "STREAMS", "planets", "$",
+				proto.Array(
+					proto.Array(proto.String("planets"),
+						proto.Array(
+							proto.Array(proto.String("5-1"), proto.Strings("name", "block", "idx", "6")),
+						),
+					),
+				),
+			)
+			cancel()
+			wg.Wait()
+		})
 	})
 
 	t.Run("error cases", func(t *testing.T) {
