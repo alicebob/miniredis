@@ -1482,7 +1482,7 @@ func xautoclaim(
 }
 
 func writeXautoclaim(c *server.Peer, nextCallId string, res []StreamEntry, justId bool) {
-	c.WriteLen(2)
+	c.WriteLen(3)
 	c.WriteBulk(nextCallId)
 	c.WriteLen(len(res))
 	for _, entry := range res {
@@ -1498,6 +1498,8 @@ func writeXautoclaim(c *server.Peer, nextCallId string, res []StreamEntry, justI
 			c.WriteBulk(v)
 		}
 	}
+	// TODO: see "Redis 7" note
+	c.WriteLen(0)
 }
 
 // XCLAIM
