@@ -1,6 +1,3 @@
-//go:build int
-// +build int
-
 package main
 
 import (
@@ -8,6 +5,7 @@ import (
 )
 
 func TestEcho(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		c.Do("ECHO", "hello world")
 		c.Do("ECHO", "42")
@@ -31,6 +29,7 @@ func TestEcho(t *testing.T) {
 }
 
 func TestPing(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		c.Do("PING")
 		c.Do("PING", "hello world")
@@ -51,6 +50,7 @@ func TestPing(t *testing.T) {
 }
 
 func TestSelect(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		c.Do("SET", "foo", "bar")
 		c.Do("GET", "foo")
@@ -85,6 +85,7 @@ func TestSelect(t *testing.T) {
 }
 
 func TestAuth(t *testing.T) {
+	skip(t)
 	testAuth(t,
 		"supersecret",
 		func(c *client) {
@@ -144,6 +145,7 @@ func TestAuth(t *testing.T) {
 }
 
 func TestHello(t *testing.T) {
+	skip(t)
 	testRaw(t,
 		func(c *client) {
 			c.Do("SADD", "s", "aap") // sets have resp3 specific code

@@ -1,6 +1,3 @@
-//go:build int
-// +build int
-
 package main
 
 import (
@@ -8,6 +5,7 @@ import (
 )
 
 func TestGeoadd(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		c.Do("GEOADD",
 			"Sicily",
@@ -69,6 +67,7 @@ func TestGeoadd(t *testing.T) {
 }
 
 func TestGeopos(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		c.Do("GEOADD",
 			"Sicily",
@@ -90,6 +89,7 @@ func TestGeopos(t *testing.T) {
 }
 
 func TestGeodist(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		c.Do("GEOADD",
 			"Sicily",
@@ -118,6 +118,7 @@ func TestGeodist(t *testing.T) {
 }
 
 func TestGeoradius(t *testing.T) {
+	skip(t)
 	t.Run("basic", func(t *testing.T) {
 		testRaw(t, func(c *client) {
 			c.Do("GEOADD",
@@ -267,6 +268,7 @@ func TestGeoradius(t *testing.T) {
 }
 
 func TestGeoradiusByMember(t *testing.T) {
+	skip(t)
 	t.Run("basic", func(t *testing.T) {
 		testRaw(t, func(c *client) {
 			c.Do("GEOADD",
@@ -419,6 +421,7 @@ func TestGeoradiusByMember(t *testing.T) {
 
 // a bit longer testset
 func TestGeo(t *testing.T) {
+	skip(t)
 	// some subway stations
 	// https://data.cityofnewyork.us/Transportation/Subway-Stations/arq3-7z49/data
 	testRaw(t, func(c *client) {

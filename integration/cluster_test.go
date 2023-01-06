@@ -1,11 +1,9 @@
-//go:build int
-// +build int
-
 package main
 
 import "testing"
 
 func TestCluster(t *testing.T) {
+	skip(t)
 	testCluster(t,
 		func(c *client) {
 			// c.DoLoosly("CLUSTER", "SLOTS")

@@ -1,6 +1,3 @@
-//go:build int
-// +build int
-
 package main
 
 import (
@@ -8,6 +5,7 @@ import (
 )
 
 func TestScript(t *testing.T) {
+	skip(t)
 	t.Run("EVAL", func(t *testing.T) {
 		testRaw(t, func(c *client) {
 			c.Do("EVAL", "return 42", "0")
@@ -110,6 +108,7 @@ func TestScript(t *testing.T) {
 }
 
 func TestLua(t *testing.T) {
+	skip(t)
 	// basic datatype things
 	datatypes := func(c *client) {
 		c.Do("EVAL", "", "0")
@@ -236,6 +235,7 @@ func TestLua(t *testing.T) {
 }
 
 func TestLuaCall(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		c.Do("SET", "foo", "1")
 		c.Do("EVAL", `local foo = redis.call("GET", "foo"); redis.call("SET", "foo", foo+1)`, "0")
@@ -381,6 +381,7 @@ func TestLuaCall(t *testing.T) {
 }
 
 func TestScriptNoAuth(t *testing.T) {
+	skip(t)
 	testAuth(t,
 		"supersecret",
 		func(c *client) {
@@ -392,6 +393,7 @@ func TestScriptNoAuth(t *testing.T) {
 }
 
 func TestScriptReplicate(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		c.Do(
 			"EVAL", `redis.replicate_commands();`, "0",
@@ -400,6 +402,7 @@ func TestScriptReplicate(t *testing.T) {
 }
 
 func TestScriptTx(t *testing.T) {
+	skip(t)
 	sha2 := "bfbf458525d6a0b19200bfd6db3af481156b367b" // keys[1], argv[1]
 
 	testRaw(t, func(c *client) {

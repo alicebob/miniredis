@@ -1,15 +1,11 @@
-//go:build int
-// +build int
-
 package main
-
-// Transaction things.
 
 import (
 	"testing"
 )
 
 func TestTx(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		c.Do("MULTI")
 		c.Do("SET", "AAP", "1")

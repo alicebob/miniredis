@@ -1,15 +1,11 @@
-//go:build int
-// +build int
-
 package main
-
-// Hash keys.
 
 import (
 	"testing"
 )
 
 func TestHash(t *testing.T) {
+	skip(t)
 	t.Run("basics", func(t *testing.T) {
 		testRaw(t, func(c *client) {
 			c.Do("HSET", "aap", "noot", "mies")
@@ -61,6 +57,7 @@ func TestHash(t *testing.T) {
 }
 
 func TestHashSetnx(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		c.Do("HSETNX", "aap", "noot", "mies")
 		c.Do("EXISTS", "aap")
@@ -77,6 +74,7 @@ func TestHashSetnx(t *testing.T) {
 }
 
 func TestHashDelExists(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		c.Do("HSET", "aap", "noot", "mies")
 		c.Do("HSET", "aap", "vuur", "wim")
@@ -102,6 +100,7 @@ func TestHashDelExists(t *testing.T) {
 }
 
 func TestHashGetall(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		c.Do("HSET", "aap", "noot", "mies")
 		c.Do("HSET", "aap", "vuur", "wim")
@@ -127,6 +126,7 @@ func TestHashGetall(t *testing.T) {
 }
 
 func TestHmset(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		c.Do("HMSET", "aap", "noot", "mies", "vuur", "zus")
 		c.Do("HGET", "aap", "noot")
@@ -143,6 +143,7 @@ func TestHmset(t *testing.T) {
 }
 
 func TestHashIncr(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		c.Do("HINCRBY", "aap", "noot", "12")
 		c.Do("HINCRBY", "aap", "noot", "-13")
@@ -179,6 +180,7 @@ func TestHashIncr(t *testing.T) {
 }
 
 func TestHscan(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		// No set yet
 		c.Do("HSCAN", "h", "0")
@@ -212,6 +214,7 @@ func TestHscan(t *testing.T) {
 }
 
 func TestHstrlen(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		c.Do("HSTRLEN", "hash", "foo")
 		c.Do("HSET", "hash", "foo", "bar")

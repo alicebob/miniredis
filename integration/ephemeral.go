@@ -1,6 +1,3 @@
-//go:build int
-// +build int
-
 package main
 
 // Start a redis server in memory-only mode on a random port.
