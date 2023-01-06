@@ -1,6 +1,3 @@
-//go:build int
-// +build int
-
 package main
 
 import (
@@ -9,6 +6,7 @@ import (
 )
 
 func TestString(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		c.Do("SET", "foo", "bar")
 		c.Do("GET", "foo")
@@ -56,6 +54,7 @@ func TestString(t *testing.T) {
 }
 
 func TestStringGetSet(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		c.Do("SET", "foo", "bar")
 		c.Do("GETSET", "foo", "new")
@@ -75,6 +74,7 @@ func TestStringGetSet(t *testing.T) {
 }
 
 func TestStringGetex(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		c.Do("GETEX", "missing")
 
@@ -104,6 +104,7 @@ func TestStringGetex(t *testing.T) {
 }
 
 func TestStringGetdel(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		c.Do("GETDEL", "missing")
 
@@ -121,6 +122,7 @@ func TestStringGetdel(t *testing.T) {
 }
 
 func TestStringMget(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		c.Do("SET", "foo", "bar")
 		c.Do("SET", "foo2", "bar")
@@ -138,6 +140,7 @@ func TestStringMget(t *testing.T) {
 }
 
 func TestStringSetnx(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		c.Do("SETNX", "foo", "bar")
 		c.Do("GET", "foo")
@@ -155,6 +158,7 @@ func TestStringSetnx(t *testing.T) {
 }
 
 func TestExpire(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		c.Do("SET", "foo", "bar")
 		c.Do("EXPIRE", "foo", "12")
@@ -214,6 +218,7 @@ func TestExpire(t *testing.T) {
 }
 
 func TestMset(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		c.Do("MSET", "foo", "bar")
 		c.Do("MSET", "foo", "bar", "baz", "?")
@@ -242,6 +247,7 @@ func TestMset(t *testing.T) {
 }
 
 func TestSetx(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		c.Do("SETEX", "foo", "12", "bar")
 		c.Do("GET", "foo")
@@ -266,6 +272,7 @@ func TestSetx(t *testing.T) {
 }
 
 func TestGetrange(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		c.Do("SET", "foo", "The quick brown fox jumps over the lazy dog")
 		c.Do("GETRANGE", "foo", "0", "100")
@@ -284,6 +291,7 @@ func TestGetrange(t *testing.T) {
 }
 
 func TestStrlen(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		c.Do("SET", "str", "The quick brown fox jumps over the lazy dog")
 		c.Do("STRLEN", "str")
@@ -296,6 +304,7 @@ func TestStrlen(t *testing.T) {
 }
 
 func TestSetrange(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		c.Do("SET", "foo", "The quick brown fox jumps over the lazy dog")
 		c.Do("SETRANGE", "foo", "0", "aap")
@@ -322,6 +331,7 @@ func TestSetrange(t *testing.T) {
 }
 
 func TestIncrAndFriends(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		c.Do("INCR", "aap")
 		c.Do("INCR", "aap")
@@ -392,6 +402,7 @@ func TestIncrAndFriends(t *testing.T) {
 }
 
 func TestBitcount(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		c.Do("SET", "str", "The quick brown fox jumps over the lazy dog")
 		c.Do("SET", "utf8", "❆❅❄☃")
@@ -420,6 +431,7 @@ func TestBitcount(t *testing.T) {
 }
 
 func TestBitop(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		c.Do("SET", "a", "foo")
 		c.Do("SET", "b", "aap")
@@ -492,6 +504,7 @@ func TestBitop(t *testing.T) {
 }
 
 func TestBitpos(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		c.Do("SET", "a", "\x00\x0f")
 		c.Do("SET", "b", "\xf0\xf0")
@@ -560,6 +573,7 @@ func TestBitpos(t *testing.T) {
 }
 
 func TestGetbit(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		for i := 0; i < 100; i++ {
 			c.Do("SET", "a", "\x00\x0f")
@@ -581,6 +595,7 @@ func TestGetbit(t *testing.T) {
 }
 
 func TestSetbit(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		for i := 0; i < 100; i++ {
 			c.Do("SET", "a", "\x00\x0f")
@@ -610,6 +625,7 @@ func TestSetbit(t *testing.T) {
 }
 
 func TestAppend(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		c.Do("SET", "foo", "bar")
 		c.Do("APPEND", "foo", "more")
@@ -624,6 +640,7 @@ func TestAppend(t *testing.T) {
 }
 
 func TestMove(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		c.Do("SET", "foo", "bar")
 		c.Do("EXPIRE", "foo", "12345")

@@ -1,6 +1,3 @@
-//go:build int
-// +build int
-
 package main
 
 import (
@@ -10,6 +7,7 @@ import (
 )
 
 func TestKeys(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		c.Do("SET", "one", "1")
 		c.Do("SET", "two", "2")
@@ -43,6 +41,7 @@ func TestKeys(t *testing.T) {
 }
 
 func TestRandom(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		c.Do("RANDOMKEY")
 		// A random key from a DB with a single key. We can test that.
@@ -55,6 +54,7 @@ func TestRandom(t *testing.T) {
 }
 
 func TestUnknownCommand(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		c.Error("unknown", "nosuch")
 		c.Error("unknown", "noSUCH")
@@ -63,12 +63,14 @@ func TestUnknownCommand(t *testing.T) {
 }
 
 func TestQuit(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		c.Do("QUIT")
 	})
 }
 
 func TestExists(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		c.Do("SET", "a", "3")
 		c.Do("HSET", "b", "c", "d")
@@ -82,6 +84,7 @@ func TestExists(t *testing.T) {
 }
 
 func TestRename(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		// No 'a' key
 		c.Error("no such", "RENAME", "a", "b")
@@ -114,6 +117,7 @@ func TestRename(t *testing.T) {
 }
 
 func TestRenamenx(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		// No 'a' key
 		c.Error("no such", "RENAMENX", "a", "b")
@@ -138,6 +142,7 @@ func TestRenamenx(t *testing.T) {
 }
 
 func TestScan(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		// No keys yet
 		c.Do("SCAN", "0")
@@ -177,6 +182,7 @@ func TestScan(t *testing.T) {
 }
 
 func TestFastForward(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		c.Do("SET", "key1", "value")
 		c.Do("SET", "key", "value", "PX", "100")
@@ -205,12 +211,14 @@ func TestFastForward(t *testing.T) {
 }
 
 func TestProto(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		c.Do("ECHO", strings.Repeat("X", 1<<24))
 	})
 }
 
 func TestSwapdb(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		c.Do("SET", "key1", "val1")
 		c.Do("SWAPDB", "0", "1")
@@ -247,6 +255,7 @@ func TestSwapdb(t *testing.T) {
 }
 
 func TestDel(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		c.Do("SET", "one", "1")
 		c.Do("SET", "two", "2")
@@ -267,6 +276,7 @@ func TestDel(t *testing.T) {
 }
 
 func TestUnlink(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		c.Do("SET", "one", "1")
 		c.Do("SET", "two", "2")
@@ -287,6 +297,7 @@ func TestUnlink(t *testing.T) {
 }
 
 func TestTouch(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		c.Do("SET", "a", "some value")
 		c.Do("TOUCH", "a")
@@ -300,6 +311,7 @@ func TestTouch(t *testing.T) {
 }
 
 func TestPersist(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		c.Do("SET", "foo", "bar")
 		c.Do("EXPIRE", "foo", "12")
@@ -310,6 +322,7 @@ func TestPersist(t *testing.T) {
 }
 
 func TestCopy(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		c.Error("wrong number", "COPY")
 		c.Error("wrong number", "COPY", "a")

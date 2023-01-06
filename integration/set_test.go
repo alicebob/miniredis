@@ -1,15 +1,11 @@
-//go:build int
-// +build int
-
 package main
-
-// Set keys.
 
 import (
 	"testing"
 )
 
 func TestSet(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		c.Do("SADD", "s", "aap", "noot", "mies")
 		c.Do("SADD", "s", "vuur", "noot")
@@ -52,6 +48,7 @@ func TestSet(t *testing.T) {
 }
 
 func TestSetMove(t *testing.T) {
+	skip(t)
 	// Move a set around
 	testRaw(t, func(c *client) {
 		c.Do("SADD", "s", "aap", "noot", "mies")
@@ -66,6 +63,7 @@ func TestSetMove(t *testing.T) {
 }
 
 func TestSetDel(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		c.Do("SADD", "s", "aap", "noot", "mies")
 		c.Do("SREM", "s", "noot", "nosuch")
@@ -82,6 +80,7 @@ func TestSetDel(t *testing.T) {
 }
 
 func TestSetSMove(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		c.Do("SADD", "s", "aap", "noot", "mies")
 		c.Do("SMOVE", "s", "s2", "aap")
@@ -119,6 +118,7 @@ func TestSetSMove(t *testing.T) {
 }
 
 func TestSetSpop(t *testing.T) {
+	skip(t)
 	t.Run("without count", func(t *testing.T) {
 		testRaw(t, func(c *client) {
 			c.Do("SADD", "s", "aap")
@@ -174,6 +174,7 @@ func TestSetSpop(t *testing.T) {
 }
 
 func TestSetSrandmember(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		// Set with a single member...
 		c.Do("SADD", "s", "aap")
@@ -204,6 +205,7 @@ func TestSetSrandmember(t *testing.T) {
 }
 
 func TestSetSdiff(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		c.Do("SADD", "s1", "aap", "noot", "mies")
 		c.Do("SADD", "s2", "noot", "mies", "vuur")
@@ -242,6 +244,7 @@ func TestSetSdiff(t *testing.T) {
 }
 
 func TestSetSinter(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		c.Do("SADD", "s1", "aap", "noot", "mies")
 		c.Do("SADD", "s2", "noot", "mies", "vuur")
@@ -272,6 +275,7 @@ func TestSetSinter(t *testing.T) {
 }
 
 func TestSetSunion(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		c.Do("SUNION", "s1", "aap", "noot", "mies")
 		c.Do("SUNION", "s2", "noot", "mies", "vuur")
@@ -301,6 +305,7 @@ func TestSetSunion(t *testing.T) {
 }
 
 func TestSscan(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		// No set yet
 		c.Do("SSCAN", "set", "0")
@@ -336,6 +341,7 @@ func TestSscan(t *testing.T) {
 }
 
 func TestSetNoAuth(t *testing.T) {
+	skip(t)
 	testAuth(t,
 		"supersecret",
 		func(c *client) {

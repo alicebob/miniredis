@@ -1,6 +1,3 @@
-//go:build int
-// +build int
-
 package main
 
 import (
@@ -9,6 +6,7 @@ import (
 )
 
 func TestSubscribe(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		c.Error("wrong number", "SUBSCRIBE")
 
@@ -31,6 +29,7 @@ func TestSubscribe(t *testing.T) {
 }
 
 func TestPsubscribe(t *testing.T) {
+	skip(t)
 	testRaw2(t, func(c1, c2 *client) {
 		c1.Error("wrong number", "PSUBSCRIBE")
 
@@ -109,6 +108,7 @@ func TestPsubscribe(t *testing.T) {
 }
 
 func TestPublish(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		c.Error("wrong number", "PUBLISH")
 		c.Error("wrong number", "PUBLISH", "foo")
@@ -119,6 +119,7 @@ func TestPublish(t *testing.T) {
 }
 
 func TestPubSub(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		c.Error("wrong number", "PUBSUB")
 		c.Error("subcommand", "PUBSUB", "FOO")
@@ -146,6 +147,7 @@ func TestPubSub(t *testing.T) {
 }
 
 func TestPubsubFull(t *testing.T) {
+	skip(t)
 	testRaw2(t, func(c1, c2 *client) {
 		c1.Do("SUBSCRIBE", "news", "sport")
 		c1.Receive()
@@ -171,6 +173,7 @@ func TestPubsubFull(t *testing.T) {
 }
 
 func TestPubsubMulti(t *testing.T) {
+	skip(t)
 	var wg1 sync.WaitGroup
 	wg1.Add(2)
 	testMulti(t,
@@ -200,6 +203,7 @@ func TestPubsubMulti(t *testing.T) {
 }
 
 func TestPubsubSelect(t *testing.T) {
+	skip(t)
 	testRaw2(t, func(c1, c2 *client) {
 		c1.Do("SUBSCRIBE", "news", "sport")
 		c1.Receive()
@@ -210,6 +214,7 @@ func TestPubsubSelect(t *testing.T) {
 }
 
 func TestPubsubMode(t *testing.T) {
+	skip(t)
 	// most commands aren't allowed in publish mode
 	t.Run("basic", func(t *testing.T) {
 		testRaw(t, func(c *client) {
@@ -363,6 +368,7 @@ func TestPubsubMode(t *testing.T) {
 }
 
 func TestSubscriptions(t *testing.T) {
+	skip(t)
 	testRaw2(t, func(c1, c2 *client) {
 		c1.Do("SUBSCRIBE", "foo", "bar", "foo")
 		c2.Do("PUBSUB", "NUMSUB")
@@ -372,6 +378,7 @@ func TestSubscriptions(t *testing.T) {
 }
 
 func TestPubsubUnsub(t *testing.T) {
+	skip(t)
 	testRaw2(t, func(c1, c2 *client) {
 		c1.Do("SUBSCRIBE", "news", "sport")
 		c1.Receive()
@@ -382,6 +389,7 @@ func TestPubsubUnsub(t *testing.T) {
 }
 
 func TestPubsubTx(t *testing.T) {
+	skip(t)
 	// publish is in a tx
 	testRaw2(t, func(c1, c2 *client) {
 		c1.Do("SUBSCRIBE", "foo")

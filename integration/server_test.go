@@ -1,6 +1,3 @@
-//go:build int
-// +build int
-
 package main
 
 import (
@@ -8,6 +5,7 @@ import (
 )
 
 func TestServer(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		c.Do("SET", "foo", "bar")
 		c.Do("SET", "baz", "bak")
@@ -40,6 +38,7 @@ func TestServer(t *testing.T) {
 }
 
 func TestServerTLS(t *testing.T) {
+	skip(t)
 	testTLS(t, func(c *client) {
 		c.Do("PING", "foo")
 

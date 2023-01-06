@@ -1,11 +1,9 @@
-//go:build int
-// +build int
-
 package main
 
 import (
 	"fmt"
 	"math"
+	"os"
 	"reflect"
 	"sort"
 	"strconv"
@@ -16,6 +14,13 @@ import (
 	"github.com/alicebob/miniredis/v2"
 	"github.com/alicebob/miniredis/v2/proto"
 )
+
+func skip(t testing.TB) {
+	t.Helper()
+	if os.Getenv("INT") == "" {
+		t.Skip("INT=1 not set")
+	}
+}
 
 func testRaw(t *testing.T, cb func(*client)) {
 	t.Helper()

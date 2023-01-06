@@ -19,4 +19,4 @@ jobs:
     - name: Install Redis
       run: (cd ./integration && ./get_redis.sh)
     - name: Test
-      run: make test testrace int
+      run: make int testrace

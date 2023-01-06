@@ -1,6 +1,3 @@
-//go:build int
-// +build int
-
 package main
 
 import (

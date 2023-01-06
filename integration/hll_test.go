@@ -1,9 +1,4 @@
-//go:build int
-// +build int
-
 package main
-
-// Hash keys.
 
 import (
 	"math/rand"
@@ -11,6 +6,7 @@ import (
 )
 
 func TestHll(t *testing.T) {
+	skip(t)
 	t.Run("basics", func(t *testing.T) {
 		testRaw(t, func(c *client) {
 			// Add 100 unique random values to h1 and 50 of these 100 to h2

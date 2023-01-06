@@ -1,9 +1,4 @@
-//go:build int
-// +build int
-
 package main
-
-// List keys.
 
 import (
 	"sync"
@@ -12,6 +7,7 @@ import (
 )
 
 func TestLPushLpop(t *testing.T) {
+	skip(t)
 	t.Run("without count", func(t *testing.T) {
 		testRaw(t, func(c *client) {
 			c.Do("LPUSH", "l", "aap", "noot", "mies")
@@ -73,6 +69,7 @@ func TestLPushLpop(t *testing.T) {
 }
 
 func TestLPushx(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		c.Do("LPUSHX", "l", "aap")
 		c.Do("EXISTS", "l")
@@ -92,6 +89,7 @@ func TestLPushx(t *testing.T) {
 }
 
 func TestRPushRPop(t *testing.T) {
+	skip(t)
 	t.Run("without count", func(t *testing.T) {
 		testRaw(t, func(c *client) {
 			c.Do("RPUSH", "l", "aap", "noot", "mies")
@@ -141,6 +139,7 @@ func TestRPushRPop(t *testing.T) {
 }
 
 func TestLinxed(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		c.Do("RPUSH", "l", "aap", "noot", "mies")
 		c.Do("LINDEX", "l", "0")
@@ -167,6 +166,7 @@ func TestLinxed(t *testing.T) {
 }
 
 func TestLpos(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		c.Do("RPUSH", "l", "aap", "noot", "aap", "mies", "aap", "vuur", "aap", "aap")
 		c.Do("LPOS", "l", "app")
@@ -235,6 +235,7 @@ func TestLpos(t *testing.T) {
 }
 
 func TestLlen(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		c.Do("RPUSH", "l", "aap", "noot", "mies")
 		c.Do("LLEN", "l")
@@ -249,6 +250,7 @@ func TestLlen(t *testing.T) {
 }
 
 func TestLtrim(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		c.Do("RPUSH", "l", "aap", "noot", "mies")
 		c.Do("LTRIM", "l", "0", "1")
@@ -278,6 +280,7 @@ func TestLtrim(t *testing.T) {
 }
 
 func TestLrem(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		c.Do("RPUSH", "l", "aap", "noot", "mies", "mies", "mies")
 		c.Do("LREM", "l", "1", "mies")
@@ -306,6 +309,7 @@ func TestLrem(t *testing.T) {
 }
 
 func TestLset(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		c.Do("RPUSH", "l", "aap", "noot", "mies", "mies", "mies")
 		c.Do("LSET", "l", "1", "[cencored]")
@@ -328,6 +332,7 @@ func TestLset(t *testing.T) {
 }
 
 func TestLinsert(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		c.Do("RPUSH", "l", "aap", "noot", "mies", "mies", "mies!")
 		c.Do("LINSERT", "l", "before", "aap", "1")
@@ -353,6 +358,7 @@ func TestLinsert(t *testing.T) {
 }
 
 func TestRpoplpush(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		c.Do("RPUSH", "l", "aap", "noot", "mies")
 		c.Do("RPOPLPUSH", "l", "l2")
@@ -386,6 +392,7 @@ func TestRpoplpush(t *testing.T) {
 }
 
 func TestRpushx(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		c.Do("RPUSHX", "l", "aap")
 		c.Do("EXISTS", "l")
@@ -406,6 +413,7 @@ func TestRpushx(t *testing.T) {
 }
 
 func TestBrpop(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		c.Do("LPUSH", "l", "one")
 		c.Do("BRPOP", "l", "1")
@@ -429,6 +437,7 @@ func TestBrpop(t *testing.T) {
 }
 
 func TestBrpopMulti(t *testing.T) {
+	skip(t)
 	testMulti(t,
 		func(c *client) {
 			c.Do("BRPOP", "key", "1")
@@ -446,6 +455,7 @@ func TestBrpopMulti(t *testing.T) {
 }
 
 func TestBrpopTrans(t *testing.T) {
+	skip(t)
 	testMulti(t,
 		func(c *client) {
 			c.Do("BRPOP", "key", "1")
@@ -459,6 +469,7 @@ func TestBrpopTrans(t *testing.T) {
 }
 
 func TestBlpop(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		c.Do("LPUSH", "l", "one")
 		c.Do("BLPOP", "l", "1")
@@ -490,6 +501,7 @@ func TestBlpop(t *testing.T) {
 }
 
 func TestBrpoplpush(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		c.Do("LPUSH", "l", "one")
 		c.Do("BRPOPLPUSH", "l", "l2", "0.1")
@@ -531,6 +543,7 @@ func TestBrpoplpush(t *testing.T) {
 }
 
 func TestLmove(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		c.Do("RPUSH", "src", "LR", "LL", "RR", "RL")
 		c.Do("LMOVE", "src", "dst", "LEFT", "RIGHT")

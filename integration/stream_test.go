@@ -1,6 +1,3 @@
-//go:build int
-// +build int
-
 package main
 
 import (
@@ -10,6 +7,7 @@ import (
 )
 
 func TestStream(t *testing.T) {
+	skip(t)
 	t.Run("XADD", func(t *testing.T) {
 		testRaw(t, func(c *client) {
 			c.Do("XADD",
@@ -267,6 +265,7 @@ func TestStream(t *testing.T) {
 }
 
 func TestStreamRange(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		c.Do("XADD",
 			"ordplanets",
@@ -374,6 +373,7 @@ func TestStreamRange(t *testing.T) {
 }
 
 func TestStreamGroup(t *testing.T) {
+	skip(t)
 	t.Run("XGROUP", func(t *testing.T) {
 		testRaw(t, func(c *client) {
 			c.Error("to exist", "XGROUP", "CREATE", "planets", "processing", "$")
@@ -687,6 +687,7 @@ func TestStreamGroup(t *testing.T) {
 }
 
 func TestStreamTrim(t *testing.T) {
+	skip(t)
 	t.Run("XTRIM MAXLEN", func(t *testing.T) {
 		testRaw(t, func(c *client) {
 			c.Do("XADD", "planets", "0-1", "name", "Mercury")

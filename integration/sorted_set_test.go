@@ -1,15 +1,11 @@
-//go:build int
-// +build int
-
 package main
-
-// Sorted Set keys.
 
 import (
 	"testing"
 )
 
 func TestSortedSet(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		c.Do("ZADD", "z", "1", "aap", "2", "noot", "3", "mies")
 		c.Do("ZADD", "z", "1", "vuur", "4", "noot")
@@ -97,6 +93,7 @@ func TestSortedSet(t *testing.T) {
 }
 
 func TestSortedSetAdd(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		c.Do("ZADD", "z",
 			"1", "aap",
@@ -169,6 +166,7 @@ func TestSortedSetAdd(t *testing.T) {
 }
 
 func TestSortedSetRange(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		c.Do("ZADD", "z",
 			"1", "aap",
@@ -259,6 +257,7 @@ func TestSortedSetRange(t *testing.T) {
 }
 
 func TestSortedSetRevRange(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		c.Do("ZADD", "z",
 			"1", "aap",
@@ -288,6 +287,7 @@ func TestSortedSetRevRange(t *testing.T) {
 }
 
 func TestSortedSetRem(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		c.Do("ZADD", "z",
 			"1", "aap",
@@ -312,6 +312,7 @@ func TestSortedSetRem(t *testing.T) {
 }
 
 func TestSortedSetRemRangeByLex(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		c.Do("ZADD", "z",
 			"12", "zero kelvin",
@@ -342,6 +343,7 @@ func TestSortedSetRemRangeByLex(t *testing.T) {
 }
 
 func TestSortedSetRemRangeByRank(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		c.Do("ZADD", "z",
 			"12", "zero kelvin",
@@ -377,6 +379,7 @@ func TestSortedSetRemRangeByRank(t *testing.T) {
 }
 
 func TestSortedSetRemRangeByScore(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		c.Do("ZADD", "z",
 			"1", "aap",
@@ -410,6 +413,7 @@ func TestSortedSetRemRangeByScore(t *testing.T) {
 }
 
 func TestSortedSetScore(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		c.Do("ZADD", "z",
 			"1", "aap",
@@ -434,6 +438,7 @@ func TestSortedSetScore(t *testing.T) {
 }
 
 func TestSortedSetRangeByScore(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		c.Do("ZADD", "z",
 			"1", "aap",
@@ -518,6 +523,7 @@ func TestSortedSetRangeByScore(t *testing.T) {
 }
 
 func TestSortedSetRangeByLex(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		c.Do("ZADD", "z",
 			"12", "zero kelvin",
@@ -600,6 +606,7 @@ func TestSortedSetRangeByLex(t *testing.T) {
 }
 
 func TestSortedSetIncyby(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		c.Do("ZINCRBY", "z", "1.0", "m")
 		c.Do("ZINCRBY", "z", "1.0", "m")
@@ -621,6 +628,7 @@ func TestSortedSetIncyby(t *testing.T) {
 }
 
 func TestZscan(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		// No set yet
 		c.Do("ZSCAN", "h", "0")
@@ -654,6 +662,7 @@ func TestZscan(t *testing.T) {
 }
 
 func TestZunion(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		// example from the docs https://redis.io/commands/ZUNION
 		c.Do("ZADD", "zset1", "1", "one")
@@ -702,6 +711,7 @@ func TestZunion(t *testing.T) {
 }
 
 func TestZunionstore(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		c.Do("ZADD", "h1", "1.0", "key1")
 		c.Do("ZADD", "h1", "2.0", "key2")
@@ -762,6 +772,7 @@ func TestZunionstore(t *testing.T) {
 }
 
 func TestZinterstore(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		c.Do("ZADD", "h1", "1.0", "key1")
 		c.Do("ZADD", "h1", "2.0", "key2")
@@ -809,6 +820,7 @@ func TestZinterstore(t *testing.T) {
 }
 
 func TestZpopminmax(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		c.Do("ZADD", "set:zpop", "1.0", "key1")
 		c.Do("ZADD", "set:zpop", "2.0", "key2")
@@ -839,6 +851,7 @@ func TestZpopminmax(t *testing.T) {
 }
 
 func TestZrandmember(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		c.Do("ZADD", "q", "1.0", "key1")
 		c.Do("ZADD", "q", "2.0", "key2")
