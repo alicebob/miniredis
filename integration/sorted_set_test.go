@@ -39,14 +39,16 @@ func TestSortedSet(t *testing.T) {
 
 		c.Do("ZPOPMAX", "zz", "2")
 		c.Do("ZPOPMAX", "zz")
-		c.Do("ZPOPMAX", "zz", "-100")
+		c.Error("out of range", "ZPOPMAX", "zz", "-100")
 		c.Do("ZPOPMAX", "nosuch", "1")
+		c.Do("ZPOPMAX", "zz", "0")
 		c.Do("ZPOPMAX", "zz", "100")
 
 		c.Do("ZPOPMIN", "zz", "2")
 		c.Do("ZPOPMIN", "zz")
-		c.Do("ZPOPMIN", "zz", "-100")
+		c.Error("out of range", "ZPOPMIN", "zz", "-100")
 		c.Do("ZPOPMIN", "nosuch", "1")
+		c.Do("ZPOPMIN", "zz", "0")
 		c.Do("ZPOPMIN", "zz", "100")
 
 		// failure cases
@@ -67,10 +69,10 @@ func TestSortedSet(t *testing.T) {
 		c.Error("wrong number", "ZREVRANK")
 		c.Error("wrong number", "ZREVRANK", "key")
 		c.Error("wrong number", "ZPOPMAX")
-		c.Error("not an integer", "ZPOPMAX", "set", "noint")
+		c.Error("out of range", "ZPOPMAX", "set", "noint")
 		c.Error("syntax error", "ZPOPMAX", "set", "1", "toomany")
 		c.Error("wrong number", "ZPOPMIN")
-		c.Error("not an integer", "ZPOPMIN", "set", "noint")
+		c.Error("out of range", "ZPOPMIN", "set", "noint")
 		c.Error("syntax error", "ZPOPMIN", "set", "1", "toomany")
 
 		c.Do("RENAME", "z", "z2")
@@ -821,17 +823,17 @@ func TestZpopminmax(t *testing.T) {
 		c.Do("ZPOPMIN", "set:zpop")
 		c.Do("ZPOPMIN", "set:zpop", "2")
 		c.Do("ZPOPMIN", "set:zpop", "100")
-		c.Do("ZPOPMIN", "set:zpop", "-100")
+		c.Error("out of range", "ZPOPMIN", "set:zpop", "-100")
 
 		c.Do("ZPOPMAX", "set:zpop")
 		c.Do("ZPOPMAX", "set:zpop", "2")
 		c.Do("ZPOPMAX", "set:zpop", "100")
-		c.Do("ZPOPMAX", "set:zpop", "-100")
+		c.Error("out of range", "ZPOPMAX", "set:zpop", "-100")
 		c.Do("ZPOPMAX", "nosuch", "1")
 
 		// Wrong args
 		c.Error("wrong number", "ZPOPMIN")
-		c.Error("not an integer", "ZPOPMIN", "set:zpop", "h1")
+		c.Error("out of range", "ZPOPMIN", "set:zpop", "h1")
 		c.Error("syntax error", "ZPOPMIN", "set:zpop", "1", "h2")
 	})
 }

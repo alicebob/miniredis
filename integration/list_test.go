@@ -52,6 +52,7 @@ func TestLPushLpop(t *testing.T) {
 			c.Do("LPOP", "l", "0")
 			c.Do("LPOP", "l", "2")
 			c.Do("LPOP", "l", "2")
+			c.Error("out of range", "LPOP", "l", "-42")
 			c.Do("LPOP", "nosuch", "2")
 
 			c.Error("wrong number", "LPOP", "nosuch", "2", "foobar")
@@ -65,6 +66,8 @@ func TestLPushLpop(t *testing.T) {
 			c.Do("LPOP", "l", "9")
 			c.Do("LPOP", "l")
 			c.Do("LPOP", "l", "9")
+			c.Do("LPOP", "nosuch")
+			c.Do("LPOP", "nosuch", "9")
 		})
 	})
 }

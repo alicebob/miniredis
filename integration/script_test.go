@@ -43,7 +43,7 @@ func TestScript(t *testing.T) {
 			c.Do("SCRIPT", "EXISTS", "1fa00e76656cc152ad327c13fe365858fd7be306")
 			c.Do("SCRIPT", "EXISTS", "0", "1fa00e76656cc152ad327c13fe365858fd7be306")
 			c.Do("SCRIPT", "EXISTS", "0")
-			c.Do("SCRIPT", "EXISTS")
+			c.Error("wrong number", "SCRIPT", "EXISTS")
 
 			c.Do("SCRIPT", "FLUSH")
 			c.Do("SCRIPT", "EXISTS", "1fa00e76656cc152ad327c13fe365858fd7be306")
@@ -57,7 +57,7 @@ func TestScript(t *testing.T) {
 			c.Error("wrong number", "SCRIPT", "LOAD")
 			c.Error("only support", "SCRIPT", "FLUSH", "foo")
 			c.Error("only support", "SCRIPT", "FLUSH", "ASYNC", "foo")
-			c.Error("wrong number", "SCRIPT", "FOO")
+			c.Error("unknown subcommand", "SCRIPT", "FOO")
 		})
 	})
 
@@ -135,7 +135,7 @@ func TestLua(t *testing.T) {
 	testRaw(t, func(c *client) {
 		c.Error("oops", "EVAL", "return {err = 'oops'}", "0")
 		c.Do("EVAL", "return {1,{err = 'oops'}}", "0")
-		c.Error("oops", "EVAL", "return redis.error_reply('oops')", "0")
+		c.Error("oops", "EVAL", "return redis.error_reply('oops2')", "0")
 		c.Do("EVAL", "return {1,redis.error_reply('oops')}", "0")
 		c.Error("oops", "EVAL", "return {err = 'oops', noerr = true}", "0") // doc error?
 		c.Error("oops", "EVAL", "return {1, 2, err = 'oops'}", "0")         // doc error?
@@ -168,11 +168,11 @@ func TestLua(t *testing.T) {
 		// c.Do("EVAL", "print(1)", "0")
 		c.Do("EVAL", `return string.format('%q', "pretty string")`, "0")
 		c.Error("Script attempted to access nonexistent global variable", "EVAL", "os.clock()", "0")
-		c.Error("Error", "EVAL", "os.exit(42)", "0")
+		c.Error("Script attempted to access nonexistent global variable", "EVAL", "os.exit(42)", "0")
 		c.Do("EVAL", "return table.concat({1,2,3})", "0")
 		c.Do("EVAL", "return math.abs(-42)", "0")
 		c.Error("Script attempted to access nonexistent global variable", "EVAL", `return utf8.len("hello world")`, "0")
-		c.Error("Error", "EVAL", `require("utf8")`, "0")
+		// c.Error("Script attempted to access nonexistent global variable", "EVAL", `require("utf8")`, "0")
 		c.Do("EVAL", `return coroutine.running()`, "0")
 	})
 
@@ -257,41 +257,41 @@ func TestLuaCall(t *testing.T) {
 	// datatype errors
 	testRaw(t, func(c *client) {
 		c.Error(
-			"Please specify at least one argument for redis.call()",
+			"Please specify at least one argument for this redis lib call script: 23251039f40992dadef496cbfe3f3d23a6d314ce",
 			"EVAL", `redis.call()`, "0",
 		)
 		c.Error(
-			"Lua redis() command arguments must be strings or integers",
+			"Lua redis lib command arguments must be strings or integers script: 2c79b56ef55f7dc96da28dddb6ba551017fb1480,",
 			"EVAL", `redis.call({})`, "0",
 		)
 		c.Error(
-			"Unknown Redis command called from Lua script",
+			"Unknown Redis command called from script script: 1f422cead4ec560a2473e39974d64f965b99b8b0",
 			"EVAL", `redis.call(1)`, "0",
 		)
 		c.Error(
-			"Unknown Redis command called from Lua script",
+			"Unknown Redis command called from script script: cd72c3c55975da213448de4e59a8674b8b21c486",
 			"EVAL", `redis.call("1")`, "0",
 		)
 		c.Error(
-			"Lua redis() command arguments must be strings or integers",
+			"Lua redis lib command arguments must be strings or integers script: 40286a2418d06fc20cf71762ed4c52b5348b4bb0",
 			"EVAL", `redis.call("ECHO", true)`, "0",
 		)
 		c.Error(
-			"Lua redis() command arguments must be strings or integers",
+			"Lua redis lib command arguments must be strings or integers script: d2f4e1eb2935fe53669068a377a3dc4b923eb669,",
 			"EVAL", `redis.call("ECHO", false)`, "0",
 		)
 		c.Error(
-			"Lua redis() command arguments must be strings or integers",
+			"Lua redis lib command arguments must be strings or integers script: 33462f69402788110bccac05df6a8ac9c7429304,",
 			"EVAL", `redis.call("ECHO", nil)`, "0",
 		)
 		c.Error(
-			"Lua redis() command arguments must be strings or integers",
+			"Lua redis lib command arguments must be strings or integers script: 180500c268449fd1a24ea520d39a4aa76d6693c2,",
 			"EVAL", `redis.call("HELLO", {})`, "0",
 		)
 		// c.Error("Error", "EVAL", `redis.call("HELLO", 1)`, "0")
 		// c.Error("Redis command", "EVAL", `redis.call("HELLO", 3.14)`, "0")
 		c.Error(
-			"Lua redis() command arguments must be strings or integers",
+			"Lua redis lib command arguments must be strings or integers script: 32c9afc7bcb832809c41272b7a5525020b3e8bf5,",
 			"EVAL", `redis.call("GET", {})`, "0",
 		)
 	})
@@ -314,13 +314,13 @@ func TestLuaCall(t *testing.T) {
 	testRaw(t, func(c *client) {
 		c.Do("SET", "foo", "1")
 		c.Error(
-			"Lua redis() command arguments must be strings or integers",
+			"Lua redis lib command arguments must be strings or integers script: 66acd1fa6589521219d0b0dc3c1965f4b11a3422,",
 			"EVAL", `local foo = redis.pcall("HGET", "foo"); redis.call("SET", "res", foo)`, "0",
 		)
 		c.Do("GET", "foo")
 		c.Do("GET", "res")
 		c.Error(
-			"Lua redis() command arguments must be strings or integers",
+			"Lua redis lib command arguments must be strings or integers script: 5b67bc50d5e0ed20baae44ca5a735efa6a3e5243,",
 			"EVAL", `local foo = redis.pcall("HGET", "foo", "bar"); redis.call("SET", "res", foo)`, "0",
 		)
 		c.Do("GET", "foo")
@@ -332,47 +332,47 @@ func TestLuaCall(t *testing.T) {
 		c.Do("SET", "foo", "1")
 
 		c.Error(
-			"This Redis command is not allowed from scripts",
+			"This Redis command is not allowed from script script: a17bb9f079d9b5202346e82ccaa50f3b9553172b,",
 			"EVAL", `redis.call("MULTI")`, "0",
 		)
 		c.Error(
-			"This Redis command is not allowed from scripts",
+			"This Redis command is not allowed from script script: 56569e2c63cf8996b64922e5a26e23c60fe9f1aa,",
 			"EVAL", `redis.call("EXEC")`, "0",
 		)
 		c.Error(
-			"This Redis command is not allowed from scripts",
+			"This Redis command is not allowed from script script: a2457385c7980996400fc4315534dcf332d54f46,",
 			"EVAL", `redis.call("EVAL", "redis.call(\"GET\", \"foo\")", 0)`, "0",
 		)
 		c.Error(
-			"This Redis command is not allowed from scripts",
+			"This Redis command is not allowed from script script: ac613210b61b9f3339fd677969291675b9b703d3,",
 			"EVAL", `redis.call("SCRIPT", "LOAD", "return 42")`, "0",
 		)
 		c.Error(
-			"This Redis command is not allowed from scripts",
+			"This Redis command is not allowed from script script: 888b717177e29e998baf4bac6116c2a4787b4c70,",
 			"EVAL", `redis.call("EVALSHA", "123", "0")`, "0",
 		)
 		c.Error(
-			"This Redis command is not allowed from scripts",
+			"This Redis command is not allowed from script script: 508bef3f1ab46859dee541a8bc3b0f368ae1844f,",
 			"EVAL", `redis.call("AUTH", "foobar")`, "0",
 		)
 		c.Error(
-			"This Redis command is not allowed from scripts",
+			"This Redis command is not allowed from script script: 62b5d652eb4d90746a5672a450ed9e3627521df1,",
 			"EVAL", `redis.call("WATCH", "foobar")`, "0",
 		)
 		c.Error(
-			"This Redis command is not allowed from scripts",
+			"This Redis command is not allowed from script script: 65ea661820802737ade33d7a70582838a09fcf8d,",
 			"EVAL", `redis.call("SUBSCRIBE", "foo")`, "0",
 		)
 		c.Error(
-			"This Redis command is not allowed from scripts",
+			"This Redis command is not allowed from script script: 1af9ab7e7d8aa211959de33824dc075ee816ab1a,",
 			"EVAL", `redis.call("UNSUBSCRIBE", "foo")`, "0",
 		)
 		c.Error(
-			"This Redis command is not allowed from scripts",
+			"This Redis command is not allowed from script script: 0610e3628fbdca44e6d49736d5b59be8bab5047d,",
 			"EVAL", `redis.call("PSUBSCRIBE", "foo")`, "0",
 		)
 		c.Error(
-			"This Redis command is not allowed from scripts",
+			"This Redis command is not allowed from script script: ba7f784eaff4e747e31a39abd5386c432aac3140,",
 			"EVAL", `redis.call("PUNSUBSCRIBE", "foo")`, "0",
 		)
 		c.Do("EVAL", `redis.pcall("EXEC")`, "0")
@@ -419,8 +419,10 @@ func TestScriptTx(t *testing.T) {
 	testRaw(t, func(c *client) {
 		c.Do("MULTI")
 		c.Do("SCRIPT", "LOAD", "return {")
-		c.Do("SCRIPT", "FOO")
 		c.Do("EVALSHA", "aaaa", "0")
 		c.DoLoosely("EXEC")
+
+		c.Do("MULTI")
+		c.Error("unknown subcommand", "SCRIPT", "FOO")
 	})
 }

@@ -582,6 +582,8 @@ func TestStreamGroup(t *testing.T) {
 				proto.String("consumers"), proto.Int(0),
 				proto.String("pending"), proto.Int(0),
 				proto.String("last-delivered-id"), proto.String("0-0"),
+				proto.String("entries-read"), proto.Nil,
+				proto.String("lag"), proto.Int(0),
 			),
 		),
 	)
@@ -602,6 +604,8 @@ func TestStreamGroup(t *testing.T) {
 				proto.String("consumers"), proto.Int(1),
 				proto.String("pending"), proto.Int(0),
 				proto.String("last-delivered-id"), proto.String("0-0"),
+				proto.String("entries-read"), proto.Nil,
+				proto.String("lag"), proto.Int(0),
 			),
 		),
 	)
@@ -631,6 +635,8 @@ func TestStreamGroup(t *testing.T) {
 				proto.String("consumers"), proto.Int(0),
 				proto.String("pending"), proto.Int(0),
 				proto.String("last-delivered-id"), proto.String("0-0"),
+				proto.String("entries-read"), proto.Nil,
+				proto.String("lag"), proto.Int(0),
 			),
 		),
 	)
@@ -658,15 +664,15 @@ func TestStreamGroup(t *testing.T) {
 		)
 		mustDo(t, c,
 			"XGROUP", "HELP",
-			proto.Error("ERR 'XGROUP HELP' not supported"),
+			proto.Error("ERR 'XGROUP help' not supported"),
 		)
 		mustDo(t, c,
 			"XGROUP", "foo",
-			proto.Error("ERR Unknown subcommand or wrong number of arguments for 'FOO'. Try XGROUP HELP."),
+			proto.Error("ERR unknown subcommand 'foo'. Try XGROUP HELP."),
 		)
 		mustDo(t, c,
 			"XGROUP", "SETID",
-			proto.Error("ERR 'XGROUP SETID' not supported"),
+			proto.Error("ERR 'XGROUP setid' not supported"),
 		)
 	})
 }
@@ -701,6 +707,8 @@ func TestStreamReadGroup(t *testing.T) {
 				proto.String("consumers"), proto.Int(0),
 				proto.String("pending"), proto.Int(0),
 				proto.String("last-delivered-id"), proto.String("0-0"),
+				proto.String("entries-read"), proto.Nil,
+				proto.String("lag"), proto.Int(0),
 			),
 		),
 	)
@@ -734,6 +742,8 @@ func TestStreamReadGroup(t *testing.T) {
 				proto.String("consumers"), proto.Int(1),
 				proto.String("pending"), proto.Int(1),
 				proto.String("last-delivered-id"), proto.String("0-1"),
+				proto.String("entries-read"), proto.Nil,
+				proto.String("lag"), proto.Int(1),
 			),
 		),
 	)
@@ -863,6 +873,8 @@ func TestStreamAck(t *testing.T) {
 				proto.String("consumers"), proto.Int(1),
 				proto.String("pending"), proto.Int(0),
 				proto.String("last-delivered-id"), proto.String("0-1"),
+				proto.String("entries-read"), proto.Nil,
+				proto.String("lag"), proto.Int(1),
 			),
 		),
 	)
@@ -1117,6 +1129,7 @@ func TestStreamAutoClaim(t *testing.T) {
 		proto.Array(
 			proto.String("0-0"),
 			proto.Array(),
+			proto.Array(),
 		),
 	)
 	mustDo(t, c,
@@ -1146,6 +1159,7 @@ func TestStreamAutoClaim(t *testing.T) {
 		proto.Array(
 			proto.String("0-0"),
 			proto.Array(proto.Array(proto.String("0-1"), proto.Strings("name", "Mercury"))),
+			proto.Array(),
 		),
 	)
 	mustDo(t, c,
@@ -1187,6 +1201,7 @@ func TestStreamAutoClaim(t *testing.T) {
 		proto.Array(
 			proto.String("0-0"),
 			proto.Array(),
+			proto.Array(),
 		),
 	)
 
@@ -1197,7 +1212,10 @@ func TestStreamAutoClaim(t *testing.T) {
 		"XAUTOCLAIM", "planets", "processing", "alice", "15000", "0",
 		proto.Array(
 			proto.String("0-0"),
-			proto.Array(proto.Array(proto.String("0-1"), proto.Strings("name", "Mercury"))),
+			proto.Array(
+				proto.Array(proto.String("0-1"), proto.Strings("name", "Mercury")),
+			),
+			proto.Array(),
 		),
 	)
 
@@ -1208,7 +1226,10 @@ func TestStreamAutoClaim(t *testing.T) {
 		"XAUTOCLAIM", "planets", "processing", "alice", "15000", "0",
 		proto.Array(
 			proto.String("0-0"),
-			proto.Array(proto.Array(proto.String("0-2"), proto.Strings("name", "Venus"))),
+			proto.Array(
+				proto.Array(proto.String("0-2"), proto.Strings("name", "Venus")),
+			),
+			proto.Array(),
 		),
 	)
 
@@ -1222,6 +1243,7 @@ func TestStreamAutoClaim(t *testing.T) {
 				proto.Array(proto.String("0-1"), proto.Strings("name", "Mercury")),
 				proto.Array(proto.String("0-2"), proto.Strings("name", "Venus")),
 			),
+			proto.Array(),
 		),
 	)
 
@@ -1244,6 +1266,7 @@ func TestStreamAutoClaim(t *testing.T) {
 				proto.Array(proto.String("0-1"), proto.Strings("name", "Mercury")),
 				proto.Array(proto.String("0-2"), proto.Strings("name", "Venus")),
 			),
+			proto.Array(),
 		),
 	)
 	mustDo(t, c,
@@ -1268,6 +1291,7 @@ func TestStreamAutoClaim(t *testing.T) {
 			proto.Array(
 				proto.Array(proto.String("0-1"), proto.Strings("name", "Mercury")),
 			),
+			proto.Array(),
 		),
 	)
 	mustDo(t, c,
@@ -1316,6 +1340,8 @@ func TestStreamAutoClaim(t *testing.T) {
 				proto.String("consumers"), proto.Int(0),
 				proto.String("pending"), proto.Int(0),
 				proto.String("last-delivered-id"), proto.String("0-2"),
+				proto.String("entries-read"), proto.Nil,
+				proto.String("lag"), proto.Int(2),
 			),
 		),
 	)
@@ -1387,6 +1413,8 @@ func TestStreamClaim(t *testing.T) {
 				proto.String("consumers"), proto.Int(1),
 				proto.String("pending"), proto.Int(2),
 				proto.String("last-delivered-id"), proto.String("0-0"),
+				proto.String("entries-read"), proto.Nil,
+				proto.String("lag"), proto.Int(2),
 			),
 		),
 	)
@@ -1424,16 +1452,18 @@ func TestStreamClaim(t *testing.T) {
 	)
 	mustDo(t, c,
 		"XCLAIM", "planets", "processing", "bob", "0", "0-1",
-		proto.Array(proto.Nil),
+		proto.Array(),
 	)
 	mustDo(t, c,
 		"XINFO", "GROUPS", "planets",
 		proto.Array(
 			proto.Array(
 				proto.String("name"), proto.String("processing"),
-				proto.String("consumers"), proto.Int(2),
-				proto.String("pending"), proto.Int(2),
+				proto.String("consumers"), proto.Int(1),
+				proto.String("pending"), proto.Int(1),
 				proto.String("last-delivered-id"), proto.String("0-0"),
+				proto.String("entries-read"), proto.Nil,
+				proto.String("lag"), proto.Int(1),
 			),
 		),
 	)
@@ -1444,10 +1474,7 @@ func TestStreamClaim(t *testing.T) {
 				proto.String("name"), proto.String("alice"),
 				proto.String("pending"), proto.Int(1),
 			),
-			proto.Array(
-				proto.String("name"), proto.String("bob"),
-				proto.String("pending"), proto.Int(1),
-			),
+			// bob only has a deleted one
 		),
 	)
 	mustDo(t, c,
@@ -1563,7 +1590,7 @@ func TestStreamClaim(t *testing.T) {
 			),
 			proto.Array(
 				proto.String("name"), proto.String("bob"),
-				proto.String("pending"), proto.Int(1),
+				proto.String("pending"), proto.Int(0), // deleted
 			),
 		),
 	)
@@ -1576,7 +1603,7 @@ func TestStreamClaim(t *testing.T) {
 	newTimeString := strconv.FormatInt(newTime.UnixNano()/time.Millisecond.Nanoseconds(), 10)
 	mustDo(t, c,
 		"XCLAIM", "planets", "processing", "alice", "0", "0-1", "RETRYCOUNT", "1", "TIME", newTimeString, "JUSTID",
-		proto.Array(proto.String("0-1")),
+		proto.Array(),
 	)
 	mustDo(t, c,
 		"XPENDING", "planets", "processing", "-", "+", "999",
@@ -1610,7 +1637,7 @@ func TestStreamClaim(t *testing.T) {
 
 	mustDo(t, c,
 		"XACK", "planets", "processing", "0-1", "0-2", "0-3", "0-4",
-		proto.Int(4),
+		proto.Int(3),
 	)
 	mustDo(t, c,
 		"XPENDING", "planets", "processing", "-", "+", "999",

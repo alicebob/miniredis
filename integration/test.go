@@ -341,7 +341,7 @@ func (c *client) Do(cmd string, args ...string) {
 	// c.t.Logf("real:%q mini:%q", string(resReal), string(resMini))
 
 	if resReal != resMini {
-		c.t.Errorf("expected: %q got: %q", string(resReal), string(resMini))
+		c.t.Errorf("real: %q mini: %q", string(resReal), string(resMini))
 		return
 	}
 

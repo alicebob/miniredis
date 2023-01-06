@@ -153,7 +153,7 @@ func TestScript(t *testing.T) {
 
 	mustDo(t, c,
 		"SCRIPT", "EXISTS",
-		proto.Array(),
+		proto.Error(errWrongNumber("script|exists")),
 	)
 
 	mustDo(t, c,
@@ -163,12 +163,12 @@ func TestScript(t *testing.T) {
 
 	mustDo(t, c,
 		"SCRIPT", "LOAD",
-		proto.Error("ERR Unknown subcommand or wrong number of arguments for 'LOAD'. Try SCRIPT HELP."),
+		proto.Error("ERR unknown subcommand or wrong number of arguments for 'LOAD'. Try SCRIPT HELP."),
 	)
 
 	mustDo(t, c,
 		"SCRIPT", "LOAD", "return 42", "FOO",
-		proto.Error("ERR Unknown subcommand or wrong number of arguments for 'LOAD'. Try SCRIPT HELP."),
+		proto.Error("ERR unknown subcommand or wrong number of arguments for 'LOAD'. Try SCRIPT HELP."),
 	)
 
 	mustContain(t, c,
@@ -183,7 +183,7 @@ func TestScript(t *testing.T) {
 
 	mustDo(t, c,
 		"SCRIPT", "FOO",
-		proto.Error("ERR Unknown subcommand or wrong number of arguments for 'FOO'. Try SCRIPT HELP."),
+		proto.Error("ERR unknown subcommand 'FOO'. Try SCRIPT HELP."),
 	)
 }
 
@@ -438,7 +438,7 @@ func TestCmdEvalReply(t *testing.T) {
 
 	mustDo(t, c,
 		"EVAL", `return redis.error_reply("broken")`, "0",
-		proto.Error("broken"),
+		proto.Error("ERR broken"),
 	)
 
 	mustDo(t, c,
