@@ -89,6 +89,7 @@ func TestHll(t *testing.T) {
 const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
 func randomStr(length int) string {
+	rand.Seed(42)
 	b := make([]byte, length)
 	for i := range b {
 		b[i] = letters[rand.Intn(len(letters))]

@@ -328,10 +328,11 @@ func TestSpop(t *testing.T) {
 	})
 
 	t.Run("count argument", func(t *testing.T) {
+		s.Seed(42)
 		s.SetAdd("s", "aap", "noot", "mies", "vuur")
 		mustDo(t, c,
 			"SPOP", "s", "2",
-			proto.Strings("aap", "noot"),
+			proto.Strings("mies", "vuur"),
 		)
 		members, err := s.Members("s")
 		ok(t, err)
