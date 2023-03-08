@@ -32,6 +32,13 @@ func TestString(t *testing.T) {
 		c.Do("SET", "gone", "bar", "EXAT", "123")
 		c.Do("EXISTS", "gone")
 
+		// SET NX GET
+		c.Do("SET", "unique", "value1", "NX", "GET")
+		c.Do("SET", "unique", "value2", "NX", "GET")
+		c.Do("SET", "unique", "value3", "XX", "GET")
+		c.Do("SET", "unique", "value4", "XX", "GET")
+		c.Do("SET", "uniquer", "value5", "XX", "GET")
+
 		// Failure cases
 		c.Error("wrong number", "SET")
 		c.Error("wrong number", "SET", "foo")
