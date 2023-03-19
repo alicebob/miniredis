@@ -591,3 +591,74 @@ func TestLmove(t *testing.T) {
 		c.Do("LRANGE", "chk", "0", "-1")
 	})
 }
+
+func TestBlmove(t *testing.T) {
+	skip(t)
+	testRaw(t, func(c *client) {
+		c.Do("RPUSH", "src", "LR", "LL", "RR", "RL")
+		c.Do("BLMOVE", "src", "dst", "LEFT", "RIGHT", "0")
+		c.Do("LRANGE", "src", "0", "-1")
+		c.Do("LRANGE", "dst", "0", "-1")
+		c.Do("BLMOVE", "src", "dst", "RIGHT", "LEFT", "0")
+		c.Do("BLMOVE", "src", "dst", "LEFT", "LEFT", "0")
+		c.Do("BLMOVE", "src", "dst", "RIGHT", "RIGHT", "0") // now empty
+		c.Do("EXISTS", "src")
+		c.Do("LRANGE", "dst", "0", "-1")
+
+		// Cycle left to right
+		c.Do("RPUSH", "round", "aap", "noot", "mies")
+		c.Do("BLMOVE", "round", "round", "LEFT", "RIGHT", "0")
+		c.Do("LRANGE", "round", "0", "-1")
+		c.Do("BLMOVE", "round", "round", "LEFT", "RIGHT", "0")
+		c.Do("BLMOVE", "round", "round", "LEFT", "RIGHT", "0")
+		c.Do("BLMOVE", "round", "round", "LEFT", "RIGHT", "0")
+		c.Do("BLMOVE", "round", "round", "LEFT", "RIGHT", "0")
+		c.Do("LRANGE", "round", "0", "-1")
+		// Cycle right to left
+		c.Do("BLMOVE", "round", "round", "RIGHT", "LEFT", "0")
+		c.Do("LRANGE", "round", "0", "-1")
+		c.Do("BLMOVE", "round", "round", "RIGHT", "LEFT", "0")
+		c.Do("BLMOVE", "round", "round", "RIGHT", "LEFT", "0")
+		c.Do("BLMOVE", "round", "round", "RIGHT", "LEFT", "0")
+		c.Do("BLMOVE", "round", "round", "RIGHT", "LEFT", "0")
+		c.Do("LRANGE", "round", "0", "-1")
+		// Cycle same side
+		c.Do("BLMOVE", "round", "round", "LEFT", "LEFT", "0")
+		c.Do("LRANGE", "round", "0", "-1")
+		c.Do("BLMOVE", "round", "round", "RIGHT", "RIGHT", "0")
+		c.Do("LRANGE", "round", "0", "-1")
+
+		// failure cases
+		c.Do("RPUSH", "chk", "aap", "noot", "mies")
+		c.Error("wrong number", "LMOVE")
+		c.Error("wrong number", "LMOVE", "chk")
+		c.Error("wrong number", "LMOVE", "chk", "dst")
+		c.Error("wrong number", "LMOVE", "chk", "dst", "chk")
+		c.Error("wrong number", "LMOVE", "chk", "dst", "chk", "too", "many")
+		c.Do("SET", "str", "I am a string")
+		c.Error("wrong kind", "BLMOVE", "chk", "str", "LEFT", "LEFT", "0")
+		c.Error("wrong kind", "BLMOVE", "str", "chk", "LEFT", "LEFT", "0")
+		c.Do("LRANGE", "chk", "0", "-1")
+	})
+
+	wg := &sync.WaitGroup{}
+	wg.Add(1)
+	testMulti(t,
+		func(c *client) {
+			c.Do("BLMOVE", "from", "to", "RIGHT", "LEFT", "1")
+			c.Do("BLMOVE", "from", "to", "RIGHT", "LEFT", "1")
+			c.Do("BLMOVE", "from", "to", "RIGHT", "LEFT", "1")
+			c.Do("BLMOVE", "from", "to", "RIGHT", "LEFT", "1")
+			c.Do("BLMOVE", "from", "to", "RIGHT", "LEFT", "1") // will timeout
+			wg.Done()
+		},
+		func(c *client) {
+			c.Do("LPUSH", "from", "aap", "noot", "mies")
+			time.Sleep(20 * time.Millisecond)
+			c.Do("LPUSH", "from", "toon")
+			wg.Wait()
+			c.Do("LRANGE", "from", "0", "-1")
+			c.Do("LRANGE", "to", "0", "-1")
+		},
+	)
+}
