@@ -154,6 +154,49 @@ func TestStreamAdd(t *testing.T) {
 		equals(t, 10, len(nowz))
 	})
 
+	t.Run("XADD MINID", func(t *testing.T) {
+		now := time.Date(2023, 1, 1, 4, 4, 5, 4000000, time.UTC)
+		s.SetTime(now)
+
+		minID := strconv.FormatInt(now.Add(-time.Second).UnixNano()/time.Millisecond.Nanoseconds(), 10)
+		_, err := c.Do("XADD", "mid", "MINID", minID, "*", "one", "1")
+		ok(t, err)
+		_, err = c.Do("XADD", "mid", "MINID", minID, "*", "two", "2")
+		ok(t, err)
+		now = now.Add(time.Second)
+		s.SetTime(now)
+		_, err = c.Do("XADD", "mid", "MINID", minID, "*", "three", "3")
+		ok(t, err)
+		now = now.Add(time.Second)
+		s.SetTime(now)
+		// advance the minID, older entries will be dropped
+		minID = strconv.FormatInt(now.Add(-time.Second).UnixNano()/time.Millisecond.Nanoseconds(), 10)
+		_, err = c.Do("XADD", "mid", "MINID", minID, "*", "four", "4")
+		ok(t, err)
+
+		mustDo(t, c,
+			"XRANGE", "mid", "-", "+",
+			proto.Array(
+				proto.Array(proto.String("1672545846004-0"), proto.Strings("three", "3")),
+				proto.Array(proto.String("1672545847004-0"), proto.Strings("four", "4")),
+			),
+		)
+		// advance now & minID and test with ~
+		now = now.Add(time.Second)
+		s.SetTime(now)
+		minID = strconv.FormatInt(now.Add(-time.Second).UnixNano()/time.Millisecond.Nanoseconds(), 10)
+		_, err = c.Do("XADD", "mid", "MINID", "~", minID, "*", "five", "5")
+		ok(t, err)
+
+		mustDo(t, c,
+			"XRANGE", "mid", "-", "+",
+			proto.Array(
+				proto.Array(proto.String("1672545847004-0"), proto.Strings("four", "4")),
+				proto.Array(proto.String("1672545848004-0"), proto.Strings("five", "5")),
+			),
+		)
+	})
+
 	t.Run("error cases", func(t *testing.T) {
 		// Wrong type of key
 		mustOK(t, c,
