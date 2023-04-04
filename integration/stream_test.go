@@ -84,6 +84,28 @@ func TestStream(t *testing.T) {
 			c.Do("SET", "str", "I am a string")
 			c.Error("not an integer", "XADD", "str", "MAXLEN", "four", "*", "foo", "bar")
 		})
+
+		testRaw(t, func(c *client) {
+			c.Do("XADD", "planets", "MINID", "450", "450-0", "name", "Venus")
+			c.Do("XADD", "planets", "MINID", "450", "450-1", "name", "Venus")
+			c.Do("XADD", "planets", "MINID", "450", "456-1", "name", "Mercury")
+			c.Do("XADD", "planets", "MINID", "450", "456-2", "name", "Mercury")
+			c.Do("XADD", "planets", "MINID", "450", "456-3", "name", "Mercury")
+			c.Do("XADD", "planets", "MINID", "450", "456-4", "name", "Mercury")
+			c.Do("XADD", "planets", "MINID", "450", "456-5", "name", "Mercury")
+			c.Do("XADD", "planets", "MINID", "450", "456-6", "name", "Mercury")
+			c.Do("XADD", "planets", "MINID", "~", "450", "456-7", "name", "Mercury")
+			c.Do("XLEN", "planets")
+
+			c.Error("equal or smaller than the target", "XADD", "planets", "MINID", "450", "449-0", "name", "Earth")
+			c.Error("equal or smaller than the target", "XADD", "planets", "MINID", "450", "450", "name", "Earth")
+			c.Error("wrong number", "XADD", "planets", "MINID", "~")
+			c.Error("wrong number", "XADD", "planets", "MINID")
+			c.Error("wrong number", "XADD", "planets", "MINID", "100")
+
+			c.Do("SET", "str", "I am a string")
+			c.Error("key holding the wrong kind of value", "XADD", "str", "MINID", "400", "*", "foo", "bar")
+		})
 	})
 
 	t.Run("transactions", func(t *testing.T) {
