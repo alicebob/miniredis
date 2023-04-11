@@ -184,7 +184,6 @@ func TestLpushx(t *testing.T) {
 			proto.Error(msgWrongType),
 		)
 	}
-
 }
 
 func TestLpop(t *testing.T) {
@@ -1661,5 +1660,170 @@ func TestLmove(t *testing.T) {
 			"LMOVE", "src", "dst", "left", "invalid",
 			proto.Error("ERR syntax error"),
 		)
+	})
+}
+
+func TestBlmove(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := proto.Dial(s.Addr())
+	ok(t, err)
+	defer c.Close()
+
+	t.Run("Behaves just like LMOVE", func(t *testing.T) {
+		s.Push("src", "LR", "LL", "RR", "RL")
+		s.Push("dst", "m1", "m2", "m3")
+
+		// RIGHT LEFT
+		{
+			mustDo(t, c,
+				"BLMOVE", "src", "dst", "RIGHT", "LEFT", "0",
+				proto.String("RL"),
+			)
+			s.CheckList(t, "src", "LR", "LL", "RR")
+			s.CheckList(t, "dst", "RL", "m1", "m2", "m3")
+		}
+		// LEFT RIGHT
+		{
+			mustDo(t, c,
+				"BLMOVE", "src", "dst", "LEFT", "RIGHT", "0",
+				proto.String("LR"),
+			)
+			s.CheckList(t, "src", "LL", "RR")
+			s.CheckList(t, "dst", "RL", "m1", "m2", "m3", "LR")
+		}
+		// RIGHT RIGHT
+		{
+			mustDo(t, c,
+				"BLMOVE", "src", "dst", "RIGHT", "RIGHT", "0",
+				proto.String("RR"),
+			)
+			s.CheckList(t, "src", "LL")
+			s.CheckList(t, "dst", "RL", "m1", "m2", "m3", "LR", "RR")
+		}
+		// LEFT LEFT
+		{
+			mustDo(t, c,
+				"BLMOVE", "src", "dst", "LEFT", "LEFT", "0",
+				proto.String("LL"),
+			)
+			assert(t, !s.Exists("src"), "src exists")
+			s.CheckList(t, "dst", "LL", "RL", "m1", "m2", "m3", "LR", "RR")
+		}
+
+		// Non existing lists
+		{
+			s.Push("ll", "aap", "noot", "mies")
+
+			mustDo(t, c,
+				"BLMOVE", "ll", "nosuch", "RIGHT", "LEFT", "0",
+				proto.String("mies"),
+			)
+			assert(t, s.Exists("nosuch"), "nosuch exists")
+			s.CheckList(t, "ll", "aap", "noot")
+			s.CheckList(t, "nosuch", "mies")
+
+			mustNilList(t, c,
+				"BLMOVE", "nosuch2", "ll", "RIGHT", "LEFT", "0.001",
+			)
+		}
+
+		// Cycle
+		{
+			s.Push("cycle", "aap", "noot", "mies")
+
+			mustDo(t, c,
+				"BLMOVE", "cycle", "cycle", "RIGHT", "LEFT", "0",
+				proto.String("mies"),
+			)
+			s.CheckList(t, "cycle", "mies", "aap", "noot")
+
+			mustDo(t, c,
+				"BLMOVE", "cycle", "cycle", "LEFT", "RIGHT", "0",
+				proto.String("mies"),
+			)
+			s.CheckList(t, "cycle", "aap", "noot", "mies")
+		}
+	})
+
+	t.Run("Errors", func(t *testing.T) {
+		s.Push("src", "aap", "noot", "mies")
+		s.Push("dst", "aap", "noot", "mies")
+		mustDo(t, c,
+			"BLMOVE",
+			proto.Error(errWrongNumber("blmove")),
+		)
+		mustDo(t, c,
+			"BLMOVE", "l",
+			proto.Error(errWrongNumber("blmove")),
+		)
+		mustDo(t, c,
+			"BLMOVE", "l", "l",
+			proto.Error(errWrongNumber("blmove")),
+		)
+		mustDo(t, c,
+			"BLMOVE", "l", "l", "l",
+			proto.Error(errWrongNumber("blmove")),
+		)
+		mustDo(t, c,
+			"BLMOVE", "l", "l", "l", "l",
+			proto.Error(errWrongNumber("blmove")),
+		)
+		mustDo(t, c,
+			"BLMOVE", "too", "many", "many", "many", "many", "arguments",
+			proto.Error(errWrongNumber("blmove")),
+		)
+
+		s.Set("str", "string!")
+		mustDo(t, c,
+			"BLMOVE", "str", "src", "left", "right", "0",
+			proto.Error(msgWrongType),
+		)
+		mustDo(t, c,
+			"BLMOVE", "src", "str", "left", "right", "0",
+			proto.Error(msgWrongType),
+		)
+
+		mustDo(t, c,
+			"BLMOVE", "src", "dst", "no", "good", "0",
+			proto.Error("ERR syntax error"),
+		)
+		mustDo(t, c,
+			"BLMOVE", "src", "dst", "invalid", "right", "0",
+			proto.Error("ERR syntax error"),
+		)
+		mustDo(t, c,
+			"BLMOVE", "src", "dst", "left", "invalid", "0",
+			proto.Error("ERR syntax error"),
+		)
+	})
+
+	t.Run("Blocking: simple case", func(t *testing.T) {
+		c.Do("DEL", "src", "dst")
+
+		s.Push("src", "s1", "s2")
+		s.Push("dst", "d1")
+		got := goStrings(t, s, "BLMOVE", "src", "dst", "RIGHT", "LEFT", "0.1")
+		select {
+		case have := <-got:
+			equals(t, proto.String("s2"), have)
+			s.CheckList(t, "src", "s1")
+			s.CheckList(t, "dst", "s2", "d1")
+		case <-time.After(200 * time.Millisecond):
+			t.Error("BLMOVE took too long")
+		}
+	})
+
+	t.Run("Blocking: timeout", func(t *testing.T) {
+		c.Do("DEL", "src", "dst")
+
+		got := goStrings(t, s, "BLMOVE", "src", "dst", "RIGHT", "LEFT", "0.1")
+		select {
+		case have := <-got:
+			equals(t, proto.NilList, have)
+		case <-time.After(200 * time.Millisecond):
+			t.Error("BLMOVE took too long")
+		}
 	})
 }
