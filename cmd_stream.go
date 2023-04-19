@@ -944,7 +944,12 @@ parsing:
 					return
 				} else if id == "$" {
 					db := m.DB(getCtx(c).selectedDB)
-					opts.ids[i] = db.streamKeys[opts.streams[i]].lastID()
+					stream, ok := db.streamKeys[opts.streams[i]]
+					if ok {
+						opts.ids[i] = stream.lastID()
+					} else {
+						opts.ids[i] = "0-0"
+					}
 				}
 			}
 			args = nil

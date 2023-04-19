@@ -283,6 +283,19 @@ func TestStream(t *testing.T) {
 			wg.Wait()
 			c.Do("XREAD", "BLOCK", "1000", "STREAMS", "pl", "$")
 		})
+
+		// special '$' ID on non-existing stream
+		testRaw2(t, func(c, c2 *client) {
+			var wg sync.WaitGroup
+			wg.Add(1)
+			go func() {
+				time.Sleep(10 * time.Millisecond)
+				c2.Do("XADD", "pl", "60-1", "nosuch", "Mercury")
+				wg.Done()
+			}()
+			wg.Wait()
+			c.Do("XREAD", "BLOCK", "1000", "STREAMS", "nosuch", "$")
+		})
 	})
 }
 
