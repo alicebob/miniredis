@@ -536,6 +536,42 @@ func (c *client) Error(msg string, cmd string, args ...string) {
 	// }
 }
 
+// both must return exactly the same error
+func (c *client) ErrorTheSame(msg string, cmd string, args ...string) {
+	c.t.Helper()
+
+	resReal, errReal := c.real.Do(append([]string{cmd}, args...)...)
+	if errReal != nil {
+		c.t.Errorf("error from realredis: %s", errReal)
+		return
+	}
+	resMini, errMini := c.mini.Do(append([]string{cmd}, args...)...)
+	if errMini != nil {
+		c.t.Errorf("error from miniredis: %s", errMini)
+		return
+	}
+
+	mini, err := proto.ReadError(resMini)
+	if err != nil {
+		c.t.Logf("real:%q mini:%q", string(resReal), string(resMini))
+		c.t.Errorf("parse error miniredis: %s", err)
+		return
+	}
+	real, err := proto.ReadError(resReal)
+	if err != nil {
+		c.t.Errorf("parse error realredis: %s", err)
+		return
+	}
+
+	if real != msg {
+		c.t.Errorf("expected (real)\n%q\nto contain %q", real, msg)
+	}
+	if mini != msg {
+		c.t.Errorf("expected (mini)\n%q\nto contain %q\nreal:\n%s", mini, msg, real)
+	}
+	// real == msg && mini == msg => real == mini, so we don't want to check it explicity
+}
+
 // only receive a command, which can't be an error
 func (c *client) Receive() {
 	c.t.Helper()
