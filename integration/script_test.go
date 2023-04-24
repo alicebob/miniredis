@@ -152,6 +152,13 @@ func TestLua(t *testing.T) {
 		c.Error("type of arguments", "EVAL", "return redis.status_reply(1)", "0")
 		c.Error("type of arguments", "EVAL", "return redis.status_reply()", "0")
 		c.Error("type of arguments", "EVAL", "return redis.status_reply(redis.status_reply('foo'))", "0")
+		
+		c.ErrorTheSame("ERR ", "EVAL", "return redis.error_reply('')", "0")
+		c.ErrorTheSame("ERR ", "EVAL", "return redis.error_reply('-')", "0")
+		c.ErrorTheSame("ERR foo", "EVAL", "return redis.error_reply('foo')", "0")
+		c.ErrorTheSame("ERR foo", "EVAL", "return redis.error_reply('-foo')", "0")
+		c.ErrorTheSame("foo bar", "EVAL", "return redis.error_reply('foo bar')", "0")
+		c.ErrorTheSame("foo bar", "EVAL", "return redis.error_reply('-foo bar')", "0")
 	})
 
 	// state inside lua
