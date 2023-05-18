@@ -891,3 +891,24 @@ func TestZrandmember(t *testing.T) {
 		c.Error("not an integer", "ZRANDMEMBER", "q", "two")
 	})
 }
+
+func TestZMScore(t *testing.T) {
+	testRaw(t, func(c *client) {
+		c.Do("ZADD", "q", "1.0", "key1")
+		c.Do("ZADD", "q", "2.0", "key2")
+		c.Do("ZADD", "q", "3.0", "key3")
+		c.Do("ZADD", "q", "4.0", "key4")
+		c.Do("ZADD", "q", "5.0", "key5")
+
+		c.Do("ZMSCORE", "q", "key1")
+		c.Do("ZMSCORE", "q", "key1 key2 key3")
+		c.Do("ZMSCORE", "q", "nosuch")
+		c.Do("ZMSCORE", "nosuch", "key1")
+		c.Do("ZMSCORE", "nosuch", "key1", "key2")
+
+		// failure cases
+		c.Error("wrong number", "ZMSCORE", "q")
+		c.Do("SET", "str", "I am a string")
+		c.Error("wrong kind", "ZMSCORE", "str", "key1")
+	})
+}

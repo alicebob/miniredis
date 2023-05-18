@@ -1109,6 +1109,79 @@ func TestSortedSetScore(t *testing.T) {
 	})
 }
 
+// Test ZMSCORE
+func TestSortedSetMultiScore(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := proto.Dial(s.Addr())
+	ok(t, err)
+	defer c.Close()
+
+	s.ZAdd("z", 1, "one")
+	s.ZAdd("z", 2, "two")
+	s.ZAdd("z", 2, "zwei")
+
+	// One member only
+	mustDo(t, c,
+		"ZMSCORE", "z", "two",
+		proto.Strings("2"),
+	)
+
+	// Two members
+	mustDo(t, c,
+		"ZMSCORE", "z", "one", "two",
+		proto.Strings("1", "2"),
+	)
+
+	// Three members
+	mustDo(t, c,
+		"ZMSCORE", "z", "one", "two", "zwei",
+		proto.Strings("1", "2", "2"),
+	)
+
+	// No such member
+	mustDo(t, c, "ZMSCORE", "z", "nosuch",
+		proto.Array(proto.Nil),
+	)
+
+	// One member exists, one doesn't
+	mustDo(t, c, "ZMSCORE", "z", "nosuch", "two",
+		proto.Array(proto.Nil, proto.String("2")),
+	)
+
+	// No such key
+	mustNil(t, c,
+		"ZSCORE", "nosuch", "nosuch",
+	)
+
+	// Direct
+	{
+		s.ZAdd("z2", 1, "one")
+		s.ZAdd("z2", 2, "two")
+		scores, err := s.ZMScore("z2", "one", "two")
+		ok(t, err)
+		equals(t, []float64{1.0, 2.0}, scores)
+	}
+
+	t.Run("errors", func(t *testing.T) {
+		mustDo(t, c,
+			"ZMSCORE",
+			proto.Error(errWrongNumber("zmscore")),
+		)
+		mustDo(t, c,
+			"ZMSCORE", "key",
+			proto.Error(errWrongNumber("zmscore")),
+		)
+
+		s.Set("str", "value")
+		mustDo(t, c,
+			"ZMSCORE", "str", "aap",
+			proto.Error(msgWrongType),
+		)
+	})
+}
+
 // Test ZRANGEBYLEX, ZREVRANGEBYLEX, ZLEXCOUNT
 func TestSortedSetRangeByLex(t *testing.T) {
 	s, err := Run()
