@@ -1077,7 +1077,7 @@ func (m *Miniredis) cmdZMscore(c *server.Peer, cmd string, args []string) {
 			return
 		}
 
-		c.WriteLen(len(args) - 1)
+		c.WriteLen(len(members))
 		for _, member := range members {
 			if !db.ssetExists(key, member) {
 				c.WriteNull()
