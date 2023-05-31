@@ -5,7 +5,7 @@
 
 - fix lua error_reply (thanks @pkierski)
 - fix use of blocking functions in lua
-- support for ZSCORE (thanks @lsgndln)
+- support for ZMSCORE (thanks @lsgndln)
 - lua cache (thanks @tonyhb)
 
 
