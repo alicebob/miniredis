@@ -163,17 +163,18 @@ outer:
 
 		res := 0
 		for member, score := range elems {
-			if opts.nx && db.ssetExists(opts.key, member) {
+			exists := db.ssetExists(opts.key, member)
+			if opts.nx && exists {
 				continue
 			}
-			if opts.xx && !db.ssetExists(opts.key, member) {
+			if opts.xx && !exists {
 				continue
 			}
 			old := db.ssetScore(opts.key, member)
-			if opts.gt && score <= old {
+			if opts.gt && exists && score <= old {
 				continue
 			}
-			if opts.lt && score >= old {
+			if opts.lt && exists && score >= old {
 				continue
 			}
 			if db.ssetAdd(opts.key, score, member) {

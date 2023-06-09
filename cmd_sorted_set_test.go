@@ -236,6 +236,13 @@ func TestSortedSetAdd(t *testing.T) {
 		)
 	}
 
+	t.Run("LT and GT options", func(t *testing.T) {
+		must1(t, c, "ZADD", "zlt", "LT", "1", "one")
+		must0(t, c, "ZADD", "zlt", "LT", "2", "one")
+		must1(t, c, "ZADD", "zgt", "GT", "-1", "one")
+		must0(t, c, "ZADD", "zgt", "GT", "-2", "one")
+	})
+
 	t.Run("errors", func(t *testing.T) {
 		// Wrong type of key
 		mustOK(t, c, "SET", "str", "value")
