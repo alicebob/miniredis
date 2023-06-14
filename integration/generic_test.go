@@ -164,6 +164,8 @@ func TestScan(t *testing.T) {
 		c.Do("SCAN", "0", "TYPE", "set", "MATCH", "setkey")
 		c.Do("SCAN", "0", "TYPE", "set", "COUNT", "100")
 		c.Do("SCAN", "0", "TYPE", "set", "MATCH", "setkey", "COUNT", "100")
+		c.DoLoosely("SCAN", "0", "COUNT", "1") // cursor differs
+		c.DoLoosely("SCAN", "0", "COUNT", "2") // cursor differs
 
 		// Can't really test multiple keys.
 		// c.Do("SET", "key2", "value2")
@@ -173,6 +175,7 @@ func TestScan(t *testing.T) {
 		c.Error("wrong number", "SCAN")
 		c.Error("invalid cursor", "SCAN", "noint")
 		c.Error("not an integer", "SCAN", "0", "COUNT", "noint")
+		c.Error("syntax error", "SCAN", "0", "COUNT", "0")
 		c.Error("syntax error", "SCAN", "0", "COUNT")
 		c.Error("syntax error", "SCAN", "0", "MATCH")
 		c.Error("syntax error", "SCAN", "0", "garbage")

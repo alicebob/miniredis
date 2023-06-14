@@ -655,13 +655,47 @@ func TestScan(t *testing.T) {
 		)
 	})
 
-	t.Run("count (ignored)", func(t *testing.T) {
+	t.Run("count", func(t *testing.T) {
 		mustDo(t, c,
 			"SCAN", "0", "COUNT", "200",
 			proto.Array(
 				proto.String("0"),
 				proto.Array(
 					proto.String("key"),
+				),
+			),
+		)
+
+		s.Set("v1", "value")
+		s.Set("v2", "value")
+		s.Set("v3", "value")
+		s.Set("v4", "value")
+		s.Set("v5", "value")
+		s.Set("v6", "value")
+		s.Set("v7", "value")
+		s.Set("v8", "value")
+		s.Set("v9", "value")
+
+		mustDo(t, c,
+			"SCAN", "0", "COUNT", "3",
+			proto.Array(
+				proto.String("3"),
+				proto.Array(
+					proto.String("key"),
+					proto.String("v1"),
+					proto.String("v2"),
+				),
+			),
+		)
+
+		mustDo(t, c,
+			"SCAN", "3", "COUNT", "3",
+			proto.Array(
+				proto.String("6"),
+				proto.Array(
+					proto.String("v3"),
+					proto.String("v4"),
+					proto.String("v5"),
 				),
 			),
 		)
@@ -724,6 +758,14 @@ func TestScan(t *testing.T) {
 		)
 		mustDo(t, c,
 			"SCAN", "1", "COUNT", "noint",
+			proto.Error("ERR value is not an integer or out of range"),
+		)
+		mustDo(t, c,
+			"SCAN", "0", "COUNT", "0",
+			proto.Error("ERR syntax error"),
+		)
+		mustDo(t, c,
+			"SCAN", "0", "COUNT", "-1",
 			proto.Error("ERR value is not an integer or out of range"),
 		)
 		mustDo(t, c,
