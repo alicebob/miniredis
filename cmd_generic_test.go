@@ -824,6 +824,14 @@ func TestCopy(t *testing.T) {
 		s.CheckGet(t, "existingkey", "value")
 	})
 
+	t.Run("list", func(t *testing.T) {
+		must1(t, c, "LPUSH", "l1", "original")
+		must1(t, c, "COPY", "l1", "l2")
+		mustOK(t, c, "LSET", "l1", "0", "modified")
+		s.CheckList(t, "l1", "modified")
+		s.CheckList(t, "l2", "original")
+	})
+
 	t.Run("destination db", func(t *testing.T) {
 		s.Set("akey1", "value")
 		must1(t, c, "COPY", "akey1", "akey2", "DB", "2")

@@ -386,6 +386,15 @@ func TestCopy(t *testing.T) {
 			c.Do("HGET", "temp2", "oslo")
 		})
 
+		t.Run("list set", func(t *testing.T) {
+			c.Do("LPUSH", "list", "aap", "noot", "mies")
+			c.Do("COPY", "list", "list2")
+			c.Do("TYPE", "list2")
+			c.Do("LSET", "list", "1", "vuur")
+			c.Do("LRANGE", "list", "0", "-1")
+			c.Do("LRANGE", "list2", "0", "-1")
+		})
+
 		t.Run("list", func(t *testing.T) {
 			c.Do("LPUSH", "list", "aap", "noot", "mies")
 			c.Do("COPY", "list", "list2")
