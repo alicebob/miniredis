@@ -870,3 +870,10 @@ func TestSscan(t *testing.T) {
 		),
 	)
 }
+
+func TestDelElem(t *testing.T) {
+	equals(t, []string{"b", "c", "d"}, delElem([]string{"a", "b", "c", "d"}, 0))
+	equals(t, []string{"a", "c", "d"}, delElem([]string{"a", "b", "c", "d"}, 1))
+	equals(t, []string{"a", "b", "d"}, delElem([]string{"a", "b", "c", "d"}, 2))
+	equals(t, []string{"a", "b", "c"}, delElem([]string{"a", "b", "c", "d"}, 3))
+}
