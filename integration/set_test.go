@@ -16,9 +16,11 @@ func TestSet(t *testing.T) {
 		c.DoSorted("SMEMBERS", "nosuch")
 		c.Do("SISMEMBER", "s", "aap")
 		c.Do("SISMEMBER", "s", "nosuch")
+		c.Do("SMISMEMBER", "q", "aap", "noot", "nosuch")
 
 		c.Do("SCARD", "nosuch")
 		c.Do("SISMEMBER", "nosuch", "nosuch")
+		c.Do("SMISMEMBER", "nosuch", "nosuch", "nosuch")
 
 		// failure cases
 		c.Error("wrong number", "SADD")
@@ -30,11 +32,14 @@ func TestSet(t *testing.T) {
 		c.Error("wrong number", "SISMEMBER")
 		c.Error("wrong number", "SISMEMBER", "few")
 		c.Error("wrong number", "SISMEMBER", "too", "many", "arguments")
+		c.Error("wrong number", "SMISMEMBER")
+		c.Error("wrong number", "SMISMEMBER", "few")
 		// Wrong type
 		c.Do("SET", "str", "I am a string")
 		c.Error("wrong kind", "SADD", "str", "noot", "mies")
 		c.Error("wrong kind", "SMEMBERS", "str")
 		c.Error("wrong kind", "SISMEMBER", "str", "noot")
+		c.Error("wrong kind", "SMISMEMBER", "str", "noot")
 		c.Error("wrong kind", "SCARD", "str")
 	})
 
@@ -44,6 +49,7 @@ func TestSet(t *testing.T) {
 		c.Do("SMEMBERS", "q")
 		c.Do("SISMEMBER", "q", "aap")
 		c.Do("SISMEMBER", "q", "noot")
+		c.Do("SMISMEMBER", "q", "aap", "noot", "nosuch")
 	})
 }
 

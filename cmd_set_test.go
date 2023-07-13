@@ -148,6 +148,36 @@ func TestSismember(t *testing.T) {
 	})
 }
 
+// Test SMISMEMBER
+func TestSmismember(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := proto.Dial(s.Addr())
+	ok(t, err)
+	defer c.Close()
+
+	s.SetAdd("s", "aap", "noot", "mies")
+
+	mustDo(t, c, "SMISMEMBER", "s", "aap", "nosuch", "mies", proto.Ints(1, 0, 1))
+
+	t.Run("errors", func(t *testing.T) {
+		mustOK(t, c, "SET", "str", "value")
+		mustDo(t, c,
+			"SMISMEMBER", "str", "foo",
+			proto.Error(msgWrongType),
+		)
+		mustDo(t, c,
+			"SMISMEMBER",
+			proto.Error(errWrongNumber("smismember")),
+		)
+		mustDo(t, c,
+			"SMISMEMBER", "set",
+			proto.Error(errWrongNumber("smismember")),
+		)
+	})
+}
+
 // Test SREM
 func TestSrem(t *testing.T) {
 	s, err := Run()
