@@ -16,7 +16,7 @@ func TestSet(t *testing.T) {
 		c.DoSorted("SMEMBERS", "nosuch")
 		c.Do("SISMEMBER", "s", "aap")
 		c.Do("SISMEMBER", "s", "nosuch")
-		c.Do("SMISMEMBER", "q", "aap", "noot", "nosuch")
+		c.Do("SMISMEMBER", "s", "aap", "noot", "nosuch")
 
 		c.Do("SCARD", "nosuch")
 		c.Do("SISMEMBER", "nosuch", "nosuch")

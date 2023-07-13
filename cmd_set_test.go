@@ -160,6 +160,7 @@ func TestSmismember(t *testing.T) {
 	s.SetAdd("s", "aap", "noot", "mies")
 
 	mustDo(t, c, "SMISMEMBER", "s", "aap", "nosuch", "mies", proto.Ints(1, 0, 1))
+	mustDo(t, c, "SMISMEMBER", "q", "aap", "nosuch", "mies", proto.Ints(0, 0, 0))
 
 	t.Run("errors", func(t *testing.T) {
 		mustOK(t, c, "SET", "str", "value")

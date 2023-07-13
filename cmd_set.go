@@ -314,7 +314,10 @@ func (m *Miniredis) cmdSmismember(c *server.Peer, cmd string, args []string) {
 		db := m.db(ctx.selectedDB)
 
 		if !db.exists(key) {
-			c.WriteInt(0)
+			c.WriteLen(len(values))
+			for range values {
+				c.WriteInt(0)
+			}
 			return
 		}
 
