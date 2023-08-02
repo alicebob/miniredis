@@ -1,6 +1,11 @@
 ## Changelog
 
 
+### v2.30.5
+
+- support SMISMEMBER (thanks @sandyharvie)
+
+
 ### v2.30.4
 
 - fix ZADD LT/LG (thanks @sejin-P)

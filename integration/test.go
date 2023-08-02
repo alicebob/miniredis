@@ -569,7 +569,7 @@ func (c *client) ErrorTheSame(msg string, cmd string, args ...string) {
 	if mini != msg {
 		c.t.Errorf("expected (mini)\n%q\nto contain %q\nreal:\n%s", mini, msg, real)
 	}
-	// real == msg && mini == msg => real == mini, so we don't want to check it explicity
+	// real == msg && mini == msg => real == mini, so we don't want to check it explicitly
 }
 
 // only receive a command, which can't be an error
