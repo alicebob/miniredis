@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/DmitriyVTitov/size"
 	"github.com/alicebob/miniredis/v2/server"
+	"github.com/alicebob/miniredis/v2/size"
 )
 
 func commandsServer(m *Miniredis) {
@@ -38,13 +38,53 @@ func (m *Miniredis) cmdMemory(c *server.Peer, cmd string, args []string) {
 		db := m.db(ctx.selectedDB)
 
 		switch args[0] {
+
 		case "USAGE":
-			value, ok := db.stringKeys[args[1]]
-			if !ok {
-				c.WriteError(ErrKeyNotFound.Error())
-				return
+			var value interface{}
+			var ok bool
+
+			switch db.keys[args[1]] {
+			case "string":
+				if value, ok = db.stringKeys[args[1]]; ok {
+					c.WriteInt(size.Of(value))
+					return
+				}
+			case "set":
+				if value, ok = db.setKeys[args[1]]; ok {
+					c.WriteInt(size.Of(value))
+					return
+				}
+			case "hash":
+				if value, ok = db.hashKeys[args[1]]; ok {
+					c.WriteInt(size.Of(value))
+					return
+				}
+			case "list":
+				if value, ok = db.listKeys[args[1]]; ok {
+					c.WriteInt(size.Of(value))
+					return
+				}
+
+			case "hll":
+				if value, ok = db.hllKeys[args[1]]; ok {
+					c.WriteInt(size.Of(value))
+					return
+				}
+
+			case "zset":
+				if value, ok = db.sortedsetKeys[args[1]]; ok {
+					c.WriteInt(size.Of(value))
+					return
+				}
+
+			case "stream":
+				if value, ok = db.streamKeys[args[1]]; ok {
+					c.WriteInt(size.Of(value))
+					return
+				}
 			}
-			c.WriteInt(size.Of(value))
+
+			c.WriteError(ErrKeyNotFound.Error())
 			break
 		default:
 			c.WriteError(errWrongNumber(cmd))
