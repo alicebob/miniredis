@@ -144,13 +144,14 @@ Implemented commands:
    - SINTERSTORE
    - SISMEMBER
    - SMEMBERS
+   - SMISMEMBER
    - SMOVE
    - SPOP -- see m.Seed(...)
    - SRANDMEMBER -- see m.Seed(...)
    - SREM
+   - SSCAN
    - SUNION
    - SUNIONSTORE
-   - SSCAN
  - Sorted Set keys (complete)
    - ZADD
    - ZCARD

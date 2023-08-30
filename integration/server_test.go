@@ -23,6 +23,8 @@ func TestServer(t *testing.T) {
 		c.Do("DBSIZE")
 		c.Do("FLUSHALL")
 		c.Do("DBSIZE")
+		c.Do("MEMORY", "USAGE", "foo")
+		c.Do("MEMORY", "USAGE", "planets")
 
 		c.Do("FLUSHDB", "aSyNc")
 		c.Do("FLUSHALL", "AsYnC")

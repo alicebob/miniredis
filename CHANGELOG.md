@@ -1,6 +1,18 @@
 ## Changelog
 
 
+### v2.30.5
+
+- support SMISMEMBER (thanks @sandyharvie)
+
+
+### v2.30.4
+
+- fix ZADD LT/LG (thanks @sejin-P)
+- fix COPY (thanks @jerargus)
+- quicker SPOP
+
+
 ### v2.30.3
 
 - fix lua error_reply (thanks @pkierski)
