@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/DmitriyVTitov/size"
 	"github.com/alicebob/miniredis/v2/server"
 )
 
@@ -16,6 +17,40 @@ func commandsServer(m *Miniredis) {
 	m.srv.Register("FLUSHDB", m.cmdFlushdb)
 	m.srv.Register("INFO", m.cmdInfo)
 	m.srv.Register("TIME", m.cmdTime)
+	m.srv.Register("MEMORY", m.cmdMemory)
+}
+
+// MEMORY
+func (m *Miniredis) cmdMemory(c *server.Peer, cmd string, args []string) {
+	if len(args) == 0 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
+	}
+	if !m.handleAuth(c) {
+		return
+	}
+	if m.checkPubsub(c, cmd) {
+		return
+	}
+
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
+		db := m.db(ctx.selectedDB)
+
+		switch args[0] {
+		case "USAGE":
+			value, ok := db.stringKeys[args[1]]
+			if !ok {
+				c.WriteError(ErrKeyNotFound.Error())
+				return
+			}
+			c.WriteInt(size.Of(value))
+			break
+		default:
+			c.WriteError(errWrongNumber(cmd))
+		}
+
+	})
 }
 
 // DBSIZE

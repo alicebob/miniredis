@@ -127,3 +127,20 @@ func TestCmdServerTime(t *testing.T) {
 		proto.Error(errWrongNumber("time")),
 	)
 }
+
+// Test Memory Usage
+func TestCmdServerMemoryUsage(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := proto.Dial(s.Addr())
+	ok(t, err)
+	defer c.Close()
+
+	c.Do("SET", "test:1", "something")
+
+	mustDo(t, c,
+		"MEMORY", "USAGE", "test:1",
+		proto.Int(25),
+	)
+}
