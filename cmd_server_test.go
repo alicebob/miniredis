@@ -137,10 +137,11 @@ func TestCmdServerMemoryUsage(t *testing.T) {
 	ok(t, err)
 	defer c.Close()
 
-	c.Do("SET", "test:1", "something")
+	c.Do("SET", "foo", "bar")
 
+	// Intended only for having metrics not to be 1:1 Redis
 	mustDo(t, c,
-		"MEMORY", "USAGE", "test:1",
-		proto.Int(25),
+		"MEMORY", "USAGE", "foo",
+		proto.Int(19), // normally, with Redis it should be 56 but we don't have the same overhead as Redis
 	)
 }
