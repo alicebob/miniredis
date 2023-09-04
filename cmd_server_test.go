@@ -127,3 +127,30 @@ func TestCmdServerTime(t *testing.T) {
 		proto.Error(errWrongNumber("time")),
 	)
 }
+
+// Test Memory Usage
+func TestCmdServerMemoryUsage(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := proto.Dial(s.Addr())
+	ok(t, err)
+	defer c.Close()
+
+	c.Do("SET", "foo", "bar")
+	mustDo(t, c,
+		"PFADD", "h", "aap", "noot", "mies",
+		proto.Int(1),
+	)
+
+	// Intended only for having metrics not to be 1:1 Redis
+	mustDo(t, c,
+		"MEMORY", "USAGE", "foo",
+		proto.Int(19), // normally, with Redis it should be 56 but we don't have the same overhead as Redis
+	)
+	// Intended only for having metrics not to be 1:1 Redis
+	mustDo(t, c,
+		"MEMORY", "USAGE", "h",
+		proto.Int(124), // normally, with Redis it should be 56 but we don't have the same overhead as Redis
+	)
+}
