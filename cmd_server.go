@@ -3,6 +3,7 @@
 package miniredis
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -37,59 +38,48 @@ func (m *Miniredis) cmdMemory(c *server.Peer, cmd string, args []string) {
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
-		switch args[0] {
-
+		cmd, args := args[0], args[1:]
+		switch cmd {
 		case "USAGE":
-			var value interface{}
-			var ok bool
-
-			switch db.keys[args[1]] {
-			case "string":
-				if value, ok = db.stringKeys[args[1]]; ok {
-					c.WriteInt(size.Of(value))
-					return
-				}
-			case "set":
-				if value, ok = db.setKeys[args[1]]; ok {
-					c.WriteInt(size.Of(value))
-					return
-				}
-			case "hash":
-				if value, ok = db.hashKeys[args[1]]; ok {
-					c.WriteInt(size.Of(value))
-					return
-				}
-			case "list":
-				if value, ok = db.listKeys[args[1]]; ok {
-					c.WriteInt(size.Of(value))
-					return
-				}
-
-			case "hll":
-				if value, ok = db.hllKeys[args[1]]; ok {
-					c.WriteInt(size.Of(value))
-					return
-				}
-
-			case "zset":
-				if value, ok = db.sortedsetKeys[args[1]]; ok {
-					c.WriteInt(size.Of(value))
-					return
-				}
-
-			case "stream":
-				if value, ok = db.streamKeys[args[1]]; ok {
-					c.WriteInt(size.Of(value))
-					return
-				}
+			if len(args) < 1 {
+				setDirty(c)
+				c.WriteError(errWrongNumber("memory|usage"))
+				return
+			}
+			if len(args) > 1 {
+				setDirty(c)
+				c.WriteError(msgSyntaxError)
+				return
 			}
 
-			c.WriteError(ErrKeyNotFound.Error())
-			break
+			var (
+				value interface{}
+				ok    bool
+			)
+			switch db.keys[args[0]] {
+			case "string":
+				value, ok = db.stringKeys[args[0]]
+			case "set":
+				value, ok = db.setKeys[args[0]]
+			case "hash":
+				value, ok = db.hashKeys[args[0]]
+			case "list":
+				value, ok = db.listKeys[args[0]]
+			case "hll":
+				value, ok = db.hllKeys[args[0]]
+			case "zset":
+				value, ok = db.sortedsetKeys[args[0]]
+			case "stream":
+				value, ok = db.streamKeys[args[0]]
+			}
+			if !ok {
+				c.WriteNull()
+				return
+			}
+			c.WriteInt(size.Of(value))
 		default:
-			c.WriteError(errWrongNumber(cmd))
+			c.WriteError(fmt.Sprintf(msgMemorySubcommand, strings.ToUpper(cmd)))
 		}
-
 	})
 }
 

@@ -49,6 +49,11 @@ func TestServer(t *testing.T) {
 		c.DoLoosely("MEMORY", "USAGE", "ahll")
 		c.Do("XADD", "astream", "0-1", "name", "Mercury")
 		c.DoLoosely("MEMORY", "USAGE", "astream")
+		c.DoLoosely("MEMORY", "USAGE", "nosuch")
+
+		c.Error("Try MEMORY HELP", "MEMORY", "FOO")
+		c.Error("wrong number of arguments", "MEMORY", "USAGE")
+		c.Error("syntax error", "MEMORY", "USAGE", "too", "many")
 	})
 }
 
