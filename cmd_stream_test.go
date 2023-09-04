@@ -658,6 +658,8 @@ func TestStreamGroup(t *testing.T) {
 			proto.Array(
 				proto.String("name"), proto.String("alice"),
 				proto.String("pending"), proto.Int(0),
+				proto.String("idle"), proto.Int(-1),
+				proto.String("inactive"), proto.Int(-1),
 			),
 		),
 	)
@@ -797,6 +799,8 @@ func TestStreamReadGroup(t *testing.T) {
 			proto.Array(
 				proto.String("name"), proto.String("alice"),
 				proto.String("pending"), proto.Int(1),
+				proto.String("idle"), proto.Int(-1),
+				proto.String("inactive"), proto.Int(-1),
 			),
 		),
 	)
@@ -928,6 +932,8 @@ func TestStreamAck(t *testing.T) {
 			proto.Array(
 				proto.String("name"), proto.String("alice"),
 				proto.String("pending"), proto.Int(0),
+				proto.String("idle"), proto.Int(-1),
+				proto.String("inactive"), proto.Int(-1),
 			),
 		),
 	)
@@ -1211,6 +1217,8 @@ func TestStreamAutoClaim(t *testing.T) {
 			proto.Array(
 				proto.String("name"), proto.String("alice"),
 				proto.String("pending"), proto.Int(1),
+				proto.String("idle"), proto.Int(-1),
+				proto.String("inactive"), proto.Int(-1),
 			),
 		),
 	)
@@ -1233,6 +1241,8 @@ func TestStreamAutoClaim(t *testing.T) {
 			proto.Array(
 				proto.String("name"), proto.String("alice"),
 				proto.String("pending"), proto.Int(2),
+				proto.String("idle"), proto.Int(-1),
+				proto.String("inactive"), proto.Int(-1),
 			),
 		),
 	)
@@ -1296,6 +1306,8 @@ func TestStreamAutoClaim(t *testing.T) {
 			proto.Array(
 				proto.String("name"), proto.String("alice"),
 				proto.String("pending"), proto.Int(2),
+				proto.String("idle"), proto.Int(-1),
+				proto.String("inactive"), proto.Int(-1),
 			),
 		),
 	)
@@ -1318,10 +1330,14 @@ func TestStreamAutoClaim(t *testing.T) {
 			proto.Array(
 				proto.String("name"), proto.String("alice"),
 				proto.String("pending"), proto.Int(0),
+				proto.String("idle"), proto.Int(-1),
+				proto.String("inactive"), proto.Int(-1),
 			),
 			proto.Array(
 				proto.String("name"), proto.String("bob"),
 				proto.String("pending"), proto.Int(2),
+				proto.String("idle"), proto.Int(-1),
+				proto.String("inactive"), proto.Int(-1),
 			),
 		),
 	)
@@ -1343,10 +1359,14 @@ func TestStreamAutoClaim(t *testing.T) {
 			proto.Array(
 				proto.String("name"), proto.String("alice"),
 				proto.String("pending"), proto.Int(1),
+				proto.String("idle"), proto.Int(-1),
+				proto.String("inactive"), proto.Int(-1),
 			),
 			proto.Array(
 				proto.String("name"), proto.String("bob"),
 				proto.String("pending"), proto.Int(1),
+				proto.String("idle"), proto.Int(-1),
+				proto.String("inactive"), proto.Int(-1),
 			),
 		),
 	)
@@ -1420,7 +1440,14 @@ func TestStreamClaim(t *testing.T) {
 	)
 	mustDo(t, c,
 		"XINFO", "CONSUMERS", "planets", "processing",
-		proto.Array(),
+		proto.Array(
+			proto.Array(
+				proto.String("name"), proto.String("alice"),
+				proto.String("pending"), proto.Int(0),
+				proto.String("idle"), proto.Int(0),
+				proto.String("inactive"), proto.Int(-1),
+			),
+		),
 	)
 
 	mustDo(t, c,
@@ -1467,6 +1494,8 @@ func TestStreamClaim(t *testing.T) {
 			proto.Array(
 				proto.String("name"), proto.String("alice"),
 				proto.String("pending"), proto.Int(2),
+				proto.String("idle"), proto.Int(0),
+				proto.String("inactive"), proto.Int(0),
 			),
 		),
 	)
@@ -1502,7 +1531,7 @@ func TestStreamClaim(t *testing.T) {
 		proto.Array(
 			proto.Array(
 				proto.String("name"), proto.String("processing"),
-				proto.String("consumers"), proto.Int(1),
+				proto.String("consumers"), proto.Int(2),
 				proto.String("pending"), proto.Int(1),
 				proto.String("last-delivered-id"), proto.String("0-0"),
 				proto.String("entries-read"), proto.Nil,
@@ -1516,8 +1545,15 @@ func TestStreamClaim(t *testing.T) {
 			proto.Array(
 				proto.String("name"), proto.String("alice"),
 				proto.String("pending"), proto.Int(1),
+				proto.String("idle"), proto.Int(20000),
+				proto.String("inactive"), proto.Int(20000),
 			),
-			// bob only has a deleted one
+			proto.Array(
+				proto.String("name"), proto.String("bob"),
+				proto.String("pending"), proto.Int(0),
+				proto.String("idle"), proto.Int(0),
+				proto.String("inactive"), proto.Int(-1),
+			),
 		),
 	)
 	mustDo(t, c,
@@ -1630,10 +1666,14 @@ func TestStreamClaim(t *testing.T) {
 			proto.Array(
 				proto.String("name"), proto.String("alice"),
 				proto.String("pending"), proto.Int(3),
+				proto.String("idle"), proto.Int(20000),
+				proto.String("inactive"), proto.Int(20000),
 			),
 			proto.Array(
 				proto.String("name"), proto.String("bob"),
 				proto.String("pending"), proto.Int(0), // deleted
+				proto.String("idle"), proto.Int(0),
+				proto.String("inactive"), proto.Int(0),
 			),
 		),
 	)

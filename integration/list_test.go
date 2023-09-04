@@ -418,7 +418,7 @@ func TestBrpop(t *testing.T) {
 		c.Do("LPUSH", "l", "one")
 		c.Do("BRPOP", "l", "1")
 		c.Do("BRPOP", "l", "0.1")
-		c.Error("negative", "BRPOP", "l", "inf")
+		c.Error("timeout is out of range", "BRPOP", "l", "inf")
 		c.Do("EXISTS", "l")
 
 		// transaction
@@ -432,7 +432,7 @@ func TestBrpop(t *testing.T) {
 		c.Error("not a float", "BRPOP", "l", "X")
 		c.Error("not a float", "BRPOP", "l", "")
 		c.Error("wrong number", "BRPOP", "1")
-		c.Error("negative", "BRPOP", "key", "-1")
+		c.Error("timeout is negative", "BRPOP", "key", "-1")
 	})
 }
 
@@ -481,7 +481,7 @@ func TestBlpop(t *testing.T) {
 		c.Error("not a float", "BLPOP", "l", "X")
 		c.Error("not a float", "BLPOP", "l", "")
 		c.Error("wrong number", "BLPOP", "1")
-		c.Error("negative", "BLPOP", "key", "-1")
+		c.Error("timeout is negative", "BLPOP", "key", "-1")
 	})
 
 	testMulti(t,
@@ -515,8 +515,8 @@ func TestBrpoplpush(t *testing.T) {
 		c.Error("wrong number", "BRPOPLPUSH", "l")
 		c.Error("wrong number", "BRPOPLPUSH", "l", "x")
 		c.Error("wrong number", "BRPOPLPUSH", "1")
-		c.Error("negative", "BRPOPLPUSH", "from", "to", "-1")
-		c.Error("negative", "BRPOPLPUSH", "from", "to", "inf")
+		c.Error("timeout is negative", "BRPOPLPUSH", "from", "to", "-1")
+		c.Error("out of range", "BRPOPLPUSH", "from", "to", "inf")
 		c.Error("wrong number", "BRPOPLPUSH", "from", "to", "-1", "xxx")
 	})
 

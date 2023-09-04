@@ -240,7 +240,7 @@ func TestStream(t *testing.T) {
 			c.Error("wrong number", "XREAD", "STREAMS", "foo")
 			c.Do("XREAD", "STREAMS", "foo", "0")
 			c.Error("wrong number", "XREAD", "STREAMS", "ordplanets")
-			c.Error("Unbalanced XREAD", "XREAD", "STREAMS", "ordplanets", "foo", "0")
+			c.Error("Unbalanced 'xread'", "XREAD", "STREAMS", "ordplanets", "foo", "0")
 			c.Error("wrong number", "XREAD", "COUNT")
 			c.Error("wrong number", "XREAD", "COUNT", "notint")
 			c.Error("wrong number", "XREAD", "COUNT", "10") // No streams
@@ -670,13 +670,13 @@ func TestStreamGroup(t *testing.T) {
 			c.Do("XGROUP", "CREATE", "planets", "processing", "$", "MKSTREAM")
 			c.Error("No such key", "XCLAIM", "planets", "foo", "alice", "0", "0-0")
 			c.Do("XCLAIM", "planets", "processing", "alice", "0", "0-0")
-			c.Do("XINFO", "CONSUMERS", "planets", "processing")
+			c.DoLoosely("XINFO", "CONSUMERS", "planets", "processing") // "idle" is fiddly
 
 			c.Do("XADD", "planets", "0-1", "name", "Mercury")
 			c.Do("XADD", "planets", "0-2", "name", "Venus")
 
 			c.Do("XCLAIM", "planets", "processing", "alice", "0", "0-1")
-			c.Do("XINFO", "CONSUMERS", "planets", "processing")
+			c.DoLoosely("XINFO", "CONSUMERS", "planets", "processing") //  "idle" is fiddly
 
 			c.Do("XCLAIM", "planets", "processing", "alice", "0", "0-1", "0-2", "FORCE")
 			c.Do("XINFO", "GROUPS", "planets")

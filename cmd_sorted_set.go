@@ -761,7 +761,7 @@ func (m *Miniredis) makeCmdZrangebyscore(reverse bool) server.Cmd {
 // ZRANK and ZREVRANK
 func (m *Miniredis) makeCmdZrank(reverse bool) server.Cmd {
 	return func(c *server.Peer, cmd string, args []string) {
-		if len(args) != 2 {
+		if len(args) < 2 {
 			setDirty(c)
 			c.WriteError(errWrongNumber(cmd))
 			return
@@ -777,6 +777,12 @@ func (m *Miniredis) makeCmdZrank(reverse bool) server.Cmd {
 
 		withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 			db := m.db(ctx.selectedDB)
+
+			if len(args) > 2 {
+				setDirty(c)
+				c.WriteError(msgSyntaxError)
+				return
+			}
 
 			if !db.exists(key) {
 				c.WriteNull()

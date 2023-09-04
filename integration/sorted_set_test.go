@@ -60,7 +60,7 @@ func TestSortedSet(t *testing.T) {
 		c.Error("wrong kind", "ZCARD", "str")
 		c.Error("wrong number", "ZRANK")
 		c.Error("wrong number", "ZRANK", "key")
-		c.Error("wrong number", "ZRANK", "key", "too", "many")
+		c.Error("syntax error", "ZRANK", "key", "too", "many")
 		c.Error("wrong kind", "ZRANK", "str", "member")
 		c.Error("wrong number", "ZREVRANK")
 		c.Error("wrong number", "ZREVRANK", "key")
