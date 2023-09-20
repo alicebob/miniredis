@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"net"
+	"strconv"
 	"strings"
 	"sync"
 	"unicode"
@@ -484,7 +485,7 @@ func formatFloat(v float64) string {
 	if math.IsInf(v, -1) {
 		return "-inf"
 	}
-	return stripZeros(fmt.Sprintf("%.12f", v))
+	return stripZeros(strconv.FormatFloat(v, 'g', 18, 64))
 }
 
 func stripZeros(sv string) string {
