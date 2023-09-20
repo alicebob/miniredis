@@ -455,3 +455,20 @@ func TestCopy(t *testing.T) {
 		})
 	})
 }
+
+func TestClient(t *testing.T) {
+	skip(t)
+	testRaw(t, func(c *client) {
+		// Set the client name
+		c.Do("CLIENT", "SETNAME", "miniredis-tests")
+
+		// Get the client name
+		c.Do("CLIENT", "GETNAME")
+
+		// Try to get the client name without setting it first
+		c.Do("CLIENT", "GETNAME")
+
+		// Try to execute the CLIENT command with no arguments
+		c.Error("wrong number", "CLIENT")
+	})
+}

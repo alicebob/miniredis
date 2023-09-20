@@ -196,6 +196,7 @@ func (m *Miniredis) start(s *server.Server) error {
 	commandsGeo(m)
 	commandsCluster(m)
 	commandsHll(m)
+	commandsClient(m)
 
 	return nil
 }
