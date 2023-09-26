@@ -421,7 +421,7 @@ func (db *RedisDB) SetTTL(k string, ttl time.Duration) {
 	defer db.master.signal.Broadcast()
 
 	db.ttl[k] = ttl
-	db.keyVersion[k]++
+	db.touch(k, true)
 }
 
 // Type gives the type of a key, or ""
@@ -506,7 +506,7 @@ func (db *RedisDB) hdel(k, f string) {
 		return
 	}
 	delete(db.hashKeys[k], f)
-	db.keyVersion[k]++
+	db.touch(k, true)
 }
 
 // HIncrBy increases the integer value of a hash field by delta (int).

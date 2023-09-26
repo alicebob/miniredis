@@ -368,7 +368,7 @@ func (m *Miniredis) cmdLinsert(c *server.Peer, cmd string, args []string) {
 				}
 			}
 			db.listKeys[key] = l
-			db.keyVersion[key]++
+			db.touch(key, true)
 			c.WriteInt(len(l))
 			return
 		}
@@ -715,7 +715,7 @@ func (m *Miniredis) cmdLrem(c *server.Peer, cmd string, args []string) {
 			db.del(opts.key, true)
 		} else {
 			db.listKeys[opts.key] = newL
-			db.keyVersion[opts.key]++
+			db.touch(opts.key, true)
 		}
 
 		c.WriteInt(deleted)
@@ -769,7 +769,7 @@ func (m *Miniredis) cmdLset(c *server.Peer, cmd string, args []string) {
 			return
 		}
 		l[index] = opts.value
-		db.keyVersion[opts.key]++
+		db.touch(opts.key, true)
 
 		c.WriteOK()
 	})
@@ -823,7 +823,7 @@ func (m *Miniredis) cmdLtrim(c *server.Peer, cmd string, args []string) {
 			db.del(opts.key, true)
 		} else {
 			db.listKeys[opts.key] = l
-			db.keyVersion[opts.key]++
+			db.touch(opts.key, true)
 		}
 		c.WriteOK()
 	})
