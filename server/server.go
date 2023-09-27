@@ -248,6 +248,7 @@ type Peer struct {
 	Ctx          interface{} // anything goes, server won't touch this
 	onDisconnect []func()    // list of callbacks
 	mu           sync.Mutex  // for Block()
+	ClientName   string      // client name set by CLIENT SETNAME
 }
 
 func NewPeer(w *bufio.Writer) *Peer {

@@ -132,7 +132,7 @@ func TestSortedSet(t *testing.T) {
 		)
 		mustDo(t, c,
 			"ZRANK", "set", "spurious", "args",
-			proto.Error(errWrongNumber("zrank")),
+			proto.Error(msgSyntaxError),
 		)
 
 		mustDo(t, c,
