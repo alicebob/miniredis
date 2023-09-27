@@ -628,7 +628,6 @@ func TestSortedSetIncyby(t *testing.T) {
 }
 
 func TestZscan(t *testing.T) {
-	skip(t)
 	testRaw(t, func(c *client) {
 		// No set yet
 		c.Do("ZSCAN", "h", "0")
@@ -637,6 +636,9 @@ func TestZscan(t *testing.T) {
 		c.Do("ZSCAN", "h", "0")
 		c.Do("ZSCAN", "h", "0", "COUNT", "12")
 		c.Do("ZSCAN", "h", "0", "cOuNt", "12")
+
+		// ZSCAN may return a higher count of items than requested (See https://redis.io/docs/manual/keyspace/), so we must query all items.
+		c.Do("ZSCAN", "h", "0", "COUNT", "10") // cursor differs
 
 		c.Do("ZADD", "h", "2.0", "anotherkey")
 		c.Do("ZSCAN", "h", "0", "MATCH", "anoth*")
@@ -652,6 +654,8 @@ func TestZscan(t *testing.T) {
 		c.Error("wrong number", "ZSCAN", "noint")
 		c.Error("not an integer", "ZSCAN", "h", "0", "COUNT", "noint")
 		c.Error("syntax error", "ZSCAN", "h", "0", "COUNT")
+		c.Error("syntax error", "ZSCAN", "h", "0", "COUNT", "0")
+		c.Error("syntax error", "ZSCAN", "h", "0", "COUNT", "-1")
 		c.Error("syntax error", "ZSCAN", "h", "0", "MATCH")
 		c.Error("syntax error", "ZSCAN", "h", "0", "garbage")
 		c.Error("syntax error", "ZSCAN", "h", "0", "COUNT", "12", "MATCH", "foo", "garbage")
