@@ -20,15 +20,17 @@ func (m *Miniredis) cmdClient(c *server.Peer, cmd string, args []string) {
 		return
 	}
 
-	switch strings.ToUpper(args[0]) {
-	case "SETNAME":
-		m.cmdClientSetName(c, args[1:])
-	case "GETNAME":
-		m.cmdClientGetName(c, args[1:])
-	default:
-		setDirty(c)
-		c.WriteError(fmt.Sprintf("ERR 'CLIENT %s' not supported", strings.Join(args, " ")))
-	}
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
+		switch cmd := strings.ToUpper(args[0]); cmd {
+		case "SETNAME":
+			m.cmdClientSetName(c, args[1:])
+		case "GETNAME":
+			m.cmdClientGetName(c, args[1:])
+		default:
+			setDirty(c)
+			c.WriteError(fmt.Sprintf("ERR unknown subcommand '%s'. Try CLIENT HELP.", cmd))
+		}
+	})
 }
 
 // CLIENT SETNAME
@@ -39,7 +41,14 @@ func (m *Miniredis) cmdClientSetName(c *server.Peer, args []string) {
 		return
 	}
 
-	c.ClientName = args[0]
+	name := args[0]
+	if strings.ContainsAny(name, " \n") {
+		setDirty(c)
+		c.WriteError("ERR Client names cannot contain spaces, newlines or special characters.")
+		return
+
+	}
+	c.ClientName = name
 	c.WriteOK()
 }
 
