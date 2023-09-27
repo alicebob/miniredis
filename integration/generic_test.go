@@ -459,16 +459,31 @@ func TestCopy(t *testing.T) {
 func TestClient(t *testing.T) {
 	skip(t)
 	testRaw(t, func(c *client) {
-		// Set the client name
-		c.Do("CLIENT", "SETNAME", "miniredis-tests")
-
-		// Get the client name
-		c.Do("CLIENT", "GETNAME")
-
 		// Try to get the client name without setting it first
 		c.Do("CLIENT", "GETNAME")
 
-		// Try to execute the CLIENT command with no arguments
+		c.Do("CLIENT", "SETNAME", "miniredis-tests")
+		c.Do("CLIENT", "GETNAME")
+		c.Do("CLIENT", "SETNAME", "miniredis-tests2")
+		c.Do("CLIENT", "GETNAME")
+		c.Do("CLIENT", "SETNAME", "")
+		c.Do("CLIENT", "GETNAME")
+
 		c.Error("wrong number", "CLIENT")
+		c.Error("unknown subcommand", "CLIENT", "FOOBAR")
+		c.Error("wrong number", "CLIENT", "GETNAME", "foo")
+		c.Error("contain spaces", "CLIENT", "SETNAME", "miniredis tests")
+		c.Error("contain spaces", "CLIENT", "SETNAME", "miniredis\ntests")
 	})
+
+	testRaw2(t, func(c1, c2 *client) {
+		c1.Do("MULTI")
+		c1.Do("CLIENT", "SETNAME", "conn-c1")
+		c1.Do("CLIENT", "GETNAME")
+		c2.Do("CLIENT", "GETNAME") // not set yet
+		c1.Do("EXEC")
+		c1.Do("CLIENT", "GETNAME")
+		c2.Do("CLIENT", "GETNAME")
+	})
+
 }
