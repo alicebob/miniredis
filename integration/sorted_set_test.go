@@ -90,6 +90,14 @@ func TestSortedSet(t *testing.T) {
 		c.Do("ZRANGEBYLEX", "z", "[a", "[z")
 		c.Do("ZRANGE", "z", "0", "-1", "WITHSCORES")
 	})
+
+	testRaw(t, func(c *client) {
+		// very small values
+		c.Do("ZADD", "a_zset", "1.2", "one")
+		c.Do("ZADD", "a_zset", "incr", "1.2", "one")
+		c.DoRounded(1, "ZADD", "a_zset", "incr", "1.2", "one") // real: 3.5999999999999996, mini: 3.6
+		c.Do("ZADD", "a_zset", "incr", "1.2", "one")
+	})
 }
 
 func TestSortedSetAdd(t *testing.T) {
