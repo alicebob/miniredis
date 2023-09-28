@@ -164,8 +164,9 @@ func TestScan(t *testing.T) {
 		c.Do("SCAN", "0", "TYPE", "set", "MATCH", "setkey")
 		c.Do("SCAN", "0", "TYPE", "set", "COUNT", "100")
 		c.Do("SCAN", "0", "TYPE", "set", "MATCH", "setkey", "COUNT", "100")
-		c.DoLoosely("SCAN", "0", "COUNT", "1") // cursor differs
-		c.DoLoosely("SCAN", "0", "COUNT", "2") // cursor differs
+
+		// SCAN may return a higher count of items than requested (See https://redis.io/docs/manual/keyspace/), so we must query all items.
+		c.DoLoosely("SCAN", "0", "COUNT", "100") // cursor differs
 
 		// Can't really test multiple keys.
 		// c.Do("SET", "key2", "value2")
