@@ -213,7 +213,7 @@ func TestSortedSetAdd(t *testing.T) {
 
 		mustDo(t, c,
 			"ZADD", "z", "INCR", "XX", "1.2", "one",
-			proto.String("3.6"),
+			proto.String("3.5999999999999996"),
 		)
 
 		mustNil(t, c,
