@@ -1,6 +1,7 @@
 package fpconv
 
 import (
+	"math"
 	"testing"
 )
 
@@ -14,6 +15,10 @@ func TestFormatFloat(t *testing.T) {
 	}
 
 	eq(t, "3.1415", 3.1415)
+	eq(t, "0", 0.0)
+	eq(t, "inf", math.Inf(1))
+	eq(t, "-inf", math.Inf(-1))
+	eq(t, "nan", math.NaN())
 	eq(t, "1", 1.0)
 	eq(t, "-1", -1.0)
 	eq(t, "-1.1", -1.1)

@@ -1,5 +1,9 @@
 package fpconv
 
+import (
+	"math"
+)
+
 var (
 	fracmask         = uint64(0x000FFFFFFFFFFFFF)
 	expmask   uint64 = 0x7FF0000000000000
@@ -63,11 +67,9 @@ func Dtoa(d float64) string {
 		neg = true
 	}
 
-	// TODO: special cases
-	// int spec = filter_special(d, dest + str_len);
-	// if (spec) {
-	// return str_len + spec;
-	// }
+	if spec := filter_special(d, dest[str_len:]); spec != 0 {
+		return string(dest[:str_len+spec])
+	}
 
 	var (
 		k       int = 0
@@ -76,6 +78,27 @@ func Dtoa(d float64) string {
 
 	str_len += emit_digits(&digits, ndigits, dest[str_len:], k, neg)
 	return string(dest[:str_len])
+}
+
+func filter_special(fp float64, dest []rune) int {
+	if fp == 0.0 {
+		dest[0] = '0'
+		return 1
+	}
+
+	if math.IsNaN(fp) {
+		dest[0] = 'n'
+		dest[1] = 'a'
+		dest[2] = 'n'
+		return 3
+	}
+	if math.IsInf(fp, 0) {
+		dest[0] = 'i'
+		dest[1] = 'n'
+		dest[2] = 'f'
+		return 3
+	}
+	return 0
 }
 
 func grisu2(d float64, digits *[18]rune, K *int) int {

@@ -4,12 +4,12 @@ import (
 	"bufio"
 	"crypto/tls"
 	"fmt"
-	"math"
 	"net"
-	"strconv"
 	"strings"
 	"sync"
 	"unicode"
+
+	"github.com/alicebob/miniredis/v2/fpconv"
 )
 
 func errUnknownCommand(cmd string, args []string) string {
@@ -478,14 +478,8 @@ func (w *Writer) Flush() {
 	w.w.Flush()
 }
 
-// formatFloat formats a float the way redis does (sort-of)
-// Redis uses a method called "grisu2", which gives slightly different output.
+// formatFloat formats a float the way redis does.
+// Redis uses a method called "grisu2", which we ported from C.
 func formatFloat(v float64) string {
-	if math.IsInf(v, 1) {
-		return "inf"
-	}
-	if math.IsInf(v, -1) {
-		return "-inf"
-	}
-	return strconv.FormatFloat(v, 'g', 16, 64)
+	return fpconv.Dtoa(v)
 }
