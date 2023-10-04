@@ -1089,9 +1089,15 @@ func TestSortedSetScore(t *testing.T) {
 	{
 		s.ZAdd("z2", 1, "one")
 		s.ZAdd("z2", 2, "two")
+		s.ZAdd("z2", 0.000000000000000000000000000000000000000000000000000000000000000025339988685347402, "small")
 		score, err := s.ZScore("z2", "two")
 		ok(t, err)
 		equals(t, 2.0, score)
+
+		score, err = s.ZScore("z2", "small")
+		ok(t, err)
+		equals(t, 0.000000000000000000000000000000000000000000000000000000000000000025339988685347402, score)
+
 	}
 
 	t.Run("errors", func(t *testing.T) {

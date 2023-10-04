@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"net"
+	"strconv"
 	"strings"
 	"sync"
 	"unicode"
@@ -478,6 +479,7 @@ func (w *Writer) Flush() {
 }
 
 // formatFloat formats a float the way redis does (sort-of)
+// Redis uses a method called "grisu2", which gives slightly different output.
 func formatFloat(v float64) string {
 	if math.IsInf(v, 1) {
 		return "inf"
@@ -485,21 +487,5 @@ func formatFloat(v float64) string {
 	if math.IsInf(v, -1) {
 		return "-inf"
 	}
-	return stripZeros(fmt.Sprintf("%.12f", v))
-}
-
-func stripZeros(sv string) string {
-	for strings.Contains(sv, ".") {
-		if sv[len(sv)-1] != '0' {
-			break
-		}
-		// Remove trailing 0s.
-		sv = sv[:len(sv)-1]
-		// Ends with a '.'.
-		if sv[len(sv)-1] == '.' {
-			sv = sv[:len(sv)-1]
-			break
-		}
-	}
-	return sv
+	return strconv.FormatFloat(v, 'g', 16, 64)
 }
