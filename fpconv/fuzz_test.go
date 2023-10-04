@@ -1,3 +1,5 @@
+//go:build !go1.14
+
 package fpconv
 
 import (
