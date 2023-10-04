@@ -69,4 +69,8 @@ func TestFormatFloat(t *testing.T) {
 	eq(t, "3.5999999999999996", a)
 	a += 1.2
 	eq(t, "4.8", a)
+
+	// fuzz cases
+	eq(t, "386804001288986340000000", 3.8680400128898634e+23)   // not a fuzz case...
+	eq(t, "-386804001288986340000000", -3.8680400128898634e+23) // ...but this one crashed
 }

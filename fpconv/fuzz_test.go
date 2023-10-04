@@ -1,10 +1,10 @@
-//go:build !go1.14
-// +build !go1.14
+//go:build go1.16
+// +build go1.16
 
 package fpconv
 
 import (
-	"strings"
+	"strconv"
 	"testing"
 )
 
@@ -19,11 +19,12 @@ func FuzzDtoa(f *testing.F) {
 		if s == "" {
 			t.Errorf("empty result")
 		}
-		if strings.Count(s, ".") > 1 {
-			t.Errorf("too many .s")
+		n, err := strconv.ParseFloat(s, 64)
+		if err != nil {
+			t.Errorf("parse failed: %s", err)
 		}
-		if strings.Count(s, "e") > 1 {
-			t.Errorf("too many e's")
+		if n != orig {
+			t.Errorf("changed %f -> %f", n, orig)
 		}
 	})
 }

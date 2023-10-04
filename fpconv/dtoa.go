@@ -51,7 +51,7 @@ func minv(a, b int) int {
 
 func Dtoa(d float64) string {
 	var (
-		dest   [24]rune
+		dest   [25]rune // Note C has 24, which is broken
 		digits [18]rune
 
 		str_len int = 0
