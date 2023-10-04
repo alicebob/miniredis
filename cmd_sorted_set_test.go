@@ -1560,7 +1560,7 @@ func TestZscan(t *testing.T) {
 		)
 		mustDo(t, c,
 			"ZSCAN", "set", "0", "COUNT", "-3",
-			proto.Error(msgInvalidInt),
+			proto.Error(msgSyntaxError),
 		)
 		s.Set("str", "value")
 		mustDo(t, c,
