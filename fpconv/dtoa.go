@@ -5,15 +5,12 @@ import (
 )
 
 var (
-	fracmask         = uint64(0x000FFFFFFFFFFFFF)
+	fracmask  uint64 = 0x000FFFFFFFFFFFFF
 	expmask   uint64 = 0x7FF0000000000000
 	hiddenbit uint64 = 0x0010000000000000
 	signmask  uint64 = 0x8000000000000000
-	expbias   int64  = (1023 + 52)
+	expbias   int64  = 1023 + 52
 	zeros            = []rune("0000000000000000000000")
-
-	// #define absv(n) ((n) < 0 ? -(n) : (n))
-	// #define minv(a, b) ((a) < (b) ? (a) : (b))
 
 	tens = []uint64{
 		10000000000000000000,
