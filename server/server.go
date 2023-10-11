@@ -12,7 +12,7 @@ import (
 	"github.com/alicebob/miniredis/v2/fpconv"
 )
 
-func ErrUnknownCommand(cmd string, args []string) string {
+func errUnknownCommand(cmd string, args []string) string {
 	s := fmt.Sprintf("ERR unknown command `%s`, with args beginning with: ", cmd)
 	if len(args) > 20 {
 		args = args[:20]
@@ -208,7 +208,7 @@ func (s *Server) Dispatch(c *Peer, args []string) {
 	cb, ok := s.cmds[cmdUp]
 	s.mu.Unlock()
 	if !ok {
-		c.WriteError(ErrUnknownCommand(cmd, args))
+		c.WriteError(errUnknownCommand(cmd, args))
 		return
 	}
 

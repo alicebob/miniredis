@@ -37,6 +37,7 @@ const (
 	msgFScriptUsageSimple   = "ERR unknown subcommand '%s'. Try SCRIPT HELP."
 	msgFPubsubUsage         = "ERR unknown subcommand or wrong number of arguments for '%s'. Try PUBSUB HELP."
 	msgFPubsubUsageSimple   = "ERR unknown subcommand '%s'. Try PUBSUB HELP."
+	msgFObjectUsage         = "ERR unknown subcommand '%s'. Try OBJECT HELP."
 	msgScriptFlush          = "ERR SCRIPT FLUSH only support SYNC|ASYNC option"
 	msgSingleElementPair    = "ERR INCR option supports a single increment-element pair"
 	msgGTLTandNX            = "ERR GT, LT, and/or NX options at the same time are not compatible"

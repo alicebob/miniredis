@@ -489,5 +489,27 @@ func TestClient(t *testing.T) {
 		c1.Do("CLIENT", "GETNAME")
 		c2.Do("CLIENT", "GETNAME")
 	})
+}
 
+func TestObject(t *testing.T) {
+	skip(t)
+	testRaw(t, func(c *client) {
+		c.Do("OBJECT", "IDLETIME", "foo")
+
+		c.Do("SET", "foo", "bar")
+		c.Do("OBJECT", "IDLETIME", "foo")
+		c.Do("GET", "foo")
+		c.Do("OBJECT", "IDLETIME", "foo")
+
+		c.Error("number", "OBJECT")
+		c.Error("unknown subcommand 'foo'", "OBJECT", "foo")
+		c.Error("object|idletime", "OBJECT", "IDLETIME")
+		c.Error("wrong number", "OBJECT", "IDLETIME", "foo", "bar")
+
+		c.Do("MULTI")
+		c.Do("OBJECT", "IDLETIME", "foo")
+		c.Error("object|idletime", "OBJECT", "IDLETIME", "bar", "baz")
+		c.Error("object|idletime", "OBJECT", "IDLETIME")
+		c.Error("Transaction discarded", "EXEC")
+	})
 }
