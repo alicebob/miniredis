@@ -4,6 +4,7 @@ package miniredis
 
 import (
 	"errors"
+	"fmt"
 	"math"
 	"sort"
 	"strconv"
@@ -761,7 +762,7 @@ func (m *Miniredis) makeCmdZrangebyscore(reverse bool) server.Cmd {
 // ZRANK and ZREVRANK
 func (m *Miniredis) makeCmdZrank(reverse bool) server.Cmd {
 	return func(c *server.Peer, cmd string, args []string) {
-		if len(args) != 2 {
+		if len(args) < 2 {
 			setDirty(c)
 			c.WriteError(errWrongNumber(cmd))
 			return
@@ -777,6 +778,12 @@ func (m *Miniredis) makeCmdZrank(reverse bool) server.Cmd {
 
 		withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 			db := m.db(ctx.selectedDB)
+
+			if len(args) > 2 {
+				setDirty(c)
+				c.WriteError(msgSyntaxError)
+				return
+			}
 
 			if !db.exists(key) {
 				c.WriteNull()
@@ -1449,6 +1456,7 @@ func (m *Miniredis) cmdZscan(c *server.Peer, cmd string, args []string) {
 	var opts struct {
 		key       string
 		cursor    int
+		count     int
 		withMatch bool
 		match     string
 	}
@@ -1466,12 +1474,18 @@ func (m *Miniredis) cmdZscan(c *server.Peer, cmd string, args []string) {
 				c.WriteError(msgSyntaxError)
 				return
 			}
-			if _, err := strconv.Atoi(args[1]); err != nil {
+			count, err := strconv.Atoi(args[1])
+			if err != nil {
 				setDirty(c)
 				c.WriteError(msgInvalidInt)
 				return
 			}
-			// We do nothing with count.
+			if count <= 0 {
+				setDirty(c)
+				c.WriteError(msgSyntaxError)
+				return
+			}
+			opts.count = count
 			args = args[2:]
 			continue
 		}
@@ -1493,14 +1507,6 @@ func (m *Miniredis) cmdZscan(c *server.Peer, cmd string, args []string) {
 
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
-		// Paging is not implementend, all results are returned for cursor 0.
-		if opts.cursor != 0 {
-			// Invalid cursor.
-			c.WriteLen(2)
-			c.WriteBulk("0") // no next cursor
-			c.WriteLen(0)    // no elements
-			return
-		}
 		if db.exists(opts.key) && db.t(opts.key) != "zset" {
 			c.WriteError(ErrWrongType.Error())
 			return
@@ -1511,8 +1517,27 @@ func (m *Miniredis) cmdZscan(c *server.Peer, cmd string, args []string) {
 			members, _ = matchKeys(members, opts.match)
 		}
 
+		low := opts.cursor
+		high := low + opts.count
+		// validate high is correct
+		if high > len(members) || high == 0 {
+			high = len(members)
+		}
+		if opts.cursor > high {
+			// invalid cursor
+			c.WriteLen(2)
+			c.WriteBulk("0") // no next cursor
+			c.WriteLen(0)    // no elements
+			return
+		}
+		cursorValue := low + opts.count
+		if cursorValue >= len(members) {
+			cursorValue = 0 // no next cursor
+		}
+		members = members[low:high]
+
 		c.WriteLen(2)
-		c.WriteBulk("0") // no next cursor
+		c.WriteBulk(fmt.Sprintf("%d", cursorValue))
 		// HSCAN gives key, values.
 		c.WriteLen(len(members) * 2)
 		for _, k := range members {

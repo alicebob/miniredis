@@ -1253,7 +1253,7 @@ func TestBrpop(t *testing.T) {
 		)
 		mustDo(t, c,
 			"BRPOP", "key", "inf",
-			proto.Error("ERR timeout is negative"),
+			proto.Error("ERR timeout is out of range"),
 		)
 	})
 }
@@ -1415,7 +1415,7 @@ func TestBlpop(t *testing.T) {
 		)
 		mustDo(t, c,
 			"BLPOP", "key", "inf",
-			proto.Error("ERR timeout is negative"),
+			proto.Error("ERR timeout is out of range"),
 		)
 	})
 }
@@ -1478,7 +1478,7 @@ func TestBrpoplpush(t *testing.T) {
 		)
 		mustDo(t, c,
 			"BRPOPLPUSH", "key", "foo", "inf",
-			proto.Error("ERR timeout is negative"),
+			proto.Error("ERR timeout is out of range"),
 		)
 		mustDo(t, c,
 			"BRPOPLPUSH", "key", "foo", "1", "baz",

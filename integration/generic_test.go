@@ -165,6 +165,9 @@ func TestScan(t *testing.T) {
 		c.Do("SCAN", "0", "TYPE", "set", "COUNT", "100")
 		c.Do("SCAN", "0", "TYPE", "set", "MATCH", "setkey", "COUNT", "100")
 
+		// SCAN may return a higher count of items than requested (See https://redis.io/docs/manual/keyspace/), so we must query all items.
+		c.DoLoosely("SCAN", "0", "COUNT", "100") // cursor differs
+
 		// Can't really test multiple keys.
 		// c.Do("SET", "key2", "value2")
 		// c.Do("SCAN", "0")
@@ -173,6 +176,7 @@ func TestScan(t *testing.T) {
 		c.Error("wrong number", "SCAN")
 		c.Error("invalid cursor", "SCAN", "noint")
 		c.Error("not an integer", "SCAN", "0", "COUNT", "noint")
+		c.Error("syntax error", "SCAN", "0", "COUNT", "0")
 		c.Error("syntax error", "SCAN", "0", "COUNT")
 		c.Error("syntax error", "SCAN", "0", "MATCH")
 		c.Error("syntax error", "SCAN", "0", "garbage")
@@ -454,4 +458,36 @@ func TestCopy(t *testing.T) {
 			c.Do("PFCOUNT", "hlog2")
 		})
 	})
+}
+
+func TestClient(t *testing.T) {
+	skip(t)
+	testRaw(t, func(c *client) {
+		// Try to get the client name without setting it first
+		c.Do("CLIENT", "GETNAME")
+
+		c.Do("CLIENT", "SETNAME", "miniredis-tests")
+		c.Do("CLIENT", "GETNAME")
+		c.Do("CLIENT", "SETNAME", "miniredis-tests2")
+		c.Do("CLIENT", "GETNAME")
+		c.Do("CLIENT", "SETNAME", "")
+		c.Do("CLIENT", "GETNAME")
+
+		c.Error("wrong number", "CLIENT")
+		c.Error("unknown subcommand", "CLIENT", "FOOBAR")
+		c.Error("wrong number", "CLIENT", "GETNAME", "foo")
+		c.Error("contain spaces", "CLIENT", "SETNAME", "miniredis tests")
+		c.Error("contain spaces", "CLIENT", "SETNAME", "miniredis\ntests")
+	})
+
+	testRaw2(t, func(c1, c2 *client) {
+		c1.Do("MULTI")
+		c1.Do("CLIENT", "SETNAME", "conn-c1")
+		c1.Do("CLIENT", "GETNAME")
+		c2.Do("CLIENT", "GETNAME") // not set yet
+		c1.Do("EXEC")
+		c1.Do("CLIENT", "GETNAME")
+		c2.Do("CLIENT", "GETNAME")
+	})
+
 }

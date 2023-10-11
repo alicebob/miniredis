@@ -132,7 +132,7 @@ func TestSortedSet(t *testing.T) {
 		)
 		mustDo(t, c,
 			"ZRANK", "set", "spurious", "args",
-			proto.Error(errWrongNumber("zrank")),
+			proto.Error(msgSyntaxError),
 		)
 
 		mustDo(t, c,
@@ -213,7 +213,7 @@ func TestSortedSetAdd(t *testing.T) {
 
 		mustDo(t, c,
 			"ZADD", "z", "INCR", "XX", "1.2", "one",
-			proto.String("3.6"),
+			proto.String("3.5999999999999996"),
 		)
 
 		mustNil(t, c,
@@ -1089,9 +1089,15 @@ func TestSortedSetScore(t *testing.T) {
 	{
 		s.ZAdd("z2", 1, "one")
 		s.ZAdd("z2", 2, "two")
+		s.ZAdd("z2", 0.000000000000000000000000000000000000000000000000000000000000000025339988685347402, "small")
 		score, err := s.ZScore("z2", "two")
 		ok(t, err)
 		equals(t, 2.0, score)
+
+		score, err = s.ZScore("z2", "small")
+		ok(t, err)
+		equals(t, 0.000000000000000000000000000000000000000000000000000000000000000025339988685347402, score)
+
 	}
 
 	t.Run("errors", func(t *testing.T) {
@@ -1558,16 +1564,73 @@ func TestZscan(t *testing.T) {
 			proto.Error(msgSyntaxError),
 		)
 		mustDo(t, c,
+			"ZSCAN", "set", "0", "COUNT", "0",
+			proto.Error(msgSyntaxError),
+		)
+		mustDo(t, c,
 			"ZSCAN", "set", "0", "COUNT", "noint",
 			proto.Error(msgInvalidInt),
 		)
-
+		mustDo(t, c,
+			"ZSCAN", "set", "0", "COUNT", "-3",
+			proto.Error(msgSyntaxError),
+		)
 		s.Set("str", "value")
 		mustDo(t, c,
 			"ZSCAN", "str", "0",
 			proto.Error(msgWrongType),
 		)
 	})
+
+	s.ZAdd("largeset", 1.0, "v1")
+	s.ZAdd("largeset", 2.0, "v2")
+	s.ZAdd("largeset", 3.0, "v3")
+	s.ZAdd("largeset", 4.0, "v4")
+	s.ZAdd("largeset", 5.0, "v5")
+	s.ZAdd("largeset", 6.0, "v6")
+	s.ZAdd("largeset", 7.0, "v7")
+	s.ZAdd("largeset", 8.0, "v8")
+
+	mustDo(t, c,
+		"ZSCAN", "largeset", "0", "COUNT", "3",
+		proto.Array(
+			proto.String("3"),
+			proto.Array(
+				proto.String("v1"),
+				proto.String("1"),
+				proto.String("v2"),
+				proto.String("2"),
+				proto.String("v3"),
+				proto.String("3"),
+			),
+		),
+	)
+	mustDo(t, c,
+		"ZSCAN", "largeset", "3", "COUNT", "3",
+		proto.Array(
+			proto.String("6"),
+			proto.Array(
+				proto.String("v4"),
+				proto.String("4"),
+				proto.String("v5"),
+				proto.String("5"),
+				proto.String("v6"),
+				proto.String("6"),
+			),
+		),
+	)
+	mustDo(t, c,
+		"ZSCAN", "largeset", "6", "COUNT", "3",
+		proto.Array(
+			proto.String("0"),
+			proto.Array(
+				proto.String("v7"),
+				proto.String("7"),
+				proto.String("v8"),
+				proto.String("8"),
+			),
+		),
+	)
 }
 
 func TestZunionstore(t *testing.T) {

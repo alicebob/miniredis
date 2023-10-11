@@ -60,7 +60,7 @@ func TestSortedSet(t *testing.T) {
 		c.Error("wrong kind", "ZCARD", "str")
 		c.Error("wrong number", "ZRANK")
 		c.Error("wrong number", "ZRANK", "key")
-		c.Error("wrong number", "ZRANK", "key", "too", "many")
+		c.Error("syntax error", "ZRANK", "key", "too", "many")
 		c.Error("wrong kind", "ZRANK", "str", "member")
 		c.Error("wrong number", "ZREVRANK")
 		c.Error("wrong number", "ZREVRANK", "key")
@@ -89,6 +89,14 @@ func TestSortedSet(t *testing.T) {
 		c.Do("ZSCAN", "z", "0", "MATCH", "*")
 		c.Do("ZRANGEBYLEX", "z", "[a", "[z")
 		c.Do("ZRANGE", "z", "0", "-1", "WITHSCORES")
+	})
+
+	testRaw(t, func(c *client) {
+		// very small values
+		c.Do("ZADD", "a_zset", "1.2", "one")
+		c.Do("ZADD", "a_zset", "incr", "1.2", "one")
+		c.DoRounded(1, "ZADD", "a_zset", "incr", "1.2", "one") // real: 3.5999999999999996, mini: 3.6
+		c.Do("ZADD", "a_zset", "incr", "1.2", "one")
 	})
 }
 
@@ -628,7 +636,6 @@ func TestSortedSetIncyby(t *testing.T) {
 }
 
 func TestZscan(t *testing.T) {
-	skip(t)
 	testRaw(t, func(c *client) {
 		// No set yet
 		c.Do("ZSCAN", "h", "0")
@@ -637,6 +644,9 @@ func TestZscan(t *testing.T) {
 		c.Do("ZSCAN", "h", "0")
 		c.Do("ZSCAN", "h", "0", "COUNT", "12")
 		c.Do("ZSCAN", "h", "0", "cOuNt", "12")
+
+		// ZSCAN may return a higher count of items than requested (See https://redis.io/docs/manual/keyspace/), so we must query all items.
+		c.Do("ZSCAN", "h", "0", "COUNT", "10") // cursor differs
 
 		c.Do("ZADD", "h", "2.0", "anotherkey")
 		c.Do("ZSCAN", "h", "0", "MATCH", "anoth*")
@@ -652,6 +662,8 @@ func TestZscan(t *testing.T) {
 		c.Error("wrong number", "ZSCAN", "noint")
 		c.Error("not an integer", "ZSCAN", "h", "0", "COUNT", "noint")
 		c.Error("syntax error", "ZSCAN", "h", "0", "COUNT")
+		c.Error("syntax error", "ZSCAN", "h", "0", "COUNT", "0")
+		c.Error("syntax error", "ZSCAN", "h", "0", "COUNT", "-1")
 		c.Error("syntax error", "ZSCAN", "h", "0", "MATCH")
 		c.Error("syntax error", "ZSCAN", "h", "0", "garbage")
 		c.Error("syntax error", "ZSCAN", "h", "0", "COUNT", "12", "MATCH", "foo", "garbage")
