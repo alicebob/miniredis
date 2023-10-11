@@ -694,7 +694,7 @@ func (m *Miniredis) copy(
 		panic("missing case")
 	}
 	destDB.keys[dst] = srcDB.keys[src]
-	destDB.touch(dst, true)
+	destDB.incr(dst)
 	if v, ok := srcDB.ttl[src]; ok {
 		destDB.ttl[dst] = v
 	}

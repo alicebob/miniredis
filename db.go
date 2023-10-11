@@ -13,17 +13,11 @@ var (
 	errInvalidEntryID = errors.New("stream ID is invalid")
 )
 
-func (db *RedisDB) touch(k string, write bool) {
-	db.lru[k] = db.master.effectiveNow()
-	if write {
-		db.keyVersion[k]++
-	}
-}
-
+// exists also updates the lru
 func (db *RedisDB) exists(k string) bool {
 	_, ok := db.keys[k]
 	if ok {
-		db.touch(k, false)
+		db.lru[k] = db.master.effectiveNow()
 	}
 	return ok
 }
@@ -31,6 +25,12 @@ func (db *RedisDB) exists(k string) bool {
 // t gives the type of a key, or ""
 func (db *RedisDB) t(k string) string {
 	return db.keys[k]
+}
+
+// incr increases the version and the lru timestamp
+func (db *RedisDB) incr(k string) {
+	db.lru[k] = db.master.effectiveNow()
+	db.keyVersion[k]++
 }
 
 // allKeys returns all keys. Sorted.
@@ -89,7 +89,7 @@ func (db *RedisDB) move(key string, to *RedisDB) bool {
 	if v, ok := db.ttl[key]; ok {
 		to.ttl[key] = v
 	}
-	to.touch(key, true)
+	to.incr(key)
 	db.del(key, true)
 	return true
 }
@@ -118,7 +118,7 @@ func (db *RedisDB) rename(from, to string) {
 	if v, ok := db.ttl[from]; ok {
 		db.ttl[to] = v
 	}
-	db.touch(to, true)
+	db.incr(to)
 
 	db.del(from, true)
 }
@@ -167,7 +167,7 @@ func (db *RedisDB) stringSet(k, v string) {
 	db.del(k, false)
 	db.keys[k] = "string"
 	db.stringKeys[k] = v
-	db.touch(k, true)
+	db.incr(k)
 }
 
 // change int key value
@@ -209,7 +209,7 @@ func (db *RedisDB) listLpush(k, v string) int {
 	}
 	l = append([]string{v}, l...)
 	db.listKeys[k] = l
-	db.touch(k, true)
+	db.incr(k)
 	return len(l)
 }
 
@@ -223,7 +223,7 @@ func (db *RedisDB) listLpop(k string) string {
 	} else {
 		db.listKeys[k] = l
 	}
-	db.touch(k, true)
+	db.incr(k)
 	return el
 }
 
@@ -234,7 +234,7 @@ func (db *RedisDB) listPush(k string, v ...string) int {
 	}
 	l = append(l, v...)
 	db.listKeys[k] = l
-	db.touch(k, true)
+	db.incr(k)
 	return len(l)
 }
 
@@ -246,7 +246,7 @@ func (db *RedisDB) listPop(k string) string {
 		db.del(k, true)
 	} else {
 		db.listKeys[k] = l
-		db.touch(k, true)
+		db.incr(k)
 	}
 	return el
 }
@@ -255,7 +255,7 @@ func (db *RedisDB) listPop(k string) string {
 func (db *RedisDB) setSet(k string, set setKey) {
 	db.keys[k] = "set"
 	db.setKeys[k] = set
-	db.touch(k, true)
+	db.incr(k)
 }
 
 // setadd adds members to a set. Returns nr of new keys.
@@ -273,7 +273,7 @@ func (db *RedisDB) setAdd(k string, elems ...string) int {
 		s[e] = struct{}{}
 	}
 	db.setKeys[k] = s
-	db.touch(k, true)
+	db.incr(k)
 	return added
 }
 
@@ -295,7 +295,7 @@ func (db *RedisDB) setRem(k string, fields ...string) int {
 	} else {
 		db.setKeys[k] = s
 	}
-	db.touch(k, true)
+	db.incr(k)
 	return removed
 }
 
@@ -361,7 +361,7 @@ func (db *RedisDB) hashSet(k string, fv ...string) int {
 		f, v := fv[idx], fv[idx+1]
 		_, ok := db.hashKeys[k][f]
 		db.hashKeys[k][f] = v
-		db.touch(k, true)
+		db.incr(k)
 		if !ok {
 			new++
 		}
@@ -413,7 +413,7 @@ func (db *RedisDB) sortedSet(key string) map[string]float64 {
 // ssetSet sets a complete sorted set.
 func (db *RedisDB) ssetSet(key string, sset sortedSet) {
 	db.keys[key] = "zset"
-	db.touch(key, true)
+	db.incr(key)
 	db.sortedsetKeys[key] = sset
 }
 
@@ -427,7 +427,7 @@ func (db *RedisDB) ssetAdd(key string, score float64, member string) bool {
 	_, ok = ss[member]
 	ss[member] = score
 	db.sortedsetKeys[key] = ss
-	db.touch(key, true)
+	db.incr(key)
 	return !ok
 }
 
@@ -521,7 +521,7 @@ func (db *RedisDB) ssetIncrby(k, m string, delta float64) float64 {
 	v, _ := ss.get(m)
 	v += delta
 	ss.set(v, m)
-	db.touch(k, true)
+	db.incr(k)
 	return v
 }
 
@@ -625,7 +625,7 @@ func (db *RedisDB) newStream(key string) (*streamKey, error) {
 	db.keys[key] = "stream"
 	s := newStreamKey()
 	db.streamKeys[key] = s
-	db.touch(key, true)
+	db.incr(key)
 	return s, nil
 }
 
@@ -677,7 +677,7 @@ func (db *RedisDB) hllAdd(k string, elems ...string) int {
 		}
 	}
 	db.hllKeys[k] = s
-	db.touch(k, true)
+	db.incr(k)
 	return hllAltered
 }
 
@@ -724,7 +724,7 @@ func (db *RedisDB) hllMerge(keys []string) error {
 
 	db.hllKeys[destKey] = destHll
 	db.keys[destKey] = "hll"
-	db.touch(destKey, true)
+	db.incr(destKey)
 
 	return nil
 }

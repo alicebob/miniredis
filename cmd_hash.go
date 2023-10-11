@@ -105,7 +105,7 @@ func (m *Miniredis) cmdHsetnx(c *server.Peer, cmd string, args []string) {
 			return
 		}
 		db.hashKeys[opts.key][opts.field] = opts.value
-		db.touch(opts.key, true)
+		db.incr(opts.key)
 		c.WriteInt(1)
 	})
 }
