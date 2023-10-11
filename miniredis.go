@@ -47,6 +47,7 @@ type RedisDB struct {
 	sortedsetKeys map[string]sortedSet     // ZADD &c. keys
 	streamKeys    map[string]*streamKey    // XADD &c. keys
 	ttl           map[string]time.Duration // effective TTL values
+	lru           map[string]time.Time     // last recently used ( read or written to )
 	keyVersion    map[string]uint          // used to watch values
 }
 
@@ -105,6 +106,7 @@ func newRedisDB(id int, m *Miniredis) RedisDB {
 		id:            id,
 		master:        m,
 		keys:          map[string]string{},
+		lru:           map[string]time.Time{},
 		stringKeys:    map[string]string{},
 		hashKeys:      map[string]hashKey{},
 		listKeys:      map[string]listKey{},
@@ -197,6 +199,7 @@ func (m *Miniredis) start(s *server.Server) error {
 	commandsCluster(m)
 	commandsHll(m)
 	commandsClient(m)
+	commandsObject(m)
 
 	return nil
 }
@@ -691,7 +694,7 @@ func (m *Miniredis) copy(
 		panic("missing case")
 	}
 	destDB.keys[dst] = srcDB.keys[src]
-	destDB.keyVersion[dst]++
+	destDB.touch(dst, true)
 	if v, ok := srcDB.ttl[src]; ok {
 		destDB.ttl[dst] = v
 	}

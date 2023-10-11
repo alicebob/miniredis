@@ -138,7 +138,7 @@ func makeCmdExpire(m *Miniredis, unix bool, d time.Duration) func(*server.Peer, 
 				return
 			}
 			db.ttl[opts.key] = newTTL
-			db.keyVersion[opts.key]++
+			db.touch(opts.key, true)
 			db.checkTTL(opts.key)
 			c.WriteInt(1)
 		})
@@ -274,7 +274,7 @@ func (m *Miniredis) cmdPersist(c *server.Peer, cmd string, args []string) {
 			return
 		}
 		delete(db.ttl, key)
-		db.keyVersion[key]++
+		db.touch(key, true)
 		c.WriteInt(1)
 	})
 }
