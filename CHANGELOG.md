@@ -1,6 +1,15 @@
 ## Changelog
 
 
+### v2.31.0
+
+- support for MEMORY USAGE (thanks @davidroman0O)
+- test against Redis 7.2.0
+- support for CLIENT SETNAME/GETNAME (thanks @mr-karan)
+- fix very small numbers (thanks @zsh1995)
+- use the same float-to-string logic real Redis uses
+
+
 ### v2.30.5
 
 - support SMISMEMBER (thanks @sandyharvie)
