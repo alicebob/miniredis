@@ -165,6 +165,9 @@ func TestScan(t *testing.T) {
 		c.Do("SCAN", "0", "TYPE", "set", "COUNT", "100")
 		c.Do("SCAN", "0", "TYPE", "set", "MATCH", "setkey", "COUNT", "100")
 
+		// SCAN may return a higher count of items than requested (See https://redis.io/docs/manual/keyspace/), so we must query all items.
+		c.DoLoosely("SCAN", "0", "COUNT", "100") // cursor differs
+
 		// Can't really test multiple keys.
 		// c.Do("SET", "key2", "value2")
 		// c.Do("SCAN", "0")
@@ -173,6 +176,7 @@ func TestScan(t *testing.T) {
 		c.Error("wrong number", "SCAN")
 		c.Error("invalid cursor", "SCAN", "noint")
 		c.Error("not an integer", "SCAN", "0", "COUNT", "noint")
+		c.Error("syntax error", "SCAN", "0", "COUNT", "0")
 		c.Error("syntax error", "SCAN", "0", "COUNT")
 		c.Error("syntax error", "SCAN", "0", "MATCH")
 		c.Error("syntax error", "SCAN", "0", "garbage")
