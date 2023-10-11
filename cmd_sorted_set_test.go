@@ -1865,6 +1865,36 @@ func TestZunion(t *testing.T) {
 	})
 }
 
+func TestZinter(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := proto.Dial(s.Addr())
+	ok(t, err)
+	defer c.Close()
+
+	s.ZAdd("h1", 1.0, "field1")
+	s.ZAdd("h1", 2.0, "field2")
+	s.ZAdd("h1", 3.0, "field3")
+	s.ZAdd("h2", 1.0, "field1")
+	s.ZAdd("h2", 2.0, "field2")
+	s.ZAdd("h2", 4.0, "field4")
+	s.SAdd("s2", "field1")
+
+	// Simple case
+	{
+		mustDo(t, c,
+			"ZINTER", "2", "h1", "h2",
+			proto.Strings("field1", "field2"),
+		)
+		mustDo(t, c,
+			"ZINTER", "2", "h1", "h2", "WITHSCORES",
+			proto.Strings("field1", "2", "field2", "4"),
+		)
+	}
+	// it's the same code as ZINTERSTORE, so see TestZinterstore()
+}
+
 func TestZinterstore(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
