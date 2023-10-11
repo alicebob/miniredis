@@ -19,7 +19,8 @@ func commandsSortedSet(m *Miniredis) {
 	m.srv.Register("ZCARD", m.cmdZcard)
 	m.srv.Register("ZCOUNT", m.cmdZcount)
 	m.srv.Register("ZINCRBY", m.cmdZincrby)
-	m.srv.Register("ZINTERSTORE", m.cmdZinterstore)
+	m.srv.Register("ZINTER", m.makeCmdZinter(false))
+	m.srv.Register("ZINTERSTORE", m.makeCmdZinter(true))
 	m.srv.Register("ZLEXCOUNT", m.cmdZlexcount)
 	m.srv.Register("ZRANGE", m.cmdZrange)
 	m.srv.Register("ZRANGEBYLEX", m.makeCmdZrangebylex(false))
@@ -324,145 +325,192 @@ func (m *Miniredis) cmdZincrby(c *server.Peer, cmd string, args []string) {
 	})
 }
 
-// ZINTERSTORE
-func (m *Miniredis) cmdZinterstore(c *server.Peer, cmd string, args []string) {
-	if len(args) < 3 {
-		setDirty(c)
-		c.WriteError(errWrongNumber(cmd))
-		return
-	}
-	if !m.handleAuth(c) {
-		return
-	}
-	if m.checkPubsub(c, cmd) {
-		return
-	}
+// ZINTERSTORE and ZINTER
+func (m *Miniredis) makeCmdZinter(store bool) func(c *server.Peer, cmd string, args []string) {
+	return func(c *server.Peer, cmd string, args []string) {
+		minArgs := 2
+		if store {
+			minArgs++
+		}
+		if len(args) < minArgs {
+			setDirty(c)
+			c.WriteError(errWrongNumber(cmd))
+			return
+		}
+		if !m.handleAuth(c) {
+			return
+		}
+		if m.checkPubsub(c, cmd) {
+			return
+		}
 
-	destination := args[0]
-	numKeys, err := strconv.Atoi(args[1])
-	if err != nil {
-		setDirty(c)
-		c.WriteError(msgInvalidInt)
-		return
-	}
-	args = args[2:]
-	if len(args) < numKeys {
-		setDirty(c)
-		c.WriteError(msgSyntaxError)
-		return
-	}
-	if numKeys <= 0 {
-		setDirty(c)
-		c.WriteError("ERR at least 1 input key is needed for ZUNIONSTORE/ZINTERSTORE")
-		return
-	}
-	keys := args[:numKeys]
-	args = args[numKeys:]
+		var opts = struct {
+			Store       bool   // if true this is ZINTERSTORE
+			Destination string // only relevant if $store is true
+			Keys        []string
+			Aggregate   string
+			WithWeights bool
+			Weights     []float64
+			WithScores  bool // only for ZINTER
+		}{
+			Store:     store,
+			Aggregate: "sum",
+		}
 
-	withWeights := false
-	weights := []float64{}
-	aggregate := "sum"
-	for len(args) > 0 {
-		switch strings.ToLower(args[0]) {
-		case "weights":
-			if len(args) < numKeys+1 {
-				setDirty(c)
-				c.WriteError(msgSyntaxError)
-				return
-			}
-			for i := 0; i < numKeys; i++ {
-				f, err := strconv.ParseFloat(args[i+1], 64)
-				if err != nil {
-					setDirty(c)
-					c.WriteError("ERR weight value is not a float")
-					return
-				}
-				weights = append(weights, f)
-			}
-			withWeights = true
-			args = args[numKeys+1:]
-		case "aggregate":
-			if len(args) < 2 {
-				setDirty(c)
-				c.WriteError(msgSyntaxError)
-				return
-			}
-			aggregate = strings.ToLower(args[1])
-			switch aggregate {
-			case "sum", "min", "max":
-			default:
-				setDirty(c)
-				c.WriteError(msgSyntaxError)
-				return
-			}
-			args = args[2:]
-		default:
+		if store {
+			opts.Destination = args[0]
+			args = args[1:]
+		}
+		numKeys, err := strconv.Atoi(args[0])
+		if err != nil {
+			setDirty(c)
+			c.WriteError(msgInvalidInt)
+			return
+		}
+		args = args[1:]
+		if len(args) < numKeys {
 			setDirty(c)
 			c.WriteError(msgSyntaxError)
 			return
 		}
-	}
+		if numKeys <= 0 {
+			setDirty(c)
+			c.WriteError("ERR at least 1 input key is needed for ZUNIONSTORE/ZINTERSTORE")
+			return
+		}
+		opts.Keys = args[:numKeys]
+		args = args[numKeys:]
 
-	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
-		db := m.db(ctx.selectedDB)
-		db.del(destination, true)
-
-		// We collect everything and remove all keys which turned out not to be
-		// present in every set.
-		sset := map[string]float64{}
-		counts := map[string]int{}
-		for i, key := range keys {
-			if !db.exists(key) {
-				continue
-			}
-
-			var set map[string]float64
-			switch db.t(key) {
-			case "set":
-				set = map[string]float64{}
-				for elem := range db.setKeys[key] {
-					set[elem] = 1.0
+		for len(args) > 0 {
+			switch strings.ToLower(args[0]) {
+			case "weights":
+				if len(args) < numKeys+1 {
+					setDirty(c)
+					c.WriteError(msgSyntaxError)
+					return
 				}
-			case "zset":
-				set = db.sortedSet(key)
+				for i := 0; i < numKeys; i++ {
+					f, err := strconv.ParseFloat(args[i+1], 64)
+					if err != nil {
+						setDirty(c)
+						c.WriteError("ERR weight value is not a float")
+						return
+					}
+					opts.Weights = append(opts.Weights, f)
+				}
+				opts.WithWeights = true
+				args = args[numKeys+1:]
+			case "aggregate":
+				if len(args) < 2 {
+					setDirty(c)
+					c.WriteError(msgSyntaxError)
+					return
+				}
+				aggregate := strings.ToLower(args[1])
+				switch aggregate {
+				case "sum", "min", "max":
+					opts.Aggregate = aggregate
+				default:
+					setDirty(c)
+					c.WriteError(msgSyntaxError)
+					return
+				}
+				args = args[2:]
+			case "withscores":
+				if store {
+					setDirty(c)
+					c.WriteError(msgSyntaxError)
+					return
+				}
+				opts.WithScores = true
+				args = args[1:]
 			default:
-				c.WriteError(msgWrongType)
+				setDirty(c)
+				c.WriteError(msgSyntaxError)
 				return
 			}
-			for member, score := range set {
-				if withWeights {
-					score *= weights[i]
-				}
-				counts[member]++
-				old, ok := sset[member]
-				if !ok {
-					sset[member] = score
+		}
+
+		withTx(m, c, func(c *server.Peer, ctx *connCtx) {
+			db := m.db(ctx.selectedDB)
+			if opts.Store {
+				db.del(opts.Destination, true)
+			}
+
+			// We collect everything and remove all keys which turned out not to be
+			// present in every set.
+			sset := map[string]float64{}
+			counts := map[string]int{}
+			for i, key := range opts.Keys {
+				if !db.exists(key) {
 					continue
 				}
-				switch aggregate {
-				default:
-					panic("Invalid aggregate")
-				case "sum":
-					sset[member] += score
-				case "min":
-					if score < old {
-						sset[member] = score
+
+				var set map[string]float64
+				switch db.t(key) {
+				case "set":
+					set = map[string]float64{}
+					for elem := range db.setKeys[key] {
+						set[elem] = 1.0
 					}
-				case "max":
-					if score > old {
+				case "zset":
+					set = db.sortedSet(key)
+				default:
+					c.WriteError(msgWrongType)
+					return
+				}
+				for member, score := range set {
+					if opts.WithWeights {
+						score *= opts.Weights[i]
+					}
+					counts[member]++
+					old, ok := sset[member]
+					if !ok {
 						sset[member] = score
+						continue
+					}
+					switch opts.Aggregate {
+					default:
+						panic("Invalid aggregate")
+					case "sum":
+						sset[member] += score
+					case "min":
+						if score < old {
+							sset[member] = score
+						}
+					case "max":
+						if score > old {
+							sset[member] = score
+						}
 					}
 				}
 			}
-		}
-		for key, count := range counts {
-			if count != numKeys {
-				delete(sset, key)
+			for key, count := range counts {
+				if count != numKeys {
+					delete(sset, key)
+				}
 			}
-		}
-		db.ssetSet(destination, sset)
-		c.WriteInt(len(sset))
-	})
+
+			if opts.Store {
+				// ZINTERSTORE mode
+				db.ssetSet(opts.Destination, sset)
+				c.WriteInt(len(sset))
+				return
+			}
+			// ZINTER mode
+			size := len(sset)
+			if opts.WithScores {
+				size *= 2
+			}
+			c.WriteLen(size)
+			for _, l := range sortedKeys(sset) {
+				c.WriteBulk(l)
+				if opts.WithScores {
+					c.WriteFloat(sset[l])
+				}
+			}
+		})
+	}
 }
 
 // ZLEXCOUNT
@@ -1946,4 +1994,13 @@ func parseLexrange(s string) (string, bool, error) {
 	default:
 		return "", false, errors.New(msgInvalidRangeItem)
 	}
+}
+
+func sortedKeys(m map[string]float64) []string {
+	var keys []string
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
 }

@@ -111,7 +111,7 @@
 
 ### v2.16.1
 
-- fix ZINTERSTORE with wets (thanks @lingjl2010 and @okhowang)
+- fix ZINTERSTORE with sets (thanks @lingjl2010 and @okhowang)
 - fix exclusive ranges in XRANGE (thanks @joseotoro)
 
 

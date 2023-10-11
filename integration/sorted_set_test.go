@@ -783,8 +783,48 @@ func TestZunionstore(t *testing.T) {
 	})
 }
 
-func TestZinterstore(t *testing.T) {
+func TestZinter(t *testing.T) {
 	skip(t)
+	// ZINTER
+	testRaw(t, func(c *client) {
+		c.Do("ZADD", "h1", "1.0", "key1")
+		c.Do("ZADD", "h1", "2.0", "key2")
+		c.Do("ZADD", "h1", "3.0", "key3")
+		c.Do("ZADD", "h2", "1.0", "key1")
+		c.Do("ZADD", "h2", "4.0", "key2")
+		c.Do("ZADD", "h3", "4.0", "key4")
+		c.DoSorted("ZINTER", "2", "h1", "h2")
+
+		c.DoSorted("ZINTER", "2", "h1", "h2", "WEIGHTS", "2.0", "12")
+		c.DoSorted("ZINTER", "2", "h1", "h2", "WEIGHTS", "2", "-12")
+
+		c.DoSorted("ZINTER", "2", "h1", "h2", "AGGREGATE", "min")
+		c.DoSorted("ZINTER", "2", "h1", "h2", "AGGREGATE", "max")
+		c.DoSorted("ZINTER", "2", "h1", "h2", "AGGREGATE", "sum")
+
+		// normal set
+		c.Do("ZADD", "q1", "2", "f1")
+		c.Do("SADD", "q2", "f1")
+		c.Do("ZINTER", "2", "q1", "q2")
+		c.DoSorted("ZINTER", "2", "q1", "q2", "WITHSCORES")
+
+		// Error cases
+		c.Error("wrong number", "ZINTER")
+		c.Error("wrong number", "ZINTER", "noint")
+		c.Error("at least 1", "ZINTER", "0", "f")
+		c.Error("syntax error", "ZINTER", "2", "f")
+		c.Error("at least 1", "ZINTER", "-1", "f")
+		c.Error("syntax error", "ZINTER", "2", "f1", "f2", "f3")
+		c.Error("syntax error", "ZINTER", "2", "f1", "f2", "WEIGHTS")
+		c.Error("syntax error", "ZINTER", "2", "f1", "f2", "WEIGHTS", "1")
+		c.Error("syntax error", "ZINTER", "2", "f1", "f2", "WEIGHTS", "1", "2", "3")
+		c.Error("not a float", "ZINTER", "2", "f1", "f2", "WEIGHTS", "f", "2")
+		c.Error("syntax error", "ZINTER", "2", "f1", "f2", "AGGREGATE", "foo")
+		c.Do("SET", "str", "1")
+		c.Error("wrong kind", "ZINTER", "1", "str")
+	})
+
+	// ZINTERSTORE
 	testRaw(t, func(c *client) {
 		c.Do("ZADD", "h1", "1.0", "key1")
 		c.Do("ZADD", "h1", "2.0", "key2")
