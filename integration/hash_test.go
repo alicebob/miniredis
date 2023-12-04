@@ -229,3 +229,14 @@ func TestHstrlen(t *testing.T) {
 		c.Error("wrong kind", "HSTRLEN", "str", "bar")
 	})
 }
+
+func TestHrandfield(t *testing.T) {
+	skip(t)
+	testRaw(t, func(c *client) {
+		// A random key from a DB with a single key. We can test that.
+		c.Do("HSET", "one", "foo", "bar")
+		c.Do("HRANDFIELD", "one", "1")
+
+		c.Error("ERR syntax error", "HRANDFIELD", "foo", "1", "2")
+	})
+}
