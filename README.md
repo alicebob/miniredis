@@ -103,6 +103,7 @@ Implemented commands:
    - HLEN
    - HMGET
    - HMSET
+   - HRANDFIELD
    - HSET
    - HSETNX
    - HSTRLEN
