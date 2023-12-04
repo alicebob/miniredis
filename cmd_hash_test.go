@@ -664,7 +664,7 @@ func TestHashRandField(t *testing.T) {
 		}
 
 		assert(t, len(keys) == 2, "HRANDFIELD looks sane")
-		assert(t, keys[0] == "zus" || keys[0] == "teun" || keys[0] == "gijs" || keys[0] == "keees", "HRANDFIELD looks sane")
+		assert(t, keys[0] == "zus" || keys[0] == "teun" || keys[0] == "gijs" || keys[0] == "kees", "HRANDFIELD looks sane")
 		assert(t, keys[1] == "jet" || keys[1] == "vuur" || keys[1] == "lam" || keys[1] == "bok", "HRANDFIELD looks sane")
 	}
 
