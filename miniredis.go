@@ -634,6 +634,13 @@ func (m *Miniredis) randIntn(n int) int {
 	return m.rand.Intn(n)
 }
 
+func (m *Miniredis) randPerm(n int) []int {
+	if m.rand == nil {
+		return rand.Perm(n)
+	}
+	return m.rand.Perm(n)
+}
+
 // shuffle shuffles a list of strings. Kinda.
 func (m *Miniredis) shuffle(l []string) {
 	for range l {
