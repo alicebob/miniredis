@@ -27,6 +27,7 @@ func commandsHash(m *Miniredis) {
 	m.srv.Register("HSTRLEN", m.cmdHstrlen)
 	m.srv.Register("HVALS", m.cmdHvals)
 	m.srv.Register("HSCAN", m.cmdHscan)
+	m.srv.Register("HRANDFIELD", m.cmdHrandfield)
 }
 
 // HSET
@@ -678,6 +679,86 @@ func (m *Miniredis) cmdHscan(c *server.Peer, cmd string, args []string) {
 		for _, k := range members {
 			c.WriteBulk(k)
 			c.WriteBulk(db.hashGet(opts.key, k))
+		}
+	})
+}
+
+// HRANDFIELD
+func (m *Miniredis) cmdHrandfield(c *server.Peer, cmd string, args []string) {
+	if len(args) > 3 || len(args) < 1 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
+	}
+	if !m.handleAuth(c) {
+		return
+	}
+	if m.checkPubsub(c, cmd) {
+		return
+	}
+
+	opts := struct {
+		key        string
+		count      int
+		withValues bool
+	}{
+		key:   args[0],
+		count: 1,
+	}
+
+	if len(args) > 1 {
+		if ok := optIntErr(c, args[1], &opts.count, msgInvalidInt); !ok {
+			return
+		}
+	}
+
+	if len(args) == 3 {
+		if strings.ToLower(args[2]) == "withvalues" {
+			opts.withValues = true
+		} else {
+			setDirty(c)
+			c.WriteError(msgSyntaxError)
+			return
+		}
+	}
+
+	withTx(m, c, func(peer *server.Peer, ctx *connCtx) {
+		if opts.count == 0 {
+			peer.WriteLen(0)
+			return
+		}
+		db := m.db(ctx.selectedDB)
+		members := db.hashFields(opts.key)
+		// if cnt positive
+		cnt := 0
+		iterCnt := len(members)
+		if opts.count > 0 {
+			if opts.count > len(members) {
+				cnt = len(members)
+			} else {
+				cnt = opts.count
+			}
+		} else {
+			cnt = -opts.count
+			iterCnt *= cnt
+		}
+
+		p := m.randPerm(iterCnt)
+		if opts.withValues {
+			peer.WriteMapLen(cnt)
+			for i := 0; i < cnt; i++ {
+				idx := p[i] % len(members)
+				peer.WriteBulk(members[idx])
+				peer.WriteBulk(db.hashGet(opts.key, members[idx]))
+			}
+			return
+		} else {
+			peer.WriteLen(cnt)
+			for i := 0; i < cnt; i++ {
+				idx := p[i] % len(members)
+				peer.WriteBulk(members[idx])
+			}
+			return
 		}
 	})
 }

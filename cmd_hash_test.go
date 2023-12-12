@@ -1,6 +1,7 @@
 package miniredis
 
 import (
+	"sort"
 	"testing"
 	"time"
 
@@ -632,4 +633,99 @@ func TestHstrlen(t *testing.T) {
 			proto.Error("WRONGTYPE Operation against a key holding the wrong kind of value"),
 		)
 	})
+}
+
+func TestHashRandField(t *testing.T) {
+	s := RunT(t)
+	c, err := proto.Dial(s.Addr())
+	ok(t, err)
+	defer c.Close()
+
+	s.HSet("wim", "zus", "jet")
+	s.HSet("wim", "teun", "vuur")
+	s.HSet("wim", "gijs", "lam")
+	s.HSet("wim", "kees", "bok")
+
+	{
+		v, err := c.Do("HRANDFIELD", "wim", "1")
+		ok(t, err)
+		assert(t, v == proto.Strings("zus") || v == proto.Strings("teun") || v == proto.Strings("gijs") || v == proto.Strings("kees"), "HRANDFIELD looks sane")
+	}
+
+	{
+		v, err := c.Do("HRANDFIELD", "wim", "1", "WITHVALUES")
+		ok(t, err)
+		st, err := proto.Parse(v)
+		ok(t, err)
+		li := st.([]interface{})
+		keys := make([]string, len(li))
+		for i, v := range li {
+			keys[i] = v.(string)
+		}
+
+		assert(t, len(keys) == 2, "HRANDFIELD looks sane")
+		assert(t, keys[0] == "zus" || keys[0] == "teun" || keys[0] == "gijs" || keys[0] == "kees", "HRANDFIELD looks sane")
+		assert(t, keys[1] == "jet" || keys[1] == "vuur" || keys[1] == "lam" || keys[1] == "bok", "HRANDFIELD looks sane")
+	}
+
+	{
+		v, err := c.Do("HRANDFIELD", "wim", "4")
+		ok(t, err)
+		st, err := proto.Parse(v)
+		ok(t, err)
+		li := st.([]interface{})
+		keys := make([]string, len(li))
+		for i, v := range li {
+			keys[i] = v.(string)
+		}
+		sort.Slice(keys, func(i, j int) bool { return keys[i] < keys[j] })
+		assert(t, len(keys) == 4, "HRANDFIELD looks sane")
+		assert(t, keys[0] == "gijs", "HRANDFIELD looks sane")
+		assert(t, keys[1] == "kees", "HRANDFIELD looks sane")
+		assert(t, keys[2] == "teun", "HRANDFIELD looks sane")
+		assert(t, keys[3] == "zus", "HRANDFIELD looks sane")
+	}
+
+	{
+		v, err := c.Do("HRANDFIELD", "wim", "5")
+		ok(t, err)
+		st, err := proto.Parse(v)
+		ok(t, err)
+		li := st.([]interface{})
+		keys := make([]string, len(li))
+		for i, v := range li {
+			keys[i] = v.(string)
+		}
+		sort.Slice(keys, func(i, j int) bool { return keys[i] < keys[j] })
+		assert(t, len(keys) == 4, "HRANDFIELD looks sane")
+		assert(t, keys[0] == "gijs", "HRANDFIELD looks sane")
+		assert(t, keys[1] == "kees", "HRANDFIELD looks sane")
+		assert(t, keys[2] == "teun", "HRANDFIELD looks sane")
+		assert(t, keys[3] == "zus", "HRANDFIELD looks sane")
+	}
+
+	{
+		v, err := c.Do("HRANDFIELD", "wim", "-5")
+		ok(t, err)
+		st, err := proto.Parse(v)
+		ok(t, err)
+		li := st.([]interface{})
+		keys := make([]string, len(li))
+		for i, v := range li {
+			keys[i] = v.(string)
+		}
+
+		keyMap := make(map[string]bool)
+		for _, key := range keys {
+			keyMap[key] = true
+		}
+		assert(t, len(keys) == 5, "HRANDFIELD looks sane")
+		assert(t, len(keyMap) <= 4, "HRANDFIELD looks sane")
+	}
+
+	// Wrong key type
+	mustDo(t, c,
+		"HRANDFIELD", "wim", "zus",
+		proto.Error(msgInvalidInt),
+	)
 }
