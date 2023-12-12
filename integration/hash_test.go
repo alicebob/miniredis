@@ -233,10 +233,40 @@ func TestHstrlen(t *testing.T) {
 func TestHrandfield(t *testing.T) {
 	skip(t)
 	testRaw(t, func(c *client) {
-		// A random key from a DB with a single key. We can test that.
 		c.Do("HSET", "one", "foo", "bar")
+		c.Do("HRANDFIELD", "one")
+		c.Do("HRANDFIELD", "one", "0")
 		c.Do("HRANDFIELD", "one", "1")
+		c.Do("HRANDFIELD", "one", "2") // limited to 1
+		c.Do("HRANDFIELD", "one", "3") // limited to 1
+		c.Do("HRANDFIELD", "one", "-1")
+		c.Do("HRANDFIELD", "one", "-2") // padded
+		c.Do("HRANDFIELD", "one", "-3") // padded
+
+		c.Do("HSET", "more", "foo", "bar", "baz", "bak")
+		c.DoLoosely("HRANDFIELD", "more")
+		c.Do("HRANDFIELD", "more", "0")
+		c.DoLoosely("HRANDFIELD", "more", "1")
+		c.DoLoosely("HRANDFIELD", "more", "2")
+		c.DoLoosely("HRANDFIELD", "more", "3") // limited to 2
+		c.DoLoosely("HRANDFIELD", "more", "-1")
+		c.DoLoosely("HRANDFIELD", "more", "-2")
+		c.DoLoosely("HRANDFIELD", "more", "-3") // length padded to 3
+
+		c.Do("HRANDFIELD", "nosuch", "1")
+		c.Do("HRANDFIELD", "nosuch", "2")
+		c.Do("HRANDFIELD", "nosuch", "3")
+		c.Do("HRANDFIELD", "nosuch", "0")
+		c.Do("HRANDFIELD", "nosuch")
+		c.Do("HRANDFIELD", "nosuch", "-1") // still empty
+		c.Do("HRANDFIELD", "nosuch", "-2") // still empty
+		c.Do("HRANDFIELD", "nosuch", "-3") // still empty
+		c.DoLoosely("HRANDFIELD", "one", "2")
+		c.DoLoosely("HRANDFIELD", "one", "7")
+		c.DoLoosely("HRANDFIELD", "one", "2", "WITHVALUE")
+		c.DoLoosely("HRANDFIELD", "one", "7", "WITHVALUE")
 
 		c.Error("ERR syntax error", "HRANDFIELD", "foo", "1", "2")
+		c.Error("ERR wrong number", "HRANDFIELD")
 	})
 }

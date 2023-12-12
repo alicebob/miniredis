@@ -4,6 +4,7 @@ package miniredis
 
 import (
 	"math/big"
+	"math/rand"
 	"strconv"
 	"strings"
 
@@ -700,16 +701,17 @@ func (m *Miniredis) cmdHrandfield(c *server.Peer, cmd string, args []string) {
 	opts := struct {
 		key        string
 		count      int
+		countSet   bool
 		withValues bool
 	}{
-		key:   args[0],
-		count: 1,
+		key: args[0],
 	}
 
 	if len(args) > 1 {
 		if ok := optIntErr(c, args[1], &opts.count, msgInvalidInt); !ok {
 			return
 		}
+		opts.countSet = true
 	}
 
 	if len(args) == 3 {
@@ -723,42 +725,54 @@ func (m *Miniredis) cmdHrandfield(c *server.Peer, cmd string, args []string) {
 	}
 
 	withTx(m, c, func(peer *server.Peer, ctx *connCtx) {
-		if opts.count == 0 {
-			peer.WriteLen(0)
-			return
-		}
 		db := m.db(ctx.selectedDB)
 		members := db.hashFields(opts.key)
-		// if cnt positive
-		cnt := 0
-		iterCnt := len(members)
-		if opts.count > 0 {
-			if opts.count > len(members) {
-				cnt = len(members)
-			} else {
-				cnt = opts.count
+		m.shuffle(members)
+
+		if !opts.countSet {
+			// > When called with just the key argument, return a random field from the
+			// hash value stored at key.
+			if len(members) == 0 {
+				peer.WriteNull()
+				return
 			}
-		} else {
-			cnt = -opts.count
-			iterCnt *= cnt
+			peer.WriteBulk(members[0])
+			return
 		}
 
-		p := m.randPerm(iterCnt)
-		if opts.withValues {
-			peer.WriteMapLen(cnt)
-			for i := 0; i < cnt; i++ {
-				idx := p[i] % len(members)
-				peer.WriteBulk(members[idx])
-				peer.WriteBulk(db.hashGet(opts.key, members[idx]))
+		if len(members) > abs(opts.count) {
+			members = members[:abs(opts.count)]
+		}
+		switch {
+		case opts.count >= 0:
+			// if count is positive there can't be duplicates, and the length is restricted
+		case opts.count < 0:
+			// if count is negative there can be duplicates, but length will match
+			if len(members) > 0 {
+				for len(members) < -opts.count {
+					members = append(members, members[rand.Intn(len(members))])
+				}
 			}
-			return
-		} else {
-			peer.WriteLen(cnt)
-			for i := 0; i < cnt; i++ {
-				idx := p[i] % len(members)
-				peer.WriteBulk(members[idx])
+		}
+
+		if opts.withValues {
+			peer.WriteMapLen(len(members))
+			for _, m := range members {
+				peer.WriteBulk(m)
+				peer.WriteBulk(db.hashGet(opts.key, m))
 			}
 			return
 		}
+		peer.WriteLen(len(members))
+		for _, m := range members {
+			peer.WriteBulk(m)
+		}
 	})
+}
+
+func abs(n int) int {
+	if n < 0 {
+		return -n
+	}
+	return n
 }
