@@ -4,7 +4,6 @@ package miniredis
 
 import (
 	"math/big"
-	"math/rand"
 	"strconv"
 	"strings"
 
@@ -750,7 +749,7 @@ func (m *Miniredis) cmdHrandfield(c *server.Peer, cmd string, args []string) {
 			// if count is negative there can be duplicates, but length will match
 			if len(members) > 0 {
 				for len(members) < -opts.count {
-					members = append(members, members[rand.Intn(len(members))])
+					members = append(members, members[m.randIntn(len(members))])
 				}
 			}
 		}
