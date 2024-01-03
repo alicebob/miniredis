@@ -1,6 +1,13 @@
 ## Changelog
 
 
+### v2.31.1
+
+- support COUNT in SCAN and ZSCAN (thanks @BarakSilverfort)
+- support for OBJECT IDLETIME (thanks @nerd2)
+- support for HRANDFIELD (thanks @sejin-P)
+
+
 ### v2.31.0
 
 - support for MEMORY USAGE (thanks @davidroman0O)
