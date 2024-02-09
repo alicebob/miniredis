@@ -608,11 +608,15 @@ func (db *RedisDB) setIntercard(keys []string, limit int) (int, error) {
 	}
 
 	smallestKey := keys[0]
-	for _, key := range keys {
+	smallestIdx := 0
+	for i, key := range keys {
 		if len(db.setKeys[key]) < len(db.setKeys[smallestKey]) {
 			smallestKey = key
+			smallestIdx = i
 		}
 	}
+	keys[smallestIdx] = keys[len(keys)-1]
+	keys = keys[:len(keys)-1]
 
 	count := 0
 	for item, _ := range db.setKeys[smallestKey] {
