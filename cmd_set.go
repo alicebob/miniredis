@@ -18,6 +18,7 @@ func commandsSet(m *Miniredis) {
 	m.srv.Register("SDIFFSTORE", m.cmdSdiffstore)
 	m.srv.Register("SINTER", m.cmdSinter)
 	m.srv.Register("SINTERSTORE", m.cmdSinterstore)
+	m.srv.Register("SINTERCARD", m.cmdSintercard)
 	m.srv.Register("SISMEMBER", m.cmdSismember)
 	m.srv.Register("SMEMBERS", m.cmdSmembers)
 	m.srv.Register("SMISMEMBER", m.cmdSmismember)
@@ -216,6 +217,70 @@ func (m *Miniredis) cmdSinterstore(c *server.Peer, cmd string, args []string) {
 		db.del(dest, true)
 		db.setSet(dest, set)
 		c.WriteInt(len(set))
+	})
+}
+
+// SINTERCARD
+func (m *Miniredis) cmdSintercard(c *server.Peer, cmd string, args []string) {
+	if len(args) < 2 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
+	}
+	if !m.handleAuth(c) {
+		return
+	}
+	if m.checkPubsub(c, cmd) {
+		return
+	}
+
+	var keys []string
+	var limit int
+
+	numKeys, err := strconv.Atoi(args[0])
+	if err != nil {
+		setDirty(c)
+		c.WriteError(msgInvalidInt)
+		return
+	}
+
+	args = args[1:]
+	if len(args) < numKeys {
+		setDirty(c)
+		c.WriteError(msgSyntaxError)
+		return
+	}
+	if numKeys <= 0 {
+		setDirty(c)
+		c.WriteError("ERR at least 1 input key is needed for SINTERCARD")
+		return
+	}
+	keys = args[:numKeys]
+
+	args = args[numKeys:]
+	if len(args) == 2 && strings.ToLower(args[0]) == "limit" {
+		limit, err = strconv.Atoi(args[1])
+		if err != nil {
+			setDirty(c)
+			c.WriteError(msgInvalidInt)
+			return
+		}
+	} else if len(args) > 0 {
+		setDirty(c)
+		c.WriteError(msgSyntaxError)
+		return
+	}
+
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
+		db := m.db(ctx.selectedDB)
+
+		count, err := db.setIntercard(keys, limit)
+		if err != nil {
+			c.WriteError(err.Error())
+			return
+		}
+
+		c.WriteInt(count)
 	})
 }
 

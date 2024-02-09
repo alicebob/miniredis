@@ -666,6 +666,120 @@ func TestSinterstore(t *testing.T) {
 	})
 }
 
+// Test SINTERCARD
+func TestSintercard(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := proto.Dial(s.Addr())
+	ok(t, err)
+	defer c.Close()
+
+	_, _ = s.SetAdd("s1", "a", "b", "c")
+	_, _ = s.SetAdd("s2", "b", "c", "d")
+	_, _ = s.SetAdd("s3", "c", "d", "e")
+
+	t.Run("no limit set", func(t *testing.T) {
+		mustDo(t, c,
+			"SINTERCARD", "2", "s1", "s2",
+			proto.Int(2),
+		)
+	})
+
+	t.Run("limit greater than result", func(t *testing.T) {
+		mustDo(t, c,
+			"SINTERCARD", "2", "s1", "s2", "LIMIT", "15",
+			proto.Int(2),
+		)
+	})
+
+	t.Run("limit of 0", func(t *testing.T) {
+		mustDo(t, c,
+			"SINTERCARD", "2", "s1", "s2", "LIMIT", "0",
+			proto.Int(2),
+		)
+	})
+
+	t.Run("limit of 1", func(t *testing.T) {
+		mustDo(t, c,
+			"SINTERCARD", "2", "s1", "s2", "LIMIT", "1",
+			proto.Int(1),
+		)
+	})
+
+	t.Run("multi intersection", func(t *testing.T) {
+		mustDo(t, c,
+			"SINTERCARD", "3", "s1", "s2", "s3",
+			proto.Int(1),
+		)
+	})
+
+	t.Run("nonexisting key", func(t *testing.T) {
+		mustDo(
+			t, c,
+			"SINTERCARD", "2", "s1", "NOT_A_KEY",
+			proto.Int(0),
+		)
+	})
+
+	t.Run("bad numKeys", func(t *testing.T) {
+		mustDo(
+			t, c,
+			"SINTERCARD", "two", "key1", "key2",
+			proto.Error(msgInvalidInt),
+		)
+	})
+
+	t.Run("too many keys limit", func(t *testing.T) {
+		mustDo(
+			t, c,
+			"SINTERCARD", "2", "key1", "key2", "key3", "LIMIT", "3",
+			proto.Error(msgSyntaxError),
+		)
+	})
+
+	t.Run("too many keys no limit", func(t *testing.T) {
+		mustDo(
+			t, c,
+			"SINTERCARD", "2", "key1", "key2", "key3",
+			proto.Error(msgSyntaxError),
+		)
+	})
+
+	t.Run("too few keys limit", func(t *testing.T) {
+		mustDo(
+			t, c,
+			"SINTERCARD", "4", "key1", "key2", "key3", "LIMIT", "3",
+			proto.Error(msgSyntaxError),
+		)
+	})
+
+	t.Run("too few keys no limit", func(t *testing.T) {
+		mustDo(
+			t, c,
+			"SINTERCARD", "4", "key1", "key2", "key3",
+			proto.Error(msgSyntaxError),
+		)
+	})
+
+	t.Run("bad limit", func(t *testing.T) {
+		mustDo(
+			t, c,
+			"SINTERCARD", "2", "key1", "key2", "LIMIT", "five",
+			proto.Error(msgInvalidInt),
+		)
+	})
+
+	t.Run("wrong type", func(t *testing.T) {
+		_ = s.Set("str", "value")
+
+		mustDo(t, c,
+			"SINTERCARD", "1", "str",
+			proto.Error(msgWrongType),
+		)
+	})
+}
+
 // Test SUNION
 func TestSunion(t *testing.T) {
 	s, err := Run()
