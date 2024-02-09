@@ -143,6 +143,7 @@ Implemented commands:
    - SDIFFSTORE
    - SINTER
    - SINTERSTORE
+   - SINTERCARD
    - SISMEMBER
    - SMEMBERS
    - SMISMEMBER
