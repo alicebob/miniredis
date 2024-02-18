@@ -56,6 +56,7 @@ const (
 	msgRankIsZero           = "ERR RANK can't be zero: use 1 to start from the first match, 2 from the second ... or use negative to start from the end of the list"
 	msgCountIsNegative      = "ERR COUNT can't be negative"
 	msgMaxLengthIsNegative  = "ERR MAXLEN can't be negative"
+	msgLimitIsNegative      = "ERR LIMIT can't be negative"
 	msgMemorySubcommand     = "ERR unknown subcommand '%s'. Try MEMORY HELP."
 )
 

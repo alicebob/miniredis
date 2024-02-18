@@ -280,6 +280,46 @@ func TestSetSinter(t *testing.T) {
 	})
 }
 
+func TestSetSintercard(t *testing.T) {
+	skip(t)
+	testRaw(t, func(c *client) {
+		c.Do("SADD", "s1", "aap", "noot", "mies")
+		c.Do("SADD", "s2", "noot", "mies", "vuur")
+		c.Do("SADD", "s3", "mies", "wim")
+		c.Do("SINTERCARD", "1", "s1")
+		c.Do("SINTERCARD", "2", "s1", "s2")
+		c.Do("SINTERCARD", "3", "s1", "s2", "s3")
+		c.Do("SINTERCARD", "1", "nosuch")
+		c.Do("SINTERCARD", "5", "s1", "nosuch", "s2", "nosuch", "s3")
+		c.Do("SINTERCARD", "2", "s1", "s1")
+
+		c.Do("SINTERCARD", "1", "s1", "LIMIT", "1")
+		c.Do("SINTERCARD", "2", "s1", "s2", "LIMIT", "0")
+		c.Do("SINTERCARD", "2", "s1", "s2", "LIMIT", "1")
+		c.Do("SINTERCARD", "2", "s1", "s2", "LIMIT", "2")
+		c.Do("SINTERCARD", "2", "s1", "s2", "LIMIT", "3")
+
+		// failure cases
+		c.Error("wrong number", "SINTERCARD")
+		c.Error("wrong number", "SINTERCARD", "0")
+		c.Error("wrong number", "SINTERCARD", "")
+		c.Error("wrong number", "SINTERCARD", "s1")
+		c.Error("greater than 0", "SINTERCARD", "s1", "s2")
+		c.Error("greater than 0", "SINTERCARD", "-2", "s1", "s2")
+		c.Error("greater than 0", "SINTERCARD", "-1", "s1", "s2")
+		c.Error("greater than 0", "SINTERCARD", "0", "s1", "s2")
+		c.Error("syntax error", "SINTERCARD", "1", "s1", "s2")
+		c.Error("can't be greater", "SINTERCARD", "3", "s1", "s2")
+		// Wrong type
+		c.Do("SET", "str", "I am a string")
+		c.Error("wrong kind", "SINTERCARD", "2", "s1", "str")
+		c.Error("wrong kind", "SINTERCARD", "2", "nosuch", "str")
+		c.Error("wrong kind", "SINTERCARD", "2", "str", "nosuch")
+		c.Error("wrong kind", "SINTERCARD", "2", "str", "s1")
+		c.Error("can't be negative", "SINTERCARD", "2", "s1", "s2", "LIMIT", "-1")
+	})
+}
+
 func TestSetSunion(t *testing.T) {
 	skip(t)
 	testRaw(t, func(c *client) {

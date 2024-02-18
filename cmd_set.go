@@ -16,9 +16,9 @@ func commandsSet(m *Miniredis) {
 	m.srv.Register("SCARD", m.cmdScard)
 	m.srv.Register("SDIFF", m.cmdSdiff)
 	m.srv.Register("SDIFFSTORE", m.cmdSdiffstore)
+	m.srv.Register("SINTERCARD", m.cmdSintercard)
 	m.srv.Register("SINTER", m.cmdSinter)
 	m.srv.Register("SINTERSTORE", m.cmdSinterstore)
-	m.srv.Register("SINTERCARD", m.cmdSintercard)
 	m.srv.Register("SISMEMBER", m.cmdSismember)
 	m.srv.Register("SMEMBERS", m.cmdSmembers)
 	m.srv.Register("SMISMEMBER", m.cmdSmismember)
@@ -234,37 +234,45 @@ func (m *Miniredis) cmdSintercard(c *server.Peer, cmd string, args []string) {
 		return
 	}
 
-	var keys []string
-	var limit int
+	opts := struct {
+		keys  []string
+		limit int
+	}{}
 
 	numKeys, err := strconv.Atoi(args[0])
 	if err != nil {
 		setDirty(c)
-		c.WriteError(msgInvalidInt)
+		c.WriteError("ERR numkeys should be greater than 0")
+		return
+	}
+	if numKeys < 1 {
+		setDirty(c)
+		c.WriteError("ERR numkeys should be greater than 0")
 		return
 	}
 
 	args = args[1:]
 	if len(args) < numKeys {
 		setDirty(c)
-		c.WriteError(msgSyntaxError)
+		c.WriteError("ERR Number of keys can't be greater than number of args")
 		return
 	}
-	if numKeys <= 0 {
-		setDirty(c)
-		c.WriteError("ERR at least 1 input key is needed for SINTERCARD")
-		return
-	}
-	keys = args[:numKeys]
+	opts.keys = args[:numKeys]
 
 	args = args[numKeys:]
 	if len(args) == 2 && strings.ToLower(args[0]) == "limit" {
-		limit, err = strconv.Atoi(args[1])
+		l, err := strconv.Atoi(args[1])
 		if err != nil {
 			setDirty(c)
 			c.WriteError(msgInvalidInt)
 			return
 		}
+		if l < 0 {
+			setDirty(c)
+			c.WriteError(msgLimitIsNegative)
+			return
+		}
+		opts.limit = l
 	} else if len(args) > 0 {
 		setDirty(c)
 		c.WriteError(msgSyntaxError)
@@ -274,12 +282,11 @@ func (m *Miniredis) cmdSintercard(c *server.Peer, cmd string, args []string) {
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
 
-		count, err := db.setIntercard(keys, limit)
+		count, err := db.setIntercard(opts.keys, opts.limit)
 		if err != nil {
 			c.WriteError(err.Error())
 			return
 		}
-
 		c.WriteInt(count)
 	})
 }
