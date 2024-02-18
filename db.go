@@ -619,7 +619,7 @@ func (db *RedisDB) setIntercard(keys []string, limit int) (int, error) {
 	keys = keys[:len(keys)-1]
 
 	count := 0
-	for item, _ := range db.setKeys[smallestKey] {
+	for item := range db.setKeys[smallestKey] {
 		inIntersection := true
 		for _, key := range keys {
 			if _, ok := db.setKeys[key][item]; !ok {
