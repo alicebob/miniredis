@@ -726,7 +726,7 @@ func TestSintercard(t *testing.T) {
 		mustDo(
 			t, c,
 			"SINTERCARD", "two", "key1", "key2",
-			proto.Error(msgInvalidInt),
+			proto.Error("ERR numkeys should be greater than 0"),
 		)
 	})
 
@@ -758,7 +758,7 @@ func TestSintercard(t *testing.T) {
 		mustDo(
 			t, c,
 			"SINTERCARD", "4", "key1", "key2", "key3",
-			proto.Error(msgSyntaxError),
+			proto.Error("ERR Number of keys can't be greater than number of args"),
 		)
 	})
 
