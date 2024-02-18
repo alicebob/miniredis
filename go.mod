@@ -5,6 +5,4 @@ require (
 	github.com/yuin/gopher-lua v1.1.1
 )
 
-require github.com/DmitriyVTitov/size v1.5.0
-
 go 1.14
