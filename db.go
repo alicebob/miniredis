@@ -590,6 +590,54 @@ func (db *RedisDB) setInter(keys []string) (setKey, error) {
 	return s, nil
 }
 
+// setIntercard implements the logic behind SINTER*
+// len keys needs to be > 0
+func (db *RedisDB) setIntercard(keys []string, limit int) (int, error) {
+	// all keys must either not exist, or be of type "set".
+	allExist := true
+	for _, key := range keys {
+		exists := db.exists(key)
+		allExist = allExist && exists
+		if exists && db.t(key) != "set" {
+			return 0, ErrWrongType
+		}
+	}
+
+	if !allExist {
+		return 0, nil
+	}
+
+	smallestKey := keys[0]
+	smallestIdx := 0
+	for i, key := range keys {
+		if len(db.setKeys[key]) < len(db.setKeys[smallestKey]) {
+			smallestKey = key
+			smallestIdx = i
+		}
+	}
+	keys[smallestIdx] = keys[len(keys)-1]
+	keys = keys[:len(keys)-1]
+
+	count := 0
+	for item := range db.setKeys[smallestKey] {
+		inIntersection := true
+		for _, key := range keys {
+			if _, ok := db.setKeys[key][item]; !ok {
+				inIntersection = false
+				break
+			}
+		}
+		if inIntersection {
+			count++
+			if count == limit {
+				break
+			}
+		}
+	}
+
+	return count, nil
+}
+
 // setUnion implements the logic behind SUNION*
 func (db *RedisDB) setUnion(keys []string) (setKey, error) {
 	key := keys[0]

@@ -16,6 +16,7 @@ func commandsSet(m *Miniredis) {
 	m.srv.Register("SCARD", m.cmdScard)
 	m.srv.Register("SDIFF", m.cmdSdiff)
 	m.srv.Register("SDIFFSTORE", m.cmdSdiffstore)
+	m.srv.Register("SINTERCARD", m.cmdSintercard)
 	m.srv.Register("SINTER", m.cmdSinter)
 	m.srv.Register("SINTERSTORE", m.cmdSinterstore)
 	m.srv.Register("SISMEMBER", m.cmdSismember)
@@ -216,6 +217,77 @@ func (m *Miniredis) cmdSinterstore(c *server.Peer, cmd string, args []string) {
 		db.del(dest, true)
 		db.setSet(dest, set)
 		c.WriteInt(len(set))
+	})
+}
+
+// SINTERCARD
+func (m *Miniredis) cmdSintercard(c *server.Peer, cmd string, args []string) {
+	if len(args) < 2 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
+	}
+	if !m.handleAuth(c) {
+		return
+	}
+	if m.checkPubsub(c, cmd) {
+		return
+	}
+
+	opts := struct {
+		keys  []string
+		limit int
+	}{}
+
+	numKeys, err := strconv.Atoi(args[0])
+	if err != nil {
+		setDirty(c)
+		c.WriteError("ERR numkeys should be greater than 0")
+		return
+	}
+	if numKeys < 1 {
+		setDirty(c)
+		c.WriteError("ERR numkeys should be greater than 0")
+		return
+	}
+
+	args = args[1:]
+	if len(args) < numKeys {
+		setDirty(c)
+		c.WriteError("ERR Number of keys can't be greater than number of args")
+		return
+	}
+	opts.keys = args[:numKeys]
+
+	args = args[numKeys:]
+	if len(args) == 2 && strings.ToLower(args[0]) == "limit" {
+		l, err := strconv.Atoi(args[1])
+		if err != nil {
+			setDirty(c)
+			c.WriteError(msgInvalidInt)
+			return
+		}
+		if l < 0 {
+			setDirty(c)
+			c.WriteError(msgLimitIsNegative)
+			return
+		}
+		opts.limit = l
+	} else if len(args) > 0 {
+		setDirty(c)
+		c.WriteError(msgSyntaxError)
+		return
+	}
+
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
+		db := m.db(ctx.selectedDB)
+
+		count, err := db.setIntercard(opts.keys, opts.limit)
+		if err != nil {
+			c.WriteError(err.Error())
+			return
+		}
+		c.WriteInt(count)
 	})
 }
 
