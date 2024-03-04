@@ -167,13 +167,18 @@ func TestStringSetnx(t *testing.T) {
 func TestExpire(t *testing.T) {
 	skip(t)
 	testRaw(t, func(c *client) {
+		c.Do("EXPIRETIME", "missing")
+
 		c.Do("SET", "foo", "bar")
+		c.Do("EXPIRETIME", "foo")
+
 		c.Do("EXPIRE", "foo", "12")
 		c.Do("TTL", "foo")
 		c.Do("TTL", "nosuch")
 		c.Do("SET", "foo", "bar")
 		c.Do("PEXPIRE", "foo", "999999")
 		c.Do("EXPIREAT", "foo", "2234567890")
+		c.Do("EXPIRETIME", "foo")
 		c.Do("PEXPIREAT", "foo", "2234567890000")
 		// c.Do("PTTL", "foo")
 		c.Do("PTTL", "nosuch")

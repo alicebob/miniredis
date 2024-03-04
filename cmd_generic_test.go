@@ -362,6 +362,32 @@ func TestType(t *testing.T) {
 	})
 }
 
+func TestExpireTime(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := proto.Dial(s.Addr())
+	ok(t, err)
+	defer c.Close()
+
+	t.Run("nosuch", func(t *testing.T) {
+		mustDo(t, c, "EXPIRETIME", "nosuch", proto.Int(-2))
+	})
+
+	t.Run("noexpire", func(t *testing.T) {
+		s.Set("noexpire", "")
+		mustDo(t, c, "EXPIRETIME", "noexpire", proto.Int(-1))
+	})
+
+	t.Run("", func(t *testing.T) {
+		s.Set("foo", "")
+		must1(t, c, "EXPIREAT", "foo", "10413792000") // Mon Jan 01 2300 00:00:00 GMT+0000
+		mustDo(t, c, "EXPIRETIME", "foo",
+			proto.Int(10413792000),
+		)
+	})
+}
+
 func TestExists(t *testing.T) {
 	s, err := Run()
 	ok(t, err)

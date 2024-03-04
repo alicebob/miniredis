@@ -12,6 +12,13 @@ import (
 	"github.com/alicebob/miniredis/v2/server"
 )
 
+const (
+	// expiretimeReplyNoExpiration is returned by [Miniredis.cmdExpireTime] if the key exists but has no associated expiration time
+	expiretimeReplyNoExpiration = -1
+	// expiretimeReplyMissingKey is returned by [Miniredis.cmdExpireTime] if the key does not exist
+	expiretimeReplyMissingKey = -2
+)
+
 // commandsGeneric handles EXPIRE, TTL, PERSIST, &c.
 func commandsGeneric(m *Miniredis) {
 	m.srv.Register("COPY", m.cmdCopy)
@@ -20,6 +27,7 @@ func commandsGeneric(m *Miniredis) {
 	m.srv.Register("EXISTS", m.cmdExists)
 	m.srv.Register("EXPIRE", makeCmdExpire(m, false, time.Second))
 	m.srv.Register("EXPIREAT", makeCmdExpire(m, true, time.Second))
+	m.srv.Register("EXPIRETIME", m.cmdExpireTime)
 	m.srv.Register("KEYS", m.cmdKeys)
 	// MIGRATE
 	m.srv.Register("MOVE", m.cmdMove)
@@ -143,6 +151,43 @@ func makeCmdExpire(m *Miniredis, unix bool, d time.Duration) func(*server.Peer, 
 			c.WriteInt(1)
 		})
 	}
+}
+
+// cmdExpireTime returns the absolute Unix timestamp (since January 1, 1970) in seconds at which the given key will expire.
+// See [redis documentation].
+//
+// [redis documentation]: https://redis.io/commands/expiretime/
+func (m *Miniredis) cmdExpireTime(c *server.Peer, cmd string, args []string) {
+	if len(args) != 1 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
+	}
+
+	if !m.handleAuth(c) {
+		return
+	}
+	if m.checkPubsub(c, cmd) {
+		return
+	}
+
+	key := args[0]
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
+		db := m.db(ctx.selectedDB)
+
+		if _, ok := db.keys[key]; !ok {
+			c.WriteInt(expiretimeReplyMissingKey)
+			return
+		}
+
+		ttl, ok := db.ttl[key]
+		if !ok {
+			c.WriteInt(expiretimeReplyNoExpiration)
+			return
+		}
+
+		c.WriteInt(int(m.effectiveNow().Add(ttl).Unix()))
+	})
 }
 
 // TOUCH
