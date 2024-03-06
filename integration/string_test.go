@@ -226,6 +226,9 @@ func TestExpire(t *testing.T) {
 		c.Error("wrong number", "PEXPIREAT")
 		c.Error("wrong number", "PTTL")
 		c.Error("wrong number", "PTTL", "too", "many")
+
+		c.Error("wrong number", "EXPIRETIME")
+		c.Error("wrong number", "EXPIRETIME", "too", "many")
 	})
 }
 
