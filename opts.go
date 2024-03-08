@@ -47,3 +47,14 @@ func optDuration(c *server.Peer, src string, dest *time.Duration) bool {
 	*dest = time.Duration(n*1_000_000) * time.Microsecond
 	return true
 }
+
+func optFloat(c *server.Peer, src string, dest *float64) bool {
+	n, err := strconv.ParseFloat(src, 64)
+	if err != nil {
+		setDirty(c)
+		c.WriteError(msgInvalidInt) // FIXME
+		return false
+	}
+	*dest = n
+	return true
+}

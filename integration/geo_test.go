@@ -934,3 +934,63 @@ func TestGeo(t *testing.T) {
 		c.DoLoosely("ZRANGE", "resbymemd", "0", "-1", "WITHSCORES")
 	})
 }
+
+func TestGeosearch(t *testing.T) {
+	skip(t)
+	t.Run("basic", func(t *testing.T) {
+		testRaw(t, func(c *client) {
+			c.Do("GEOADD",
+				"stations",
+				"-73.99106999861966", "40.73005400028978", "Astor Pl",
+				"-74.00019299927328", "40.71880300107709", "Canal St",
+				"-73.98384899986625", "40.76172799961419", "50th St",
+			)
+			c.Do("GEOSEARCH", "stations", "FROMLONLAT", "-73.9718893", "40.7728773", "BYRADIUS", "4", "km")
+			c.Do("GEOSEARCH", "stations", "FROMLONLAT", "-73.9718893", "40.7728773", "BYRADIUS", "4", "KM") // case of KM
+			c.Do("GEOSEARCH", "stations", "FROMLONLAT", "1.0", "1.0", "BYRADIUS", "1", "km")
+			// c.Do("GEOSEARCH", "stations", "FROMLONLAT", "-73.9718893", "40.7728773", "BYRADIUS", "4", "ft", "WITHDIST")
+			// c.Do("GEORADIUS", "stations", "FROMLONLAT", "-73.9718893", "40.7728773", "BYRADIUS", "4", "m", "WITHDIST")
+
+			/*
+				// redis has more precision in the coords
+				c.Do("GEORADIUS", "stations", "-73.9718893", "40.7728773", "4", "m", "WITHCOORD")
+				c.DoRounded(3, "GEORADIUS", "stations", "-73.9718893", "40.7728773", "400", "km", "WITHDIST", "WITHCOORD")
+				c.DoRounded(3, "GEORADIUS", "stations", "-73.9718893", "40.7728773", "400", "km", "WITHCOORD", "WITHDIST")
+				c.DoRounded(3, "GEORADIUS", "stations", "-73.9718893", "40.7728773", "400", "km", "WITHCOORD", "WITHCOORD", "WITHCOORD")
+				c.DoRounded(3, "GEORADIUS", "stations", "-73.9718893", "40.7728773", "400", "km", "WITHDIST", "WITHDIST", "WITHDIST")
+				// FIXME: the distances don't quite match for miles or km
+				c.DoRounded(3, "GEORADIUS", "stations", "-73.9718893", "40.7728773", "400", "mi", "WITHDIST")
+				c.DoRounded(3, "GEORADIUS", "stations", "-73.9718893", "40.7728773", "400", "km", "WITHDIST")
+
+				// Sorting
+				c.Do("GEORADIUS", "stations", "-73.9718893", "40.7728773", "400", "km", "DESC")
+				c.Do("GEORADIUS", "stations", "-73.9718893", "40.7728773", "400", "km", "ASC")
+				c.Do("GEORADIUS", "stations", "-73.9718893", "40.7728773", "400", "km", "ASC", "DESC", "ASC")
+
+				// COUNT
+				c.DoRounded(3, "GEORADIUS", "stations", "-73.9718893", "40.7728773", "400", "km", "ASC", "COUNT", "1")
+				c.DoRounded(3, "GEORADIUS", "stations", "-73.9718893", "40.7728773", "400", "km", "ASC", "COUNT", "2")
+				c.DoRounded(3, "GEORADIUS", "stations", "-73.9718893", "40.7728773", "400", "km", "ASC", "COUNT", "999")
+				c.Error("syntax error", "GEORADIUS", "stations", "-73.9718893", "40.7728773", "400", "km", "COUNT")
+				c.Error("COUNT must", "GEORADIUS", "stations", "-73.9718893", "40.7728773", "400", "km", "COUNT", "0")
+				c.Error("COUNT must", "GEORADIUS", "stations", "-73.9718893", "40.7728773", "400", "km", "COUNT", "-12")
+				c.Error("not an integer", "GEORADIUS", "stations", "-73.9718893", "40.7728773", "400", "km", "COUNT", "foobar")
+
+				// non-existing key
+				c.Do("GEORADIUS", "foo", "-73.9718893", "40.7728773", "4", "km")
+
+				// no error in redis, for some reason
+				// c.Do("GEORADIUS", "foo", "-73.9718893", "40.7728773", "4", "km", "FOOBAR")
+				c.Error("syntax error", "GEORADIUS", "stations", "-73.9718893", "40.7728773", "400", "km", "ASC", "FOOBAR")
+
+				// GEORADIUS_RO
+				c.Do("GEORADIUS_RO", "stations", "-73.9718893", "40.7728773", "4", "km")
+				c.Do("GEORADIUS_RO", "stations", "1.0", "1.0", "1", "km")
+				c.Error("syntax error", "GEORADIUS_RO", "stations", "-73.9718893", "40.7728773", "4", "km", "STORE", "bar")
+				c.Error("syntax error", "GEORADIUS_RO", "stations", "-73.9718893", "40.7728773", "4", "km", "STOREDIST", "bar")
+				c.Error("syntax error", "GEORADIUS_RO", "stations", "-73.9718893", "40.7728773", "4", "km", "STORE")
+				c.Error("syntax error", "GEORADIUS_RO", "stations", "-73.9718893", "40.7728773", "4", "km", "STOREDIST")
+			*/
+		})
+	})
+}

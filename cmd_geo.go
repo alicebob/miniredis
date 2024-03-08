@@ -20,6 +20,7 @@ func commandsGeo(m *Miniredis) {
 	m.srv.Register("GEORADIUS_RO", m.cmdGeoradius)
 	m.srv.Register("GEORADIUSBYMEMBER", m.cmdGeoradiusbymember)
 	m.srv.Register("GEORADIUSBYMEMBER_RO", m.cmdGeoradiusbymember)
+	m.srv.Register("GEOSEARCH", m.cmdGeosearch)
 }
 
 // GEOADD
@@ -606,4 +607,192 @@ func parseUnit(u string) float64 {
 	default:
 		return 0
 	}
+}
+
+type tuple struct {
+	a float64
+	b float64
+}
+
+// GEOSEARCH
+func (m *Miniredis) cmdGeosearch(c *server.Peer, cmd string, args []string) {
+	if len(args) < 2 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
+	}
+	if !m.handleAuth(c) {
+		return
+	}
+	if m.checkPubsub(c, cmd) {
+		return
+	}
+
+	var opts struct {
+		key            string
+		withFromMember bool
+		fromMember     string
+		withFromLonLat bool
+		fromLonLat     tuple
+		withByRadius   bool
+		byRadius       float64
+		withByBox      bool
+		byBox          tuple
+		direction      direction // unsorted
+		count          int
+		withAny        bool
+		withCoord      bool
+		withDist       bool
+		withHash       bool
+	}
+
+	opts.key, args = args[0], args[1:]
+
+	fmt.Printf("args: %v\n", args)
+
+	switch strings.ToUpper(args[0]) {
+	case "FROMMEMBER":
+		if len(args) < 2 {
+			setDirty(c)
+			c.WriteError(errWrongNumber(cmd))
+			return
+		}
+		opts.withFromMember = true
+		opts.fromMember = args[1]
+		args = args[2:]
+	case "FROMLONLAT":
+		if len(args) < 3 {
+			setDirty(c)
+			c.WriteError(errWrongNumber(cmd))
+			return
+		}
+		opts.withFromLonLat = true
+		if !optFloat(c, args[1], &opts.fromLonLat.a) {
+			return
+		}
+		if !optFloat(c, args[2], &opts.fromLonLat.b) {
+			return
+		}
+		args = args[3:]
+	default:
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
+	}
+
+	if len(args) < 3 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
+	}
+	switch strings.ToUpper(args[0]) {
+	case "BYRADIUS":
+		if len(args) < 3 {
+			setDirty(c)
+			c.WriteError(errWrongNumber(cmd))
+			return
+		}
+		opts.withByRadius = true
+		if !optFloat(c, args[1], &opts.byRadius) {
+			return
+		}
+		toMeter := parseUnit(args[2])
+		if toMeter == 0 {
+			setDirty(c)
+			c.WriteError(errWrongNumber(cmd))
+			return
+		}
+		opts.byRadius *= toMeter
+		args = args[3:]
+	case "BYBOX":
+		if len(args) < 4 {
+			setDirty(c)
+			c.WriteError(errWrongNumber(cmd))
+			return
+		}
+		opts.withByBox = true
+		if !optFloat(c, args[1], &opts.byBox.a) {
+			return
+		}
+		if !optFloat(c, args[2], &opts.byBox.b) {
+			return
+		}
+		toMeter := parseUnit(args[3])
+		if toMeter == 0 {
+			setDirty(c)
+			c.WriteError(errWrongNumber(cmd))
+			return
+		}
+		opts.byBox.a *= toMeter
+		opts.byBox.b *= toMeter
+		args = args[4:]
+	default:
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
+	}
+
+	// FIXME: ASC|DESC
+	// FIXME: COUNT n ANY
+	// FIXME: WITHCOORD
+	// FIXME: WITHDIST
+	// FIXME: WITHHASH
+
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
+		db := m.db(ctx.selectedDB)
+		members := db.ssetElements(opts.key)
+
+		if !opts.withFromLonLat {
+			panic("wip")
+		}
+		if !opts.withByRadius {
+			panic("wip")
+		}
+		matches := withinRadius(members, opts.fromLonLat.a, opts.fromLonLat.b, opts.byRadius)
+
+		/*
+			// deal with ASC/DESC
+			if opts.direction != unsorted {
+				sort.Slice(matches, func(i, j int) bool {
+					if opts.direction == desc {
+						return matches[i].Distance > matches[j].Distance
+					}
+					return matches[i].Distance < matches[j].Distance
+				})
+			}
+
+			// deal with COUNT
+			if opts.count > 0 && len(matches) > opts.count {
+				matches = matches[:opts.count]
+			}
+		*/
+
+		c.WriteLen(len(matches))
+		for _, member := range matches {
+			// if !opts.withDist && !opts.withCoord {
+			c.WriteBulk(member.Name)
+			continue
+			// }
+
+			/*
+				len := 1
+				if opts.withDist {
+					len++
+				}
+				if opts.withCoord {
+					len++
+				}
+				c.WriteLen(len)
+				c.WriteBulk(member.Name)
+				if opts.withDist {
+					c.WriteBulk(fmt.Sprintf("%.4f", member.Distance/toMeter))
+				}
+				if opts.withCoord {
+					c.WriteLen(2)
+					c.WriteBulk(fmt.Sprintf("%f", member.Longitude))
+					c.WriteBulk(fmt.Sprintf("%f", member.Latitude))
+				}
+			*/
+		}
+	})
 }
