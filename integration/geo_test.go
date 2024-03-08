@@ -103,6 +103,7 @@ func TestGeodist(t *testing.T) {
 		c.Do("GEODIST", "nosuch", "Catania", "Palermo")
 		c.DoRounded(2, "GEODIST", "Sicily", "Palermo", "Catania", "m")
 		c.Do("GEODIST", "Sicily", "Palermo", "Catania", "km")
+		c.Do("GEODIST", "Sicily", "Palermo", "Catania", "KM")
 		c.Do("GEODIST", "Sicily", "Palermo", "Catania", "mi")
 		c.DoRounded(2, "GEODIST", "Sicily", "Palermo", "Catania", "ft")
 		c.Do("GEODIST", "Sicily", "Palermo", "Palermo")
@@ -112,6 +113,7 @@ func TestGeodist(t *testing.T) {
 		c.Error("wrong number", "GEODIST", "Sicily")
 		c.Error("wrong number", "GEODIST", "Sicily", "Palermo")
 		c.Error("syntax error", "GEODIST", "Sicily", "Palermo", "Palermo", "miles", "too many")
+		c.Error("unsupported unit provided. please use M, KM, FT, MI", "GEODIST", "Sicily", "Palermo", "Catania", "foobar")
 		c.Do("SET", "string", "123")
 		c.Error("wrong kind", "GEODIST", "string", "a", "b")
 	})
@@ -128,6 +130,7 @@ func TestGeoradius(t *testing.T) {
 				"-73.98384899986625", "40.76172799961419", "50th St",
 			)
 			c.Do("GEORADIUS", "stations", "-73.9718893", "40.7728773", "4", "km")
+			c.Do("GEORADIUS", "stations", "-73.9718893", "40.7728773", "4", "KM")
 			c.Do("GEORADIUS", "stations", "1.0", "1.0", "1", "km")
 			c.Do("GEORADIUS", "stations", "-73.9718893", "40.7728773", "4", "ft", "WITHDIST")
 			c.Do("GEORADIUS", "stations", "-73.9718893", "40.7728773", "4", "m", "WITHDIST")
