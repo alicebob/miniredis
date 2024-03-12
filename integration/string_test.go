@@ -168,9 +168,11 @@ func TestExpire(t *testing.T) {
 	skip(t)
 	testRaw(t, func(c *client) {
 		c.Do("EXPIRETIME", "missing")
+		c.Do("PEXPIRETIME", "missing")
 
 		c.Do("SET", "foo", "bar")
 		c.Do("EXPIRETIME", "foo")
+		c.Do("PEXPIRETIME", "foo")
 
 		c.Do("EXPIRE", "foo", "12")
 		c.Do("TTL", "foo")
@@ -178,8 +180,9 @@ func TestExpire(t *testing.T) {
 		c.Do("SET", "foo", "bar")
 		c.Do("PEXPIRE", "foo", "999999")
 		c.Do("EXPIREAT", "foo", "2234567890")
+		c.Do("PEXPIREAT", "foo", "2234567890123")
 		c.Do("EXPIRETIME", "foo")
-		c.Do("PEXPIREAT", "foo", "2234567890000")
+		c.Do("PEXPIRETIME", "foo")
 		// c.Do("PTTL", "foo")
 		c.Do("PTTL", "nosuch")
 
@@ -229,6 +232,8 @@ func TestExpire(t *testing.T) {
 
 		c.Error("wrong number", "EXPIRETIME")
 		c.Error("wrong number", "EXPIRETIME", "too", "many")
+		c.Error("wrong number", "PEXPIRETIME")
+		c.Error("wrong number", "PEXPIRETIME", "too", "many")
 	})
 }
 
