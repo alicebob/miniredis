@@ -388,6 +388,32 @@ func TestExpireTime(t *testing.T) {
 	})
 }
 
+func TestPExpireTime(t *testing.T) {
+	s, err := Run()
+	ok(t, err)
+	defer s.Close()
+	c, err := proto.Dial(s.Addr())
+	ok(t, err)
+	defer c.Close()
+
+	t.Run("nosuch", func(t *testing.T) {
+		mustDo(t, c, "PEXPIRETIME", "nosuch", proto.Int(-2))
+	})
+
+	t.Run("noexpire", func(t *testing.T) {
+		s.Set("noexpire", "")
+		mustDo(t, c, "PEXPIRETIME", "noexpire", proto.Int(-1))
+	})
+
+	t.Run("", func(t *testing.T) {
+		s.Set("foo", "")
+		must1(t, c, "PEXPIREAT", "foo", "10413792000123") // Mon Jan 01 2300 00:00:00.123 GMT+0000
+		mustDo(t, c, "PEXPIRETIME", "foo",
+			proto.Int(10413792000123),
+		)
+	})
+}
+
 func TestExists(t *testing.T) {
 	s, err := Run()
 	ok(t, err)
