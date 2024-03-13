@@ -288,7 +288,7 @@ func TestGeodist(t *testing.T) {
 		)
 		mustDo(t, c,
 			"GEODIST", "Sicily", "Palermo", "Catania", "miles",
-			proto.Error("ERR unsupported unit provided. please use m, km, ft, mi"),
+			proto.Error("ERR unsupported unit provided. please use M, KM, FT, MI"),
 		)
 		mustDo(t, c,
 			"GEODIST", "Sicily", "Palermo", "Catania", "m", "too many",

@@ -39,15 +39,17 @@ Implemented commands:
    - EXISTS
    - EXPIRE
    - EXPIREAT
+   - EXPIRETIME
    - KEYS
    - MOVE
    - PERSIST
    - PEXPIRE
    - PEXPIREAT
+   - PEXPIRETIME
    - PTTL
+   - RANDOMKEY -- see m.Seed(...)
    - RENAME
    - RENAMENX
-   - RANDOMKEY -- see m.Seed(...)
    - SCAN
    - TOUCH
    - TTL

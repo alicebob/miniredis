@@ -1,6 +1,13 @@
 ## Changelog
 
 
+### v2.32.1
+
+- support for SINTERCARD (thanks @s-barr-fetch)
+- support for EXPIRETIME and PEXPIRETIME (thanks @wszaranski)
+- fix GEO* units to be case insensitive
+
+
 ### v2.31.1
 
 - support COUNT in SCAN and ZSCAN (thanks @BarakSilverfort)
