@@ -3,6 +3,7 @@
 package miniredis
 
 import (
+	"errors"
 	"fmt"
 	"sort"
 	"strconv"
@@ -597,6 +598,60 @@ func (m *Miniredis) cmdRenamenx(c *server.Peer, cmd string, args []string) {
 	})
 }
 
+type scanOpts struct {
+	cursor    int
+	count     int
+	withMatch bool
+	match     string
+	withType  bool
+	_type     string
+}
+
+func scanParse(cmd string, args []string) (*scanOpts, error) {
+	var opts scanOpts
+	if err := optIntSimple(args[0], &opts.cursor); err != nil {
+		return nil, errors.New(msgInvalidCursor)
+	}
+	args = args[1:]
+
+	// MATCH, COUNT and TYPE options
+	for len(args) > 0 {
+		if strings.ToLower(args[0]) == "count" {
+			if len(args) < 2 {
+				return nil, errors.New(msgSyntaxError)
+			}
+			count, err := strconv.Atoi(args[1])
+			if err != nil || count < 0 {
+				return nil, errors.New(msgInvalidInt)
+			}
+			if count == 0 {
+				return nil, errors.New(msgSyntaxError)
+			}
+			opts.count = count
+			args = args[2:]
+			continue
+		}
+		if strings.ToLower(args[0]) == "match" {
+			if len(args) < 2 {
+				return nil, errors.New(msgSyntaxError)
+			}
+			opts.withMatch = true
+			opts.match, args = args[1], args[2:]
+			continue
+		}
+		if strings.ToLower(args[0]) == "type" {
+			if len(args) < 2 {
+				return nil, errors.New(msgSyntaxError)
+			}
+			opts.withType = true
+			opts._type, args = strings.ToLower(args[1]), args[2:]
+			continue
+		}
+		return nil, errors.New(msgSyntaxError)
+	}
+	return &opts, nil
+}
+
 // SCAN
 func (m *Miniredis) cmdScan(c *server.Peer, cmd string, args []string) {
 	if len(args) < 1 {
@@ -611,65 +666,10 @@ func (m *Miniredis) cmdScan(c *server.Peer, cmd string, args []string) {
 		return
 	}
 
-	var opts struct {
-		cursor    int
-		count     int
-		withMatch bool
-		match     string
-		withType  bool
-		_type     string
-	}
-
-	if ok := optIntErr(c, args[0], &opts.cursor, msgInvalidCursor); !ok {
-		return
-	}
-	args = args[1:]
-
-	// MATCH, COUNT and TYPE options
-	for len(args) > 0 {
-		if strings.ToLower(args[0]) == "count" {
-			if len(args) < 2 {
-				setDirty(c)
-				c.WriteError(msgSyntaxError)
-				return
-			}
-			count, err := strconv.Atoi(args[1])
-			if err != nil || count < 0 {
-				setDirty(c)
-				c.WriteError(msgInvalidInt)
-				return
-			}
-			if count == 0 {
-				setDirty(c)
-				c.WriteError(msgSyntaxError)
-				return
-			}
-			opts.count = count
-			args = args[2:]
-			continue
-		}
-		if strings.ToLower(args[0]) == "match" {
-			if len(args) < 2 {
-				setDirty(c)
-				c.WriteError(msgSyntaxError)
-				return
-			}
-			opts.withMatch = true
-			opts.match, args = args[1], args[2:]
-			continue
-		}
-		if strings.ToLower(args[0]) == "type" {
-			if len(args) < 2 {
-				setDirty(c)
-				c.WriteError(msgSyntaxError)
-				return
-			}
-			opts.withType = true
-			opts._type, args = strings.ToLower(args[1]), args[2:]
-			continue
-		}
+	opts, err := scanParse(cmd, args)
+	if err != nil {
 		setDirty(c)
-		c.WriteError(msgSyntaxError)
+		c.WriteError(err.Error())
 		return
 	}
 
