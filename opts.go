@@ -1,6 +1,7 @@
 package miniredis
 
 import (
+	"errors"
 	"math"
 	"strconv"
 	"time"
@@ -48,13 +49,11 @@ func optDuration(c *server.Peer, src string, dest *time.Duration) bool {
 	return true
 }
 
-func optFloat(c *server.Peer, src string, dest *float64) bool {
+func optFloat(src string, dest *float64) error {
 	n, err := strconv.ParseFloat(src, 64)
 	if err != nil {
-		setDirty(c)
-		c.WriteError(msgInvalidInt) // FIXME
-		return false
+		return errors.New(msgInvalidInt) // FIXME
 	}
 	*dest = n
-	return true
+	return nil
 }

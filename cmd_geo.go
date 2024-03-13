@@ -3,6 +3,7 @@
 package miniredis
 
 import (
+	"errors"
 	"fmt"
 	"sort"
 	"strconv"
@@ -614,6 +615,104 @@ type tuple struct {
 	b float64
 }
 
+type geosearchOpts struct {
+	key            string
+	withFromMember bool
+	fromMember     string
+	withFromLonLat bool
+	fromLonLat     tuple
+	withByRadius   bool
+	byRadius       float64
+	withByBox      bool
+	byBox          tuple
+	direction      direction // unsorted
+	count          int
+	withAny        bool
+	withCoord      bool
+	withDist       bool
+	withHash       bool
+}
+
+func geosearchParse(cmd string, args []string) (*geosearchOpts, error) {
+	var opts geosearchOpts
+
+	opts.key, args = args[0], args[1:]
+
+	fmt.Printf("args: %v\n", args)
+
+	switch strings.ToUpper(args[0]) {
+	case "FROMMEMBER":
+		if len(args) < 2 {
+			return nil, errors.New(errWrongNumber(cmd))
+		}
+		opts.withFromMember = true
+		opts.fromMember = args[1]
+		args = args[2:]
+	case "FROMLONLAT":
+		if len(args) < 3 {
+			return nil, errors.New(errWrongNumber(cmd))
+		}
+		opts.withFromLonLat = true
+		if err := optFloat(args[1], &opts.fromLonLat.a); err != nil {
+			return nil, err
+		}
+		if err := optFloat(args[2], &opts.fromLonLat.b); err != nil {
+			return nil, err
+		}
+		args = args[3:]
+	default:
+		return nil, errors.New(errWrongNumber(cmd))
+	}
+
+	if len(args) < 3 {
+		return nil, errors.New(errWrongNumber(cmd))
+	}
+	switch strings.ToUpper(args[0]) {
+	case "BYRADIUS":
+		if len(args) < 3 {
+			return nil, errors.New(errWrongNumber(cmd))
+		}
+		opts.withByRadius = true
+		if err := optFloat(args[1], &opts.byRadius); err != nil {
+			return nil, err
+		}
+		toMeter := parseUnit(args[2])
+		if toMeter == 0 {
+			return nil, errors.New(errWrongNumber(cmd))
+		}
+		opts.byRadius *= toMeter
+		args = args[3:]
+	case "BYBOX":
+		if len(args) < 4 {
+			return nil, errors.New(errWrongNumber(cmd))
+		}
+		opts.withByBox = true
+		if err := optFloat(args[1], &opts.byBox.a); err != nil {
+			return nil, err
+		}
+		if err := optFloat(args[2], &opts.byBox.b); err != nil {
+			return nil, err
+		}
+		toMeter := parseUnit(args[3])
+		if toMeter == 0 {
+			return nil, errors.New(errWrongNumber(cmd))
+		}
+		opts.byBox.a *= toMeter
+		opts.byBox.b *= toMeter
+		args = args[4:]
+	default:
+		return nil, errors.New(errWrongNumber(cmd))
+	}
+
+	// FIXME: ASC|DESC
+	// FIXME: COUNT n ANY
+	// FIXME: WITHCOORD
+	// FIXME: WITHDIST
+	// FIXME: WITHHASH
+
+	return &opts, nil
+}
+
 // GEOSEARCH
 func (m *Miniredis) cmdGeosearch(c *server.Peer, cmd string, args []string) {
 	if len(args) < 2 {
@@ -628,115 +727,12 @@ func (m *Miniredis) cmdGeosearch(c *server.Peer, cmd string, args []string) {
 		return
 	}
 
-	var opts struct {
-		key            string
-		withFromMember bool
-		fromMember     string
-		withFromLonLat bool
-		fromLonLat     tuple
-		withByRadius   bool
-		byRadius       float64
-		withByBox      bool
-		byBox          tuple
-		direction      direction // unsorted
-		count          int
-		withAny        bool
-		withCoord      bool
-		withDist       bool
-		withHash       bool
-	}
-
-	opts.key, args = args[0], args[1:]
-
-	fmt.Printf("args: %v\n", args)
-
-	switch strings.ToUpper(args[0]) {
-	case "FROMMEMBER":
-		if len(args) < 2 {
-			setDirty(c)
-			c.WriteError(errWrongNumber(cmd))
-			return
-		}
-		opts.withFromMember = true
-		opts.fromMember = args[1]
-		args = args[2:]
-	case "FROMLONLAT":
-		if len(args) < 3 {
-			setDirty(c)
-			c.WriteError(errWrongNumber(cmd))
-			return
-		}
-		opts.withFromLonLat = true
-		if !optFloat(c, args[1], &opts.fromLonLat.a) {
-			return
-		}
-		if !optFloat(c, args[2], &opts.fromLonLat.b) {
-			return
-		}
-		args = args[3:]
-	default:
+	opts, err := geosearchParse(cmd, args)
+	if err != nil {
 		setDirty(c)
-		c.WriteError(errWrongNumber(cmd))
+		c.WriteError(err.Error())
 		return
 	}
-
-	if len(args) < 3 {
-		setDirty(c)
-		c.WriteError(errWrongNumber(cmd))
-		return
-	}
-	switch strings.ToUpper(args[0]) {
-	case "BYRADIUS":
-		if len(args) < 3 {
-			setDirty(c)
-			c.WriteError(errWrongNumber(cmd))
-			return
-		}
-		opts.withByRadius = true
-		if !optFloat(c, args[1], &opts.byRadius) {
-			return
-		}
-		toMeter := parseUnit(args[2])
-		if toMeter == 0 {
-			setDirty(c)
-			c.WriteError(errWrongNumber(cmd))
-			return
-		}
-		opts.byRadius *= toMeter
-		args = args[3:]
-	case "BYBOX":
-		if len(args) < 4 {
-			setDirty(c)
-			c.WriteError(errWrongNumber(cmd))
-			return
-		}
-		opts.withByBox = true
-		if !optFloat(c, args[1], &opts.byBox.a) {
-			return
-		}
-		if !optFloat(c, args[2], &opts.byBox.b) {
-			return
-		}
-		toMeter := parseUnit(args[3])
-		if toMeter == 0 {
-			setDirty(c)
-			c.WriteError(errWrongNumber(cmd))
-			return
-		}
-		opts.byBox.a *= toMeter
-		opts.byBox.b *= toMeter
-		args = args[4:]
-	default:
-		setDirty(c)
-		c.WriteError(errWrongNumber(cmd))
-		return
-	}
-
-	// FIXME: ASC|DESC
-	// FIXME: COUNT n ANY
-	// FIXME: WITHCOORD
-	// FIXME: WITHDIST
-	// FIXME: WITHHASH
 
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
