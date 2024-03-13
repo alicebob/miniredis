@@ -61,6 +61,47 @@ func commandsGeneric(m *Miniredis) {
 	m.srv.Register("UNLINK", m.cmdDel)
 }
 
+type expireOpts struct {
+	key   string
+	value int
+	nx    bool
+	xx    bool
+	gt    bool
+	lt    bool
+}
+
+func expireParse(cmd string, args []string) (*expireOpts, error) {
+	var opts expireOpts
+
+	opts.key = args[0]
+	if err := optIntSimple(args[1], &opts.value); err != nil {
+		return nil, err
+	}
+	args = args[2:]
+	for len(args) > 0 {
+		switch strings.ToLower(args[0]) {
+		case "nx":
+			opts.nx = true
+		case "xx":
+			opts.xx = true
+		case "gt":
+			opts.gt = true
+		case "lt":
+			opts.lt = true
+		default:
+			return nil, fmt.Errorf("ERR Unsupported option %s", args[0])
+		}
+		args = args[1:]
+	}
+	if opts.gt && opts.lt {
+		return nil, errors.New("ERR GT and LT options at the same time are not compatible")
+	}
+	if opts.nx && (opts.xx || opts.gt || opts.lt) {
+		return nil, errors.New("ERR NX and XX, GT or LT options at the same time are not compatible")
+	}
+	return &opts, nil
+}
+
 // generic expire command for EXPIRE, PEXPIRE, EXPIREAT, PEXPIREAT
 // d is the time unit. If unix is set it'll be seen as a unixtimestamp and
 // converted to a duration.
@@ -78,44 +119,10 @@ func makeCmdExpire(m *Miniredis, unix bool, d time.Duration) func(*server.Peer, 
 			return
 		}
 
-		var opts struct {
-			key   string
-			value int
-			nx    bool
-			xx    bool
-			gt    bool
-			lt    bool
-		}
-		opts.key = args[0]
-		if ok := optInt(c, args[1], &opts.value); !ok {
-			return
-		}
-		args = args[2:]
-		for len(args) > 0 {
-			switch strings.ToLower(args[0]) {
-			case "nx":
-				opts.nx = true
-			case "xx":
-				opts.xx = true
-			case "gt":
-				opts.gt = true
-			case "lt":
-				opts.lt = true
-			default:
-				setDirty(c)
-				c.WriteError(fmt.Sprintf("ERR Unsupported option %s", args[0]))
-				return
-			}
-			args = args[1:]
-		}
-		if opts.gt && opts.lt {
+		opts, err := expireParse(cmd, args)
+		if err != nil {
 			setDirty(c)
-			c.WriteError("ERR GT and LT options at the same time are not compatible")
-			return
-		}
-		if opts.nx && (opts.xx || opts.gt || opts.lt) {
-			setDirty(c)
-			c.WriteError("ERR NX and XX, GT or LT options at the same time are not compatible")
+			c.WriteError(err.Error())
 			return
 		}
 
@@ -724,6 +731,42 @@ func (m *Miniredis) cmdScan(c *server.Peer, cmd string, args []string) {
 	})
 }
 
+type copyOpts struct {
+	from          string
+	to            string
+	destinationDB int
+	replace       bool
+}
+
+func copyParse(cmd string, args []string) (*copyOpts, error) {
+	opts := copyOpts{
+		destinationDB: -1,
+	}
+
+	opts.from, opts.to, args = args[0], args[1], args[2:]
+	for len(args) > 0 {
+		switch strings.ToLower(args[0]) {
+		case "db":
+			if len(args) < 2 {
+				return nil, errors.New(msgSyntaxError)
+			}
+			if err := optIntSimple(args[1], &opts.destinationDB); err != nil {
+				return nil, err
+			}
+			if opts.destinationDB < 0 {
+				return nil, errors.New(msgDBIndexOutOfRange)
+			}
+			args = args[2:]
+		case "replace":
+			opts.replace = true
+			args = args[1:]
+		default:
+			return nil, errors.New(msgSyntaxError)
+		}
+	}
+	return &opts, nil
+}
+
 // COPY
 func (m *Miniredis) cmdCopy(c *server.Peer, cmd string, args []string) {
 	if len(args) < 2 {
@@ -738,47 +781,12 @@ func (m *Miniredis) cmdCopy(c *server.Peer, cmd string, args []string) {
 		return
 	}
 
-	var opts = struct {
-		from          string
-		to            string
-		destinationDB int
-		replace       bool
-	}{
-		destinationDB: -1,
+	opts, err := copyParse(cmd, args)
+	if err != nil {
+		setDirty(c)
+		c.WriteError(err.Error())
+		return
 	}
-
-	opts.from, opts.to, args = args[0], args[1], args[2:]
-	for len(args) > 0 {
-		switch strings.ToLower(args[0]) {
-		case "db":
-			if len(args) < 2 {
-				setDirty(c)
-				c.WriteError(msgSyntaxError)
-				return
-			}
-			db, err := strconv.Atoi(args[1])
-			if err != nil {
-				setDirty(c)
-				c.WriteError(msgInvalidInt)
-				return
-			}
-			if db < 0 {
-				setDirty(c)
-				c.WriteError(msgDBIndexOutOfRange)
-				return
-			}
-			opts.destinationDB = db
-			args = args[2:]
-		case "replace":
-			opts.replace = true
-			args = args[1:]
-		default:
-			setDirty(c)
-			c.WriteError(msgSyntaxError)
-			return
-		}
-	}
-
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		fromDB, toDB := ctx.selectedDB, opts.destinationDB
 		if toDB == -1 {

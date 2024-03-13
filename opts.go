@@ -1,6 +1,7 @@
 package miniredis
 
 import (
+	"errors"
 	"math"
 	"strconv"
 	"time"
