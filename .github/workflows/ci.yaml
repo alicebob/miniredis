@@ -17,4 +17,4 @@ jobs:
       with:
         go-version: ${{ matrix.go }}
     - name: Test
-      run: make int testrace
+      run: make conformance testrace

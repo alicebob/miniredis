@@ -17,8 +17,8 @@ import (
 
 func skip(t testing.TB) {
 	t.Helper()
-	if os.Getenv("INT") == "" {
-		t.Skip("INT=1 not set")
+	if os.Getenv("MINIREDIS_CONFORMANCE") == "" {
+		t.Skip("MINIREDIS_CONFORMANCE=1 not set")
 	}
 }
 

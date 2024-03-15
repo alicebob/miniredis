@@ -1,6 +1,6 @@
-/integration/redis_src/
-/integration/dump.rdb
+/conformance/redis_src/
+/conformance/dump.rdb
+/conformance/nodes.conf
 *.swp
-/integration/nodes.conf
 .idea/
 miniredis.iml

@@ -17,16 +17,16 @@ test: ### Run unit tests
 testrace: ### Run unit tests with race detector
 	go test -race ./...
 
-.PHONY: int
-int: integration/redis_src/redis-server ### Run integration tests
-	INT=1 go test ./integration/...
+.PHONY: conformance
+conformance: conformance/redis_src/redis-server ### Run conformance tests (compare miniredis implementation with original redis)
+	MINIREDIS_CONFORMANCE=1 go test ./conformance/...
 
-integration/redis_src/redis-server: integration/get_redis.sh ### Download and build redis if not available or in wrong version
-	./integration/get_redis.sh
+conformance/redis_src/redis-server: conformance/get_redis.sh ### Download and build redis if not available or in wrong version
+	./conformance/get_redis.sh
 
 .PHONY: clean
-clean: ### Cleanup integration test files (including built redis binary)
+clean: ### Cleanup conformance test files (including redis binary)
 	rm -rf \
-		integration/redis_src \
-		integration/dump.rdb \
-		integration/nodes.conf
+		conformance/redis_src \
+		conformance/dump.rdb \
+		conformance/nodes.conf
