@@ -410,6 +410,17 @@ func TestIncrAndFriends(t *testing.T) {
 		c.Do("INCRBYFLOAT", "zero", "12.3")
 		c.Do("INCRBYFLOAT", "zero", "-13.1")
 
+		// Overflow
+		c.Do("SET", "overflow-up", "9223372036854775807")
+		c.Error("increment or decrement would overflow", "INCR", "overflow-up")
+		c.Error("increment or decrement would overflow", "INCRBY", "overflow-up", "1")
+		c.Error("increment or decrement would overflow", "DECRBY", "overflow-up", "-1")
+
+		c.Do("SET", "overflow-down", "-9223372036854775808")
+		c.Error("increment or decrement would overflow", "DECR", "overflow-down")
+		c.Error("increment or decrement would overflow", "INCRBY", "overflow-down", "-1")
+		c.Error("increment or decrement would overflow", "DECRBY", "overflow-down", "1")
+
 		// E
 		c.Do("INCRBYFLOAT", "one", "12e12")
 		// c.Do("INCRBYFLOAT", "one", "12e34") // FIXME

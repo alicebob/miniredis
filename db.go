@@ -9,6 +9,13 @@ import (
 	"time"
 )
 
+const (
+	intSize = 32 << (^uint(0) >> 63) // 32 or 64
+
+	maxInt = 1<<(intSize-1) - 1  // [math.MaxInt] was added in go 1.17
+	minInt = -1 << (intSize - 1) // [math.MinInt] was added in go 1.17
+)
+
 var (
 	errInvalidEntryID = errors.New("stream ID is invalid")
 )
@@ -180,6 +187,17 @@ func (db *RedisDB) stringIncr(k string, delta int) (int, error) {
 			return 0, ErrIntValueError
 		}
 	}
+
+	if delta > 0 {
+		if maxInt-delta < v {
+			return 0, ErrIntValueOverflowError
+		}
+	} else {
+		if minInt-delta > v {
+			return 0, ErrIntValueOverflowError
+		}
+	}
+
 	v += delta
 	db.stringSet(k, strconv.Itoa(v))
 	return v, nil
