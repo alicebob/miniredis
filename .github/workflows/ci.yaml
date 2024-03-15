@@ -16,7 +16,5 @@ jobs:
     - uses: actions/setup-go@v4
       with:
         go-version: ${{ matrix.go }}
-    - name: Install Redis
-      run: (cd ./integration && ./get_redis.sh)
     - name: Test
       run: make int testrace
