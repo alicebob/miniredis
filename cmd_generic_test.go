@@ -17,6 +17,14 @@ func TestTTL(t *testing.T) {
 	ok(t, err)
 	defer c.Close()
 
+	t.Run("parse", func(t *testing.T) {
+		t.Run("basic", func(t *testing.T) {
+			v, err := expireParse("SCAN", []string{"foo", "200"})
+			ok(t, err)
+			equals(t, expireOpts{key: "foo", value: 200}, *v)
+		})
+	})
+
 	// Not volatile yet
 	{
 		equals(t, time.Duration(0), s.TTL("foo"))
@@ -681,6 +689,14 @@ func TestScan(t *testing.T) {
 	ok(t, err)
 	defer c.Close()
 
+	t.Run("parse", func(t *testing.T) {
+		t.Run("basic", func(t *testing.T) {
+			v, err := scanParse("SCAN", []string{"0", "COUNT", "200"})
+			ok(t, err)
+			equals(t, scanOpts{count: 200}, *v)
+		})
+	})
+
 	// We cheat with scan. It always returns everything.
 
 	s.Set("key", "value")
@@ -895,6 +911,14 @@ func TestCopy(t *testing.T) {
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
+
+	t.Run("parse", func(t *testing.T) {
+		t.Run("basic", func(t *testing.T) {
+			v, err := copyParse("copy", []string{"key1", "key2"})
+			ok(t, err)
+			equals(t, copyOpts{from: "key1", to: "key2", destinationDB: -1}, *v)
+		})
+	})
 
 	t.Run("basic", func(t *testing.T) {
 		s.Set("key1", "value")
