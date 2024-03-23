@@ -3,17 +3,11 @@ package miniredis
 import (
 	"errors"
 	"fmt"
+	"math"
 	"math/big"
 	"sort"
 	"strconv"
 	"time"
-)
-
-const (
-	intSize = 32 << (^uint(0) >> 63) // 32 or 64
-
-	maxInt = 1<<(intSize-1) - 1  // [math.MaxInt] was added in go 1.17
-	minInt = -1 << (intSize - 1) // [math.MinInt] was added in go 1.17
 )
 
 var (
@@ -189,11 +183,11 @@ func (db *RedisDB) stringIncr(k string, delta int) (int, error) {
 	}
 
 	if delta > 0 {
-		if maxInt-delta < v {
+		if math.MaxInt-delta < v {
 			return 0, ErrIntValueOverflowError
 		}
 	} else {
-		if minInt-delta > v {
+		if math.MinInt-delta > v {
 			return 0, ErrIntValueOverflowError
 		}
 	}

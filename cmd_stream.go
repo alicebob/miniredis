@@ -1665,7 +1665,7 @@ func (m *Miniredis) cmdXclaim(c *server.Peer, cmd string, args []string) {
 				c.WriteError("ERR Invalid TIME option argument for XCLAIM")
 				return
 			}
-			opts.newLastDelivery = unixMilli(timeMs)
+			opts.newLastDelivery = time.UnixMilli(timeMs)
 			args = args[2:]
 		case "RETRYCOUNT":
 			retryCount, err := strconv.Atoi(args[1])
@@ -1805,9 +1805,4 @@ func parseBlock(cmd string, args []string, block *bool, timeout *time.Duration) 
 	}
 	(*timeout) = time.Millisecond * time.Duration(ms)
 	return nil
-}
-
-// taken from Go's time package. Can be dropped if miniredis supports >= 1.17
-func unixMilli(msec int64) time.Time {
-	return time.Unix(msec/1e3, (msec%1e3)*1e6)
 }
