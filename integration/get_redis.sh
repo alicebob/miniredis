@@ -4,6 +4,7 @@ set -eu
 
 VERSION=7.2.4
 
+cd "$(dirname "$0")"
 rm -rf ./redis_src/
 mkdir -p ./redis_src/
 cd ./redis_src/

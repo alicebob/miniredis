@@ -636,6 +636,7 @@ func TestSortedSetIncyby(t *testing.T) {
 }
 
 func TestZscan(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		// No set yet
 		c.Do("ZSCAN", "h", "0")
@@ -945,6 +946,7 @@ func TestZrandmember(t *testing.T) {
 }
 
 func TestZMScore(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		c.Do("ZADD", "q", "1.0", "key1")
 		c.Do("ZADD", "q", "2.0", "key2")
