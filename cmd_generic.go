@@ -25,10 +25,7 @@ func inSeconds(t time.Time) int {
 }
 
 func inMilliSeconds(t time.Time) int {
-	// Time.UnixMilli() was added in go 1.17
-	// return int(t.UnixNano() / 1000000) is limited to dates between year 1678 and 2262
-	// by using following calculation we extend this time without too much complexity
-	return int(t.Unix())*1000 + t.Nanosecond()/1000000
+	return int(t.UnixMilli())
 }
 
 // commandsGeneric handles EXPIRE, TTL, PERSIST, &c.
