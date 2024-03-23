@@ -479,6 +479,15 @@ func TestIncr(t *testing.T) {
 		assert(t, err != nil, "do s.Incr error")
 	}
 
+	// Overflow
+	{
+		s.Set("overflow", "9223372036854775807")
+		mustDo(t, c,
+			"INCR", "overflow",
+			proto.Error(msgIntOverflow),
+		)
+	}
+
 	// Wrong usage
 	{
 		mustDo(t, c,
@@ -542,6 +551,20 @@ func TestIncrBy(t *testing.T) {
 		"INCRBY", "key", "noint",
 		proto.Error(msgInvalidInt),
 	)
+
+	// Overflow
+	{
+		s.Set("overflow", "10")
+		mustDo(t, c,
+			"INCRBY", "overflow", "9223372036854775807",
+			proto.Error(msgIntOverflow),
+		)
+		s.Set("overflow", "-10")
+		mustDo(t, c,
+			"INCRBY", "overflow", "-9223372036854775807",
+			proto.Error(msgIntOverflow),
+		)
+	}
 
 	// Wrong usage
 	{
@@ -684,6 +707,20 @@ func TestDecrBy(t *testing.T) {
 		proto.Error(msgInvalidInt),
 	)
 
+	// Overflow
+	{
+		s.Set("overflow", "10")
+		mustDo(t, c,
+			"DECRBY", "overflow", "-9223372036854775807",
+			proto.Error(msgIntOverflow),
+		)
+		s.Set("overflow", "-10")
+		mustDo(t, c,
+			"DECRBY", "overflow", "9223372036854775807",
+			proto.Error(msgIntOverflow),
+		)
+	}
+
 	// Wrong usage
 	{
 		mustDo(t, c,
@@ -751,6 +788,15 @@ func TestDecr(t *testing.T) {
 		mustDo(t, c,
 			"DECR", "new", "key",
 			proto.Error(errWrongNumber("decr")),
+		)
+	}
+
+	// Overflow
+	{
+		s.Set("overflow", "-9223372036854775808")
+		mustDo(t, c,
+			"DECR", "overflow",
+			proto.Error(msgIntOverflow),
 		)
 	}
 
