@@ -1,5 +1,5 @@
 .PHONY: int
-int: redis_src/redis-server
+int:
 	INT=1 go test
 
 redis_src/redis-server: get_redis.sh

@@ -8,7 +8,10 @@ testrace:
 int:
 	${MAKE} -C integration int
 
-ci: test int testrace
+ci:
+	${MAKE} test
+	${MAKE} -C integration redis_src/redis-server int
+	${MAKE} testrace
 
 clean:
 	${MAKE} -C integration clean
