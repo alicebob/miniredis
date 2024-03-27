@@ -9,10 +9,7 @@ import (
 )
 
 func TestHash(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	must1(t, c, "HSET", "aap", "noot", "mies")
 
@@ -95,10 +92,7 @@ func TestHash(t *testing.T) {
 }
 
 func TestHashSetNX(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	// New Hash
 	must1(t, c, "HSETNX", "wim", "zus", "jet")
@@ -117,10 +111,7 @@ func TestHashSetNX(t *testing.T) {
 }
 
 func TestHashMSet(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	// New Hash
 	{
@@ -150,10 +141,7 @@ func TestHashMSet(t *testing.T) {
 }
 
 func TestHashDel(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	s.HSet("wim", "zus", "jet")
 	s.HSet("wim", "teun", "vuur")
@@ -181,10 +169,7 @@ func TestHashDel(t *testing.T) {
 }
 
 func TestHashExists(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	s.HSet("wim", "zus", "jet")
 	s.HSet("wim", "teun", "vuur")
@@ -201,10 +186,7 @@ func TestHashExists(t *testing.T) {
 }
 
 func TestHashGetall(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	s.HSet("wim", "zus", "jet")
 	s.HSet("wim", "teun", "vuur")
@@ -248,10 +230,7 @@ func TestHashGetall(t *testing.T) {
 }
 
 func TestHashKeys(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	s.HSet("wim", "zus", "jet")
 	s.HSet("wim", "teun", "vuur")
@@ -288,10 +267,7 @@ func TestHashKeys(t *testing.T) {
 }
 
 func TestHashValues(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	s.HSet("wim", "zus", "jet")
 	s.HSet("wim", "teun", "vuur")
@@ -314,10 +290,7 @@ func TestHashValues(t *testing.T) {
 }
 
 func TestHashLen(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	s.HSet("wim", "zus", "jet")
 	s.HSet("wim", "teun", "vuur")
@@ -333,10 +306,7 @@ func TestHashLen(t *testing.T) {
 }
 
 func TestHashMget(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	s.HSet("wim", "zus", "jet")
 	s.HSet("wim", "teun", "vuur")
@@ -368,10 +338,7 @@ func TestHashMget(t *testing.T) {
 }
 
 func TestHashIncrby(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	// New key
 	must1(t, c, "HINCRBY", "hash", "field", "1")
@@ -414,10 +381,7 @@ func TestHashIncrby(t *testing.T) {
 }
 
 func TestHashIncrbyfloat(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	// Existing key
 	{
@@ -485,10 +449,7 @@ func TestHashIncrbyfloat(t *testing.T) {
 }
 
 func TestHscan(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	// We cheat with hscan. It always returns everything.
 
@@ -576,10 +537,7 @@ func TestHscan(t *testing.T) {
 }
 
 func TestHstrlen(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	t.Run("basic", func(t *testing.T) {
 		s.HSet("myhash", "foo", "bar")
@@ -636,10 +594,7 @@ func TestHstrlen(t *testing.T) {
 }
 
 func TestHashRandField(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	s.HSet("wim", "zus", "jet")
 	s.HSet("wim", "teun", "vuur")

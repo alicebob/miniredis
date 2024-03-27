@@ -9,10 +9,7 @@ import (
 
 // Test ZADD / ZCARD / ZRANK / ZREVRANK.
 func TestSortedSet(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	{
 		mustDo(t, c,
@@ -155,10 +152,7 @@ func TestSortedSet(t *testing.T) {
 
 // Test ZADD
 func TestSortedSetAdd(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	{
 		mustDo(t, c,
@@ -243,7 +237,7 @@ func TestSortedSetAdd(t *testing.T) {
 		// Wrong type of key
 		mustOK(t, c, "SET", "str", "value")
 
-		_, err = s.ZAdd("str", 1.0, "hi")
+		_, err := s.ZAdd("str", 1.0, "hi")
 		mustFail(t, err, msgWrongType)
 
 		mustDo(t, c,
@@ -298,10 +292,7 @@ func TestSortedSetAdd(t *testing.T) {
 }
 
 func TestSortedSetRange(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	s.ZAdd("z", 1, "one")
 	s.ZAdd("z", 2, "two")
@@ -414,10 +405,7 @@ func TestSortedSetRange(t *testing.T) {
 
 // Test ZREVRANGE
 func TestSortedSetRevRange(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	s.ZAdd("z", 1, "one")
 	s.ZAdd("z", 2, "two")
@@ -497,10 +485,7 @@ func TestSortedSetRevRange(t *testing.T) {
 
 // Test ZRANGEBYSCORE,  ZREVRANGEBYSCORE, and ZCOUNT
 func TestSortedSetRangeByScore(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	s.ZAdd("z", -273.15, "zero kelvin")
 	s.ZAdd("z", -4, "minusfour")
@@ -712,10 +697,7 @@ func TestSortedSetRangeByScore(t *testing.T) {
 }
 
 func TestIssue10(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	s.ZAdd("key", 3.3, "element")
 
@@ -732,10 +714,7 @@ func TestIssue10(t *testing.T) {
 
 // Test ZREM
 func TestSortedSetRem(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	s.ZAdd("z", 1, "one")
 	s.ZAdd("z", 2, "two")
@@ -794,10 +773,7 @@ func TestSortedSetRem(t *testing.T) {
 
 // Test ZREMRANGEBYLEX
 func TestSortedSetRemRangeByLex(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	s.ZAdd("z", 12, "zero kelvin")
 	s.ZAdd("z", 12, "minusfour")
@@ -871,10 +847,7 @@ func TestSortedSetRemRangeByLex(t *testing.T) {
 
 // Test ZREMRANGEBYRANK
 func TestSortedSetRemRangeByRank(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	s.ZAdd("z", 1, "one")
 	s.ZAdd("z", 2, "two")
@@ -953,10 +926,7 @@ func TestSortedSetRemRangeByRank(t *testing.T) {
 
 // Test ZREMRANGEBYSCORE
 func TestSortedSetRangeRemByScore(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	s.ZAdd("z", -273.15, "zero kelvin")
 	s.ZAdd("z", -4, "minusfour")
@@ -1038,10 +1008,7 @@ func TestSortedSetRangeRemByScore(t *testing.T) {
 
 // Test ZSCORE
 func TestSortedSetScore(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	s.ZAdd("z", 1, "one")
 	s.ZAdd("z", 2, "two")
@@ -1102,10 +1069,7 @@ func TestSortedSetScore(t *testing.T) {
 
 // Test ZMSCORE
 func TestSortedSetMultiScore(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	s.ZAdd("z", 1, "one")
 	s.ZAdd("z", 2, "two")
@@ -1173,10 +1137,7 @@ func TestSortedSetMultiScore(t *testing.T) {
 
 // Test ZRANGEBYLEX, ZREVRANGEBYLEX, ZLEXCOUNT
 func TestSortedSetRangeByLex(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	s.ZAdd("z", 12, "zero kelvin")
 	s.ZAdd("z", 12, "minusfour")
@@ -1397,10 +1358,7 @@ func TestSortedSetRangeByLex(t *testing.T) {
 
 // Test ZINCRBY
 func TestSortedSetIncrby(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	// Normal cases
 	{
@@ -1450,10 +1408,7 @@ func TestSortedSetIncrby(t *testing.T) {
 }
 
 func TestZscan(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	// We cheat with zscan. It always returns everything.
 
@@ -1604,10 +1559,7 @@ func TestZscan(t *testing.T) {
 }
 
 func TestZunionstore(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	s.ZAdd("h1", 1.0, "field1")
 	s.ZAdd("h1", 2.0, "field2")
@@ -1737,10 +1689,7 @@ func TestZunionstore(t *testing.T) {
 }
 
 func TestZunion(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	s.ZAdd("h1", 1.0, "field1")
 	s.ZAdd("h1", 2.0, "field2")
@@ -1832,10 +1781,7 @@ func TestZunion(t *testing.T) {
 }
 
 func TestZinter(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	s.ZAdd("h1", 1.0, "field1")
 	s.ZAdd("h1", 2.0, "field2")
@@ -1860,10 +1806,7 @@ func TestZinter(t *testing.T) {
 }
 
 func TestZinterstore(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	s.ZAdd("h1", 1.0, "field1")
 	s.ZAdd("h1", 2.0, "field2")
@@ -2068,10 +2011,7 @@ func TestSSRange(t *testing.T) {
 
 // Test ZPOPMIN
 func TestSortedSetPopMin(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	s.ZAdd("z", 1, "one")
 	s.ZAdd("z", 2, "two")
@@ -2131,10 +2071,7 @@ func TestSortedSetPopMin(t *testing.T) {
 
 // Test ZPOPMAX
 func TestSortedSetPopMax(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	s.ZAdd("z", 1, "one")
 	s.ZAdd("z", 2, "two")
@@ -2196,10 +2133,7 @@ func TestSortedSetPopMax(t *testing.T) {
 
 // Test ZRANDMEMBER
 func TestSortedSetRandmember(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	s.ZAdd("z", 1, "one")
 	s.ZAdd("z", 2, "two")

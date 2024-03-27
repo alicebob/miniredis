@@ -228,6 +228,7 @@ func TestTLS(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer c.Close()
 	res, err := c.Do("PING")
 	if err != nil {
 		t.Fatal(err)

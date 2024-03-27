@@ -7,10 +7,7 @@ import (
 )
 
 func TestMulti(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	_, c := runWithClient(t)
 
 	// Do accept MULTI, but use it as a no-op
 	mustOK(t, c,
@@ -19,10 +16,7 @@ func TestMulti(t *testing.T) {
 }
 
 func TestExec(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	_, c := runWithClient(t)
 
 	// Exec without MULTI.
 	mustDo(t, c,
@@ -32,10 +26,7 @@ func TestExec(t *testing.T) {
 }
 
 func TestDiscard(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	_, c := runWithClient(t)
 
 	// DISCARD without MULTI.
 	mustDo(t, c,
@@ -45,10 +36,7 @@ func TestDiscard(t *testing.T) {
 }
 
 func TestWatch(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	_, c := runWithClient(t)
 
 	// Simple WATCH
 	mustOK(t, c,
@@ -69,10 +57,7 @@ func TestWatch(t *testing.T) {
 
 // Test simple multi/exec block.
 func TestSimpleTransaction(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	mustOK(t, c,
 		"MULTI",
@@ -98,10 +83,7 @@ func TestSimpleTransaction(t *testing.T) {
 }
 
 func TestDiscardTransaction(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	s.Set("aap", "noot")
 
@@ -126,10 +108,7 @@ func TestDiscardTransaction(t *testing.T) {
 }
 
 func TestTxQueueErr(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	mustOK(t, c,
 		"MULTI",
@@ -163,10 +142,7 @@ func TestTxQueueErr(t *testing.T) {
 
 func TestTxWatch(t *testing.T) {
 	// Watch with no error.
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	s.Set("one", "two")
 	mustOK(t, c,
@@ -190,10 +166,7 @@ func TestTxWatch(t *testing.T) {
 
 func TestTxWatchErr(t *testing.T) {
 	// Watch with en error.
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 	c2, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c2.Close()
@@ -228,10 +201,7 @@ func TestTxWatchErr(t *testing.T) {
 }
 
 func TestUnwatch(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 	c2, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c2.Close()

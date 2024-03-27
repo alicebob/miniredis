@@ -15,10 +15,7 @@ import (
 
 // Test XADD / XLEN / XRANGE
 func TestStream(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	mustDo(t, c,
 		"XADD", "s", "1234567-89", "one", "1", "two", "2",
@@ -83,10 +80,7 @@ func TestStream(t *testing.T) {
 
 // Test XADD
 func TestStreamAdd(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	t.Run("XADD", func(t *testing.T) {
 		mustDo(t, c,
@@ -198,7 +192,7 @@ func TestStreamAdd(t *testing.T) {
 		mustOK(t, c,
 			"SET", "str", "value",
 		)
-		_, err = s.XAdd("str", "*", []string{"hi", "1"})
+		_, err := s.XAdd("str", "*", []string{"hi", "1"})
 		mustFail(t, err, msgWrongType)
 		mustDo(t, c,
 			"XADD", "str", "*", "hi", "1",
@@ -251,12 +245,9 @@ func TestStreamAdd(t *testing.T) {
 
 // Test XLEN
 func TestStreamLen(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	_, c := runWithClient(t)
 
-	_, err = c.Do("XADD", "s", "*", "one", "1", "two", "2")
+	_, err := c.Do("XADD", "s", "*", "one", "1", "two", "2")
 	ok(t, err)
 	_, err = c.Do("XADD", "s", "*", "one", "11", "two", "22")
 	ok(t, err)
@@ -290,12 +281,9 @@ func TestStreamLen(t *testing.T) {
 
 // Test XRANGE / XREVRANGE
 func TestStreamRange(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	_, c := runWithClient(t)
 
-	_, err = c.Do("XADD", "planets", "0-1", "name", "Mercury", "greek-god", "Hermes", "idx", "1")
+	_, err := c.Do("XADD", "planets", "0-1", "name", "Mercury", "greek-god", "Hermes", "idx", "1")
 	ok(t, err)
 	_, err = c.Do("XADD", "planets", "1-0", "name", "Venus", "greek-god", "Aphrodite", "idx", "2")
 	ok(t, err)
@@ -394,12 +382,9 @@ func TestStreamRange(t *testing.T) {
 
 // Test XREAD
 func TestStreamRead(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
-	_, err = c.Do("XADD", "planets", "0-1", "name", "Mercury", "greek-god", "Hermes", "idx", "1")
+	_, err := c.Do("XADD", "planets", "0-1", "name", "Mercury", "greek-god", "Hermes", "idx", "1")
 	ok(t, err)
 	_, err = c.Do("XADD", "planets", "1-0", "name", "Venus", "greek-god", "Aphrodite", "idx", "2")
 	ok(t, err)
@@ -532,10 +517,7 @@ func TestStreamRead(t *testing.T) {
 
 // Test XINFO
 func TestStreamInfo(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	_, c := runWithClient(t)
 
 	mustDo(t, c,
 		"XINFO", "STREAM", "planets",
@@ -577,10 +559,7 @@ func TestStreamInfo(t *testing.T) {
 
 // Test XGROUP
 func TestStreamGroup(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	_, c := runWithClient(t)
 
 	mustDo(t, c,
 		"XGROUP", "CREATE", "s", "processing", "$",
@@ -710,10 +689,7 @@ func TestStreamGroup(t *testing.T) {
 
 // Test XREADGROUP
 func TestStreamReadGroup(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	_, c := runWithClient(t)
 
 	mustDo(t, c,
 		"XREADGROUP", "GROUP", "processing", "alice", "STREAMS", "planets", ">",
@@ -804,10 +780,7 @@ func TestStreamReadGroup(t *testing.T) {
 
 // Test XDEL
 func TestStreamDelete(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	_, c := runWithClient(t)
 
 	mustOK(t, c,
 		"XGROUP", "CREATE", "planets", "processing", "$", "MKSTREAM",
@@ -859,10 +832,7 @@ func TestStreamDelete(t *testing.T) {
 
 // Test XACK
 func TestStreamAck(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	_, c := runWithClient(t)
 
 	mustOK(t, c,
 		"XGROUP", "CREATE", "planets", "processing", "$", "MKSTREAM",
@@ -926,10 +896,7 @@ func TestStreamAck(t *testing.T) {
 
 // Test XPENDING
 func TestStreamXpending(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 	now := time.Now()
 	s.SetTime(now)
 
@@ -1068,10 +1035,7 @@ func TestStreamXpending(t *testing.T) {
 
 // Test XTRIM
 func TestStreamTrim(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	_, c := runWithClient(t)
 
 	t.Run("error cases", func(t *testing.T) {
 		mustDo(t, c,
@@ -1085,7 +1049,7 @@ func TestStreamTrim(t *testing.T) {
 			proto.Error(msgXtrimInvalidMaxLen))
 	})
 
-	_, err = c.Do("XADD", "planets", "0-1", "name", "Mercury")
+	_, err := c.Do("XADD", "planets", "0-1", "name", "Mercury")
 	ok(t, err)
 	_, err = c.Do("XADD", "planets", "1-0", "name", "Venus")
 	ok(t, err)
@@ -1130,10 +1094,7 @@ func TestStreamTrim(t *testing.T) {
 }
 
 func TestStreamAutoClaim(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	now := time.Now()
 	s.SetTime(now)
@@ -1385,10 +1346,7 @@ func TestStreamAutoClaim(t *testing.T) {
 }
 
 func TestStreamClaim(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	now := time.Now()
 	s.SetTime(now)

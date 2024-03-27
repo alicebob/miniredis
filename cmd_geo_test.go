@@ -7,10 +7,7 @@ import (
 )
 
 func TestGeoadd(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	_, c := runWithClient(t)
 
 	t.Run("ok", func(t *testing.T) {
 		must1(t, c, "GEOADD", "Sicily", "13.361389", "38.115556", "Palermo")
@@ -47,10 +44,7 @@ func TestGeoadd(t *testing.T) {
 }
 
 func TestGeopos(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	must1(t, c, "GEOADD", "Sicily", "13.361389", "38.115556", "Palermo")
 
@@ -85,10 +79,7 @@ func TestGeopos(t *testing.T) {
 
 // Test GEOADD / GEORADIUS / GEORADIUS_RO
 func TestGeo(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	_, c := runWithClient(t)
 
 	must1(t, c, "GEOADD", "Sicily", "13.361389", "38.115556", "Palermo")
 	must1(t, c, "GEOADD", "Sicily", "15.087269", "37.502669", "Catania")
@@ -242,10 +233,7 @@ func TestGeo(t *testing.T) {
 }
 
 func TestGeodist(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	_, c := runWithClient(t)
 
 	must1(t, c, "GEOADD", "Sicily", "13.361389", "38.115556", "Palermo")
 	must1(t, c, "GEOADD", "Sicily", "15.087269", "37.502669", "Catania")
@@ -297,10 +285,7 @@ func TestGeodist(t *testing.T) {
 
 // Test GEOADD / GEORADIUSBYMEMBER / GEORADIUSBYMEMBER_RO
 func TestGeobymember(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	_, c := runWithClient(t)
 
 	must1(t, c, "GEOADD", "Sicily", "13.361389", "38.115556", "Palermo")
 	must1(t, c, "GEOADD", "Sicily", "15.087269", "37.502669", "Catania")

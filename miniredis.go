@@ -19,6 +19,7 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"github.com/alicebob/miniredis/v2/proto"
 	"math/rand"
 	"strconv"
 	"strings"
@@ -135,6 +136,7 @@ func RunTLS(cfg *tls.Config) (*Miniredis, error) {
 type Tester interface {
 	Fatalf(string, ...interface{})
 	Cleanup(func())
+	Logf(format string, args ...interface{})
 }
 
 // RunT start a new miniredis, pass it a testing.T. It also registers the cleanup after your test is done.
@@ -146,6 +148,22 @@ func RunT(t Tester) *Miniredis {
 	}
 	t.Cleanup(m.Close)
 	return m
+}
+
+func runWithClient(t Tester) (*Miniredis, *proto.Client) {
+	m := RunT(t)
+
+	c, err := proto.Dial(m.Addr())
+	if err != nil {
+		t.Fatalf("could not connect to miniredis: %s", err)
+	}
+	t.Cleanup(func() {
+		if err = c.Close(); err != nil {
+			t.Logf("error closing connection to miniredis: %s", err)
+		}
+	})
+
+	return m, c
 }
 
 // Start starts a server. It listens on a random port on localhost. See also

@@ -10,10 +10,7 @@ import (
 
 // Test EXPIRE. Keys with an expiration are called volatile in Redis parlance.
 func TestTTL(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	t.Run("parse", func(t *testing.T) {
 		t.Run("basic", func(t *testing.T) {
@@ -102,10 +99,7 @@ func TestTTL(t *testing.T) {
 }
 
 func TestExpireat(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	// Not volatile yet
 	{
@@ -136,10 +130,7 @@ func TestExpireat(t *testing.T) {
 }
 
 func TestTouch(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	// Set something
 	t.Run("basic", func(t *testing.T) {
@@ -176,10 +167,7 @@ func TestTouch(t *testing.T) {
 }
 
 func TestPexpireat(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	// Not volatile yet
 	{
@@ -212,10 +200,7 @@ func TestPexpireat(t *testing.T) {
 }
 
 func TestPexpire(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	t.Run("key exists", func(t *testing.T) {
 		ok(t, s.Set("foo", "bar"))
@@ -246,10 +231,7 @@ func TestPexpire(t *testing.T) {
 }
 
 func TestDel(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	t.Run("simple", func(t *testing.T) {
 		s.Set("foo", "bar")
@@ -281,10 +263,7 @@ func TestDel(t *testing.T) {
 }
 
 func TestUnlink(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	t.Run("simple", func(t *testing.T) {
 		s.Set("foo", "bar")
@@ -309,10 +288,7 @@ func TestUnlink(t *testing.T) {
 }
 
 func TestType(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	s.Set("foo", "bar!")
 	t.Run("string", func(t *testing.T) {
@@ -355,10 +331,7 @@ func TestType(t *testing.T) {
 }
 
 func TestExpireTime(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	t.Run("nosuch", func(t *testing.T) {
 		mustDo(t, c, "EXPIRETIME", "nosuch", proto.Int(-2))
@@ -379,10 +352,7 @@ func TestExpireTime(t *testing.T) {
 }
 
 func TestPExpireTime(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	t.Run("nosuch", func(t *testing.T) {
 		mustDo(t, c, "PEXPIRETIME", "nosuch", proto.Int(-2))
@@ -403,10 +373,7 @@ func TestPExpireTime(t *testing.T) {
 }
 
 func TestExists(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	t.Run("string", func(t *testing.T) {
 		s.Set("foo", "bar!")
@@ -448,10 +415,7 @@ func TestExists(t *testing.T) {
 }
 
 func TestMove(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	// No problem.
 	{
@@ -501,10 +465,7 @@ func TestMove(t *testing.T) {
 }
 
 func TestKeys(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	s.Set("foo", "bar!")
 	s.Set("foobar", "bar!")
@@ -547,10 +508,7 @@ func TestKeys(t *testing.T) {
 }
 
 func TestRandom(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	// Empty db.
 	mustNil(t, c, "RANDOMKEY")
@@ -575,10 +533,7 @@ func TestRandom(t *testing.T) {
 }
 
 func TestRename(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	// Non-existing key
 	mustDo(t, c,
@@ -652,10 +607,7 @@ func TestRename(t *testing.T) {
 }
 
 func TestScan(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	t.Run("parse", func(t *testing.T) {
 		t.Run("basic", func(t *testing.T) {
@@ -816,10 +768,7 @@ func TestScan(t *testing.T) {
 }
 
 func TestRenamenx(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	// Non-existing key
 	mustDo(t, c,
@@ -871,10 +820,7 @@ func TestRenamenx(t *testing.T) {
 }
 
 func TestCopy(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	t.Run("parse", func(t *testing.T) {
 		t.Run("basic", func(t *testing.T) {

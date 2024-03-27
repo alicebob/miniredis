@@ -9,10 +9,7 @@ import (
 
 // Test SADD / SMEMBERS.
 func TestSadd(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	{
 		mustDo(t, c,
@@ -101,10 +98,7 @@ func TestSadd(t *testing.T) {
 
 // Test SISMEMBER
 func TestSismember(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	s.SetAdd("s", "aap", "noot", "mies")
 
@@ -146,10 +140,7 @@ func TestSismember(t *testing.T) {
 
 // Test SMISMEMBER
 func TestSmismember(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	s.SetAdd("s", "aap", "noot", "mies")
 
@@ -175,10 +166,7 @@ func TestSmismember(t *testing.T) {
 
 // Test SREM
 func TestSrem(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	s.SetAdd("s", "aap", "noot", "mies", "vuur")
 
@@ -233,10 +221,7 @@ func TestSrem(t *testing.T) {
 
 // Test SMOVE
 func TestSmove(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	s.SetAdd("s", "aap", "noot")
 
@@ -304,10 +289,7 @@ func TestSmove(t *testing.T) {
 
 // Test SPOP
 func TestSpop(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	t.Run("basics", func(t *testing.T) {
 		s.SetAdd("s", "aap", "noot")
@@ -366,10 +348,7 @@ func TestSpop(t *testing.T) {
 
 // Test SRANDMEMBER
 func TestSrandmember(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	s.SetAdd("s", "aap", "noot", "mies")
 
@@ -441,10 +420,7 @@ func TestSrandmember(t *testing.T) {
 
 // Test SDIFF
 func TestSdiff(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	s.SetAdd("s1", "aap", "noot", "mies")
 	s.SetAdd("s2", "noot", "mies", "vuur")
@@ -497,10 +473,7 @@ func TestSdiff(t *testing.T) {
 
 // Test SDIFFSTORE
 func TestSdiffstore(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	s.SetAdd("s1", "aap", "noot", "mies")
 	s.SetAdd("s2", "noot", "mies", "vuur")
@@ -535,10 +508,7 @@ func TestSdiffstore(t *testing.T) {
 
 // Test SINTER
 func TestSinter(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	s.SetAdd("s1", "aap", "noot", "mies")
 	s.SetAdd("s2", "noot", "mies", "vuur")
@@ -599,10 +569,7 @@ func TestSinter(t *testing.T) {
 
 // Test SINTERSTORE
 func TestSinterstore(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	s.SetAdd("s1", "aap", "noot", "mies")
 	s.SetAdd("s2", "noot", "mies", "vuur")
@@ -646,10 +613,7 @@ func TestSinterstore(t *testing.T) {
 
 // Test SINTERCARD
 func TestSintercard(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	_, _ = s.SetAdd("s1", "a", "b", "c")
 	_, _ = s.SetAdd("s2", "b", "c", "d")
@@ -758,10 +722,7 @@ func TestSintercard(t *testing.T) {
 
 // Test SUNION
 func TestSunion(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	s.SetAdd("s1", "aap", "noot", "mies")
 	s.SetAdd("s2", "noot", "mies", "vuur")
@@ -820,10 +781,7 @@ func TestSunion(t *testing.T) {
 
 // Test SUNIONSTORE
 func TestSunionstore(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	s.SetAdd("s1", "aap", "noot", "mies")
 	s.SetAdd("s2", "noot", "mies", "vuur")
@@ -858,10 +816,7 @@ func TestSunionstore(t *testing.T) {
 }
 
 func TestSscan(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	// We cheat with sscan. It always returns everything.
 
