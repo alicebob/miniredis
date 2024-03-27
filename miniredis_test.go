@@ -13,11 +13,7 @@ import (
 
 // Test starting/stopping a server
 func TestServer(t *testing.T) {
-	s := RunT(t)
-
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 	mustDo(t, c, "PING", proto.Inline("PONG"))
 
 	// A single client

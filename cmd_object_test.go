@@ -9,10 +9,7 @@ import (
 
 // Test OBJECT IDLETIME.
 func TestObjectIdletime(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	{
 		start := time.Now()

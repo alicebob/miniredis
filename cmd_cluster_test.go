@@ -9,10 +9,7 @@ import (
 
 // Test CLUSTER *.
 func TestCluster(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	t.Run("slots", func(t *testing.T) {
 		port, err := strconv.Atoi(s.Port())

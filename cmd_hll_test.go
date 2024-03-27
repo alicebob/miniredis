@@ -8,10 +8,7 @@ import (
 
 // Test PFADD
 func TestPfadd(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	mustDo(t, c,
 		"PFADD", "h", "aap", "noot", "mies",
@@ -54,10 +51,7 @@ func TestPfadd(t *testing.T) {
 
 // Test PFCOUNT
 func TestPfcount(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	// Add 100 unique random values
 	for i := 0; i < 100; i++ {
@@ -131,10 +125,7 @@ func TestPfcount(t *testing.T) {
 
 // Test PFMERGE
 func TestPfmerge(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	// Add 100 unique random values to h1 and 50 of these 100 to h2
 	for i := 0; i < 100; i++ {

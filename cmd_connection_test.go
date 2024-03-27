@@ -8,10 +8,7 @@ import (
 
 func TestAuth(t *testing.T) {
 	t.Run("default user", func(t *testing.T) {
-		s := RunT(t)
-		c, err := proto.Dial(s.Addr())
-		ok(t, err)
-		defer c.Close()
+		s, c := runWithClient(t)
 
 		mustDo(t, c,
 			"AUTH", "foo", "bar", "baz",
@@ -38,10 +35,7 @@ func TestAuth(t *testing.T) {
 	})
 
 	t.Run("another user", func(t *testing.T) {
-		s := RunT(t)
-		c, err := proto.Dial(s.Addr())
-		ok(t, err)
-		defer c.Close()
+		s, c := runWithClient(t)
 
 		s.RequireUserAuth("hello", "world")
 		mustDo(t, c,
@@ -67,10 +61,7 @@ func TestAuth(t *testing.T) {
 	})
 
 	t.Run("error cases", func(t *testing.T) {
-		s := RunT(t)
-		c, err := proto.Dial(s.Addr())
-		ok(t, err)
-		defer c.Close()
+		_, c := runWithClient(t)
 
 		mustDo(t, c,
 			"AUTH",
@@ -85,10 +76,7 @@ func TestAuth(t *testing.T) {
 }
 
 func TestPing(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	_, c := runWithClient(t)
 
 	t.Run("no args", func(t *testing.T) {
 		mustDo(t, c,
@@ -113,10 +101,7 @@ func TestPing(t *testing.T) {
 }
 
 func TestEcho(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	_, c := runWithClient(t)
 
 	mustDo(t, c,
 		"ECHO", "hello\nworld",
@@ -130,10 +115,7 @@ func TestEcho(t *testing.T) {
 }
 
 func TestSelect(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	mustOK(t, c, "SET", "foo", "bar")
 	mustOK(t, c, "SELECT", "5")
@@ -161,10 +143,7 @@ func TestSelect(t *testing.T) {
 }
 
 func TestSwapdb(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	mustOK(t, c, "SET", "foo", "bar")
 	mustOK(t, c, "SELECT", "5")
@@ -224,10 +203,7 @@ func TestSwapdb(t *testing.T) {
 }
 
 func TestQuit(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	_, c := runWithClient(t)
 
 	mustOK(t, c, "QUIT")
 
@@ -237,10 +213,7 @@ func TestQuit(t *testing.T) {
 }
 
 func TestSetError(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	mustDo(t, c,
 		"PING",
@@ -262,10 +235,7 @@ func TestSetError(t *testing.T) {
 
 func TestHello(t *testing.T) {
 	t.Run("default user", func(t *testing.T) {
-		s := RunT(t)
-		c, err := proto.Dial(s.Addr())
-		ok(t, err)
-		defer c.Close()
+		s, c := runWithClient(t)
 
 		payl := proto.Map(
 			proto.String("server"), proto.String("miniredis"),

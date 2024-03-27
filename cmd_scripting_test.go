@@ -7,10 +7,7 @@ import (
 )
 
 func TestEval(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	_, c := runWithClient(t)
 
 	mustDo(t, c,
 		"EVAL", "return 42", "0",
@@ -82,7 +79,6 @@ func TestEval(t *testing.T) {
 		must0(t, c,
 			"EVAL", "return redis.call('expire','foo', 999999)", "0",
 		)
-		ok(t, err)
 		must0(t, c,
 			"EVAL", "return redis.call('expire','foo',1000000)", "0",
 		)
@@ -90,10 +86,7 @@ func TestEval(t *testing.T) {
 }
 
 func TestEvalCall(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	_, c := runWithClient(t)
 
 	mustContain(t, c,
 		"EVAL", "redis.call()", "0",
@@ -112,10 +105,7 @@ func TestEvalCall(t *testing.T) {
 }
 
 func TestScript(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	_, c := runWithClient(t)
 
 	var (
 		script1sha = "a42059b356c875f0717db19a51f6aaca9ae659ea"
@@ -182,10 +172,7 @@ func TestScript(t *testing.T) {
 }
 
 func TestCJSON(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	_, c := runWithClient(t)
 
 	mustDo(t, c,
 		"EVAL", `return cjson.decode('{"id":"foo"}')['id']`, "0",
@@ -219,19 +206,13 @@ func TestCJSON(t *testing.T) {
 }
 
 func TestLog(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	_, c := runWithClient(t)
 	mustNil(t, c,
 		"EVAL", "redis.log(redis.LOG_NOTICE, 'hello')", "0")
 }
 
 func TestSha1Hex(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	_, c := runWithClient(t)
 
 	test1 := func(val string, want string) {
 		t.Helper()
@@ -262,10 +243,7 @@ func TestSha1Hex(t *testing.T) {
 }
 
 func TestEvalsha(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	_, c := runWithClient(t)
 
 	script1sha := "bfbf458525d6a0b19200bfd6db3af481156b367b"
 	mustDo(t, c,
@@ -314,10 +292,7 @@ func TestEvalsha(t *testing.T) {
 }
 
 func TestCmdEvalReply(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	_, c := runWithClient(t)
 
 	// return nil
 	mustNil(t, c,
@@ -457,10 +432,7 @@ func TestCmdEvalReply(t *testing.T) {
 }
 
 func TestCmdEvalResponse(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	_, c := runWithClient(t)
 
 	mustOK(t, c,
 		"EVAL", "return redis.call('set','foo','bar')", "0",
@@ -500,10 +472,7 @@ func TestCmdEvalResponse(t *testing.T) {
 }
 
 func TestCmdEvalAuth(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	eval := "return redis.call('set','foo','bar')"
 
@@ -524,10 +493,7 @@ func TestCmdEvalAuth(t *testing.T) {
 }
 
 func TestLuaReplicate(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	_, c := runWithClient(t)
 
 	mustNil(t, c,
 		"EVAL", "redis.replicate_commands()", "0",
@@ -535,10 +501,7 @@ func TestLuaReplicate(t *testing.T) {
 }
 
 func TestLuaTX(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	_, c := runWithClient(t)
 
 	t.Run("eval", func(t *testing.T) {
 		mustOK(t, c,

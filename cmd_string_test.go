@@ -10,10 +10,7 @@ import (
 
 // Test simple GET/SET keys
 func TestString(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	// SET command
 	mustOK(t, c,
@@ -63,10 +60,7 @@ func TestString(t *testing.T) {
 }
 
 func TestSet(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	t.Run("basic", func(t *testing.T) {
 		// Simple case
@@ -206,10 +200,7 @@ func TestSet(t *testing.T) {
 }
 
 func TestMget(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	s.Set("zus", "jet")
 	s.Set("teun", "vuur")
@@ -232,10 +223,7 @@ func TestMget(t *testing.T) {
 }
 
 func TestMset(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	{
 		mustOK(t, c,
@@ -276,10 +264,7 @@ func TestMset(t *testing.T) {
 }
 
 func TestSetex(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	// Usual case
 	{
@@ -325,10 +310,7 @@ func TestSetex(t *testing.T) {
 }
 
 func TestPsetex(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	// Usual case
 	{
@@ -374,10 +356,7 @@ func TestPsetex(t *testing.T) {
 }
 
 func TestSetnx(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	// Existing key
 	{
@@ -403,17 +382,14 @@ func TestSetnx(t *testing.T) {
 			"SETNX", "foo", "not bar",
 		)
 		equals(t, "hash", s.Type("foo"))
-		_, err = s.Get("foo")
+		_, err := s.Get("foo")
 		equals(t, ErrWrongType, err)
 		equals(t, "baz", s.HGet("foo", "bar"))
 	}
 }
 
 func TestIncr(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	// Existing key
 	{
@@ -486,10 +462,7 @@ func TestIncr(t *testing.T) {
 }
 
 func TestIncrBy(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	// Existing key
 	{
@@ -562,10 +535,7 @@ func TestIncrBy(t *testing.T) {
 }
 
 func TestIncrbyfloat(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	// Existing key
 	{
@@ -637,10 +607,7 @@ func TestIncrbyfloat(t *testing.T) {
 }
 
 func TestDecrBy(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	// Existing key
 	{
@@ -713,10 +680,7 @@ func TestDecrBy(t *testing.T) {
 }
 
 func TestDecr(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	// Existing key
 	{
@@ -785,10 +749,7 @@ func TestDecr(t *testing.T) {
 }
 
 func TestGetex(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	t.Run("basic", func(t *testing.T) {
 		// Missing key
@@ -863,10 +824,7 @@ func TestGetex(t *testing.T) {
 }
 
 func TestGetSet(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	// Existing key
 	{
@@ -921,10 +879,7 @@ func TestGetSet(t *testing.T) {
 }
 
 func TestGetdel(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	// Missing key
 	{
@@ -964,10 +919,7 @@ func TestGetdel(t *testing.T) {
 }
 
 func TestStrlen(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	// Existing key
 	{
@@ -1008,10 +960,7 @@ func TestStrlen(t *testing.T) {
 }
 
 func TestAppend(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	// Existing key
 	{
@@ -1055,10 +1004,7 @@ func TestAppend(t *testing.T) {
 }
 
 func TestGetrange(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	{
 		s.Set("foo", "abcdefg")
@@ -1123,10 +1069,7 @@ func TestGetrange(t *testing.T) {
 }
 
 func TestSetrange(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	// Simple case
 	{
@@ -1185,10 +1128,7 @@ func TestSetrange(t *testing.T) {
 }
 
 func TestBitcount(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	{
 		s.Set("countme", "a") // 'a' is 0x1100001
@@ -1257,10 +1197,7 @@ func TestBitcount(t *testing.T) {
 }
 
 func TestBitop(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	{
 		and := func(a, b byte) byte { return a & b }
@@ -1368,10 +1305,7 @@ func TestBitop(t *testing.T) {
 }
 
 func TestBitpos(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	t.Run("basic", func(t *testing.T) {
 		s.Set("findme", "\xff\xf0\x00")
@@ -1545,10 +1479,7 @@ func TestBitpos(t *testing.T) {
 }
 
 func TestGetbit(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	{
 		s.Set("findme", "\x08")
@@ -1600,10 +1531,7 @@ func TestGetbit(t *testing.T) {
 }
 
 func TestSetbit(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	{
 		s.Set("findme", "\x08")
@@ -1678,10 +1606,7 @@ func TestSetbit(t *testing.T) {
 }
 
 func TestMsetnx(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	{
 		must1(t, c,

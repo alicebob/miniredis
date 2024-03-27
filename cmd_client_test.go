@@ -9,10 +9,7 @@ import (
 // Test CLIENT *.
 func TestClient(t *testing.T) {
 	t.Run("setname and getname", func(t *testing.T) {
-		s := RunT(t)
-		c, err := proto.Dial(s.Addr())
-		ok(t, err)
-		defer c.Close()
+		_, c := runWithClient(t)
 
 		// Set the client name
 		mustDo(t, c,
@@ -28,10 +25,7 @@ func TestClient(t *testing.T) {
 	})
 
 	t.Run("getname without setname", func(t *testing.T) {
-		s := RunT(t)
-		c, err := proto.Dial(s.Addr())
-		ok(t, err)
-		defer c.Close()
+		_, c := runWithClient(t)
 
 		// Get the client name without setting it first
 		mustDo(t, c,

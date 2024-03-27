@@ -8,11 +8,7 @@ import (
 )
 
 func TestMiniredis_cmdInfo(t *testing.T) {
-	s := RunT(t)
-
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	t.Run("Invalid section name", func(t *testing.T) {
 		mustDo(t, c,

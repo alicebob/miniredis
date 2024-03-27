@@ -28,10 +28,7 @@ func goStrings(t *testing.T, s *Miniredis, args ...string) <-chan string {
 }
 
 func TestLpush(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	t.Run("basic", func(t *testing.T) {
 		mustDo(t, c,
@@ -118,10 +115,7 @@ func TestLpush(t *testing.T) {
 }
 
 func TestLpushx(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	{
 		must0(t, c,
@@ -183,10 +177,7 @@ func TestLpushx(t *testing.T) {
 }
 
 func TestLpop(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	_, c := runWithClient(t)
 
 	t.Run("single", func(t *testing.T) {
 		mustDo(t, c,
@@ -266,10 +257,7 @@ func TestLpop(t *testing.T) {
 }
 
 func TestRPushPop(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	{
 		mustDo(t, c,
@@ -339,10 +327,7 @@ func TestRPushPop(t *testing.T) {
 }
 
 func TestRpop(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	s.Push("l", "aap", "noot", "mies")
 
@@ -372,10 +357,7 @@ func TestRpop(t *testing.T) {
 }
 
 func TestLindex(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	s.Push("l", "aap", "noot", "mies", "vuur")
 
@@ -431,10 +413,7 @@ func TestLindex(t *testing.T) {
 }
 
 func TestLpos(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	s.Push("l", "aap", "noot", "aap", "mies", "aap", "vuur", "aap", "aap")
 
@@ -687,10 +666,7 @@ func TestLpos(t *testing.T) {
 }
 
 func TestLlen(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	s.Push("l", "aap", "noot", "mies", "vuur")
 
@@ -719,10 +695,7 @@ func TestLlen(t *testing.T) {
 }
 
 func TestLtrim(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	s.Push("l", "aap", "noot", "mies", "vuur")
 
@@ -778,10 +751,7 @@ func TestLtrim(t *testing.T) {
 }
 
 func TestLrem(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	// Reverse
 	{
@@ -875,10 +845,7 @@ func TestLrem(t *testing.T) {
 }
 
 func TestLset(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	s.Push("l", "aap", "noot", "mies", "vuur", "noot", "noot")
 	// Simple LSET
@@ -945,10 +912,7 @@ func TestLset(t *testing.T) {
 }
 
 func TestLinsert(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	s.Push("l", "aap", "noot", "mies", "vuur", "noot", "end")
 	// Before
@@ -1041,10 +1005,7 @@ func TestLinsert(t *testing.T) {
 }
 
 func TestRpoplpush(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	s.Push("l", "aap", "noot", "mies")
 	s.Push("l2", "vuur", "noot", "end")
@@ -1132,10 +1093,7 @@ func TestRpoplpush(t *testing.T) {
 }
 
 func TestRpushx(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	// Simple cases
 	{
@@ -1194,10 +1152,7 @@ func TestRpushx(t *testing.T) {
 }
 
 func TestBrpop(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	// Simple cases
 	{
@@ -1229,10 +1184,7 @@ func TestBrpop(t *testing.T) {
 }
 
 func TestBrpopSimple(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	got := goStrings(t, s, "BRPOP", "mylist", "0")
 	time.Sleep(30 * time.Millisecond)
@@ -1251,10 +1203,7 @@ func TestBrpopSimple(t *testing.T) {
 }
 
 func TestBrpopMulti(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	got := goStrings(t, s, "BRPOP", "l1", "l2", "l3", "0")
 	must1(t, c, "RPUSH", "l0", "e01")
@@ -1279,9 +1228,6 @@ func TestBrpopMulti(t *testing.T) {
 
 func TestBrpopTimeout(t *testing.T) {
 	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
 
 	got := goStrings(t, s, "BRPOP", "l1", "0.1")
 	select {
@@ -1294,10 +1240,7 @@ func TestBrpopTimeout(t *testing.T) {
 
 func TestBrpopTx(t *testing.T) {
 	// BRPOP in a transaction behaves as if the timeout triggers right away
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	{
 		mustOK(t, c,
@@ -1347,10 +1290,7 @@ func TestBrpopTx(t *testing.T) {
 }
 
 func TestBlpop(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	t.Run("basic", func(t *testing.T) {
 		s.Push("ll", "aap", "noot", "mies")
@@ -1398,10 +1338,7 @@ func TestBlpopResourceCleanup(t *testing.T) {
 }
 
 func TestBrpoplpush(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	// Simple cases
 	{
@@ -1445,10 +1382,7 @@ func TestBrpoplpush(t *testing.T) {
 }
 
 func TestBrpoplpushSimple(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	got := goStrings(t, s, "BRPOPLPUSH", "from", "to", "1")
 	time.Sleep(30 * time.Millisecond)
@@ -1486,10 +1420,7 @@ func TestBrpoplpushTimeout(t *testing.T) {
 }
 
 func TestLmove(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	s.Push("src", "LR", "LL", "RR", "RL")
 	s.Push("dst", "m1", "m2", "m3")
@@ -1615,10 +1546,7 @@ func TestLmove(t *testing.T) {
 }
 
 func TestBlmove(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	t.Run("Behaves just like LMOVE", func(t *testing.T) {
 		s.Push("src", "LR", "LL", "RR", "RL")

@@ -7,10 +7,7 @@ import (
 )
 
 func TestSubscribe(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	mustDo(t, c,
 		"SUBSCRIBE", "event1",
@@ -83,10 +80,7 @@ func TestSubscribe(t *testing.T) {
 }
 
 func TestUnsubscribe(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	_, c := runWithClient(t)
 
 	mustDo(t, c,
 		"SUBSCRIBE", "event1", "event2", "event3", "event4", "event5",
@@ -163,10 +157,7 @@ func TestUnsubscribe(t *testing.T) {
 }
 
 func TestUnsubscribeEmpty(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	_, c := runWithClient(t)
 
 	mustDo(t, c,
 		"UNSUBSCRIBE",
@@ -179,10 +170,7 @@ func TestUnsubscribeEmpty(t *testing.T) {
 }
 
 func TestPsubscribe(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	mustDo(t, c,
 		"PSUBSCRIBE", "event1",
@@ -236,10 +224,7 @@ func TestPsubscribe(t *testing.T) {
 }
 
 func TestPunsubscribe(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	_, c := runWithClient(t)
 
 	mustDo(t, c,
 		"PSUBSCRIBE", "event1", "event2?", "event3*", "event4[abc]", "event5[]",
@@ -292,10 +277,7 @@ func TestPunsubscribe(t *testing.T) {
 }
 
 func TestPunsubscribeEmpty(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	_, c := runWithClient(t)
 
 	mustDo(t, c,
 		"PUNSUBSCRIBE",
@@ -310,10 +292,7 @@ func TestPunsubscribeEmpty(t *testing.T) {
 func TestPublishMode(t *testing.T) {
 	// only pubsub related commands should be accepted while there are
 	// subscriptions.
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	_, c := runWithClient(t)
 
 	mustDo(t, c,
 		"SUBSCRIBE", "birds",
@@ -389,10 +368,7 @@ func TestPublish(t *testing.T) {
 
 func TestPublishMix(t *testing.T) {
 	// SUBSCRIBE and PSUBSCRIBE
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	_, c := runWithClient(t)
 
 	mustDo(t, c,
 		"SUBSCRIBE", "c1",
@@ -528,10 +504,7 @@ func TestPubsubNumsub(t *testing.T) {
 }
 
 func TestPubsubNumpat(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	s, c := runWithClient(t)
 
 	must0(t, c,
 		"PUBSUB", "NUMPAT",
@@ -541,10 +514,7 @@ func TestPubsubNumpat(t *testing.T) {
 }
 
 func TestPubSubBadArgs(t *testing.T) {
-	s := RunT(t)
-	c, err := proto.Dial(s.Addr())
-	ok(t, err)
-	defer c.Close()
+	_, c := runWithClient(t)
 
 	mustDo(t, c,
 		"SUBSCRIBE",
