@@ -13,9 +13,7 @@ import (
 
 // Test starting/stopping a server
 func TestServer(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
@@ -31,10 +29,8 @@ func TestServer(t *testing.T) {
 }
 
 func TestMultipleServers(t *testing.T) {
-	s1, err := Run()
-	ok(t, err)
-	s2, err := Run()
-	ok(t, err)
+	s1 := RunT(t)
+	s2 := RunT(t)
 	if s1.Addr() == s2.Addr() {
 		t.Fatal("Non-unique addresses", s1.Addr(), s2.Addr())
 	}
@@ -48,14 +44,13 @@ func TestMultipleServers(t *testing.T) {
 }
 
 func TestRestart(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
+	s := RunT(t)
 	addr := s.Addr()
 
 	s.Set("color", "red")
 
 	s.Close()
-	err = s.Restart()
+	err := s.Restart()
 	ok(t, err)
 	if have, want := s.Addr(), addr; have != want {
 		t.Fatalf("have: %s, want: %s", have, want)
@@ -86,8 +81,7 @@ func TestAddr(t *testing.T) {
 }
 
 func TestDump(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
+	s := RunT(t)
 	s.Set("aap", "noot")
 	s.Set("vuur", "mies")
 	s.HSet("ahash", "aap", "noot")
@@ -129,8 +123,7 @@ func TestDump(t *testing.T) {
 }
 
 func TestDumpList(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
+	s := RunT(t)
 	s.Push("elements", "earth")
 	s.Push("elements", "wind")
 	s.Push("elements", "fire")
@@ -144,8 +137,7 @@ func TestDumpList(t *testing.T) {
 }
 
 func TestDumpSet(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
+	s := RunT(t)
 	s.SetAdd("elements", "earth")
 	s.SetAdd("elements", "wind")
 	s.SetAdd("elements", "fire")
@@ -159,8 +151,7 @@ func TestDumpSet(t *testing.T) {
 }
 
 func TestDumpSortedSet(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
+	s := RunT(t)
 	s.ZAdd("elements", 2.0, "wind")
 	s.ZAdd("elements", 3.0, "earth")
 	s.ZAdd("elements", 1.0, "fire")
@@ -174,8 +165,7 @@ func TestDumpSortedSet(t *testing.T) {
 }
 
 func TestDumpStream(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
+	s := RunT(t)
 	s.XAdd("elements", "0-1", []string{"name", "earth"})
 	s.XAdd("elements", "123456789-0", []string{"name", "wind"})
 	s.XAdd("elements", "123456789-1", []string{"name", "fire"})
@@ -200,8 +190,7 @@ func TestDumpStream(t *testing.T) {
 }
 
 func TestKeysAndFlush(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
+	s := RunT(t)
 	s.Set("aap", "noot")
 	s.Set("vuur", "mies")
 	s.Set("muur", "oom")
@@ -226,8 +215,7 @@ func TestKeysAndFlush(t *testing.T) {
 }
 
 func TestExpireWithFastForward(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
+	s := RunT(t)
 
 	s.Set("aap", "noot")
 	s.Set("noot", "aap")

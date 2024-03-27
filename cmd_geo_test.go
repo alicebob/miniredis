@@ -7,9 +7,7 @@ import (
 )
 
 func TestGeoadd(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -49,9 +47,7 @@ func TestGeoadd(t *testing.T) {
 }
 
 func TestGeopos(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -89,9 +85,7 @@ func TestGeopos(t *testing.T) {
 
 // Test GEOADD / GEORADIUS / GEORADIUS_RO
 func TestGeo(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -248,9 +242,7 @@ func TestGeo(t *testing.T) {
 }
 
 func TestGeodist(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -305,9 +297,7 @@ func TestGeodist(t *testing.T) {
 
 // Test GEOADD / GEORADIUSBYMEMBER / GEORADIUSBYMEMBER_RO
 func TestGeobymember(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()

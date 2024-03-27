@@ -15,9 +15,7 @@ import (
 
 // Test XADD / XLEN / XRANGE
 func TestStream(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -85,9 +83,7 @@ func TestStream(t *testing.T) {
 
 // Test XADD
 func TestStreamAdd(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -255,9 +251,7 @@ func TestStreamAdd(t *testing.T) {
 
 // Test XLEN
 func TestStreamLen(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -296,9 +290,7 @@ func TestStreamLen(t *testing.T) {
 
 // Test XRANGE / XREVRANGE
 func TestStreamRange(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -402,9 +394,7 @@ func TestStreamRange(t *testing.T) {
 
 // Test XREAD
 func TestStreamRead(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -542,9 +532,7 @@ func TestStreamRead(t *testing.T) {
 
 // Test XINFO
 func TestStreamInfo(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -589,9 +577,7 @@ func TestStreamInfo(t *testing.T) {
 
 // Test XGROUP
 func TestStreamGroup(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -724,9 +710,7 @@ func TestStreamGroup(t *testing.T) {
 
 // Test XREADGROUP
 func TestStreamReadGroup(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -820,9 +804,7 @@ func TestStreamReadGroup(t *testing.T) {
 
 // Test XDEL
 func TestStreamDelete(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -877,9 +859,7 @@ func TestStreamDelete(t *testing.T) {
 
 // Test XACK
 func TestStreamAck(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -946,9 +926,7 @@ func TestStreamAck(t *testing.T) {
 
 // Test XPENDING
 func TestStreamXpending(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -1090,9 +1068,7 @@ func TestStreamXpending(t *testing.T) {
 
 // Test XTRIM
 func TestStreamTrim(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -1154,9 +1130,7 @@ func TestStreamTrim(t *testing.T) {
 }
 
 func TestStreamAutoClaim(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -1411,9 +1385,7 @@ func TestStreamAutoClaim(t *testing.T) {
 }
 
 func TestStreamClaim(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()

@@ -7,9 +7,7 @@ import (
 )
 
 func TestEval(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -92,9 +90,7 @@ func TestEval(t *testing.T) {
 }
 
 func TestEvalCall(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -116,9 +112,7 @@ func TestEvalCall(t *testing.T) {
 }
 
 func TestScript(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -188,9 +182,7 @@ func TestScript(t *testing.T) {
 }
 
 func TestCJSON(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -227,9 +219,7 @@ func TestCJSON(t *testing.T) {
 }
 
 func TestLog(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -238,9 +228,7 @@ func TestLog(t *testing.T) {
 }
 
 func TestSha1Hex(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -274,9 +262,7 @@ func TestSha1Hex(t *testing.T) {
 }
 
 func TestEvalsha(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -328,9 +314,7 @@ func TestEvalsha(t *testing.T) {
 }
 
 func TestCmdEvalReply(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -473,9 +457,7 @@ func TestCmdEvalReply(t *testing.T) {
 }
 
 func TestCmdEvalResponse(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -518,9 +500,7 @@ func TestCmdEvalResponse(t *testing.T) {
 }
 
 func TestCmdEvalAuth(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -544,9 +524,7 @@ func TestCmdEvalAuth(t *testing.T) {
 }
 
 func TestLuaReplicate(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -557,9 +535,7 @@ func TestLuaReplicate(t *testing.T) {
 }
 
 func TestLuaTX(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()

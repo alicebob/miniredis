@@ -10,9 +10,7 @@ import (
 
 // Test EXPIRE. Keys with an expiration are called volatile in Redis parlance.
 func TestTTL(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -104,9 +102,7 @@ func TestTTL(t *testing.T) {
 }
 
 func TestExpireat(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -140,9 +136,7 @@ func TestExpireat(t *testing.T) {
 }
 
 func TestTouch(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -182,9 +176,7 @@ func TestTouch(t *testing.T) {
 }
 
 func TestPexpireat(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -220,9 +212,7 @@ func TestPexpireat(t *testing.T) {
 }
 
 func TestPexpire(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -256,9 +246,7 @@ func TestPexpire(t *testing.T) {
 }
 
 func TestDel(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -293,9 +281,7 @@ func TestDel(t *testing.T) {
 }
 
 func TestUnlink(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -323,9 +309,7 @@ func TestUnlink(t *testing.T) {
 }
 
 func TestType(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -371,9 +355,7 @@ func TestType(t *testing.T) {
 }
 
 func TestExpireTime(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -397,9 +379,7 @@ func TestExpireTime(t *testing.T) {
 }
 
 func TestPExpireTime(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -423,9 +403,7 @@ func TestPExpireTime(t *testing.T) {
 }
 
 func TestExists(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -470,9 +448,7 @@ func TestExists(t *testing.T) {
 }
 
 func TestMove(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -525,9 +501,7 @@ func TestMove(t *testing.T) {
 }
 
 func TestKeys(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -573,9 +547,7 @@ func TestKeys(t *testing.T) {
 }
 
 func TestRandom(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -603,9 +575,7 @@ func TestRandom(t *testing.T) {
 }
 
 func TestRename(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -682,9 +652,7 @@ func TestRename(t *testing.T) {
 }
 
 func TestScan(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -848,9 +816,7 @@ func TestScan(t *testing.T) {
 }
 
 func TestRenamenx(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -905,9 +871,7 @@ func TestRenamenx(t *testing.T) {
 }
 
 func TestCopy(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()

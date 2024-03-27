@@ -9,9 +9,7 @@ import (
 
 // Test SADD / SMEMBERS.
 func TestSadd(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -103,9 +101,7 @@ func TestSadd(t *testing.T) {
 
 // Test SISMEMBER
 func TestSismember(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -150,9 +146,7 @@ func TestSismember(t *testing.T) {
 
 // Test SMISMEMBER
 func TestSmismember(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -181,9 +175,7 @@ func TestSmismember(t *testing.T) {
 
 // Test SREM
 func TestSrem(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -241,9 +233,7 @@ func TestSrem(t *testing.T) {
 
 // Test SMOVE
 func TestSmove(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -314,9 +304,7 @@ func TestSmove(t *testing.T) {
 
 // Test SPOP
 func TestSpop(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -378,9 +366,7 @@ func TestSpop(t *testing.T) {
 
 // Test SRANDMEMBER
 func TestSrandmember(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -455,9 +441,7 @@ func TestSrandmember(t *testing.T) {
 
 // Test SDIFF
 func TestSdiff(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -513,9 +497,7 @@ func TestSdiff(t *testing.T) {
 
 // Test SDIFFSTORE
 func TestSdiffstore(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -553,9 +535,7 @@ func TestSdiffstore(t *testing.T) {
 
 // Test SINTER
 func TestSinter(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -619,9 +599,7 @@ func TestSinter(t *testing.T) {
 
 // Test SINTERSTORE
 func TestSinterstore(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -668,9 +646,7 @@ func TestSinterstore(t *testing.T) {
 
 // Test SINTERCARD
 func TestSintercard(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -782,9 +758,7 @@ func TestSintercard(t *testing.T) {
 
 // Test SUNION
 func TestSunion(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -846,9 +820,7 @@ func TestSunion(t *testing.T) {
 
 // Test SUNIONSTORE
 func TestSunionstore(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -886,9 +858,7 @@ func TestSunionstore(t *testing.T) {
 }
 
 func TestSscan(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
