@@ -7,9 +7,7 @@ import (
 )
 
 func TestMulti(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -21,9 +19,7 @@ func TestMulti(t *testing.T) {
 }
 
 func TestExec(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -36,9 +32,7 @@ func TestExec(t *testing.T) {
 }
 
 func TestDiscard(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -51,9 +45,7 @@ func TestDiscard(t *testing.T) {
 }
 
 func TestWatch(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -77,9 +69,7 @@ func TestWatch(t *testing.T) {
 
 // Test simple multi/exec block.
 func TestSimpleTransaction(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -108,9 +98,7 @@ func TestSimpleTransaction(t *testing.T) {
 }
 
 func TestDiscardTransaction(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -138,9 +126,7 @@ func TestDiscardTransaction(t *testing.T) {
 }
 
 func TestTxQueueErr(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -177,9 +163,7 @@ func TestTxQueueErr(t *testing.T) {
 
 func TestTxWatch(t *testing.T) {
 	// Watch with no error.
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -206,9 +190,7 @@ func TestTxWatch(t *testing.T) {
 
 func TestTxWatchErr(t *testing.T) {
 	// Watch with en error.
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -246,9 +228,7 @@ func TestTxWatchErr(t *testing.T) {
 }
 
 func TestUnwatch(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()

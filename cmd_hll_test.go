@@ -8,9 +8,7 @@ import (
 
 // Test PFADD
 func TestPfadd(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -56,9 +54,7 @@ func TestPfadd(t *testing.T) {
 
 // Test PFCOUNT
 func TestPfcount(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -135,9 +131,7 @@ func TestPfcount(t *testing.T) {
 
 // Test PFMERGE
 func TestPfmerge(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()

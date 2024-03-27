@@ -8,9 +8,7 @@ import (
 
 func TestAuth(t *testing.T) {
 	t.Run("default user", func(t *testing.T) {
-		s, err := Run()
-		ok(t, err)
-		defer s.Close()
+		s := RunT(t)
 		c, err := proto.Dial(s.Addr())
 		ok(t, err)
 		defer c.Close()
@@ -40,9 +38,7 @@ func TestAuth(t *testing.T) {
 	})
 
 	t.Run("another user", func(t *testing.T) {
-		s, err := Run()
-		ok(t, err)
-		defer s.Close()
+		s := RunT(t)
 		c, err := proto.Dial(s.Addr())
 		ok(t, err)
 		defer c.Close()
@@ -71,9 +67,7 @@ func TestAuth(t *testing.T) {
 	})
 
 	t.Run("error cases", func(t *testing.T) {
-		s, err := Run()
-		ok(t, err)
-		defer s.Close()
+		s := RunT(t)
 		c, err := proto.Dial(s.Addr())
 		ok(t, err)
 		defer c.Close()
@@ -91,9 +85,7 @@ func TestAuth(t *testing.T) {
 }
 
 func TestPing(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -121,9 +113,7 @@ func TestPing(t *testing.T) {
 }
 
 func TestEcho(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -140,9 +130,7 @@ func TestEcho(t *testing.T) {
 }
 
 func TestSelect(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -173,9 +161,7 @@ func TestSelect(t *testing.T) {
 }
 
 func TestSwapdb(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -238,9 +224,7 @@ func TestSwapdb(t *testing.T) {
 }
 
 func TestQuit(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -253,9 +237,7 @@ func TestQuit(t *testing.T) {
 }
 
 func TestSetError(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -280,9 +262,7 @@ func TestSetError(t *testing.T) {
 
 func TestHello(t *testing.T) {
 	t.Run("default user", func(t *testing.T) {
-		s, err := Run()
-		ok(t, err)
-		defer s.Close()
+		s := RunT(t)
 		c, err := proto.Dial(s.Addr())
 		ok(t, err)
 		defer c.Close()

@@ -28,9 +28,7 @@ func goStrings(t *testing.T, s *Miniredis, args ...string) <-chan string {
 }
 
 func TestLpush(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -120,9 +118,7 @@ func TestLpush(t *testing.T) {
 }
 
 func TestLpushx(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -187,9 +183,7 @@ func TestLpushx(t *testing.T) {
 }
 
 func TestLpop(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -272,9 +266,7 @@ func TestLpop(t *testing.T) {
 }
 
 func TestRPushPop(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -347,9 +339,7 @@ func TestRPushPop(t *testing.T) {
 }
 
 func TestRpop(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -382,9 +372,7 @@ func TestRpop(t *testing.T) {
 }
 
 func TestLindex(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -443,9 +431,7 @@ func TestLindex(t *testing.T) {
 }
 
 func TestLpos(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -701,9 +687,7 @@ func TestLpos(t *testing.T) {
 }
 
 func TestLlen(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -735,9 +719,7 @@ func TestLlen(t *testing.T) {
 }
 
 func TestLtrim(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -796,9 +778,7 @@ func TestLtrim(t *testing.T) {
 }
 
 func TestLrem(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -895,9 +875,7 @@ func TestLrem(t *testing.T) {
 }
 
 func TestLset(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -967,9 +945,7 @@ func TestLset(t *testing.T) {
 }
 
 func TestLinsert(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -1065,9 +1041,7 @@ func TestLinsert(t *testing.T) {
 }
 
 func TestRpoplpush(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -1158,9 +1132,7 @@ func TestRpoplpush(t *testing.T) {
 }
 
 func TestRpushx(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -1222,9 +1194,7 @@ func TestRpushx(t *testing.T) {
 }
 
 func TestBrpop(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -1259,9 +1229,7 @@ func TestBrpop(t *testing.T) {
 }
 
 func TestBrpopSimple(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -1283,9 +1251,7 @@ func TestBrpopSimple(t *testing.T) {
 }
 
 func TestBrpopMulti(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -1312,9 +1278,7 @@ func TestBrpopMulti(t *testing.T) {
 }
 
 func TestBrpopTimeout(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -1330,9 +1294,7 @@ func TestBrpopTimeout(t *testing.T) {
 
 func TestBrpopTx(t *testing.T) {
 	// BRPOP in a transaction behaves as if the timeout triggers right away
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -1385,9 +1347,7 @@ func TestBrpopTx(t *testing.T) {
 }
 
 func TestBlpop(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -1421,8 +1381,7 @@ func TestBlpop(t *testing.T) {
 }
 
 func TestBlpopResourceCleanup(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 
@@ -1439,9 +1398,7 @@ func TestBlpopResourceCleanup(t *testing.T) {
 }
 
 func TestBrpoplpush(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -1488,9 +1445,7 @@ func TestBrpoplpush(t *testing.T) {
 }
 
 func TestBrpoplpushSimple(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -1519,9 +1474,7 @@ func TestBrpoplpushSimple(t *testing.T) {
 }
 
 func TestBrpoplpushTimeout(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 
 	got := goStrings(t, s, "BRPOPLPUSH", "l1", "l2", "0.1")
 	select {
@@ -1533,9 +1486,7 @@ func TestBrpoplpushTimeout(t *testing.T) {
 }
 
 func TestLmove(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -1664,9 +1615,7 @@ func TestLmove(t *testing.T) {
 }
 
 func TestBlmove(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()

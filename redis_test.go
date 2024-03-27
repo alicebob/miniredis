@@ -9,9 +9,7 @@ import (
 )
 
 func TestRedis(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 
 	peer := &server.Peer{}
 	var wg sync.WaitGroup

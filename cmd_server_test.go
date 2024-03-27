@@ -9,9 +9,7 @@ import (
 
 // Test DBSIZE, FLUSHDB, and FLUSHALL.
 func TestCmdServer(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -106,9 +104,7 @@ func TestCmdServer(t *testing.T) {
 
 // Test TIME
 func TestCmdServerTime(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
@@ -130,9 +126,7 @@ func TestCmdServerTime(t *testing.T) {
 
 // Test Memory Usage
 func TestCmdServerMemoryUsage(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
+	s := RunT(t)
 	c, err := proto.Dial(s.Addr())
 	ok(t, err)
 	defer c.Close()
