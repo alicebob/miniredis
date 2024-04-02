@@ -416,6 +416,12 @@ func TestScriptReplicate(t *testing.T) {
 			"EVAL", `redis.replicate_commands();`, "0",
 		)
 	})
+
+	testRaw(t, func(c *client) {
+		c.Do(
+			"EVAL", `redis.set_repl(redis.REPL_NONE);`, "0",
+		)
+	})
 }
 
 func TestScriptTx(t *testing.T) {
