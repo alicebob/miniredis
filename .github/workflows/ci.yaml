@@ -16,5 +16,28 @@ jobs:
     - uses: actions/setup-go@v4
       with:
         go-version: ${{ matrix.go }}
+
+    - name: Cache redis server binary restore
+      id: cache-redis-server-binary-restore
+      uses: actions/cache/restore@v4
+      with:
+        path: integration/redis_src/redis-server
+        key: "redis-server-binary-${{ hashFiles('integration/get_redis.sh') }}"
+
+    - name: Prevent redis binary rebuild
+      if: steps.cache-redis-server-binary-restore.outputs.cache-hit
+      run: "touch -m integration/redis_src/redis-server"
+      # Make uses modification timestamp to decide if redis-server needs to be rebuilt.
+      # In github actions get_redis.sh has modification time set when cloned but redis-server binary has modification
+      # time when it was cached (always older than clone). By updating timestamp we avoid unnecessary build.
+      # Cache key includes get_redis.sh file hash so there is no risk of using stale binary.
+
     - name: Test
       run: make ci
+
+    - name: Cache redis server binary save
+      if: steps.cache-redis-server-binary-restore.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v4
+      with:
+        path: integration/redis_src/redis-server
+        key: ${{ steps.cache-redis-server-binary-restore.outputs.cache-primary-key }}
