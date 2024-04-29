@@ -19,13 +19,13 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
-	"github.com/alicebob/miniredis/v2/proto"
 	"math/rand"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/alicebob/miniredis/v2/proto"
 	"github.com/alicebob/miniredis/v2/server"
 )
 
@@ -189,6 +189,15 @@ func (m *Miniredis) StartTLS(cfg *tls.Config) error {
 // ":6379", or "127.0.0.1:0"
 func (m *Miniredis) StartAddr(addr string) error {
 	s, err := server.NewServer(addr)
+	if err != nil {
+		return err
+	}
+	return m.start(s)
+}
+
+// StartAddrTLS runs miniredis with a given addr, TLS version.
+func (m *Miniredis) StartAddrTLS(addr string, cfg *tls.Config) error {
+	s, err := server.NewServerTLS(addr, cfg)
 	if err != nil {
 		return err
 	}
