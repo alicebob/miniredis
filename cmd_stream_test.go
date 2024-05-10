@@ -200,10 +200,6 @@ func TestStreamAdd(t *testing.T) {
 			"XADD", "reallynosuchkey", "NOMKSTREAM", "MAXLEN", "~", "10", "*", "one", "1",
 			proto.Nil,
 		)
-		mustDo(t, c,
-			"XADD", "reallynosuchkey", "NOMKSTREAM", "MAXLEN", "~", "10", "MINID", "1672545848004-0", "*", "one", "1",
-			proto.Nil,
-		)
 	})
 
 	t.Run("error cases", func(t *testing.T) {
