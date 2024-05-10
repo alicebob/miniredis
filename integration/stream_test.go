@@ -27,6 +27,7 @@ func TestStream(t *testing.T) {
 			)
 			c.Do("XADD",
 				"reallynosuchkey",
+				"NOMKSTREAM",
 				"*",
 				"name", "Earth",
 			)
@@ -132,7 +133,7 @@ func TestStream(t *testing.T) {
 			c.Do("EXEC")
 
 			c.Do("MULTI")
-			c.Do("XADD", "reallynosuchkey", "MAXLEN", "four", "*", "name", "Mercury")
+			c.Do("XADD", "reallynosuchkey", "NOMKSTREAM", "MAXLEN", "four", "*", "name", "Mercury")
 			c.Do("EXEC")
 		})
 	})
