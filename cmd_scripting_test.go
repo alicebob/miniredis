@@ -495,9 +495,17 @@ func TestCmdEvalAuth(t *testing.T) {
 func TestLuaReplicate(t *testing.T) {
 	_, c := runWithClient(t)
 
-	mustNil(t, c,
-		"EVAL", "redis.replicate_commands()", "0",
-	)
+	t.Run("replicate_commands", func(t *testing.T) {
+		mustNil(t, c,
+			"EVAL", "redis.replicate_commands()", "0",
+		)
+	})
+
+	t.Run("set_repl", func(t *testing.T) {
+		mustNil(t, c,
+			"EVAL", "redis.set_repl(redis.REPL_NONE)", "0",
+		)
+	})
 }
 
 func TestLuaTX(t *testing.T) {
