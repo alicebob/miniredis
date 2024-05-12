@@ -50,6 +50,11 @@ func (m *Miniredis) cmdXadd(c *server.Peer, cmd string, args []string) {
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		maxlen := -1
 		minID := ""
+		makeStream := true
+		if strings.ToLower(args[0]) == "nomkstream" {
+			args = args[1:]
+			makeStream = false
+		}
 		if strings.ToLower(args[0]) == "maxlen" {
 			args = args[1:]
 			// we don't treat "~" special
@@ -101,7 +106,10 @@ func (m *Miniredis) cmdXadd(c *server.Peer, cmd string, args []string) {
 			return
 		}
 		if s == nil {
-			// TODO: NOMKSTREAM
+			if !makeStream {
+				c.WriteNull()
+				return
+			}
 			s, _ = db.newStream(key)
 		}
 

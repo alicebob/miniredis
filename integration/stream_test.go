@@ -25,6 +25,12 @@ func TestStream(t *testing.T) {
 				"18446744073709551000-0",
 				"name", "Earth",
 			)
+			c.Do("XADD",
+				"reallynosuchkey",
+				"NOMKSTREAM",
+				"*",
+				"name", "Earth",
+			)
 			c.Error("ID specified", "XADD",
 				"planets",
 				"18446744073709551000-0", // <-- duplicate
@@ -124,6 +130,10 @@ func TestStream(t *testing.T) {
 
 			c.Do("MULTI")
 			c.Do("XADD", "planets", "MAXLEN", "four", "*", "name", "Mercury")
+			c.Do("EXEC")
+
+			c.Do("MULTI")
+			c.Do("XADD", "reallynosuchkey", "NOMKSTREAM", "MAXLEN", "four", "*", "name", "Mercury")
 			c.Do("EXEC")
 		})
 	})
