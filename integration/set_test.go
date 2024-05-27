@@ -191,7 +191,8 @@ func TestSetSrandmember(t *testing.T) {
 		c.Do("SRANDMEMBER", "s", "-5")
 
 		c.Do("SRANDMEMBER", "s", "0")
-		c.Do("SPOP", "nosuch")
+		c.Do("SRANDMEMBER", "nosuch")
+		c.Do("SRANDMEMBER", "nosuch", "1")
 
 		// failure cases
 		c.Error("wrong number", "SRANDMEMBER")

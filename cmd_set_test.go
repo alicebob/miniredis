@@ -381,6 +381,12 @@ func TestSrandmember(t *testing.T) {
 		"SRANDMEMBER", "nosuch",
 	)
 
+	// a nonexisting key with count
+	mustDo(t, c,
+		"SRANDMEMBER", "nosuch", "1",
+		proto.Strings(),
+	)
+
 	t.Run("errors", func(t *testing.T) {
 		s.SetAdd("chk", "aap", "noot")
 		s.Set("str", "value")
