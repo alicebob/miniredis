@@ -1588,7 +1588,7 @@ func TestStreamClaim(t *testing.T) {
 				proto.String("pending"), proto.Int(1),
 				proto.String("last-delivered-id"), proto.String("0-0"),
 				proto.String("entries-read"), proto.Int(0),
-				proto.String("lag"), proto.Int(2),
+				proto.String("lag"), proto.Nil,
 			),
 		),
 	)
