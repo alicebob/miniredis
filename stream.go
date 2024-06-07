@@ -298,7 +298,7 @@ func (g *streamGroup) onDelete(id string) {
 		return
 	}
 	compare := streamCmp(g.lastID, id)
-	if compare <= 0 {
+	if compare < 0 {
 		// an item between last-delivered-id and last-written-id is deleted. Entries read is not valid anymore
 		g.entriesReadValid = false
 	}
