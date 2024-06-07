@@ -945,6 +945,36 @@ func TestStreamDelete(t *testing.T) {
 			),
 		),
 	)
+
+	mustDo(t, c,
+		"XREADGROUP", "GROUP", "processing", "alice", "STREAMS", "planets", ">",
+		proto.Array(
+			proto.Array(
+				proto.String("planets"),
+				proto.Array(
+					proto.Array(
+						proto.String("0-4"),
+						proto.Strings("name", "Jupiter"),
+					),
+				),
+			),
+		),
+	)
+
+	mustDo(t, c,
+		"XINFO", "GROUPS", "planets",
+		proto.Array(
+			proto.Array(
+				proto.String("name"), proto.String("processing"),
+				proto.String("consumers"), proto.Int(1),
+				proto.String("pending"), proto.Int(1),
+				proto.String("last-delivered-id"), proto.String("0-4"),
+				proto.String("entries-read"), proto.Int(4),
+				proto.String("lag"), proto.Int(0),
+			),
+		),
+	)
+
 }
 
 // Test XACK
