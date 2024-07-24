@@ -854,6 +854,11 @@ func TestZinter(t *testing.T) {
 		c.Do("ZINTERSTORE", "dest", "2", "q1", "q2")
 		c.Do("ZRANGE", "dest", "0", "-1", "withscores")
 
+		// store into self
+		c.Do("ZINTERSTORE", "q1", "2", "q1", "q2")
+		c.Do("ZRANGE", "q1", "0", "-1", "withscores")
+		c.Do("SMEMBERS", "q2")
+
 		// Error cases
 		c.Error("wrong number", "ZINTERSTORE")
 		c.Error("wrong number", "ZINTERSTORE", "h")

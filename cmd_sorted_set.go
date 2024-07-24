@@ -433,9 +433,6 @@ func (m *Miniredis) makeCmdZinter(store bool) func(c *server.Peer, cmd string, a
 
 		withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 			db := m.db(ctx.selectedDB)
-			if opts.Store {
-				db.del(opts.Destination, true)
-			}
 
 			// We collect everything and remove all keys which turned out not to be
 			// present in every set.
@@ -493,6 +490,7 @@ func (m *Miniredis) makeCmdZinter(store bool) func(c *server.Peer, cmd string, a
 
 			if opts.Store {
 				// ZINTERSTORE mode
+				db.del(opts.Destination, true)
 				db.ssetSet(opts.Destination, sset)
 				c.WriteInt(len(sset))
 				return
