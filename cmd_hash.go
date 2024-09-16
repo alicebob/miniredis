@@ -3,9 +3,12 @@
 package miniredis
 
 import (
+	"errors"
+	"fmt"
 	"math/big"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/alicebob/miniredis/v2/server"
 )
@@ -28,6 +31,7 @@ func commandsHash(m *Miniredis) {
 	m.srv.Register("HVALS", m.cmdHvals)
 	m.srv.Register("HSCAN", m.cmdHscan)
 	m.srv.Register("HRANDFIELD", m.cmdHrandfield)
+	m.srv.Register("HEXPIRE", m.cmdHexpire)
 }
 
 // HSET
@@ -98,6 +102,7 @@ func (m *Miniredis) cmdHsetnx(c *server.Peer, cmd string, args []string) {
 
 		if _, ok := db.hashKeys[opts.key]; !ok {
 			db.hashKeys[opts.key] = map[string]string{}
+			db.hashTtls[opts.key] = map[string]time.Duration{}
 			db.keys[opts.key] = "hash"
 		}
 		_, ok := db.hashKeys[opts.key][opts.field]
@@ -229,6 +234,7 @@ func (m *Miniredis) cmdHdel(c *server.Peer, cmd string, args []string) {
 				continue
 			}
 			delete(db.hashKeys[opts.key], f)
+			delete(db.hashTtls[opts.key], f)
 			deleted++
 		}
 		c.WriteInt(deleted)
@@ -765,6 +771,134 @@ func (m *Miniredis) cmdHrandfield(c *server.Peer, cmd string, args []string) {
 		peer.WriteLen(len(members))
 		for _, m := range members {
 			peer.WriteBulk(m)
+		}
+	})
+}
+
+type hexpireOpts struct {
+	key    string
+	value  int
+	nx     bool
+	xx     bool
+	gt     bool
+	lt     bool
+	fields []string
+}
+
+func hexpireParse(cmd string, args []string) (*hexpireOpts, error) {
+	var opts hexpireOpts
+
+	opts.key = args[0]
+	if err := optIntSimple(args[1], &opts.value); err != nil {
+		return nil, err
+	}
+	args = args[2:]
+	for len(args) > 0 {
+		switch strings.ToLower(args[0]) {
+		case "nx":
+			opts.nx = true
+		case "xx":
+			opts.xx = true
+		case "gt":
+			opts.gt = true
+		case "lt":
+			opts.lt = true
+		case "fields":
+			var fieldCount int
+			if err := optIntSimple(args[1], &fieldCount); err != nil {
+				return nil, err
+			}
+			if fieldCount == 0 {
+				return nil, fmt.Errorf("ERR Parameter `numFields` should be greater than 0")
+			}
+			if len(args) < 2+fieldCount {
+				return nil, fmt.Errorf("ERR The `numfields` parameter must match the number of arguments")
+			}
+			opts.fields = make([]string, fieldCount)
+			copy(opts.fields, args[2:])
+			args = nil
+			continue
+		default:
+			return nil, fmt.Errorf("ERR Unsupported option %s", args[0])
+		}
+		args = args[1:]
+	}
+	if opts.gt && opts.lt {
+		return nil, errors.New("ERR GT and LT options at the same time are not compatible")
+	}
+	if opts.nx && (opts.xx || opts.gt || opts.lt) {
+		return nil, errors.New("ERR NX and XX, GT or LT options at the same time are not compatible")
+	}
+	return &opts, nil
+}
+
+// HEXPIRE
+func (m *Miniredis) cmdHexpire(c *server.Peer, cmd string, args []string) {
+	if len(args) < 5 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
+	}
+	if !m.handleAuth(c) {
+		return
+	}
+	if m.checkPubsub(c, cmd) {
+		return
+	}
+
+	opts, err := hexpireParse(cmd, args)
+	if err != nil {
+		setDirty(c)
+		c.WriteError(err.Error())
+		return
+	}
+
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
+		db := m.db(ctx.selectedDB)
+
+		// Key must be present.
+		if _, ok := db.keys[opts.key]; !ok {
+			c.WriteInt(0)
+			return
+		}
+
+		fieldTtl := db.hashTtls[opts.key]
+
+		for _, field := range opts.fields {
+			oldTTL, ok := fieldTtl[field]
+
+			var newTTL time.Duration
+			//if false {
+			//	newTTL = m.at(opts.value, time.Second)
+			//} else {
+			newTTL = time.Duration(opts.value) * time.Second
+			//}
+
+			// > NX -- Set expiry only when the key has no expiry
+			if opts.nx && ok {
+				c.WriteInt(0)
+				continue
+			}
+			// > XX -- Set expiry only when the key has an existing expiry
+			if opts.xx && !ok {
+				c.WriteInt(0)
+				continue
+			}
+			// > GT -- Set expiry only when the new expiry is greater than current one
+			// (no exp == infinity)
+			if opts.gt && (!ok || newTTL <= oldTTL) {
+				c.WriteInt(0)
+				continue
+			}
+			// > LT -- Set expiry only when the new expiry is less than current one
+			if opts.lt && ok && newTTL > oldTTL {
+				c.WriteInt(0)
+				continue
+			}
+			fieldTtl[field] = newTTL
+			//db.incr(opts.key)
+			db.checkHashFieldTTL(opts.key, field)
+			c.WriteInt(1)
 		}
 	})
 }

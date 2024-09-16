@@ -684,3 +684,19 @@ func TestHashRandField(t *testing.T) {
 		proto.Error(msgInvalidInt),
 	)
 }
+
+func TestHashHexpire(t *testing.T) {
+	s, c := runWithClient(t)
+
+	must1(t, c, "HSET", "aap", "noot", "mies")
+	must1(t, c, "HEXPIRE", "aap", "30", "FIELDS", "1", "noot")
+
+	s.FastForward(time.Second * 29)
+	equals(t, time.Second, s.dbs[0].hashTtls["aap"]["noot"])
+
+	s.FastForward(time.Second)
+	_, exists := s.dbs[0].hashTtls["aap"]["noot"]
+	assert(t, !exists, "ttl still exists for field")
+	_, exists = s.dbs[0].hashKeys["aap"]["noot"]
+	assert(t, !exists, "field still exists")
+}

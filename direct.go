@@ -509,6 +509,7 @@ func (db *RedisDB) hdel(k, f string) {
 		return
 	}
 	delete(db.hashKeys[k], f)
+	delete(db.hashTtls[k], f)
 	db.incr(k)
 }
 

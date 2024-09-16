@@ -34,22 +34,24 @@ var DumpMaxLineLen = 60
 type hashKey map[string]string
 type listKey []string
 type setKey map[string]struct{}
+type hashTtl map[string]time.Duration
 
 // RedisDB holds a single (numbered) Redis database.
 type RedisDB struct {
-	master        *Miniredis               // pointer to the lock in Miniredis
-	id            int                      // db id
-	keys          map[string]string        // Master map of keys with their type
-	stringKeys    map[string]string        // GET/SET &c. keys
-	hashKeys      map[string]hashKey       // MGET/MSET &c. keys
-	listKeys      map[string]listKey       // LPUSH &c. keys
-	setKeys       map[string]setKey        // SADD &c. keys
-	hllKeys       map[string]*hll          // PFADD &c. keys
-	sortedsetKeys map[string]sortedSet     // ZADD &c. keys
-	streamKeys    map[string]*streamKey    // XADD &c. keys
-	ttl           map[string]time.Duration // effective TTL values
-	lru           map[string]time.Time     // last recently used ( read or written to )
-	keyVersion    map[string]uint          // used to watch values
+	master        *Miniredis            // pointer to the lock in Miniredis
+	id            int                   // db id
+	keys          map[string]string     // Master map of keys with their type
+	stringKeys    map[string]string     // GET/SET &c. keys
+	hashKeys      map[string]hashKey    // MGET/MSET &c. keys
+	listKeys      map[string]listKey    // LPUSH &c. keys
+	setKeys       map[string]setKey     // SADD &c. keys
+	hllKeys       map[string]*hll       // PFADD &c. keys
+	sortedsetKeys map[string]sortedSet  // ZADD &c. keys
+	streamKeys    map[string]*streamKey // XADD &c. keys
+	hashTtls      map[string]hashTtl    // HEXPIRE effective TTL values
+	ttl           hashTtl               // effective TTL values
+	lru           map[string]time.Time  // last recently used ( read or written to )
+	keyVersion    map[string]uint       // used to watch values
 }
 
 // Miniredis is a Redis server implementation.
@@ -115,7 +117,8 @@ func newRedisDB(id int, m *Miniredis) RedisDB {
 		hllKeys:       map[string]*hll{},
 		sortedsetKeys: map[string]sortedSet{},
 		streamKeys:    map[string]*streamKey{},
-		ttl:           map[string]time.Duration{},
+		ttl:           hashTtl{},
+		hashTtls:      map[string]hashTtl{},
 		keyVersion:    map[string]uint{},
 	}
 }
@@ -707,6 +710,7 @@ func (m *Miniredis) copy(
 		destDB.stringKeys[dst] = srcDB.stringKeys[src]
 	case "hash":
 		destDB.hashKeys[dst] = copyHashKey(srcDB.hashKeys[src])
+		destDB.hashTtls[dst] = copyTtl(srcDB.hashTtls[src])
 	case "list":
 		destDB.listKeys[dst] = copyListKey(srcDB.listKeys[src])
 	case "set":
@@ -730,6 +734,14 @@ func (m *Miniredis) copy(
 
 func copyHashKey(orig hashKey) hashKey {
 	cpy := hashKey{}
+	for k, v := range orig {
+		cpy[k] = v
+	}
+	return cpy
+}
+
+func copyTtl(orig hashTtl) hashTtl {
+	cpy := hashTtl{}
 	for k, v := range orig {
 		cpy[k] = v
 	}
