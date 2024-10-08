@@ -699,4 +699,89 @@ func TestHashHexpire(t *testing.T) {
 	assert(t, !exists, "ttl still exists for field")
 	_, exists = s.dbs[0].hashKeys["aap"]["noot"]
 	assert(t, !exists, "field still exists")
+
+	// Wrong key type
+	mustDo(t, c,
+		"HEXPIRE", "aap", "FIELDS", "1", "noot", "30",
+		proto.Error(msgInvalidInt),
+	)
+
+	// Wrong number of arguments
+	mustDo(t, c,
+		"HEXPIRE", "aap", "30", "FIELDS", "1",
+		proto.Error(errWrongNumber("hexpire")),
+	)
+
+	// Wrong number of fields
+	mustDo(t, c,
+		"HEXPIRE", "aap", "30", "FIELDS", "2", "noot",
+		proto.Error(msgNumFieldMismatch),
+	)
+
+	// Number of fields is not an integer
+	mustDo(t, c,
+		"HEXPIRE", "aap", "30", "FIELDS", "noot", "mies",
+		proto.Error(msgInvalidInt),
+	)
+
+	// Number of fields is negative
+	mustDo(t, c,
+		"HEXPIRE", "aap", "30", "FIELDS", "-1", "noot",
+		proto.Error(msgNumFieldIsNegative),
+	)
+
+	// Mandatory argument FIELDS is missing
+	mustDo(t, c,
+		"HEXPIRE", "aap", "30", "0", "noot", "mies",
+		proto.Error(msgFieldMissing),
+	)
+
+	// GT and LT options at the same time are not compatible
+	mustDo(t, c,
+		"HEXPIRE", "aap", "30", "GT", "LT", "FIELDS", "1", "noot",
+		proto.Error(msgGTAndLT),
+	)
+
+	// NX and XX, GT or LT options at the same time are not compatible
+	mustDo(t, c,
+		"HEXPIRE", "aap", "30", "NX", "XX", "FIELDS", "1", "noot",
+		proto.Error(msgNXandXXGTLT),
+	)
+
+	// Missing key
+	mustDo(t, c, "HEXPIRE", "nosuch", "30", "FIELDS", "1", "noot",
+		proto.Int(-2),
+	)
+
+	// Missing field
+	mustDo(t, c, "HEXPIRE", "aap", "30", "FIELDS", "1", "nosuch",
+		proto.Int(-2),
+	)
+
+	// NX option with no expiration
+	must1(t, c, "HSET", "aap", "noot", "mies")
+	must1(t, c, "HEXPIRE", "aap", "30", "NX", "FIELDS", "1", "noot")
+	must0(t, c, "HEXPIRE", "aap", "30", "NX", "FIELDS", "1", "noot")
+
+	// XX option with no expiration
+	must1(t, c, "HSET", "aap", "noot2", "mies")
+	must0(t, c, "HEXPIRE", "aap", "30", "XX", "FIELDS", "1", "noot2")
+
+	// GT option with no expiration
+	must1(t, c, "HSET", "aap", "noot3", "mies")
+	must0(t, c, "HEXPIRE", "aap", "30", "GT", "FIELDS", "1", "noot3")
+
+	// GT option with expiration less current expiration
+	must1(t, c, "HSET", "aap", "noot4", "mies")
+	must1(t, c, "HEXPIRE", "aap", "30", "FIELDS", "1", "noot4")
+	must0(t, c, "HEXPIRE", "aap", "20", "GT", "FIELDS", "1", "noot4")
+
+	// LT option with no expiration
+	must1(t, c, "HSET", "aap", "noot5", "mies")
+	must0(t, c, "HEXPIRE", "aap", "30", "LT", "FIELDS", "1", "noot5")
+
+	// LT option with expiration greater than current expiration
+	must1(t, c, "HSET", "aap", "noot6", "mies")
+	must1(t, c, "HEXPIRE", "aap", "30", "FIELDS", "1", "noot6")
+	must0(t, c, "HEXPIRE", "aap", "40", "LT", "FIELDS", "1", "noot6")
 }

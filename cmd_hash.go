@@ -4,7 +4,6 @@ package miniredis
 
 import (
 	"errors"
-	"fmt"
 	"math/big"
 	"strconv"
 	"strings"
@@ -32,6 +31,7 @@ func commandsHash(m *Miniredis) {
 	m.srv.Register("HSCAN", m.cmdHscan)
 	m.srv.Register("HRANDFIELD", m.cmdHrandfield)
 	m.srv.Register("HEXPIRE", m.cmdHexpire)
+	m.srv.Register("HTTL", m.cmdHttl)
 }
 
 // HSET
@@ -785,7 +785,7 @@ type hexpireOpts struct {
 	fields []string
 }
 
-func hexpireParse(cmd string, args []string) (*hexpireOpts, error) {
+func hexpireParse(args []string) (*hexpireOpts, error) {
 	var opts hexpireOpts
 
 	opts.key = args[0]
@@ -808,26 +808,26 @@ func hexpireParse(cmd string, args []string) (*hexpireOpts, error) {
 			if err := optIntSimple(args[1], &fieldCount); err != nil {
 				return nil, err
 			}
-			if fieldCount == 0 {
-				return nil, fmt.Errorf("ERR Parameter `numFields` should be greater than 0")
+			if fieldCount < 1 {
+				return nil, errors.New(msgNumFieldIsNegative)
 			}
 			if len(args) < 2+fieldCount {
-				return nil, fmt.Errorf("ERR The `numfields` parameter must match the number of arguments")
+				return nil, errors.New(msgNumFieldMismatch)
 			}
 			opts.fields = make([]string, fieldCount)
 			copy(opts.fields, args[2:])
 			args = nil
 			continue
 		default:
-			return nil, fmt.Errorf("ERR Unsupported option %s", args[0])
+			return nil, errors.New(msgFieldMissing)
 		}
 		args = args[1:]
 	}
 	if opts.gt && opts.lt {
-		return nil, errors.New("ERR GT and LT options at the same time are not compatible")
+		return nil, errors.New(msgGTAndLT)
 	}
 	if opts.nx && (opts.xx || opts.gt || opts.lt) {
-		return nil, errors.New("ERR NX and XX, GT or LT options at the same time are not compatible")
+		return nil, errors.New(msgNXandXXGTLT)
 	}
 	return &opts, nil
 }
@@ -846,7 +846,7 @@ func (m *Miniredis) cmdHexpire(c *server.Peer, cmd string, args []string) {
 		return
 	}
 
-	opts, err := hexpireParse(cmd, args)
+	opts, err := hexpireParse(args)
 	if err != nil {
 		setDirty(c)
 		c.WriteError(err.Error())
@@ -858,21 +858,20 @@ func (m *Miniredis) cmdHexpire(c *server.Peer, cmd string, args []string) {
 
 		// Key must be present.
 		if _, ok := db.keys[opts.key]; !ok {
-			c.WriteInt(0)
+			c.WriteInt(-2)
 			return
 		}
 
 		fieldTtl := db.hashTtls[opts.key]
 
 		for _, field := range opts.fields {
+			if _, ok := db.hashKeys[opts.key][field]; !ok {
+				c.WriteInt(-2)
+				continue
+			}
 			oldTTL, ok := fieldTtl[field]
 
-			var newTTL time.Duration
-			//if false {
-			//	newTTL = m.at(opts.value, time.Second)
-			//} else {
-			newTTL = time.Duration(opts.value) * time.Second
-			//}
+			newTTL := time.Duration(opts.value) * time.Second
 
 			// > NX -- Set expiry only when the key has no expiry
 			if opts.nx && ok {
