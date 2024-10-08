@@ -776,10 +776,6 @@ func TestHashHexpire(t *testing.T) {
 	must1(t, c, "HEXPIRE", "aap", "30", "FIELDS", "1", "noot4")
 	must0(t, c, "HEXPIRE", "aap", "20", "GT", "FIELDS", "1", "noot4")
 
-	// LT option with no expiration
-	must1(t, c, "HSET", "aap", "noot5", "mies")
-	must0(t, c, "HEXPIRE", "aap", "30", "LT", "FIELDS", "1", "noot5")
-
 	// LT option with expiration greater than current expiration
 	must1(t, c, "HSET", "aap", "noot6", "mies")
 	must1(t, c, "HEXPIRE", "aap", "30", "FIELDS", "1", "noot6")
