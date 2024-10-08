@@ -700,7 +700,7 @@ func TestHashHexpire(t *testing.T) {
 	_, exists = s.dbs[0].hashKeys["aap"]["noot"]
 	assert(t, !exists, "field still exists")
 
-	// Wrong key type
+	// Wrong type for seconds
 	mustDo(t, c,
 		"HEXPIRE", "aap", "FIELDS", "1", "noot", "30",
 		proto.Error(msgInvalidInt),
@@ -780,4 +780,52 @@ func TestHashHexpire(t *testing.T) {
 	must1(t, c, "HSET", "aap", "noot6", "mies")
 	must1(t, c, "HEXPIRE", "aap", "30", "FIELDS", "1", "noot6")
 	must0(t, c, "HEXPIRE", "aap", "40", "LT", "FIELDS", "1", "noot6")
+}
+
+func TestHashHttl(t *testing.T) {
+	_, c := runWithClient(t)
+
+	must1(t, c, "HSET", "aap", "noot", "mies")
+	must1(t, c, "HEXPIRE", "aap", "30", "FIELDS", "1", "noot")
+	mustDo(t, c, "HTTL", "aap", "FIELDS", "1", "noot", proto.Array(proto.Int(30)))
+
+	// Wrong number of arguments
+	mustDo(t, c,
+		"HTTL", "aap",
+		proto.Error(errWrongNumber("httl")),
+	)
+
+	// Mandatory argument FIELDS is missing
+	mustDo(t, c,
+		"HTTL", "aap", "noot", "mies", "sies",
+		proto.Error(msgFieldMissing),
+	)
+
+	// Number of fields is not an integer
+	mustDo(t, c,
+		"HTTL", "aap", "FIELDS", "noot", "mies",
+		proto.Error(msgInvalidInt),
+	)
+
+	// Number of fields is negative
+	mustDo(t, c,
+		"HTTL", "aap", "FIELDS", "-1", "noot", "mies",
+		proto.Error(msgNumFieldIsNegative),
+	)
+
+	// Wrong number of fields
+	mustDo(t, c,
+		"HTTL", "aap", "FIELDS", "2", "noot",
+		proto.Error(msgNumFieldMismatch),
+	)
+
+	// Missing key
+	mustDo(t, c, "HTTL", "nosuch", "FIELDS", "1", "noot", proto.Int(-2))
+
+	// Missing field
+	mustDo(t, c, "HTTL", "aap", "FIELDS", "1", "nosuch", proto.Array(proto.Int(-2)))
+
+	// No expiration
+	must1(t, c, "HSET", "aap", "noot2", "mies")
+	mustDo(t, c, "HTTL", "aap", "FIELDS", "1", "noot2", proto.Array(proto.Int(-1)))
 }

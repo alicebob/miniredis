@@ -902,6 +902,77 @@ func (m *Miniredis) cmdHexpire(c *server.Peer, cmd string, args []string) {
 	})
 }
 
+type httlOpts struct {
+	key    string
+	fields []string
+}
+
+func httlParse(args []string) (*httlOpts, error) {
+	var opts httlOpts
+
+	opts.key = args[0]
+	if args[1] != "FIELDS" {
+		return nil, errors.New(msgFieldMissing)
+	}
+	var fieldCount int
+	if err := optIntSimple(args[2], &fieldCount); err != nil {
+		return nil, err
+	}
+	if fieldCount < 1 {
+		return nil, errors.New(msgNumFieldIsNegative)
+	}
+	if len(args) < 3+fieldCount {
+		return nil, errors.New(msgNumFieldMismatch)
+	}
+	opts.fields = make([]string, fieldCount)
+	copy(opts.fields, args[3:])
+	return &opts, nil
+}
+
+// HTTL
+func (m *Miniredis) cmdHttl(c *server.Peer, cmd string, args []string) {
+	if len(args) < 4 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
+	}
+	if !m.handleAuth(c) {
+		return
+	}
+	if m.checkPubsub(c, cmd) {
+		return
+	}
+
+	opts, err := httlParse(args)
+	if err != nil {
+		setDirty(c)
+		c.WriteError(err.Error())
+		return
+	}
+
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
+		db := m.db(ctx.selectedDB)
+
+		if _, ok := db.keys[opts.key]; !ok {
+			c.WriteInt(-2)
+			return
+		}
+
+		fieldTtl := db.hashTtls[opts.key]
+
+		c.WriteLen(len(opts.fields))
+		for _, field := range opts.fields {
+			if ttl, ok := fieldTtl[field]; ok {
+				c.WriteInt(int(ttl / time.Second))
+			} else if _, ok := db.hashKeys[opts.key][field]; ok {
+				c.WriteInt(-1)
+			} else {
+				c.WriteInt(-2)
+			}
+		}
+	})
+}
+
 func abs(n int) int {
 	if n < 0 {
 		return -n
