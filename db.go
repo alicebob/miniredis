@@ -44,6 +44,16 @@ func (db *RedisDB) allKeys() []string {
 	return res
 }
 
+// allHashKeys returns all hash keys.  Sorted.
+func (db *RedisDB) allHashKeys() []string {
+	res := make([]string, 0, len(db.hashKeys))
+	for k := range db.hashKeys {
+		res = append(res, k)
+	}
+	sort.Strings(res) // To make things deterministic.
+	return res
+}
+
 // flush removes all keys and values.
 func (db *RedisDB) flush() {
 	db.keys = map[string]string{}
@@ -54,7 +64,8 @@ func (db *RedisDB) flush() {
 	db.setKeys = map[string]setKey{}
 	db.hllKeys = map[string]*hll{}
 	db.sortedsetKeys = map[string]sortedSet{}
-	db.ttl = map[string]time.Duration{}
+	db.ttl = hashTtl{}
+	db.hashTtls = map[string]hashTtl{}
 	db.streamKeys = map[string]*streamKey{}
 }
 
@@ -74,6 +85,7 @@ func (db *RedisDB) move(key string, to *RedisDB) bool {
 		to.stringKeys[key] = db.stringKeys[key]
 	case "hash":
 		to.hashKeys[key] = db.hashKeys[key]
+		to.hashTtls[key] = db.hashTtls[key]
 	case "list":
 		to.listKeys[key] = db.listKeys[key]
 	case "set":
@@ -102,6 +114,7 @@ func (db *RedisDB) rename(from, to string) {
 		db.stringKeys[to] = db.stringKeys[from]
 	case "hash":
 		db.hashKeys[to] = db.hashKeys[from]
+		db.hashTtls[to] = db.hashTtls[from]
 	case "list":
 		db.listKeys[to] = db.listKeys[from]
 	case "set":
@@ -140,6 +153,7 @@ func (db *RedisDB) del(k string, delTTL bool) {
 		delete(db.stringKeys, k)
 	case "hash":
 		delete(db.hashKeys, k)
+		delete(db.hashTtls, k)
 	case "list":
 		delete(db.listKeys, k)
 	case "set":
@@ -367,6 +381,7 @@ func (db *RedisDB) hashSet(k string, fv ...string) int {
 	db.keys[k] = "hash"
 	if _, ok := db.hashKeys[k]; !ok {
 		db.hashKeys[k] = map[string]string{}
+		db.hashTtls[k] = hashTtl{}
 	}
 	new := 0
 	for idx := 0; idx < len(fv)-1; idx = idx + 2 {
@@ -414,6 +429,12 @@ func (db *RedisDB) hashIncrfloat(key, field string, delta *big.Float) (*big.Floa
 	v.Add(v, delta)
 	db.hashSet(key, field, formatBig(v))
 	return v, nil
+}
+
+func (db *RedisDB) checkHashFieldTTL(key, field string) {
+	if v, ok := db.hashTtls[key][field]; ok && v <= 0 {
+		db.hdel(key, field)
+	}
 }
 
 // sortedSet set returns a sortedSet as map
@@ -713,6 +734,14 @@ func (db *RedisDB) fastForward(duration time.Duration) {
 		if value, ok := db.ttl[key]; ok {
 			db.ttl[key] = value - duration
 			db.checkTTL(key)
+		}
+	}
+	for _, key := range db.allHashKeys() {
+		for _, field := range db.hashFields(key) {
+			if value, ok := db.hashTtls[key][field]; ok {
+				db.hashTtls[key][field] = value - duration
+				db.checkHashFieldTTL(key, field)
+			}
 		}
 	}
 }
