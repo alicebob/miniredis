@@ -31,9 +31,26 @@ func TestSortedSet(t *testing.T) {
 		)
 
 		mustDo(t, c,
+			"ZRANK", "z", "three", "withscore",
+			proto.Array(
+				proto.Int(2),
+				proto.String("3"),
+			),
+		)
+
+		mustDo(t, c,
 			"ZREVRANK", "z", "one",
 			proto.Int(2),
 		)
+
+		mustDo(t, c,
+			"ZREVRANK", "z", "one", "withscore",
+			proto.Array(
+				proto.Int(2),
+				proto.String("1"),
+			),
+		)
+
 		must0(t, c,
 			"ZREVRANK", "z", "three",
 		)
