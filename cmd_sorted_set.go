@@ -825,6 +825,12 @@ func (m *Miniredis) makeCmdZrank(reverse bool) server.Cmd {
 		withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 			db := m.db(ctx.selectedDB)
 
+			withScore := false
+			if len(args) > 0 && strings.ToUpper(args[len(args)-1]) == "WITHSCORE" {
+				withScore = true
+				args = args[:len(args)-1]
+			}
+
 			if len(args) > 2 {
 				setDirty(c)
 				c.WriteError(msgSyntaxError)
@@ -850,7 +856,16 @@ func (m *Miniredis) makeCmdZrank(reverse bool) server.Cmd {
 				c.WriteNull()
 				return
 			}
-			c.WriteInt(rank)
+
+			if withScore {
+				c.WriteLen(2)
+				c.WriteInt(rank)
+				c.WriteFloat(db.ssetScore(key, member))
+			} else {
+				c.WriteInt(rank)
+			}
+
+			
 		})
 	}
 }
