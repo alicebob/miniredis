@@ -838,7 +838,11 @@ func (m *Miniredis) makeCmdZrank(reverse bool) server.Cmd {
 			}
 
 			if !db.exists(key) {
-				c.WriteNull()
+				if withScore {
+					c.WriteLen(-1)
+				} else {
+					c.WriteNull()
+				}
 				return
 			}
 
@@ -853,7 +857,11 @@ func (m *Miniredis) makeCmdZrank(reverse bool) server.Cmd {
 			}
 			rank, ok := db.ssetRank(key, member, direction)
 			if !ok {
-				c.WriteNull()
+				if withScore {
+					c.WriteLen(-1)
+				} else {
+					c.WriteNull()
+				}
 				return
 			}
 
@@ -864,8 +872,6 @@ func (m *Miniredis) makeCmdZrank(reverse bool) server.Cmd {
 			} else {
 				c.WriteInt(rank)
 			}
-
-			
 		})
 	}
 }
