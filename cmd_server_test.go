@@ -139,3 +139,13 @@ func TestCmdServerMemoryUsage(t *testing.T) {
 		proto.Int(124), // normally, with Redis it should be 56 but we don't have the same overhead as Redis
 	)
 }
+
+func TestCmdServerMemoryUsageLowerCase(t *testing.T) {
+	_, c := runWithClient(t)
+
+	c.Do("SET", "foo", "bar")
+	mustDo(t, c,
+		"memory", "usage", "foo",
+		proto.Int(19),
+	)
+}
