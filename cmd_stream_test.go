@@ -1076,9 +1076,13 @@ func TestStreamTrim(t *testing.T) {
 	ok(t, err)
 	_, err = c.Do("XADD", "planets", "5-1", "name", "Saturn")
 	ok(t, err)
+	_, err = c.Do("XADD", "planets", "5-2", "name", "Uranus")
+	ok(t, err)
+	_, err = c.Do("XADD", "planets", "5-11", "name", "Pluto")
+	ok(t, err)
 
 	mustDo(t, c,
-		"XTRIM", "planets", "MAXLEN", "=", "3", proto.Int(3))
+		"XTRIM", "planets", "MAXLEN", "=", "5", proto.Int(3))
 
 	mustDo(t, c,
 		"XRANGE", "planets", "-", "+",
@@ -1086,6 +1090,8 @@ func TestStreamTrim(t *testing.T) {
 			proto.Array(proto.String("3-0"), proto.Strings("name", "Mars")),
 			proto.Array(proto.String("4-1"), proto.Strings("name", "Jupiter")),
 			proto.Array(proto.String("5-1"), proto.Strings("name", "Saturn")),
+			proto.Array(proto.String("5-2"), proto.Strings("name", "Uranus")),
+			proto.Array(proto.String("5-11"), proto.Strings("name", "Pluto")),
 		))
 
 	mustDo(t, c,
@@ -1096,6 +1102,8 @@ func TestStreamTrim(t *testing.T) {
 		proto.Array(
 			proto.Array(proto.String("4-1"), proto.Strings("name", "Jupiter")),
 			proto.Array(proto.String("5-1"), proto.Strings("name", "Saturn")),
+			proto.Array(proto.String("5-2"), proto.Strings("name", "Uranus")),
+			proto.Array(proto.String("5-11"), proto.Strings("name", "Pluto")),
 		))
 
 	mustDo(t, c,
@@ -1105,6 +1113,17 @@ func TestStreamTrim(t *testing.T) {
 		"XRANGE", "planets", "-", "+",
 		proto.Array(
 			proto.Array(proto.String("5-1"), proto.Strings("name", "Saturn")),
+			proto.Array(proto.String("5-2"), proto.Strings("name", "Uranus")),
+			proto.Array(proto.String("5-11"), proto.Strings("name", "Pluto")),
+		))
+
+	mustDo(t, c,
+		"XTRIM", "planets", "MINID", "5-11", proto.Int(2))
+
+	mustDo(t, c,
+		"XRANGE", "planets", "-", "+",
+		proto.Array(
+			proto.Array(proto.String("5-11"), proto.Strings("name", "Pluto")),
 		))
 }
 
