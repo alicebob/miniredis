@@ -115,6 +115,22 @@ func TestScript(t *testing.T) {
 			c.Error("not allowed with BLOCK option", "EVAL", `redis.call("XREADGROUP", "GROUP", "group", "consumer", "BLOCK", 1000, "STREAMS", "pl", ">")`, "0")
 		})
 	})
+
+	t.Run("setresp", func(t *testing.T) {
+		testRaw(t, func(c *client) {
+			c.Do("EVAL", `redis.setresp(3); redis.call("SET", "foo", 12); return redis.call("GET", "foo")`, "0")
+			c.Do("SCRIPT", "LOAD", `redis.setresp(3)`)
+			c.Do("EVALSHA", "d204691e560b5b17f19626b50f84c2dcadff7ed5", "0")
+			c.Do("EVAL", `return redis.setresp(3)`, "0")
+			c.Do("EVAL", `return redis.setresp(2)`, "0")
+			c.Error("RESP version must be 2 or 3", "EVAL", `return redis.setresp(4)`, "0")
+		})
+		testRESP3(t, func(c *client) {
+			c.Do("SCRIPT", "LOAD", `redis.setresp(3)`)
+			c.Do("EVALSHA", "d204691e560b5b17f19626b50f84c2dcadff7ed5", "0")
+			c.Do("EVAL", `redis.setresp(3); redis.call("SET", "foo", 12); return redis.call("GET", "foo")`, "0")
+		})
+	})
 }
 
 func TestLua(t *testing.T) {
