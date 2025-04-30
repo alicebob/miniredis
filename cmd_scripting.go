@@ -9,10 +9,10 @@ import (
 	"strings"
 	"sync"
 
-	luajson "github.com/alicebob/gopher-json"
 	lua "github.com/yuin/gopher-lua"
 	"github.com/yuin/gopher-lua/parse"
 
+	luajson "github.com/alicebob/miniredis/v2/gopher-json"
 	"github.com/alicebob/miniredis/v2/server"
 )
 
