@@ -1016,7 +1016,7 @@ func TestStreamXpending(t *testing.T) {
 		)
 		mustDo(t, c,
 			"XPENDING", "planets", "processing", "-", "+", "999",
-			c,
+			proto.Array(),
 		)
 	})
 
