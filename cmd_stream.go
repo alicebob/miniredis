@@ -1274,7 +1274,7 @@ func writeXpending(
 	consumer *string,
 ) {
 	if len(g.pending) == 0 || count < 0 {
-		c.WriteLen(-1)
+		c.WriteLen(0)
 		return
 	}
 
@@ -1314,7 +1314,7 @@ func writeXpending(
 		}
 	}
 	if len(res) == 0 {
-		c.WriteLen(-1)
+		c.WriteLen(0)
 		return
 	}
 	c.WriteLen(len(res))
