@@ -966,7 +966,7 @@ func TestStreamXpending(t *testing.T) {
 		)
 		mustDo(t, c,
 			"XPENDING", "planets", "processing", "-", "+", "-99",
-			proto.NilList,
+			proto.Array(),
 		)
 
 		// Increase delivery count
@@ -992,11 +992,11 @@ func TestStreamXpending(t *testing.T) {
 
 		mustDo(t, c,
 			"XPENDING", "planets", "processing", "IDLE", "5000", "-", "+", "999",
-			proto.NilList,
+			proto.Array(),
 		)
 		mustDo(t, c,
 			"XPENDING", "planets", "processing", "-", "+", "999", "bob",
-			proto.NilList,
+			proto.Array(),
 		)
 		mustDo(t, c,
 			"XPENDING", "planets", "processing", "IDLE", "4000", "-", "+", "999", "alice",
@@ -1016,7 +1016,7 @@ func TestStreamXpending(t *testing.T) {
 		)
 		mustDo(t, c,
 			"XPENDING", "planets", "processing", "-", "+", "999",
-			proto.NilList,
+			c,
 		)
 	})
 
