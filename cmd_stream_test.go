@@ -1444,7 +1444,7 @@ func TestStreamClaim(t *testing.T) {
 	)
 	mustDo(t, c,
 		"XPENDING", "planets", "processing", "-", "+", "999",
-		proto.NilList,
+		proto.Array(),
 	)
 
 	mustDo(t, c,
@@ -1703,6 +1703,6 @@ func TestStreamClaim(t *testing.T) {
 	)
 	mustDo(t, c,
 		"XPENDING", "planets", "processing", "-", "+", "999",
-		proto.NilList,
+		proto.Array(),
 	)
 }
