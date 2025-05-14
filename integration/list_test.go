@@ -628,6 +628,13 @@ func TestBlmove(t *testing.T) {
 		c.Do("BLMOVE", "round", "round", "RIGHT", "RIGHT", "0")
 		c.Do("LRANGE", "round", "0", "-1")
 
+		// TTL
+		c.Do("LPUSH", "test", "1")
+		c.Do("EXPIRE", "test", "1000")
+		c.Do("TTL", "test")
+		c.Do("BLMOVE", "test", "test", "LEFT", "LEFT", "1")
+		c.Do("TTL", "test")
+
 		// failure cases
 		c.Do("RPUSH", "chk", "aap", "noot", "mies")
 		c.Error("wrong number", "LMOVE")
