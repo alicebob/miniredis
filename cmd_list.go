@@ -1022,7 +1022,10 @@ func (m *Miniredis) cmdBlmove(c *server.Peer, cmd string, args []string) {
 				return true
 			}
 
-			var elem string
+			var (
+				elem string
+				ttl  = db.ttl[opts.src] // in case we empty the array (deletes the entry)
+			)
 			switch opts.srcDir {
 			case "left":
 				elem = db.listLpop(opts.src)
@@ -1041,6 +1044,9 @@ func (m *Miniredis) cmdBlmove(c *server.Peer, cmd string, args []string) {
 			default:
 				c.WriteError(msgSyntaxError)
 				return true
+			}
+			if ttl > 0 {
+				db.ttl[opts.dst] = ttl
 			}
 
 			c.WriteBulk(elem)
