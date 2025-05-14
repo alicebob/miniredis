@@ -587,6 +587,9 @@ func TestStreamGroup(t *testing.T) {
 			c.Do("XGROUP", "DELCONSUMER", "planets", "processing", "alice")
 			c.Do("XPENDING", "planets", "processing")
 
+			c.Do("XGROUP", "CREATE", "empty", "empty", "$", "MKSTREAM")
+			c.Do("XPENDING", "empty", "empty", "-", "+", "999")
+
 			c.Error("consumer group", "XPENDING", "foo", "processing")
 			c.Error("consumer group", "XPENDING", "planets", "foo")
 

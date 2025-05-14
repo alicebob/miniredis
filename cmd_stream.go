@@ -1313,10 +1313,6 @@ func writeXpending(
 			})
 		}
 	}
-	if len(res) == 0 {
-		c.WriteLen(0)
-		return
-	}
 	c.WriteLen(len(res))
 	for _, e := range res {
 		c.WriteLen(4)
