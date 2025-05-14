@@ -1322,6 +1322,21 @@ func TestStreamAutoClaim(t *testing.T) {
 			proto.Array(),
 		),
 	)
+
+	// read again using the ID returned from the last XAUTOCLAIM call as 'start'.
+	// the results include that starting message. unlike XREADGROUP, the results of XAUTOCLAIM
+	// are INCLUSIVE of the start ID.
+	mustDo(t, c,
+		"XAUTOCLAIM", "planets", "processing", "bob", "15000", "0-2", "COUNT", "1",
+		proto.Array(
+			proto.String("0-0"),
+			proto.Array(
+				proto.Array(proto.String("0-2"), proto.Strings("name", "Venus")),
+			),
+			proto.Array(),
+		),
+	)
+
 	mustDo(t, c,
 		"XINFO", "CONSUMERS", "planets", "processing",
 		proto.Array(
@@ -1350,8 +1365,8 @@ func TestStreamAutoClaim(t *testing.T) {
 			proto.Array(
 				proto.String("0-2"),
 				proto.String("bob"),
-				proto.Int(20000),
-				proto.Int(4),
+				proto.Int(0),
+				proto.Int(5),
 			),
 		),
 	)

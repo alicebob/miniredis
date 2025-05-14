@@ -1536,7 +1536,7 @@ func xautoclaim(
 		return nextCallId, nil
 	}
 
-	msgs := g.pendingAfter(start)
+	msgs := g.pendingAfterOrEqual(start)
 	var res []StreamEntry
 	for i, p := range msgs {
 		if minIdleTime > 0 && now.Before(p.lastDelivery.Add(minIdleTime)) {
