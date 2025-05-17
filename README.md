@@ -36,6 +36,7 @@ Implemented commands:
  - Key
    - COPY
    - DEL
+   - DUMP -- partly, only handles string keys
    - EXISTS
    - EXPIRE
    - EXPIREAT
@@ -50,6 +51,7 @@ Implemented commands:
    - RANDOMKEY -- see m.Seed(...)
    - RENAME
    - RENAMENX
+   - RESTORE -- partly, only handles string keys
    - SCAN
    - TOUCH
    - TTL
@@ -301,10 +303,8 @@ Commands which will probably not be implemented:
     - ~~READONLY~~
     - ~~READWRITE~~
  - Key
-    - ~~DUMP~~
     - ~~MIGRATE~~
     - ~~OBJECT~~
-    - ~~RESTORE~~
     - ~~WAIT~~
  - Scripting
     - ~~FCALL / FCALL_RO *~~
