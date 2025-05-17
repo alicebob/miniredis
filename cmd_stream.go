@@ -252,7 +252,7 @@ func (m *Miniredis) makeCmdXrange(reverse bool) server.Cmd {
 				return
 			}
 
-			if db.t(opts.key) != "stream" {
+			if db.t(opts.key) != keyTypeStream {
 				c.WriteError(ErrWrongType.Error())
 				return
 			}
