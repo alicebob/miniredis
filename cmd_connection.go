@@ -213,12 +213,7 @@ func (m *Miniredis) cmdEcho(c *server.Peer, cmd string, args []string) {
 
 // SELECT
 func (m *Miniredis) cmdSelect(c *server.Peer, cmd string, args []string) {
-	if len(args) != 1 {
-		setDirty(c)
-		c.WriteError(errWrongNumber(cmd))
-		return
-	}
-	if !m.isValidCMD(c, cmd) {
+	if !m.isValidCMD(c, cmd, args, exactly(1)) {
 		return
 	}
 
