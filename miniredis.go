@@ -466,12 +466,35 @@ func (m *Miniredis) SetError(msg string) {
 	m.srv.SetPreHook(cb)
 }
 
+type argRequirements struct {
+	minimum int
+	maximum *int
+}
+
+func atLeast(n int) argRequirements {
+	return argRequirements{n, nil}
+}
+
+func between(a int, b int) argRequirements {
+	return argRequirements{a, &b}
+}
+
+func exactly(n int) argRequirements {
+	return argRequirements{n, &n}
+}
+
 // isValidCMD returns true if command is valid and can be executed.
-func (m *Miniredis) isValidCMD(c *server.Peer, cmd string) bool {
+func (m *Miniredis) isValidCMD(c *server.Peer, cmd string, args []string, argReqs argRequirements) bool {
 	if !m.handleAuth(c) {
 		return false
 	}
 	if m.checkPubsub(c, cmd) {
+		return false
+	}
+
+	if len(args) < argReqs.minimum || (argReqs.maximum != nil && len(args) > *argReqs.maximum) {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
 		return false
 	}
 

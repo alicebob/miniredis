@@ -104,15 +104,7 @@ func expireParse(cmd string, args []string) (*expireOpts, error) {
 // converted to a duration.
 func makeCmdExpire(m *Miniredis, unix bool, d time.Duration) func(*server.Peer, string, []string) {
 	return func(c *server.Peer, cmd string, args []string) {
-		if len(args) < 2 {
-			setDirty(c)
-			c.WriteError(errWrongNumber(cmd))
-			return
-		}
-		if !m.handleAuth(c) {
-			return
-		}
-		if m.checkPubsub(c, cmd) {
+		if !m.isValidCMD(c, cmd, args, atLeast(2)) {
 			return
 		}
 
@@ -178,16 +170,7 @@ func makeCmdExpire(m *Miniredis, unix bool, d time.Duration) func(*server.Peer, 
 // [pexpiretime]: https://redis.io/commands/pexpiretime/
 func (m *Miniredis) makeCmdExpireTime(timeResultStrategy func(time.Time) int) server.Cmd {
 	return func(c *server.Peer, cmd string, args []string) {
-		if len(args) != 1 {
-			setDirty(c)
-			c.WriteError(errWrongNumber(cmd))
-			return
-		}
-
-		if !m.handleAuth(c) {
-			return
-		}
-		if m.checkPubsub(c, cmd) {
+		if !m.isValidCMD(c, cmd, args, exactly(1)) {
 			return
 		}
 
@@ -213,16 +196,7 @@ func (m *Miniredis) makeCmdExpireTime(timeResultStrategy func(time.Time) int) se
 
 // TOUCH
 func (m *Miniredis) cmdTouch(c *server.Peer, cmd string, args []string) {
-	if !m.handleAuth(c) {
-		return
-	}
-	if m.checkPubsub(c, cmd) {
-		return
-	}
-
-	if len(args) == 0 {
-		setDirty(c)
-		c.WriteError(errWrongNumber(cmd))
+	if !m.isValidCMD(c, cmd, args, atLeast(1)) {
 		return
 	}
 
@@ -241,15 +215,7 @@ func (m *Miniredis) cmdTouch(c *server.Peer, cmd string, args []string) {
 
 // TTL
 func (m *Miniredis) cmdTTL(c *server.Peer, cmd string, args []string) {
-	if len(args) != 1 {
-		setDirty(c)
-		c.WriteError(errWrongNumber(cmd))
-		return
-	}
-	if !m.handleAuth(c) {
-		return
-	}
-	if m.checkPubsub(c, cmd) {
+	if !m.isValidCMD(c, cmd, args, exactly(1)) {
 		return
 	}
 
@@ -276,15 +242,7 @@ func (m *Miniredis) cmdTTL(c *server.Peer, cmd string, args []string) {
 
 // PTTL
 func (m *Miniredis) cmdPTTL(c *server.Peer, cmd string, args []string) {
-	if len(args) != 1 {
-		setDirty(c)
-		c.WriteError(errWrongNumber(cmd))
-		return
-	}
-	if !m.handleAuth(c) {
-		return
-	}
-	if m.checkPubsub(c, cmd) {
+	if !m.isValidCMD(c, cmd, args, exactly(1)) {
 		return
 	}
 
@@ -311,15 +269,7 @@ func (m *Miniredis) cmdPTTL(c *server.Peer, cmd string, args []string) {
 
 // PERSIST
 func (m *Miniredis) cmdPersist(c *server.Peer, cmd string, args []string) {
-	if len(args) != 1 {
-		setDirty(c)
-		c.WriteError(errWrongNumber(cmd))
-		return
-	}
-	if !m.handleAuth(c) {
-		return
-	}
-	if m.checkPubsub(c, cmd) {
+	if !m.isValidCMD(c, cmd, args, exactly(1)) {
 		return
 	}
 
@@ -347,16 +297,7 @@ func (m *Miniredis) cmdPersist(c *server.Peer, cmd string, args []string) {
 
 // DEL and UNLINK
 func (m *Miniredis) cmdDel(c *server.Peer, cmd string, args []string) {
-	if !m.handleAuth(c) {
-		return
-	}
-	if m.checkPubsub(c, cmd) {
-		return
-	}
-
-	if len(args) == 0 {
-		setDirty(c)
-		c.WriteError(errWrongNumber(cmd))
+	if !m.isValidCMD(c, cmd, args, atLeast(1)) {
 		return
 	}
 
@@ -376,15 +317,7 @@ func (m *Miniredis) cmdDel(c *server.Peer, cmd string, args []string) {
 
 // TYPE
 func (m *Miniredis) cmdType(c *server.Peer, cmd string, args []string) {
-	if len(args) != 1 {
-		setDirty(c)
-		c.WriteError("usage error")
-		return
-	}
-	if !m.handleAuth(c) {
-		return
-	}
-	if m.checkPubsub(c, cmd) {
+	if !m.isValidCMD(c, cmd, args, exactly(1)) {
 		return
 	}
 
@@ -405,15 +338,7 @@ func (m *Miniredis) cmdType(c *server.Peer, cmd string, args []string) {
 
 // EXISTS
 func (m *Miniredis) cmdExists(c *server.Peer, cmd string, args []string) {
-	if len(args) < 1 {
-		setDirty(c)
-		c.WriteError(errWrongNumber(cmd))
-		return
-	}
-	if !m.handleAuth(c) {
-		return
-	}
-	if m.checkPubsub(c, cmd) {
+	if !m.isValidCMD(c, cmd, args, atLeast(1)) {
 		return
 	}
 
@@ -432,15 +357,7 @@ func (m *Miniredis) cmdExists(c *server.Peer, cmd string, args []string) {
 
 // MOVE
 func (m *Miniredis) cmdMove(c *server.Peer, cmd string, args []string) {
-	if len(args) != 2 {
-		setDirty(c)
-		c.WriteError(errWrongNumber(cmd))
-		return
-	}
-	if !m.handleAuth(c) {
-		return
-	}
-	if m.checkPubsub(c, cmd) {
+	if !m.isValidCMD(c, cmd, args, exactly(2)) {
 		return
 	}
 
@@ -470,15 +387,7 @@ func (m *Miniredis) cmdMove(c *server.Peer, cmd string, args []string) {
 
 // KEYS
 func (m *Miniredis) cmdKeys(c *server.Peer, cmd string, args []string) {
-	if len(args) != 1 {
-		setDirty(c)
-		c.WriteError(errWrongNumber(cmd))
-		return
-	}
-	if !m.handleAuth(c) {
-		return
-	}
-	if m.checkPubsub(c, cmd) {
+	if !m.isValidCMD(c, cmd, args, exactly(1)) {
 		return
 	}
 
@@ -497,15 +406,7 @@ func (m *Miniredis) cmdKeys(c *server.Peer, cmd string, args []string) {
 
 // RANDOMKEY
 func (m *Miniredis) cmdRandomkey(c *server.Peer, cmd string, args []string) {
-	if len(args) != 0 {
-		setDirty(c)
-		c.WriteError(errWrongNumber(cmd))
-		return
-	}
-	if !m.handleAuth(c) {
-		return
-	}
-	if m.checkPubsub(c, cmd) {
+	if !m.isValidCMD(c, cmd, args, exactly(0)) {
 		return
 	}
 
@@ -529,15 +430,7 @@ func (m *Miniredis) cmdRandomkey(c *server.Peer, cmd string, args []string) {
 
 // RENAME
 func (m *Miniredis) cmdRename(c *server.Peer, cmd string, args []string) {
-	if len(args) != 2 {
-		setDirty(c)
-		c.WriteError(errWrongNumber(cmd))
-		return
-	}
-	if !m.handleAuth(c) {
-		return
-	}
-	if m.checkPubsub(c, cmd) {
+	if !m.isValidCMD(c, cmd, args, exactly(2)) {
 		return
 	}
 
@@ -564,15 +457,7 @@ func (m *Miniredis) cmdRename(c *server.Peer, cmd string, args []string) {
 
 // RENAMENX
 func (m *Miniredis) cmdRenamenx(c *server.Peer, cmd string, args []string) {
-	if len(args) != 2 {
-		setDirty(c)
-		c.WriteError(errWrongNumber(cmd))
-		return
-	}
-	if !m.handleAuth(c) {
-		return
-	}
-	if m.checkPubsub(c, cmd) {
+	if !m.isValidCMD(c, cmd, args, exactly(2)) {
 		return
 	}
 
@@ -658,15 +543,7 @@ func scanParse(cmd string, args []string) (*scanOpts, error) {
 
 // SCAN
 func (m *Miniredis) cmdScan(c *server.Peer, cmd string, args []string) {
-	if len(args) < 1 {
-		setDirty(c)
-		c.WriteError(errWrongNumber(cmd))
-		return
-	}
-	if !m.handleAuth(c) {
-		return
-	}
-	if m.checkPubsub(c, cmd) {
+	if !m.isValidCMD(c, cmd, args, atLeast(1)) {
 		return
 	}
 
@@ -766,15 +643,7 @@ func copyParse(cmd string, args []string) (*copyOpts, error) {
 
 // COPY
 func (m *Miniredis) cmdCopy(c *server.Peer, cmd string, args []string) {
-	if len(args) < 2 {
-		setDirty(c)
-		c.WriteError(errWrongNumber(cmd))
-		return
-	}
-	if !m.handleAuth(c) {
-		return
-	}
-	if m.checkPubsub(c, cmd) {
+	if !m.isValidCMD(c, cmd, args, atLeast(2)) {
 		return
 	}
 

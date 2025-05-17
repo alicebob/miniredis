@@ -8,13 +8,7 @@ import (
 
 // Command 'INFO' from https://redis.io/commands/info/
 func (m *Miniredis) cmdInfo(c *server.Peer, cmd string, args []string) {
-	if !m.isValidCMD(c, cmd) {
-		return
-	}
-
-	if len(args) > 1 {
-		setDirty(c)
-		c.WriteError(errWrongNumber(cmd))
+	if !m.isValidCMD(c, cmd, args, between(0, 1)) {
 		return
 	}
 
