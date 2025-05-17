@@ -373,15 +373,15 @@ func (m *Miniredis) Server() *server.Server {
 	return m.srv
 }
 
-// Dump returns a text version of the selected DB, usable for debugging.
+// DebugDump returns a text version of the selected DB, usable for debugging.
 //
-// Dump limits the maximum length of each key:value to "DumpMaxLineLen" characters.
+// DebugDump limits the maximum length of each key:value to "DumpMaxLineLen" characters.
 // To increase that, call something like:
 //
 //	miniredis.DumpMaxLineLen = 1024
 //	mr, _ = miniredis.Run()
-//	mr.Dump()
-func (m *Miniredis) Dump() string {
+//	mr.DebugDump()
+func (m *Miniredis) DebugDump() string {
 	m.Lock()
 	defer m.Unlock()
 
