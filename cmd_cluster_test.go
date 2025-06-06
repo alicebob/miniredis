@@ -1,6 +1,7 @@
 package miniredis
 
 import (
+	"fmt"
 	"strconv"
 	"testing"
 
@@ -33,7 +34,7 @@ func TestCluster(t *testing.T) {
 	t.Run("nodes", func(t *testing.T) {
 		mustDo(t, c,
 			"CLUSTER", "NODES",
-			proto.String("e7d1eecce10fd6bb5eb35b9f99a514335d9ba9ca 127.0.0.1:7000@7000 myself,master - 0 0 1 connected 0-16383"),
+			proto.String(fmt.Sprintf("e7d1eecce10fd6bb5eb35b9f99a514335d9ba9ca %s:%s@%s myself,master - 0 0 1 connected 0-16383", s.Host(), s.Port(), s.Port())),
 		)
 	})
 
