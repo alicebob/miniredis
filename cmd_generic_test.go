@@ -287,6 +287,39 @@ func TestUnlink(t *testing.T) {
 	})
 }
 
+func TestDump(t *testing.T) {
+	s, c := runWithClient(t)
+	s.Set("existing-key", "value")
+	s.HSet("set-key", "a", "b")
+
+	t.Run("parse errors", func(t *testing.T) {
+		mustDo(t, c,
+			"DUMP",
+			proto.Error(errWrongNumber("dump")))
+
+		mustDo(t, c,
+			"DUMP", "key", "extra",
+			proto.Error(errWrongNumber("dump")))
+	})
+
+	t.Run("dump missing key", func(t *testing.T) {
+		mustNil(t, c,
+			"DUMP", "missing-key")
+	})
+
+	t.Run("dump existing key", func(t *testing.T) {
+		mustDo(t, c,
+			"DUMP", "existing-key",
+			proto.String("value"))
+	})
+
+	t.Run("dump wrong key type", func(t *testing.T) {
+		mustDo(t, c,
+			"DUMP", "set-key",
+			proto.Error(msgWrongType))
+	})
+}
+
 func TestType(t *testing.T) {
 	s, c := runWithClient(t)
 
@@ -316,11 +349,11 @@ func TestType(t *testing.T) {
 	t.Run("errors", func(t *testing.T) {
 		mustDo(t, c,
 			"TYPE",
-			proto.Error("usage error"),
+			proto.Error(errWrongNumber("type")),
 		)
 		mustDo(t, c,
 			"TYPE", "spurious", "arguments",
-			proto.Error("usage error"),
+			proto.Error(errWrongNumber("type")),
 		)
 	})
 
@@ -603,6 +636,67 @@ func TestRename(t *testing.T) {
 			"RENAME", "some", "spurious", "arguments",
 			proto.Error(errWrongNumber("rename")),
 		)
+	})
+}
+
+func TestRestore(t *testing.T) {
+	s, c := runWithClient(t)
+	s.Set("existing-key", "value")
+
+	t.Run("busy key error", func(t *testing.T) {
+		mustDo(t, c,
+			"RESTORE", "existing-key", "0", "other-value",
+			proto.Error("BUSYKEY Target key name already exists."))
+
+		// Value hasn't changed
+		s.CheckGet(t, "existing-key", "value")
+	})
+
+	t.Run("overwrite existing key", func(t *testing.T) {
+		mustOK(t, c,
+			"RESTORE", "existing-key", "0", "new-value", "REPLACE")
+
+		s.CheckGet(t, "existing-key", "new-value")
+	})
+
+	t.Run("restore new key with no ttl", func(t *testing.T) {
+		mustOK(t, c, "RESTORE", "key-a", "0", "value-a")
+
+		s.CheckGet(t, "key-a", "value-a")
+		equals(t, time.Duration(0), s.TTL("key-a"))
+	})
+
+	t.Run("restore new key with regular ttl", func(t *testing.T) {
+		mustOK(t, c, "RESTORE", "key-b", "50", "value-b")
+
+		s.CheckGet(t, "key-b", "value-b")
+		equals(t, 50*time.Millisecond, s.TTL("key-b"))
+	})
+
+	t.Run("restore new key with absolute ttl", func(t *testing.T) {
+		s.SetTime(time.UnixMilli(1234567890))
+		mustOK(t, c, "RESTORE", "key-c", "1234577890", "value-c", "ABSTTL")
+
+		s.CheckGet(t, "key-c", "value-c")
+		equals(t, 10000*time.Millisecond, s.TTL("key-c"))
+	})
+
+	t.Run("parse errors", func(t *testing.T) {
+		mustDo(t, c,
+			"RESTORE",
+			proto.Error(errWrongNumber("restore")))
+
+		mustDo(t, c,
+			"RESTORE", "key", "-1", "serialized-value", "BADARG",
+			proto.Error(msgSyntaxError))
+
+		mustDo(t, c,
+			"RESTORE", "key", "-1", "serialized-value",
+			proto.Error(msgInvalidInt))
+
+		mustDo(t, c,
+			"RESTORE", "key", "argh", "serialized-value",
+			proto.Error(msgInvalidInt))
 	})
 }
 

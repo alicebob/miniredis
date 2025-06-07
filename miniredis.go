@@ -373,15 +373,15 @@ func (m *Miniredis) Server() *server.Server {
 	return m.srv
 }
 
-// Dump returns a text version of the selected DB, usable for debugging.
+// DebugDump returns a text version of the selected DB, usable for debugging.
 //
-// Dump limits the maximum length of each key:value to "DumpMaxLineLen" characters.
+// DebugDump limits the maximum length of each key:value to "DumpMaxLineLen" characters.
 // To increase that, call something like:
 //
 //	miniredis.DumpMaxLineLen = 1024
 //	mr, _ = miniredis.Run()
-//	mr.Dump()
-func (m *Miniredis) Dump() string {
+//	mr.DebugDump()
+func (m *Miniredis) DebugDump() string {
 	m.Lock()
 	defer m.Unlock()
 
@@ -466,12 +466,35 @@ func (m *Miniredis) SetError(msg string) {
 	m.srv.SetPreHook(cb)
 }
 
+type argRequirements struct {
+	minimum int
+	maximum *int
+}
+
+func atLeast(n int) argRequirements {
+	return argRequirements{n, nil}
+}
+
+func between(a int, b int) argRequirements {
+	return argRequirements{a, &b}
+}
+
+func exactly(n int) argRequirements {
+	return argRequirements{n, &n}
+}
+
 // isValidCMD returns true if command is valid and can be executed.
-func (m *Miniredis) isValidCMD(c *server.Peer, cmd string) bool {
+func (m *Miniredis) isValidCMD(c *server.Peer, cmd string, args []string, argReqs argRequirements) bool {
 	if !m.handleAuth(c) {
 		return false
 	}
 	if m.checkPubsub(c, cmd) {
+		return false
+	}
+
+	if len(args) < argReqs.minimum || (argReqs.maximum != nil && len(args) > *argReqs.maximum) {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
 		return false
 	}
 
