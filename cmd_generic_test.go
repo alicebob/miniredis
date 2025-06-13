@@ -287,7 +287,7 @@ func TestUnlink(t *testing.T) {
 	})
 }
 
-func TestDump(t *testing.T) {
+func TestDumpCommand(t *testing.T) {
 	s, c := runWithClient(t)
 	s.Set("existing-key", "value")
 	s.HSet("set-key", "a", "b")
