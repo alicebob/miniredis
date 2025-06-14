@@ -226,52 +226,113 @@ func TestExpireWithFastForward(t *testing.T) {
 
 /*
 we don't have the redis client anymore
-func TestPool(t *testing.T) {
-	s, err := Run()
-	ok(t, err)
-	defer s.Close()
 
-	pool := &redis.Pool{
-		MaxIdle:     1,
-		IdleTimeout: 5 * time.Second,
-		Dial: func() (redis.Conn, error) {
-			return redis.Dial("tcp", s.Addr())
-		},
+	func TestPool(t *testing.T) {
+		s, err := Run()
+		ok(t, err)
+		defer s.Close()
+
+		pool := &redis.Pool{
+			MaxIdle:     1,
+			IdleTimeout: 5 * time.Second,
+			Dial: func() (redis.Conn, error) {
+				return redis.Dial("tcp", s.Addr())
+			},
+		}
+		c := pool.Get()
+		c.Close()
 	}
-	c := pool.Get()
-	c.Close()
-}
 */
-
 func TestMiniredis_isValidCMD(t *testing.T) {
+	two := 2
 	testCases := []struct {
 		name         string
 		isAuthorized bool
 		isInPUBSUB   bool
+		args         []string
+		minArgs      int
+		maxArgs      *int
 		wantResult   bool
 	}{
 		{
 			name:         "Client is not authorized, no PUBSUB mode",
 			isAuthorized: false,
 			isInPUBSUB:   false,
+			args:         []string{},
+			minArgs:      0,
+			maxArgs:      nil,
 			wantResult:   false,
 		},
 		{
 			name:         "Client is not authorized, PUBSUB mode",
 			isAuthorized: false,
 			isInPUBSUB:   true,
+			args:         []string{},
+			minArgs:      0,
+			maxArgs:      nil,
 			wantResult:   false,
 		},
 		{
 			name:         "Client is authorized, PUBSUB mode",
 			isAuthorized: true,
 			isInPUBSUB:   true,
+			args:         []string{},
+			minArgs:      0,
+			maxArgs:      nil,
 			wantResult:   false,
 		},
 		{
 			name:         "Client is authorized, no PUBSUB mode",
 			isAuthorized: true,
 			isInPUBSUB:   false,
+			args:         []string{},
+			minArgs:      0,
+			maxArgs:      nil,
+			wantResult:   true,
+		},
+		{
+			name:         "Too few args",
+			isAuthorized: true,
+			isInPUBSUB:   false,
+			args:         []string{},
+			minArgs:      1,
+			maxArgs:      nil,
+			wantResult:   false,
+		},
+		{
+			name:         "Too many args",
+			isAuthorized: true,
+			isInPUBSUB:   false,
+			args:         []string{"a", "b", "c"},
+			minArgs:      1,
+			maxArgs:      &two,
+			wantResult:   false,
+		},
+		{
+			name:         "Exact args",
+			isAuthorized: true,
+			isInPUBSUB:   false,
+			args:         []string{"a", "b"},
+			minArgs:      2,
+			maxArgs:      &two,
+			wantResult:   true,
+		},
+		{
+			name:         "Surplus args (no max)",
+			isAuthorized: true,
+			isInPUBSUB:   false,
+			args:         []string{"a", "b", "c"},
+			minArgs:      1,
+			maxArgs:      nil,
+			wantResult:   true,
+		},
+		{
+			name:         "Exact args (no max)",
+			isAuthorized: true,
+			isInPUBSUB:   false,
+			args:         []string{"a"},
+			minArgs:      1,
+			maxArgs:      nil,
 			wantResult:   true,
 		},
 	}
@@ -294,7 +355,7 @@ func TestMiniredis_isValidCMD(t *testing.T) {
 				}
 			}
 
-			assert(t, tc.wantResult == m.isValidCMD(c, "example_cmd"), "fail")
+			assert(t, tc.wantResult == m.isValidCMD(c, "example_cmd", tc.args, argRequirements{tc.minArgs, tc.maxArgs}), "fail")
 		})
 	}
 }
