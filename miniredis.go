@@ -485,16 +485,16 @@ func exactly(n int) argRequirements {
 
 // isValidCMD returns true if command is valid and can be executed.
 func (m *Miniredis) isValidCMD(c *server.Peer, cmd string, args []string, argReqs argRequirements) bool {
+	if len(args) < argReqs.minimum || (argReqs.maximum != nil && len(args) > *argReqs.maximum) {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return false
+	}
+
 	if !m.handleAuth(c) {
 		return false
 	}
 	if m.checkPubsub(c, cmd) {
-		return false
-	}
-
-	if len(args) < argReqs.minimum || (argReqs.maximum != nil && len(args) > *argReqs.maximum) {
-		setDirty(c)
-		c.WriteError(errWrongNumber(cmd))
 		return false
 	}
 
