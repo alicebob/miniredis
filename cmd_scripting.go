@@ -151,17 +151,10 @@ func compile(script string) (*lua.FunctionProto, error) {
 }
 
 func (m *Miniredis) cmdEval(c *server.Peer, cmd string, args []string) {
-	if len(args) < 2 {
-		setDirty(c)
-		c.WriteError(errWrongNumber(cmd))
+	if !m.isValidCMD(c, cmd, args, atLeast(2)) {
 		return
 	}
-	if !m.handleAuth(c) {
-		return
-	}
-	if m.checkPubsub(c, cmd) {
-		return
-	}
+
 	ctx := getCtx(c)
 	if ctx.nested {
 		c.WriteError(msgNotFromScripts(ctx.nestedSHA))
@@ -180,17 +173,10 @@ func (m *Miniredis) cmdEval(c *server.Peer, cmd string, args []string) {
 }
 
 func (m *Miniredis) cmdEvalsha(c *server.Peer, cmd string, args []string) {
-	if len(args) < 2 {
-		setDirty(c)
-		c.WriteError(errWrongNumber(cmd))
+	if !m.isValidCMD(c, cmd, args, atLeast(2)) {
 		return
 	}
-	if !m.handleAuth(c) {
-		return
-	}
-	if m.checkPubsub(c, cmd) {
-		return
-	}
+
 	ctx := getCtx(c)
 	if ctx.nested {
 		c.WriteError(msgNotFromScripts(ctx.nestedSHA))
@@ -211,15 +197,7 @@ func (m *Miniredis) cmdEvalsha(c *server.Peer, cmd string, args []string) {
 }
 
 func (m *Miniredis) cmdScript(c *server.Peer, cmd string, args []string) {
-	if len(args) < 1 {
-		setDirty(c)
-		c.WriteError(errWrongNumber(cmd))
-		return
-	}
-	if !m.handleAuth(c) {
-		return
-	}
-	if m.checkPubsub(c, cmd) {
+	if !m.isValidCMD(c, cmd, args, atLeast(1)) {
 		return
 	}
 

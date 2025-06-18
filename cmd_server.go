@@ -23,15 +23,7 @@ func commandsServer(m *Miniredis) {
 
 // MEMORY
 func (m *Miniredis) cmdMemory(c *server.Peer, cmd string, args []string) {
-	if len(args) == 0 {
-		setDirty(c)
-		c.WriteError(errWrongNumber(cmd))
-		return
-	}
-	if !m.handleAuth(c) {
-		return
-	}
-	if m.checkPubsub(c, cmd) {
+	if !m.isValidCMD(c, cmd, args, atLeast(1)) {
 		return
 	}
 
@@ -85,15 +77,7 @@ func (m *Miniredis) cmdMemory(c *server.Peer, cmd string, args []string) {
 
 // DBSIZE
 func (m *Miniredis) cmdDbsize(c *server.Peer, cmd string, args []string) {
-	if len(args) > 0 {
-		setDirty(c)
-		c.WriteError(errWrongNumber(cmd))
-		return
-	}
-	if !m.handleAuth(c) {
-		return
-	}
-	if m.checkPubsub(c, cmd) {
+	if !m.isValidCMD(c, cmd, args, exactly(0)) {
 		return
 	}
 
@@ -152,15 +136,7 @@ func (m *Miniredis) cmdFlushdb(c *server.Peer, cmd string, args []string) {
 
 // TIME
 func (m *Miniredis) cmdTime(c *server.Peer, cmd string, args []string) {
-	if len(args) > 0 {
-		setDirty(c)
-		c.WriteError(errWrongNumber(cmd))
-		return
-	}
-	if !m.handleAuth(c) {
-		return
-	}
-	if m.checkPubsub(c, cmd) {
+	if !m.isValidCMD(c, cmd, args, exactly(0)) {
 		return
 	}
 

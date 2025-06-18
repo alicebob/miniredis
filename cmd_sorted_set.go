@@ -46,15 +46,7 @@ func commandsSortedSet(m *Miniredis) {
 
 // ZADD
 func (m *Miniredis) cmdZadd(c *server.Peer, cmd string, args []string) {
-	if len(args) < 3 {
-		setDirty(c)
-		c.WriteError(errWrongNumber(cmd))
-		return
-	}
-	if !m.handleAuth(c) {
-		return
-	}
-	if m.checkPubsub(c, cmd) {
+	if !m.isValidCMD(c, cmd, args, atLeast(3)) {
 		return
 	}
 
@@ -194,15 +186,7 @@ outer:
 
 // ZCARD
 func (m *Miniredis) cmdZcard(c *server.Peer, cmd string, args []string) {
-	if len(args) != 1 {
-		setDirty(c)
-		c.WriteError(errWrongNumber(cmd))
-		return
-	}
-	if !m.handleAuth(c) {
-		return
-	}
-	if m.checkPubsub(c, cmd) {
+	if !m.isValidCMD(c, cmd, args, exactly(1)) {
 		return
 	}
 
@@ -227,15 +211,7 @@ func (m *Miniredis) cmdZcard(c *server.Peer, cmd string, args []string) {
 
 // ZCOUNT
 func (m *Miniredis) cmdZcount(c *server.Peer, cmd string, args []string) {
-	if len(args) != 3 {
-		setDirty(c)
-		c.WriteError(errWrongNumber(cmd))
-		return
-	}
-	if !m.handleAuth(c) {
-		return
-	}
-	if m.checkPubsub(c, cmd) {
+	if !m.isValidCMD(c, cmd, args, exactly(3)) {
 		return
 	}
 
@@ -285,15 +261,7 @@ func (m *Miniredis) cmdZcount(c *server.Peer, cmd string, args []string) {
 
 // ZINCRBY
 func (m *Miniredis) cmdZincrby(c *server.Peer, cmd string, args []string) {
-	if len(args) != 3 {
-		setDirty(c)
-		c.WriteError(errWrongNumber(cmd))
-		return
-	}
-	if !m.handleAuth(c) {
-		return
-	}
-	if m.checkPubsub(c, cmd) {
+	if !m.isValidCMD(c, cmd, args, exactly(3)) {
 		return
 	}
 
@@ -332,15 +300,7 @@ func (m *Miniredis) makeCmdZinter(store bool) func(c *server.Peer, cmd string, a
 		if store {
 			minArgs++
 		}
-		if len(args) < minArgs {
-			setDirty(c)
-			c.WriteError(errWrongNumber(cmd))
-			return
-		}
-		if !m.handleAuth(c) {
-			return
-		}
-		if m.checkPubsub(c, cmd) {
+		if !m.isValidCMD(c, cmd, args, atLeast(minArgs)) {
 			return
 		}
 
@@ -513,15 +473,7 @@ func (m *Miniredis) makeCmdZinter(store bool) func(c *server.Peer, cmd string, a
 
 // ZLEXCOUNT
 func (m *Miniredis) cmdZlexcount(c *server.Peer, cmd string, args []string) {
-	if len(args) != 3 {
-		setDirty(c)
-		c.WriteError(errWrongNumber(cmd))
-		return
-	}
-	if !m.handleAuth(c) {
-		return
-	}
-	if m.checkPubsub(c, cmd) {
+	if !m.isValidCMD(c, cmd, args, exactly(3)) {
 		return
 	}
 
@@ -566,15 +518,7 @@ func (m *Miniredis) cmdZlexcount(c *server.Peer, cmd string, args []string) {
 
 // ZRANGE
 func (m *Miniredis) cmdZrange(c *server.Peer, cmd string, args []string) {
-	if len(args) < 3 {
-		setDirty(c)
-		c.WriteError(errWrongNumber(cmd))
-		return
-	}
-	if !m.handleAuth(c) {
-		return
-	}
-	if m.checkPubsub(c, cmd) {
+	if !m.isValidCMD(c, cmd, args, atLeast(3)) {
 		return
 	}
 
@@ -668,15 +612,7 @@ func (m *Miniredis) cmdZrange(c *server.Peer, cmd string, args []string) {
 
 // ZREVRANGE
 func (m *Miniredis) cmdZrevrange(c *server.Peer, cmd string, args []string) {
-	if len(args) < 3 {
-		setDirty(c)
-		c.WriteError(errWrongNumber(cmd))
-		return
-	}
-	if !m.handleAuth(c) {
-		return
-	}
-	if m.checkPubsub(c, cmd) {
+	if !m.isValidCMD(c, cmd, args, atLeast(3)) {
 		return
 	}
 
@@ -707,17 +643,10 @@ func (m *Miniredis) cmdZrevrange(c *server.Peer, cmd string, args []string) {
 // ZRANGEBYLEX and ZREVRANGEBYLEX
 func (m *Miniredis) makeCmdZrangebylex(reverse bool) server.Cmd {
 	return func(c *server.Peer, cmd string, args []string) {
-		if len(args) < 3 {
-			setDirty(c)
-			c.WriteError(errWrongNumber(cmd))
+		if !m.isValidCMD(c, cmd, args, atLeast(3)) {
 			return
 		}
-		if !m.handleAuth(c) {
-			return
-		}
-		if m.checkPubsub(c, cmd) {
-			return
-		}
+
 		opts := optsRangeByLex{
 			Reverse: reverse,
 			Key:     args[0],
@@ -756,15 +685,7 @@ func (m *Miniredis) makeCmdZrangebylex(reverse bool) server.Cmd {
 // ZRANGEBYSCORE and ZREVRANGEBYSCORE
 func (m *Miniredis) makeCmdZrangebyscore(reverse bool) server.Cmd {
 	return func(c *server.Peer, cmd string, args []string) {
-		if len(args) < 3 {
-			setDirty(c)
-			c.WriteError(errWrongNumber(cmd))
-			return
-		}
-		if !m.handleAuth(c) {
-			return
-		}
-		if m.checkPubsub(c, cmd) {
+		if !m.isValidCMD(c, cmd, args, atLeast(3)) {
 			return
 		}
 
@@ -808,15 +729,7 @@ func (m *Miniredis) makeCmdZrangebyscore(reverse bool) server.Cmd {
 // ZRANK and ZREVRANK
 func (m *Miniredis) makeCmdZrank(reverse bool) server.Cmd {
 	return func(c *server.Peer, cmd string, args []string) {
-		if len(args) < 2 {
-			setDirty(c)
-			c.WriteError(errWrongNumber(cmd))
-			return
-		}
-		if !m.handleAuth(c) {
-			return
-		}
-		if m.checkPubsub(c, cmd) {
+		if !m.isValidCMD(c, cmd, args, atLeast(2)) {
 			return
 		}
 
@@ -878,15 +791,7 @@ func (m *Miniredis) makeCmdZrank(reverse bool) server.Cmd {
 
 // ZREM
 func (m *Miniredis) cmdZrem(c *server.Peer, cmd string, args []string) {
-	if len(args) < 2 {
-		setDirty(c)
-		c.WriteError(errWrongNumber(cmd))
-		return
-	}
-	if !m.handleAuth(c) {
-		return
-	}
-	if m.checkPubsub(c, cmd) {
+	if !m.isValidCMD(c, cmd, args, atLeast(2)) {
 		return
 	}
 
@@ -917,15 +822,7 @@ func (m *Miniredis) cmdZrem(c *server.Peer, cmd string, args []string) {
 
 // ZREMRANGEBYLEX
 func (m *Miniredis) cmdZremrangebylex(c *server.Peer, cmd string, args []string) {
-	if len(args) != 3 {
-		setDirty(c)
-		c.WriteError(errWrongNumber(cmd))
-		return
-	}
-	if !m.handleAuth(c) {
-		return
-	}
-	if m.checkPubsub(c, cmd) {
+	if !m.isValidCMD(c, cmd, args, exactly(3)) {
 		return
 	}
 
@@ -973,15 +870,7 @@ func (m *Miniredis) cmdZremrangebylex(c *server.Peer, cmd string, args []string)
 
 // ZREMRANGEBYRANK
 func (m *Miniredis) cmdZremrangebyrank(c *server.Peer, cmd string, args []string) {
-	if len(args) != 3 {
-		setDirty(c)
-		c.WriteError(errWrongNumber(cmd))
-		return
-	}
-	if !m.handleAuth(c) {
-		return
-	}
-	if m.checkPubsub(c, cmd) {
+	if !m.isValidCMD(c, cmd, args, exactly(3)) {
 		return
 	}
 
@@ -1023,15 +912,7 @@ func (m *Miniredis) cmdZremrangebyrank(c *server.Peer, cmd string, args []string
 
 // ZREMRANGEBYSCORE
 func (m *Miniredis) cmdZremrangebyscore(c *server.Peer, cmd string, args []string) {
-	if len(args) != 3 {
-		setDirty(c)
-		c.WriteError(errWrongNumber(cmd))
-		return
-	}
-	if !m.handleAuth(c) {
-		return
-	}
-	if m.checkPubsub(c, cmd) {
+	if !m.isValidCMD(c, cmd, args, exactly(3)) {
 		return
 	}
 
@@ -1084,15 +965,7 @@ func (m *Miniredis) cmdZremrangebyscore(c *server.Peer, cmd string, args []strin
 
 // ZSCORE
 func (m *Miniredis) cmdZscore(c *server.Peer, cmd string, args []string) {
-	if len(args) != 2 {
-		setDirty(c)
-		c.WriteError(errWrongNumber(cmd))
-		return
-	}
-	if !m.handleAuth(c) {
-		return
-	}
-	if m.checkPubsub(c, cmd) {
+	if !m.isValidCMD(c, cmd, args, exactly(2)) {
 		return
 	}
 
@@ -1122,15 +995,7 @@ func (m *Miniredis) cmdZscore(c *server.Peer, cmd string, args []string) {
 
 // ZMSCORE
 func (m *Miniredis) cmdZMscore(c *server.Peer, cmd string, args []string) {
-	if len(args) < 2 {
-		setDirty(c)
-		c.WriteError(errWrongNumber(cmd))
-		return
-	}
-	if !m.handleAuth(c) {
-		return
-	}
-	if m.checkPubsub(c, cmd) {
+	if !m.isValidCMD(c, cmd, args, atLeast(2)) {
 		return
 	}
 
@@ -1271,16 +1136,7 @@ func withLexRange(members []string, min string, minIncl bool, max string, maxInc
 
 // ZUNION
 func (m *Miniredis) cmdZunion(c *server.Peer, cmd string, args []string) {
-	if len(args) < 2 {
-		setDirty(c)
-		c.WriteError(errWrongNumber(cmd))
-		return
-	}
-
-	if !m.handleAuth(c) {
-		return
-	}
-	if m.checkPubsub(c, cmd) {
+	if !m.isValidCMD(c, cmd, args, atLeast(2)) {
 		return
 	}
 
@@ -1348,15 +1204,7 @@ func (m *Miniredis) cmdZunion(c *server.Peer, cmd string, args []string) {
 
 // ZUNIONSTORE
 func (m *Miniredis) cmdZunionstore(c *server.Peer, cmd string, args []string) {
-	if len(args) < 3 {
-		setDirty(c)
-		c.WriteError(errWrongNumber(cmd))
-		return
-	}
-	if !m.handleAuth(c) {
-		return
-	}
-	if m.checkPubsub(c, cmd) {
+	if !m.isValidCMD(c, cmd, args, atLeast(3)) {
 		return
 	}
 
@@ -1508,15 +1356,7 @@ func executeZUnion(db *RedisDB, opts zunionOptions) (sortedSet, error) {
 
 // ZSCAN
 func (m *Miniredis) cmdZscan(c *server.Peer, cmd string, args []string) {
-	if len(args) < 2 {
-		setDirty(c)
-		c.WriteError(errWrongNumber(cmd))
-		return
-	}
-	if !m.handleAuth(c) {
-		return
-	}
-	if m.checkPubsub(c, cmd) {
+	if !m.isValidCMD(c, cmd, args, atLeast(2)) {
 		return
 	}
 
@@ -1680,15 +1520,7 @@ func (m *Miniredis) cmdZpopmax(reverse bool) server.Cmd {
 
 // ZRANDMEMBER
 func (m *Miniredis) cmdZrandmember(c *server.Peer, cmd string, args []string) {
-	if len(args) < 1 {
-		setDirty(c)
-		c.WriteError(errWrongNumber(cmd))
-		return
-	}
-	if !m.handleAuth(c) {
-		return
-	}
-	if m.checkPubsub(c, cmd) {
+	if !m.isValidCMD(c, cmd, args, atLeast(1)) {
 		return
 	}
 

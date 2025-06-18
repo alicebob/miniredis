@@ -192,15 +192,7 @@ func (m *Miniredis) cmdHello(c *server.Peer, cmd string, args []string) {
 
 // ECHO
 func (m *Miniredis) cmdEcho(c *server.Peer, cmd string, args []string) {
-	if len(args) != 1 {
-		setDirty(c)
-		c.WriteError(errWrongNumber(cmd))
-		return
-	}
-	if !m.handleAuth(c) {
-		return
-	}
-	if m.checkPubsub(c, cmd) {
+	if !m.isValidCMD(c, cmd, args, exactly(1)) {
 		return
 	}
 
