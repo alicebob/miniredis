@@ -271,3 +271,49 @@ func TestFormatFloat(t *testing.T) {
 	a += 1.2
 	eq(t, "4.8", a)
 }
+
+func TestReadOnlyOption(t *testing.T) {
+	// Create a new server
+	srv, err := NewServer("127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("Failed to create server: %v", err)
+	}
+	defer srv.Close()
+
+	// Test handler function
+	testHandler := func(c *Peer, cmd string, args []string) {
+		c.WriteOK()
+	}
+
+	// Register a read-only command
+	err = srv.RegisterWithOptions("TESTGET", testHandler, ReadOnlyOption())
+	if err != nil {
+		t.Fatalf("Failed to register read-only command: %v", err)
+	}
+
+	// Register a write command (default)
+	err = srv.Register("TESTSET", testHandler)
+	if err != nil {
+		t.Fatalf("Failed to register write command: %v", err)
+	}
+
+	// Test that TESTGET is marked as read-only
+	if !srv.IsReadOnlyCommand("TESTGET") {
+		t.Error("TESTGET should be marked as read-only")
+	}
+
+	// Test that TESTSET is not marked as read-only
+	if srv.IsReadOnlyCommand("TESTSET") {
+		t.Error("TESTSET should not be marked as read-only")
+	}
+
+	// Test case insensitivity
+	if !srv.IsReadOnlyCommand("testget") {
+		t.Error("Command checking should be case insensitive")
+	}
+
+	// Test non-existent command
+	if srv.IsReadOnlyCommand("NONEXISTENT") {
+		t.Error("Non-existent command should return false")
+	}
+}
