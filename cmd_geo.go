@@ -14,12 +14,12 @@ import (
 // commandsGeo handles GEOADD, GEORADIUS etc.
 func commandsGeo(m *Miniredis) {
 	m.srv.Register("GEOADD", m.cmdGeoadd)
-	m.srv.Register("GEODIST", m.cmdGeodist)
-	m.srv.Register("GEOPOS", m.cmdGeopos)
+	m.srv.RegisterWithOptions("GEODIST", m.cmdGeodist, server.ReadOnlyOption())
+	m.srv.RegisterWithOptions("GEOPOS", m.cmdGeopos, server.ReadOnlyOption())
 	m.srv.Register("GEORADIUS", m.cmdGeoradius)
-	m.srv.Register("GEORADIUS_RO", m.cmdGeoradius)
+	m.srv.RegisterWithOptions("GEORADIUS_RO", m.cmdGeoradius, server.ReadOnlyOption())
 	m.srv.Register("GEORADIUSBYMEMBER", m.cmdGeoradiusbymember)
-	m.srv.Register("GEORADIUSBYMEMBER_RO", m.cmdGeoradiusbymember)
+	m.srv.RegisterWithOptions("GEORADIUSBYMEMBER_RO", m.cmdGeoradiusbymember, server.ReadOnlyOption())
 }
 
 // GEOADD

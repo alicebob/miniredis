@@ -13,7 +13,7 @@ import (
 
 func commandsServer(m *Miniredis) {
 	m.srv.Register("COMMAND", m.cmdCommand)
-	m.srv.Register("DBSIZE", m.cmdDbsize)
+	m.srv.RegisterWithOptions("DBSIZE", m.cmdDbsize, server.ReadOnlyOption())
 	m.srv.Register("FLUSHALL", m.cmdFlushall)
 	m.srv.Register("FLUSHDB", m.cmdFlushdb)
 	m.srv.Register("INFO", m.cmdInfo)
