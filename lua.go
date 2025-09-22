@@ -71,7 +71,13 @@ func mkLua(srv *server.Server, c *server.Peer, sha string) (map[string]lua.LGFun
 					return 0
 				}
 				// pcall() mode
-				l.Push(lua.LNil)
+				res := &lua.LTable{}
+				if strings.Contains(err.Error(), "ERR unknown command") {
+					res.RawSetString("err", lua.LString("ERR Unknown Redis command called from script"))
+				} else {
+					res.RawSetString("err", lua.LString(err.Error()))
+				}
+				l.Push(res)
 				return 1
 			}
 

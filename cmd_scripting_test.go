@@ -597,3 +597,28 @@ func TestLuaTX(t *testing.T) {
 		)
 	})
 }
+
+func TestEvalWithPcall(t *testing.T) {
+	_, c := runWithClient(t)
+
+	t.Run("return error", func(t *testing.T) {
+		// Test EVAL with pcall and write command (should fail)
+		mustContain(t, c,
+			"EVAL", "return redis.pcall('FAKECOMMAND', KEYS[1], ARGV[1])", "1", "key1", "value1",
+			"Unknown Redis command called from script",
+		)
+	})
+
+	t.Run("continue after error", func(t *testing.T) {
+		script := `
+local err = redis.pcall('FAKECOMMAND', KEYS[1], ARGV[1]);
+local res = "pcall:" .. err['err'];
+return res;
+`
+		// Test EVAL with pcall and write command (should fail)
+		mustContain(t, c,
+			"EVAL", script, "1", "foo", "value1",
+			"pcall:ERR Unknown Redis command called from script",
+		)
+	})
+}
