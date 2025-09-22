@@ -308,3 +308,23 @@ func TestReadOnlyOption(t *testing.T) {
 		t.Error("Non-existent command should return false")
 	}
 }
+
+func TestIsRegisteredCommand(t *testing.T) {
+	srv, err := NewServer("127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("Failed to create server: %v", err)
+	}
+	defer srv.Close()
+
+	srv.Register("TESTGET", func(c *Peer, cmd string, args []string) {
+		c.WriteOK()
+	})
+
+	if !srv.IsRegisteredCommand("TESTGET") {
+		t.Error("TESTGET should be registered")
+	}
+
+	if srv.IsRegisteredCommand("NONEXISTENT") {
+		t.Error("NONEXISTENT should not be registered")
+	}
+}
