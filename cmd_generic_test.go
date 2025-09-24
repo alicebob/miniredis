@@ -758,14 +758,22 @@ func TestScan(t *testing.T) {
 		s.Set("v8", "value")
 		s.Set("v9", "value")
 
+		// count is ignored
 		mustDo(t, c,
 			"SCAN", "0", "COUNT", "3",
 			proto.Array(
-				proto.String("3"),
+				proto.String("0"),
 				proto.Array(
 					proto.String("key"),
 					proto.String("v1"),
 					proto.String("v2"),
+					proto.String("v3"),
+					proto.String("v4"),
+					proto.String("v5"),
+					proto.String("v6"),
+					proto.String("v7"),
+					proto.String("v8"),
+					proto.String("v9"),
 				),
 			),
 		)
@@ -773,12 +781,8 @@ func TestScan(t *testing.T) {
 		mustDo(t, c,
 			"SCAN", "3", "COUNT", "3",
 			proto.Array(
-				proto.String("6"),
-				proto.Array(
-					proto.String("v3"),
-					proto.String("v4"),
-					proto.String("v5"),
-				),
+				proto.String("0"),
+				proto.Array(),
 			),
 		)
 	})
