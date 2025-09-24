@@ -143,13 +143,7 @@ func (s *Server) Close() {
 
 // Register a command. It can't have been registered before. Safe to call on a
 // running server.
-func (s *Server) Register(cmd string, f Cmd) error {
-	return s.RegisterWithOptions(cmd, f)
-}
-
-// RegisterWithOptions registers a command with optional metadata. It can't have
-// been registered before. Safe to call on a running server.
-func (s *Server) RegisterWithOptions(cmd string, f Cmd, options ...CmdOption) error {
+func (s *Server) Register(cmd string, f Cmd, options ...CmdOption) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	cmd = strings.ToUpper(cmd)
@@ -161,12 +155,11 @@ func (s *Server) RegisterWithOptions(cmd string, f Cmd, options ...CmdOption) er
 		handler:  f,
 		readOnly: false,
 	}
-
 	for _, option := range options {
 		option(meta)
 	}
-
 	s.cmds[cmd] = meta
+
 	return nil
 }
 

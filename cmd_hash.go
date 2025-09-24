@@ -13,21 +13,21 @@ import (
 // commandsHash handles all hash value operations.
 func commandsHash(m *Miniredis) {
 	m.srv.Register("HDEL", m.cmdHdel)
-	m.srv.RegisterWithOptions("HEXISTS", m.cmdHexists, server.ReadOnlyOption())
-	m.srv.RegisterWithOptions("HGET", m.cmdHget, server.ReadOnlyOption())
-	m.srv.RegisterWithOptions("HGETALL", m.cmdHgetall, server.ReadOnlyOption())
+	m.srv.Register("HEXISTS", m.cmdHexists, server.ReadOnlyOption())
+	m.srv.Register("HGET", m.cmdHget, server.ReadOnlyOption())
+	m.srv.Register("HGETALL", m.cmdHgetall, server.ReadOnlyOption())
 	m.srv.Register("HINCRBY", m.cmdHincrby)
 	m.srv.Register("HINCRBYFLOAT", m.cmdHincrbyfloat)
-	m.srv.RegisterWithOptions("HKEYS", m.cmdHkeys, server.ReadOnlyOption())
-	m.srv.RegisterWithOptions("HLEN", m.cmdHlen, server.ReadOnlyOption())
-	m.srv.RegisterWithOptions("HMGET", m.cmdHmget, server.ReadOnlyOption())
+	m.srv.Register("HKEYS", m.cmdHkeys, server.ReadOnlyOption())
+	m.srv.Register("HLEN", m.cmdHlen, server.ReadOnlyOption())
+	m.srv.Register("HMGET", m.cmdHmget, server.ReadOnlyOption())
 	m.srv.Register("HMSET", m.cmdHmset)
 	m.srv.Register("HSET", m.cmdHset)
 	m.srv.Register("HSETNX", m.cmdHsetnx)
-	m.srv.RegisterWithOptions("HSTRLEN", m.cmdHstrlen, server.ReadOnlyOption())
-	m.srv.RegisterWithOptions("HVALS", m.cmdHvals, server.ReadOnlyOption())
-	m.srv.RegisterWithOptions("HSCAN", m.cmdHscan, server.ReadOnlyOption())
-	m.srv.RegisterWithOptions("HRANDFIELD", m.cmdHrandfield, server.ReadOnlyOption())
+	m.srv.Register("HSTRLEN", m.cmdHstrlen, server.ReadOnlyOption())
+	m.srv.Register("HVALS", m.cmdHvals, server.ReadOnlyOption())
+	m.srv.Register("HSCAN", m.cmdHscan, server.ReadOnlyOption())
+	m.srv.Register("HRANDFIELD", m.cmdHrandfield, server.ReadOnlyOption())
 }
 
 // HSET
