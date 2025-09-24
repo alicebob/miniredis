@@ -14,21 +14,21 @@ import (
 // commandsString handles all string value operations.
 func commandsString(m *Miniredis) {
 	m.srv.Register("APPEND", m.cmdAppend)
-	m.srv.RegisterWithOptions("BITCOUNT", m.cmdBitcount, server.ReadOnlyOption())
+	m.srv.Register("BITCOUNT", m.cmdBitcount, server.ReadOnlyOption())
 	m.srv.Register("BITOP", m.cmdBitop)
-	m.srv.RegisterWithOptions("BITPOS", m.cmdBitpos, server.ReadOnlyOption())
+	m.srv.Register("BITPOS", m.cmdBitpos, server.ReadOnlyOption())
 	m.srv.Register("DECRBY", m.cmdDecrby)
 	m.srv.Register("DECR", m.cmdDecr)
-	m.srv.RegisterWithOptions("GETBIT", m.cmdGetbit, server.ReadOnlyOption())
-	m.srv.RegisterWithOptions("GET", m.cmdGet, server.ReadOnlyOption())
+	m.srv.Register("GETBIT", m.cmdGetbit, server.ReadOnlyOption())
+	m.srv.Register("GET", m.cmdGet, server.ReadOnlyOption())
 	m.srv.Register("GETEX", m.cmdGetex)
-	m.srv.RegisterWithOptions("GETRANGE", m.cmdGetrange, server.ReadOnlyOption())
+	m.srv.Register("GETRANGE", m.cmdGetrange, server.ReadOnlyOption())
 	m.srv.Register("GETSET", m.cmdGetset)
 	m.srv.Register("GETDEL", m.cmdGetdel)
 	m.srv.Register("INCRBYFLOAT", m.cmdIncrbyfloat)
 	m.srv.Register("INCRBY", m.cmdIncrby)
 	m.srv.Register("INCR", m.cmdIncr)
-	m.srv.RegisterWithOptions("MGET", m.cmdMget, server.ReadOnlyOption())
+	m.srv.Register("MGET", m.cmdMget, server.ReadOnlyOption())
 	m.srv.Register("MSET", m.cmdMset)
 	m.srv.Register("MSETNX", m.cmdMsetnx)
 	m.srv.Register("PSETEX", m.cmdPsetex)
@@ -37,7 +37,7 @@ func commandsString(m *Miniredis) {
 	m.srv.Register("SET", m.cmdSet)
 	m.srv.Register("SETNX", m.cmdSetnx)
 	m.srv.Register("SETRANGE", m.cmdSetrange)
-	m.srv.RegisterWithOptions("STRLEN", m.cmdStrlen, server.ReadOnlyOption())
+	m.srv.Register("STRLEN", m.cmdStrlen, server.ReadOnlyOption())
 }
 
 // SET

@@ -13,22 +13,22 @@ import (
 // commandsSet handles all set value operations.
 func commandsSet(m *Miniredis) {
 	m.srv.Register("SADD", m.cmdSadd)
-	m.srv.RegisterWithOptions("SCARD", m.cmdScard, server.ReadOnlyOption())
-	m.srv.RegisterWithOptions("SDIFF", m.cmdSdiff, server.ReadOnlyOption())
+	m.srv.Register("SCARD", m.cmdScard, server.ReadOnlyOption())
+	m.srv.Register("SDIFF", m.cmdSdiff, server.ReadOnlyOption())
 	m.srv.Register("SDIFFSTORE", m.cmdSdiffstore)
-	m.srv.RegisterWithOptions("SINTERCARD", m.cmdSintercard, server.ReadOnlyOption())
-	m.srv.RegisterWithOptions("SINTER", m.cmdSinter, server.ReadOnlyOption())
+	m.srv.Register("SINTERCARD", m.cmdSintercard, server.ReadOnlyOption())
+	m.srv.Register("SINTER", m.cmdSinter, server.ReadOnlyOption())
 	m.srv.Register("SINTERSTORE", m.cmdSinterstore)
-	m.srv.RegisterWithOptions("SISMEMBER", m.cmdSismember, server.ReadOnlyOption())
-	m.srv.RegisterWithOptions("SMEMBERS", m.cmdSmembers, server.ReadOnlyOption())
-	m.srv.RegisterWithOptions("SMISMEMBER", m.cmdSmismember, server.ReadOnlyOption())
+	m.srv.Register("SISMEMBER", m.cmdSismember, server.ReadOnlyOption())
+	m.srv.Register("SMEMBERS", m.cmdSmembers, server.ReadOnlyOption())
+	m.srv.Register("SMISMEMBER", m.cmdSmismember, server.ReadOnlyOption())
 	m.srv.Register("SMOVE", m.cmdSmove)
 	m.srv.Register("SPOP", m.cmdSpop)
-	m.srv.RegisterWithOptions("SRANDMEMBER", m.cmdSrandmember, server.ReadOnlyOption())
+	m.srv.Register("SRANDMEMBER", m.cmdSrandmember, server.ReadOnlyOption())
 	m.srv.Register("SREM", m.cmdSrem)
-	m.srv.RegisterWithOptions("SUNION", m.cmdSunion, server.ReadOnlyOption())
+	m.srv.Register("SUNION", m.cmdSunion, server.ReadOnlyOption())
 	m.srv.Register("SUNIONSTORE", m.cmdSunionstore)
-	m.srv.RegisterWithOptions("SSCAN", m.cmdSscan, server.ReadOnlyOption())
+	m.srv.Register("SSCAN", m.cmdSscan, server.ReadOnlyOption())
 }
 
 // SADD
