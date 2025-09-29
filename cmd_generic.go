@@ -56,6 +56,7 @@ func commandsGeneric(m *Miniredis) {
 	m.srv.Register("SCAN", m.cmdScan, server.ReadOnlyOption())
 	// SORT
 	m.srv.Register("UNLINK", m.cmdDel)
+	m.srv.Register("WAIT", m.cmdWait)
 }
 
 type expireOpts struct {
@@ -772,4 +773,23 @@ func (m *Miniredis) cmdCopy(c *server.Peer, cmd string, args []string) {
 		m.copy(m.db(fromDB), opts.from, m.db(toDB), opts.to)
 		c.WriteInt(1)
 	})
+}
+
+// WAIT
+func (m *Miniredis) cmdWait(c *server.Peer, cmd string, args []string) {
+	if !m.isValidCMD(c, cmd, args, exactly(2)) {
+		return
+	}
+	nReplicas, err := strconv.Atoi(args[0])
+	if err != nil || nReplicas < 0 {
+		c.WriteError(msgInvalidInt)
+		return
+	}
+	timeout, err := strconv.Atoi(args[1])
+	if err != nil || timeout < 0 {
+		c.WriteError(msgInvalidInt)
+		return
+	}
+	// WAIT always returns 0 when called on a standalone instance
+	c.WriteInt(0)
 }
