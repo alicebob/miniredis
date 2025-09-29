@@ -57,6 +57,7 @@ Implemented commands:
    - TTL
    - TYPE
    - UNLINK
+   - WAIT -- no-op
  - Transactions (complete)
    - DISCARD
    - EXEC
@@ -305,7 +306,6 @@ Commands which will probably not be implemented:
  - Key
     - ~~MIGRATE~~
     - ~~OBJECT~~
-    - ~~WAIT~~
  - Scripting
     - ~~FCALL / FCALL_RO *~~
     - ~~FUNCTION *~~

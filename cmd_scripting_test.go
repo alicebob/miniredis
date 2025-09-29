@@ -469,6 +469,11 @@ func TestCmdEvalResponse(t *testing.T) {
 		"EVAL", "return redis.call('HMGET','mkey', 'bad', 'key')", "0",
 		proto.Array(proto.Nil, proto.Nil),
 	)
+
+	mustDo(t, c,
+		"EVAL", "return redis.call('WAIT', '2', '100')", "0",
+		proto.Int(0),
+	)
 }
 
 func TestCmdEvalAuth(t *testing.T) {

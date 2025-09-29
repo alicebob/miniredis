@@ -990,3 +990,27 @@ func TestCopy(t *testing.T) {
 		)
 	})
 }
+
+func TestWait(t *testing.T) {
+	_, c := runWithClient(t)
+
+	t.Run("success", func(t *testing.T) {
+		must0(t, c, "WAIT", "2", "100")
+		must0(t, c, "WAIT", "1", "0")
+	})
+
+	t.Run("errors", func(t *testing.T) {
+		mustDo(t, c, "WAIT",
+			proto.Error(errWrongNumber("wait")),
+		)
+		mustDo(t, c, "WAIT", "2",
+			proto.Error(errWrongNumber("wait")),
+		)
+		mustDo(t, c, "WAIT", "2", "bar",
+			proto.Error(msgInvalidInt),
+		)
+		mustDo(t, c, "WAIT", "foo", "100",
+			proto.Error(msgInvalidInt),
+		)
+	})
+}
