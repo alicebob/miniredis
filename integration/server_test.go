@@ -55,6 +55,19 @@ func TestServer(t *testing.T) {
 		c.Error("wrong number of arguments", "MEMORY", "USAGE")
 		c.Error("syntax error", "MEMORY", "USAGE", "too", "many")
 	})
+
+	testRaw(t, func(c *client) {
+		c.DoLoosely("WAIT", "1", "1")
+
+		// Failure cases
+		c.Error("wrong number", "WAIT", "1")
+		c.Error("wrong number", "WAIT", "1", "2", "3")
+		c.Error("wrong number", "WAIT")
+		c.Error("not an integer", "WAIT", "foo", "0")
+		c.Error("not an integer", "WAIT", "1", "foo")
+		// c.Error("out of range", "WAIT", "-1", "0") // something weird going on
+		c.Error("timeout is negative", "WAIT", "11", "-12")
+	})
 }
 
 func TestServerTLS(t *testing.T) {

@@ -786,8 +786,12 @@ func (m *Miniredis) cmdWait(c *server.Peer, cmd string, args []string) {
 		return
 	}
 	timeout, err := strconv.Atoi(args[1])
-	if err != nil || timeout < 0 {
+	if err != nil {
 		c.WriteError(msgInvalidInt)
+		return
+	}
+	if timeout < 0 {
+		c.WriteError(msgTimeoutNegative)
 		return
 	}
 	// WAIT always returns 0 when called on a standalone instance
