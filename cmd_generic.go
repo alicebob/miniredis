@@ -650,7 +650,8 @@ func (m *Miniredis) cmdScan(c *server.Peer, cmd string, args []string) {
 
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
-		// We return _all_ (matched) keys every time.
+		// We return _all_ (matched) keys every time, so that cursors work.
+		// We ignore "COUNT", which is allowed according to the Redis docs.
 		var keys []string
 
 		if opts.withType {
@@ -671,25 +672,14 @@ func (m *Miniredis) cmdScan(c *server.Peer, cmd string, args []string) {
 			keys, _ = matchKeys(keys, opts.match)
 		}
 
-		low := opts.cursor
-		high := low + opts.count
-		// validate high is correct
-		if high > len(keys) || high == 0 {
-			high = len(keys)
-		}
-		if opts.cursor > high {
-			// invalid cursor
+		// we only ever return all at once, so no non-zero cursor can every be valid
+		if opts.cursor != 0 {
 			c.WriteLen(2)
 			c.WriteBulk("0") // no next cursor
 			c.WriteLen(0)    // no elements
 			return
 		}
-		cursorValue := low + opts.count
-		if cursorValue >= len(keys) {
-			cursorValue = 0 // no next cursor
-		}
-		keys = keys[low:high]
-
+		cursorValue := 0 // we don't use cursors
 		c.WriteLen(2)
 		c.WriteBulk(fmt.Sprintf("%d", cursorValue))
 		c.WriteLen(len(keys))
