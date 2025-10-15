@@ -602,3 +602,124 @@ func TestLuaTX(t *testing.T) {
 		)
 	})
 }
+
+func TestEvalRo(t *testing.T) {
+	_, c := runWithClient(t)
+
+	t.Run("read-only command", func(t *testing.T) {
+		mustOK(t, c,
+			"SET", "readonly", "foo",
+		)
+
+		// Test EVALRO with read-only command (should work)
+		mustDo(t, c,
+			"EVAL_RO", "return redis.call('GET', KEYS[1])", "1", "readonly",
+			proto.String("foo"),
+		)
+	})
+
+	t.Run("write command", func(t *testing.T) {
+		// Test EVALRO with write command (should fail)
+		mustContain(t, c,
+			"EVAL_RO", "return redis.call('SET', KEYS[1], ARGV[1])", "1", "key1", "value1",
+			"Write commands are not allowed in read-only scripts",
+		)
+	})
+}
+
+func TestEvalshaRo(t *testing.T) {
+	_, c := runWithClient(t)
+
+	// First load a read-only script
+	script := "return redis.call('GET', KEYS[1])"
+	t.Run("read-only script", func(t *testing.T) {
+		mustDo(t, c,
+			"SCRIPT", "LOAD", script,
+			proto.String("d3c21d0c2b9ca22f82737626a27bcaf5d288f99f"),
+		)
+
+		mustOK(t, c,
+			"SET", "readonly", "foo",
+		)
+
+		// Test EVALSHA_RO with read-only command (should work)
+		mustDo(t, c,
+			"EVALSHA_RO", "d3c21d0c2b9ca22f82737626a27bcaf5d288f99f", "1", "readonly",
+			proto.String("foo"),
+		)
+
+	})
+
+	t.Run("write script", func(t *testing.T) {
+		// Load a write script
+		writeScript := "return redis.call('SET', KEYS[1], ARGV[1])"
+		mustDo(t, c,
+			"SCRIPT", "LOAD", writeScript,
+			proto.String("d8f2fad9f8e86a53d2a6ebd960b33c4972cacc37"),
+		)
+
+		// Test EVALSHA_RO with write command (should fail)
+		mustContain(t, c,
+			"EVALSHA_RO", "d8f2fad9f8e86a53d2a6ebd960b33c4972cacc37", "1", "key1", "value1",
+			"Write commands are not allowed in read-only scripts",
+		)
+	})
+}
+
+func TestEvalRoWriteCommandWithPcall(t *testing.T) {
+	_, c := runWithClient(t)
+
+	t.Run("return error", func(t *testing.T) {
+		// Test EVAL with pcall and write command (should fail)
+		mustContain(t, c,
+			"EVAL_RO", "return redis.pcall('FAKECOMMAND', KEYS[1], ARGV[1])", "1", "key1", "value1",
+			"Unknown Redis command called from script",
+		)
+	})
+
+	t.Run("extra work after error", func(t *testing.T) {
+		script := `
+local err = redis.pcall('FAKECOMMAND', KEYS[1], ARGV[1]);
+local res = "pcall:" .. err['err'];
+return res;
+`
+		// Test EVAL with pcall and write command (should fail)
+		mustContain(t, c,
+			"EVAL_RO", script, "1", "key1", "value1",
+			"pcall:ERR Unknown Redis command called from script",
+		)
+	})
+
+	t.Run("write command in read-only script", func(t *testing.T) {
+		// Test EVALRO with pcall and write command (should fail)
+		mustContain(t, c,
+			"EVAL_RO", "return redis.pcall('SET', KEYS[1], ARGV[1])", "1", "key1", "value1",
+			"Write commands are not allowed in read-only scripts",
+		)
+	})
+}
+
+func TestEvalWithPcall(t *testing.T) {
+	_, c := runWithClient(t)
+
+	t.Run("return error", func(t *testing.T) {
+		// Test EVAL with pcall and write command (should fail)
+		mustContain(t, c,
+			"EVAL", "return redis.pcall('FAKECOMMAND', KEYS[1], ARGV[1])", "1", "key1", "value1",
+			"Unknown Redis command called from script",
+		)
+	})
+
+	t.Run("continue after error", func(t *testing.T) {
+		script := `
+local err = redis.pcall('FAKECOMMAND', KEYS[1], ARGV[1]);
+local res = "pcall:" .. err['err'];
+return res;
+`
+		// Test EVAL with pcall and write command (should fail)
+		mustContain(t, c,
+			"EVAL", script, "1", "foo", "value1",
+			"pcall:ERR Unknown Redis command called from script",
+		)
+	})
+}
