@@ -21,6 +21,10 @@ func TestScript(t *testing.T) {
 			c.Do("EVAL", "return redis.call('ZRANGE', 'q', 0, -1)", "0")
 			c.Do("EVAL", "return redis.call('LPOP', 'foo')", "0")
 
+			c.Do("EVAL_RO", "return 42", "0")
+			c.Do("EVAL_RO", "return 42+2", "0")
+			c.Error("Write commands are not allowed", "EVAL_RO", "return redis.call('LPOP', 'foo')", "0")
+
 			// failure cases
 			c.Error("wrong number", "EVAL")
 			c.Error("wrong number", "EVAL", "return 42")
