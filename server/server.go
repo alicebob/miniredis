@@ -238,6 +238,15 @@ func (s *Server) TotalCommands() int {
 	return s.infoCmds
 }
 
+// IsRegisteredCommand checks if a command is registered
+func (s *Server) IsRegisteredCommand(cmd string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	cmdUp := strings.ToUpper(cmd)
+	_, ok := s.cmds[cmdUp]
+	return ok
+}
+
 // IsReadOnlyCommand checks if a command is marked as read-only
 func (s *Server) IsReadOnlyCommand(cmd string) bool {
 	s.mu.Lock()

@@ -18,7 +18,7 @@ var luaRedisConstants = map[string]lua.LValue{
 	"LOG_WARNING": lua.LNumber(3),
 }
 
-func mkLua(srv *server.Server, c *server.Peer, sha string) (map[string]lua.LGFunction, map[string]lua.LValue) {
+func mkLua(srv *server.Server, c *server.Peer, sha string, readOnly bool) (map[string]lua.LGFunction, map[string]lua.LValue) {
 	mkCall := func(failFast bool) func(l *lua.LState) int {
 		// one server.Ctx for a single Lua run
 		pCtx := &connCtx{}
@@ -52,6 +52,20 @@ func mkLua(srv *server.Server, c *server.Peer, sha string) (map[string]lua.LGFun
 				return 0
 			}
 
+			if readOnly && len(args) > 0 {
+				if srv.IsRegisteredCommand(args[0]) && !srv.IsReadOnlyCommand(args[0]) {
+					if failFast {
+						l.Error(lua.LString("Write commands are not allowed in read-only scripts"), 1)
+						return 0
+					}
+					// pcall() mode - return error table
+					res := &lua.LTable{}
+					res.RawSetString("err", lua.LString("Write commands are not allowed in read-only scripts"))
+					l.Push(res)
+					return 1
+				}
+			}
+
 			buf := &bytes.Buffer{}
 			wr := bufio.NewWriter(buf)
 			peer := server.NewPeer(wr)
@@ -71,7 +85,13 @@ func mkLua(srv *server.Server, c *server.Peer, sha string) (map[string]lua.LGFun
 					return 0
 				}
 				// pcall() mode
-				l.Push(lua.LNil)
+				res := &lua.LTable{}
+				if strings.Contains(err.Error(), "ERR unknown command") {
+					res.RawSetString("err", lua.LString("ERR Unknown Redis command called from script"))
+				} else {
+					res.RawSetString("err", lua.LString(err.Error()))
+				}
+				l.Push(res)
 				return 1
 			}
 
