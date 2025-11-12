@@ -758,14 +758,22 @@ func TestScan(t *testing.T) {
 		s.Set("v8", "value")
 		s.Set("v9", "value")
 
+		// count is ignored
 		mustDo(t, c,
 			"SCAN", "0", "COUNT", "3",
 			proto.Array(
-				proto.String("3"),
+				proto.String("0"),
 				proto.Array(
 					proto.String("key"),
 					proto.String("v1"),
 					proto.String("v2"),
+					proto.String("v3"),
+					proto.String("v4"),
+					proto.String("v5"),
+					proto.String("v6"),
+					proto.String("v7"),
+					proto.String("v8"),
+					proto.String("v9"),
 				),
 			),
 		)
@@ -773,12 +781,8 @@ func TestScan(t *testing.T) {
 		mustDo(t, c,
 			"SCAN", "3", "COUNT", "3",
 			proto.Array(
-				proto.String("6"),
-				proto.Array(
-					proto.String("v3"),
-					proto.String("v4"),
-					proto.String("v5"),
-				),
+				proto.String("0"),
+				proto.Array(),
 			),
 		)
 	})
@@ -987,6 +991,30 @@ func TestCopy(t *testing.T) {
 		)
 		mustDo(t, c, "COPY", "foo", "bar", "baz",
 			proto.Error(msgSyntaxError),
+		)
+	})
+}
+
+func TestWait(t *testing.T) {
+	_, c := runWithClient(t)
+
+	t.Run("success", func(t *testing.T) {
+		must0(t, c, "WAIT", "2", "100")
+		must0(t, c, "WAIT", "1", "0")
+	})
+
+	t.Run("errors", func(t *testing.T) {
+		mustDo(t, c, "WAIT",
+			proto.Error(errWrongNumber("wait")),
+		)
+		mustDo(t, c, "WAIT", "2",
+			proto.Error(errWrongNumber("wait")),
+		)
+		mustDo(t, c, "WAIT", "2", "bar",
+			proto.Error(msgInvalidInt),
+		)
+		mustDo(t, c, "WAIT", "foo", "100",
+			proto.Error(msgInvalidInt),
 		)
 	})
 }

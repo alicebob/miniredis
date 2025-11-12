@@ -56,6 +56,7 @@ func commandsGeneric(m *Miniredis) {
 	m.srv.Register("SCAN", m.cmdScan, server.ReadOnlyOption())
 	// SORT
 	m.srv.Register("UNLINK", m.cmdDel)
+	m.srv.Register("WAIT", m.cmdWait)
 }
 
 type expireOpts struct {
@@ -649,7 +650,8 @@ func (m *Miniredis) cmdScan(c *server.Peer, cmd string, args []string) {
 
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
-		// We return _all_ (matched) keys every time.
+		// We return _all_ (matched) keys every time, so that cursors work.
+		// We ignore "COUNT", which is allowed according to the Redis docs.
 		var keys []string
 
 		if opts.withType {
@@ -670,25 +672,14 @@ func (m *Miniredis) cmdScan(c *server.Peer, cmd string, args []string) {
 			keys, _ = matchKeys(keys, opts.match)
 		}
 
-		low := opts.cursor
-		high := low + opts.count
-		// validate high is correct
-		if high > len(keys) || high == 0 {
-			high = len(keys)
-		}
-		if opts.cursor > high {
-			// invalid cursor
+		// we only ever return all at once, so no non-zero cursor can every be valid
+		if opts.cursor != 0 {
 			c.WriteLen(2)
 			c.WriteBulk("0") // no next cursor
 			c.WriteLen(0)    // no elements
 			return
 		}
-		cursorValue := low + opts.count
-		if cursorValue >= len(keys) {
-			cursorValue = 0 // no next cursor
-		}
-		keys = keys[low:high]
-
+		cursorValue := 0 // we don't use cursors
 		c.WriteLen(2)
 		c.WriteBulk(fmt.Sprintf("%d", cursorValue))
 		c.WriteLen(len(keys))
@@ -772,4 +763,27 @@ func (m *Miniredis) cmdCopy(c *server.Peer, cmd string, args []string) {
 		m.copy(m.db(fromDB), opts.from, m.db(toDB), opts.to)
 		c.WriteInt(1)
 	})
+}
+
+// WAIT
+func (m *Miniredis) cmdWait(c *server.Peer, cmd string, args []string) {
+	if !m.isValidCMD(c, cmd, args, exactly(2)) {
+		return
+	}
+	nReplicas, err := strconv.Atoi(args[0])
+	if err != nil || nReplicas < 0 {
+		c.WriteError(msgInvalidInt)
+		return
+	}
+	timeout, err := strconv.Atoi(args[1])
+	if err != nil {
+		c.WriteError(msgInvalidInt)
+		return
+	}
+	if timeout < 0 {
+		c.WriteError(msgTimeoutNegative)
+		return
+	}
+	// WAIT always returns 0 when called on a standalone instance
+	c.WriteInt(0)
 }
