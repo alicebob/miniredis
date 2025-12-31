@@ -58,7 +58,7 @@ func newStreamKey() *streamKey {
 
 // generateID doesn't lock the mutex
 func (s *streamKey) generateID(now time.Time) string {
-	ts := uint64(now.UnixNano()) / 1_000_000
+	ts := uint64(now.UnixMilli())
 
 	next := fmt.Sprintf("%d-%d", ts, 0)
 	if s.lastAllocatedID != "" && streamCmp(s.lastAllocatedID, next) >= 0 {
@@ -244,7 +244,7 @@ func (s *streamKey) add(entryID string, values []string, now time.Time) (string,
 		parts := strings.Split(entryID, "-")
 		if len(parts) == 2 && parts[1] == "*" {
 			if ts, err := strconv.Atoi(parts[0]); err == nil {
-				entryID = s.generateID(time.Unix(int64(ts), 0))
+				entryID = s.generateID(time.UnixMilli(int64(ts)))
 			}
 		}
 	}
