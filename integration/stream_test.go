@@ -25,7 +25,7 @@ func TestStream(t *testing.T) {
 				"18446744073709551000-0",
 				"name", "Earth",
 			)
-			c.DoLoosely("XADD",
+			c.Do("XADD",
 				"planets",
 				"18446744073709551000-*",
 				"name", "Pluto",
