@@ -56,9 +56,13 @@ func TestStream(t *testing.T) {
 		ok(t, err)
 		equals(t, "978321845004-0", id)
 
+		id, err = s.XAdd("s1", "978321845004-*", []string{"name", "bazz"})
+		ok(t, err)
+		equals(t, "978321845004-1", id)
+
 		stream, err := s.Stream("s1")
 		ok(t, err)
-		equals(t, 2, len(stream))
+		equals(t, 3, len(stream))
 		equals(t, StreamEntry{
 			ID:     "12345-67",
 			Values: []string{"name", "bar"},
@@ -67,6 +71,10 @@ func TestStream(t *testing.T) {
 			ID:     "978321845004-0",
 			Values: []string{"name", "baz"},
 		}, stream[1])
+		equals(t, StreamEntry{
+			ID:     "978321845004-1",
+			Values: []string{"name", "bazz"},
+		}, stream[2])
 	})
 
 	useRESP3(t, c)
