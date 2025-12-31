@@ -230,14 +230,23 @@ func (s *streamKey) createGroup(group, id string) error {
 }
 
 // streamAdd adds an entry to a stream. Returns the new entry ID.
-// If id is empty or "*" the ID will be generated automatically.
+// If id is empty, "*", or "123-*", the ID will be generated automatically.
 // `values` should have an even length.
 func (s *streamKey) add(entryID string, values []string, now time.Time) (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if entryID == "" || entryID == "*" {
+	switch {
+	case entryID == "" || entryID == "*":
 		entryID = s.generateID(now)
+	default:
+		// "<timestamp>-*"
+		parts := strings.Split(entryID, "-")
+		if len(parts) == 2 && parts[1] == "*" {
+			if ts, err := strconv.Atoi(parts[0]); err == nil {
+				entryID = s.generateID(time.Unix(int64(ts), 0))
+			}
+		}
 	}
 
 	entryID, err := formatStreamID(entryID)

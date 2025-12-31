@@ -25,6 +25,11 @@ func TestStream(t *testing.T) {
 				"18446744073709551000-0",
 				"name", "Earth",
 			)
+			c.DoLoosely("XADD",
+				"planets",
+				"18446744073709551000-*",
+				"name", "Pluto",
+			)
 			c.Do("XADD",
 				"reallynosuchkey",
 				"NOMKSTREAM",
