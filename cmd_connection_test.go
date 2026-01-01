@@ -236,15 +236,21 @@ func TestSetError(t *testing.T) {
 func TestHello(t *testing.T) {
 	t.Run("default user", func(t *testing.T) {
 		s, c := runWithClient(t)
-
 		payl := proto.Map(
 			proto.String("server"), proto.String("miniredis"),
-			proto.String("version"), proto.String("6.0.5"),
+			proto.String("version"), proto.String("8.4.0"),
 			proto.String("proto"), proto.Int(3),
 			proto.String("id"), proto.Int(42),
 			proto.String("mode"), proto.String("standalone"),
 			proto.String("role"), proto.String("master"),
-			proto.String("modules"), proto.Array(),
+			proto.String("modules"), proto.Array(
+				proto.Map(
+					proto.String("name"), proto.String("vectorset"),
+					proto.String("ver"), proto.Int(1),
+					proto.String("path"), proto.String(""),
+					proto.String("args"), proto.Array(),
+				),
+			),
 		)
 
 		mustDo(t, c,
