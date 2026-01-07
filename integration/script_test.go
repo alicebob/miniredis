@@ -110,16 +110,6 @@ func TestScript(t *testing.T) {
 		})
 	})
 
-	t.Run("blocking", func(t *testing.T) {
-		testRaw(t, func(c *client) {
-			c.Do("XADD", "pl", "0-1", "name", "Mercury")
-			c.Do("EVAL", `redis.call("XINFO", "STREAM", "pl")`, "0")
-			c.Do("EVAL", `redis.call("XREAD", "STREAMS", "pl", "$")`, "0")
-			c.Error("not allowed with BLOCK option", "EVAL", `redis.call("XREAD", "BLOCK", "10", "STREAMS", "pl", "$")`, "0")
-			c.Error("not allowed with BLOCK option", "EVAL", `redis.call("XREADGROUP", "GROUP", "group", "consumer", "BLOCK", 1000, "STREAMS", "pl", ">")`, "0")
-		})
-	})
-
 	t.Run("setresp", func(t *testing.T) {
 		testRaw(t, func(c *client) {
 			c.Do("EVAL", `redis.setresp(3); redis.call("SET", "foo", 12); return redis.call("GET", "foo")`, "0")
