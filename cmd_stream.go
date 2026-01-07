@@ -753,12 +753,6 @@ parsing:
 		c,
 		opts.blockTimeout,
 		func(c *server.Peer, ctx *connCtx) bool {
-			if ctx.nested {
-				setDirty(c)
-				c.WriteError("ERR XREADGROUP command is not allowed with BLOCK option from scripts")
-				return false
-			}
-
 			db := m.db(ctx.selectedDB)
 			res, err := xreadgroup(
 				db,
@@ -969,12 +963,6 @@ parsing:
 		c,
 		opts.blockTimeout,
 		func(c *server.Peer, ctx *connCtx) bool {
-			if ctx.nested {
-				setDirty(c)
-				c.WriteError("ERR XREAD command is not allowed with BLOCK option from scripts")
-				return false
-			}
-
 			db := m.db(ctx.selectedDB)
 			res := xread(db, opts.streams, opts.ids, opts.count)
 			if len(res) == 0 {
