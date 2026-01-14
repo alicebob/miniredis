@@ -193,8 +193,9 @@ func TestLua(t *testing.T) {
 	testRaw(t, func(c *client) {
 		// c.Do("EVAL", "print(1)", "0")
 		c.Do("EVAL", `return string.format('%q', "pretty string")`, "0")
-		c.Error("Script attempted to access nonexistent global variable", "EVAL", "os.clock()", "0")
-		c.Error("Script attempted to access nonexistent global variable", "EVAL", "os.exit(42)", "0")
+		c.Error("Script attempted to access nonexistent global variable", "EVAL", "foob.clock()", "0")
+		c.DoLoosely("EVAL", "os.clock()", "0")
+		c.Error("attempt to call", "EVAL", "os.exit(42)", "0")
 		c.Do("EVAL", "return table.concat({1,2,3})", "0")
 		c.Do("EVAL", "return math.abs(-42)", "0")
 		c.Error("Script attempted to access nonexistent global variable", "EVAL", `return utf8.len("hello world")`, "0")
