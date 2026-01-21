@@ -31,6 +31,8 @@ func (m *Miniredis) cmdCluster(c *server.Peer, cmd string, args []string) {
 		m.cmdClusterKeySlot(c, cmd, args)
 	case "NODES":
 		m.cmdClusterNodes(c, cmd, args)
+	case "SHARDS":
+		m.cmdClusterShards(c, cmd, args)
 	default:
 		setDirty(c)
 		c.WriteError(fmt.Sprintf("ERR 'CLUSTER %s' not supported", strings.Join(args, " ")))
@@ -66,5 +68,34 @@ func (m *Miniredis) cmdClusterNodes(c *server.Peer, cmd string, args []string) {
 		addr := m.srv.Addr()
 		port := m.srv.Addr().Port
 		c.WriteBulk(fmt.Sprintf("e7d1eecce10fd6bb5eb35b9f99a514335d9ba9ca %s@%d myself,master - 0 0 1 connected 0-16383", addr, port))
+	})
+}
+
+// CLUSTER SHARDS
+func (m *Miniredis) cmdClusterShards(c *server.Peer, cmd string, args []string) {
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
+		// addr := m.srv.Addr()
+		port := m.srv.Addr().Port
+		c.WriteLen(1)
+		c.WriteMapLen(2)
+		c.WriteBulk("slots")
+		c.WriteLen(0)
+		c.WriteBulk("nodes")
+		c.WriteLen(1)
+		c.WriteMapLen(7)
+		c.WriteBulk("id")
+		c.WriteBulk("13f84e686106847b76671957dd348fde540a77bb")
+		c.WriteBulk("port")
+		c.WriteInt(port)
+		c.WriteBulk("ip")
+		c.WriteBulk("")
+		c.WriteBulk("endpoint")
+		c.WriteBulk("")
+		c.WriteBulk("role")
+		c.WriteBulk("master")
+		c.WriteBulk("replication-offset")
+		c.WriteInt(0)
+		c.WriteBulk("health")
+		c.WriteBulk("online")
 	})
 }

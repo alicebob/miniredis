@@ -10,6 +10,7 @@ func TestCluster(t *testing.T) {
 			c.DoLoosely("CLUSTER", "KEYSLOT", "{test}")
 			c.DoLoosely("CLUSTER", "NODES")
 			c.Error("wrong number", "CLUSTER")
+			c.DoLoosely("CLUSTER", "SHARDS")
 		},
 	)
 }

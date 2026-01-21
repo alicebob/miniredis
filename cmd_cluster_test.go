@@ -38,6 +38,35 @@ func TestCluster(t *testing.T) {
 		)
 	})
 
+	t.Run("shards", func(t *testing.T) {
+		mustDo(t, c,
+			"CLUSTER", "SHARDS",
+			proto.Array(
+				proto.Array(
+					proto.String("slots"), proto.Array(),
+					proto.String("nodes"), proto.Array(
+						proto.Array(
+							proto.String("id"),
+							proto.String("13f84e686106847b76671957dd348fde540a77bb"),
+							proto.String("port"),
+							proto.Int(s.srv.Addr().Port),
+							proto.String("ip"),
+							proto.String(""),
+							proto.String("endpoint"),
+							proto.String(""),
+							proto.String("role"),
+							proto.String("master"),
+							proto.String("replication-offset"),
+							proto.Int(0),
+							proto.String("health"),
+							proto.String("online"),
+						),
+					),
+				),
+			),
+		)
+	})
+
 	t.Run("keyslot", func(t *testing.T) {
 		mustDo(t, c,
 			"CLUSTER", "keyslot", "{test_key}",
