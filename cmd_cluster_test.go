@@ -43,21 +43,27 @@ func TestCluster(t *testing.T) {
 			"CLUSTER", "SHARDS",
 			proto.Array(
 				proto.Array(
-					proto.String("slots"), proto.Array(),
+					proto.String("slots"), proto.Array(
+						proto.Int(0),
+						proto.Int(16383),
+					),
 					proto.String("nodes"), proto.Array(
 						proto.Array(
 							proto.String("id"),
 							proto.String("13f84e686106847b76671957dd348fde540a77bb"),
+
+							proto.String("ip"),
+							proto.String(s.srv.Addr().IP.String()),
+
 							proto.String("port"),
 							proto.Int(s.srv.Addr().Port),
-							proto.String("ip"),
-							proto.String(""),
-							proto.String("endpoint"),
-							proto.String(""),
+
 							proto.String("role"),
 							proto.String("master"),
+
 							proto.String("replication-offset"),
 							proto.Int(0),
+
 							proto.String("health"),
 							proto.String("online"),
 						),
