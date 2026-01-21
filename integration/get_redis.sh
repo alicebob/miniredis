@@ -2,7 +2,7 @@
 
 set -eu
 
-VERSION=7.2.4
+VERSION=8.4.0
 
 cd "$(dirname "$0")"
 rm -rf ./redis_src/

@@ -805,6 +805,10 @@ func (m *Miniredis) cmdBitcount(c *server.Peer, cmd string, args []string) {
 		}
 		args = args[2:]
 	}
+	if len(args) != 0 {
+		c.WriteError(msgSyntaxError)
+		return
+	}
 
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)

@@ -169,40 +169,45 @@ func TestScript(t *testing.T) {
 		"SCRIPT", "FOO",
 		proto.Error("ERR unknown subcommand 'FOO'. Try SCRIPT HELP."),
 	)
-}
 
-func TestCJSON(t *testing.T) {
-	_, c := runWithClient(t)
+	t.Run("CJSON", func(t *testing.T) {
+		mustDo(t, c,
+			"EVAL", `return cjson.decode('{"id":"foo"}')['id']`, "0",
+			proto.String("foo"),
+		)
+		mustDo(t, c,
+			"EVAL", `return cjson.encode({foo=42})`, "0",
+			proto.String(`{"foo":42}`),
+		)
 
-	mustDo(t, c,
-		"EVAL", `return cjson.decode('{"id":"foo"}')['id']`, "0",
-		proto.String("foo"),
-	)
-	mustDo(t, c,
-		"EVAL", `return cjson.encode({foo=42})`, "0",
-		proto.String(`{"foo":42}`),
-	)
+		mustContain(t, c,
+			"EVAL", `redis.encode()`, "0",
+			"Error compiling script",
+		)
+		mustContain(t, c,
+			"EVAL", `redis.encode("1", "2")`, "0",
+			"Error compiling script",
+		)
+		mustContain(t, c,
+			"EVAL", `redis.decode()`, "0",
+			"Error compiling script",
+		)
+		mustContain(t, c,
+			"EVAL", `redis.decode("{")`, "0",
+			"Error compiling script",
+		)
+		mustContain(t, c,
+			"EVAL", `redis.decode("1", "2")`, "0",
+			"Error compiling script",
+		)
+	})
 
-	mustContain(t, c,
-		"EVAL", `redis.encode()`, "0",
-		"Error compiling script",
-	)
-	mustContain(t, c,
-		"EVAL", `redis.encode("1", "2")`, "0",
-		"Error compiling script",
-	)
-	mustContain(t, c,
-		"EVAL", `redis.decode()`, "0",
-		"Error compiling script",
-	)
-	mustContain(t, c,
-		"EVAL", `redis.decode("{")`, "0",
-		"Error compiling script",
-	)
-	mustContain(t, c,
-		"EVAL", `redis.decode("1", "2")`, "0",
-		"Error compiling script",
-	)
+	t.Run("os.", func(t *testing.T) {
+		mustDo(t, c,
+			"EVAL", `return os.clock()`, "0",
+			proto.Int(42),
+		)
+	})
 }
 
 func TestLog(t *testing.T) {

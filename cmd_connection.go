@@ -177,7 +177,7 @@ func (m *Miniredis) cmdHello(c *server.Peer, cmd string, args []string) {
 	c.WriteBulk("server")
 	c.WriteBulk("miniredis")
 	c.WriteBulk("version")
-	c.WriteBulk("6.0.5")
+	c.WriteBulk("8.4.0")
 	c.WriteBulk("proto")
 	c.WriteInt(opts.version)
 	c.WriteBulk("id")
@@ -186,8 +186,17 @@ func (m *Miniredis) cmdHello(c *server.Peer, cmd string, args []string) {
 	c.WriteBulk("standalone")
 	c.WriteBulk("role")
 	c.WriteBulk("master")
-	c.WriteBulk("modules")
-	c.WriteLen(0)
+	c.WriteBulk("modules")   // "modules": [
+	c.WriteLen(1)            //   we have 1: "vectorset"
+	c.WriteMapLen(4)         //   {
+	c.WriteBulk("name")      //
+	c.WriteBulk("vectorset") //
+	c.WriteBulk("ver")       //
+	c.WriteInt(1)            //
+	c.WriteBulk("path")      //
+	c.WriteBulk("")          //
+	c.WriteBulk("args")      //
+	c.WriteLen(0)            // ]} end modules
 }
 
 // ECHO

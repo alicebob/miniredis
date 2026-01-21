@@ -299,3 +299,14 @@ func luaStatusReply(msg string) *lua.LTable {
 	tab.RawSetString("ok", lua.LString(msg))
 	return tab
 }
+
+// Our very minimal "os." lua lib.
+func mkLuaOS() map[string]lua.LGFunction {
+	return map[string]lua.LGFunction{
+		// > Returns an approximation of the amount in seconds of CPU time used by the program
+		"clock": func(l *lua.LState) int {
+			l.Push(lua.LNumber(42))
+			return 1
+		},
+	}
+}
