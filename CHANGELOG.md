@@ -1,6 +1,10 @@
 ## Changelog
 
 
+## v2.36.1
+- support CLUSTER SHARDS (thanks @dadrus)
+
+
 ## v2.36.0
 
 - return actual server address by CLUSTER NODES (thanks @nastik-kum)
