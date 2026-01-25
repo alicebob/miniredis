@@ -1,5 +1,7 @@
 ## Changelog
 
+## v2.36.0
+- feat: add suport for HEXPIRE command
 
 ## v2.36.1
 - support CLUSTER SHARDS (thanks @dadrus)
