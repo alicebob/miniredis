@@ -18,6 +18,7 @@ type streamKey struct {
 	entries         []StreamEntry
 	groups          map[string]*streamGroup
 	lastAllocatedID string
+	entriesAdded    int
 	mu              sync.Mutex
 }
 
@@ -30,10 +31,12 @@ type StreamEntry struct {
 }
 
 type streamGroup struct {
-	stream    *streamKey
-	lastID    string
-	pending   []pendingEntry
-	consumers map[string]*consumer
+	stream           *streamKey
+	lastID           string
+	pending          []pendingEntry
+	consumers        map[string]*consumer
+	entriesRead      int
+	entriesReadValid bool
 }
 
 type consumer struct {
@@ -89,6 +92,14 @@ func (s *streamKey) lastIDUnlocked() string {
 	}
 
 	return s.entries[len(s.entries)-1].ID
+}
+
+func (s *streamKey) firstIDUnlocked() string {
+	if len(s.entries) == 0 {
+		return "0-0"
+	}
+
+	return s.entries[0].ID
 }
 
 func (s *streamKey) copy() *streamKey {
@@ -216,13 +227,22 @@ func (s *streamKey) createGroup(group, id string) error {
 		return errors.New("BUSYGROUP Consumer Group name already exists")
 	}
 
+	var entriesRead = 0
+	var entriesReadValid = true
 	if id == "$" {
 		id = s.lastIDUnlocked()
+		entriesRead = s.entriesAdded
+	} else if id == "0" || id == "0-0" || id == s.firstIDUnlocked() {
+		entriesRead = 0
+	} else {
+		entriesReadValid = false
 	}
 	s.groups[group] = &streamGroup{
-		stream:    s,
-		lastID:    id,
-		consumers: map[string]*consumer{},
+		stream:           s,
+		lastID:           id,
+		consumers:        map[string]*consumer{},
+		entriesRead:      entriesRead,
+		entriesReadValid: entriesReadValid,
 	}
 	return nil
 }
@@ -262,6 +282,7 @@ func (s *streamKey) add(entryID string, values []string, now time.Time) (string,
 		ID:     entryID,
 		Values: values,
 	})
+	s.entriesAdded++
 	return entryID, nil
 }
 
@@ -270,7 +291,23 @@ func (s *streamKey) trim(n int) {
 	defer s.mu.Unlock()
 
 	if len(s.entries) > n {
+		for _, group := range s.groups {
+			for _, entry := range s.entries[:n] {
+				group.onDelete(entry.ID)
+			}
+		}
 		s.entries = s.entries[len(s.entries)-n:]
+	}
+}
+
+func (g *streamGroup) onDelete(id string) {
+	if !g.entriesReadValid {
+		return
+	}
+	compare := streamCmp(g.lastID, id)
+	if compare < 0 {
+		// an item between last-delivered-id and last-written-id is deleted. Entries read is not valid anymore
+		g.entriesReadValid = false
 	}
 }
 
@@ -300,6 +337,12 @@ func (s *streamKey) after(id string) []StreamEntry {
 		return streamCmp(id, s.entries[i].ID) < 0
 	})
 	return s.entries[pos:]
+}
+
+func (s *streamKey) len() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return len(s.entries)
 }
 
 // get a stream entry by ID
@@ -370,6 +413,8 @@ func (g *streamGroup) readGroup(
 		}
 		g.consumers[consumerID].numPendingEntries += len(msgs)
 		g.lastID = msgs[len(msgs)-1].ID
+
+		g.updateEntriesRead(msgs)
 		return msgs
 	}
 
@@ -441,6 +486,9 @@ func (s *streamKey) delete(ids []string) (int, error) {
 			continue
 		}
 
+		for _, group := range s.groups {
+			group.onDelete(entry.ID)
+		}
 		s.entries = append(s.entries[:i], s.entries[i+1:]...)
 		count++
 	}
@@ -511,4 +559,27 @@ func (g *streamGroup) setLastSeen(c string, t time.Time) {
 func (g *streamGroup) setLastSuccess(c string, t time.Time) {
 	g.setLastSeen(c, t)
 	g.consumers[c].lastSuccess = t
+}
+
+func (g *streamGroup) lag() int {
+	if !g.entriesReadValid {
+		return -1
+	}
+	g.stream.mu.Lock()
+	defer g.stream.mu.Unlock()
+	return g.stream.entriesAdded - g.entriesRead
+}
+
+func (g *streamGroup) updateEntriesRead(msgs []StreamEntry) {
+	// mutex protects lastId and len(g.stream.entries) together.
+	// We should not lock the mutex  twice for each
+	g.stream.mu.Lock()
+	defer g.stream.mu.Unlock()
+	if g.entriesReadValid {
+		g.entriesRead += len(msgs)
+	} else if g.lastID == g.stream.lastIDUnlocked() {
+		// reset entries read as we catch up to the last ID
+		g.entriesRead = g.stream.entriesAdded
+		g.entriesReadValid = true
+	}
 }
