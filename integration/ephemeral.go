@@ -89,12 +89,13 @@ func runRedis(extraConfig string) (*ephemeral, string) {
 	timeout := time.Now().Add(1 * time.Second)
 	for time.Now().Before(timeout) {
 		conn, err := net.Dial("tcp", addr)
-		if err == nil {
-			conn.Close()
-			e := ephemeral(*c)
-			return &e, addr
+		if err != nil {
+			time.Sleep(1 * time.Millisecond)
+			continue
 		}
-		time.Sleep(3 * time.Millisecond)
+		conn.Close()
+		e := ephemeral(*c)
+		return &e, addr
 	}
 	panic(fmt.Sprintf("No connection on port %d", port))
 }

@@ -453,7 +453,7 @@ func TestBitcount(t *testing.T) {
 		c.Error("out of range", "BITCOUNT", "A", "0", "9223372036854775808")
 
 		c.Error("wrong number", "BITCOUNT")
-		c.Do("BITCOUNT", "wrong", "arguments")
+		c.Error("syntax error", "BITCOUNT", "wrong", "arguments")
 		c.Error("syntax error", "BITCOUNT", "str", "4", "2", "2", "2", "2")
 		c.Error("not an integer", "BITCOUNT", "str", "foo", "2")
 		c.Do("HSET", "aap", "noot", "mies")

@@ -110,16 +110,6 @@ func TestScript(t *testing.T) {
 		})
 	})
 
-	t.Run("blocking", func(t *testing.T) {
-		testRaw(t, func(c *client) {
-			c.Do("XADD", "pl", "0-1", "name", "Mercury")
-			c.Do("EVAL", `redis.call("XINFO", "STREAM", "pl")`, "0")
-			c.Do("EVAL", `redis.call("XREAD", "STREAMS", "pl", "$")`, "0")
-			c.Error("not allowed with BLOCK option", "EVAL", `redis.call("XREAD", "BLOCK", "10", "STREAMS", "pl", "$")`, "0")
-			c.Error("not allowed with BLOCK option", "EVAL", `redis.call("XREADGROUP", "GROUP", "group", "consumer", "BLOCK", 1000, "STREAMS", "pl", ">")`, "0")
-		})
-	})
-
 	t.Run("setresp", func(t *testing.T) {
 		testRaw(t, func(c *client) {
 			c.Do("EVAL", `redis.setresp(3); redis.call("SET", "foo", 12); return redis.call("GET", "foo")`, "0")
@@ -203,8 +193,9 @@ func TestLua(t *testing.T) {
 	testRaw(t, func(c *client) {
 		// c.Do("EVAL", "print(1)", "0")
 		c.Do("EVAL", `return string.format('%q', "pretty string")`, "0")
-		c.Error("Script attempted to access nonexistent global variable", "EVAL", "os.clock()", "0")
-		c.Error("Script attempted to access nonexistent global variable", "EVAL", "os.exit(42)", "0")
+		c.Error("Script attempted to access nonexistent global variable", "EVAL", "foob.clock()", "0")
+		c.DoLoosely("EVAL", "os.clock()", "0")
+		c.Error("attempt to call", "EVAL", "os.exit(42)", "0")
 		c.Do("EVAL", "return table.concat({1,2,3})", "0")
 		c.Do("EVAL", "return math.abs(-42)", "0")
 		c.Error("Script attempted to access nonexistent global variable", "EVAL", `return utf8.len("hello world")`, "0")

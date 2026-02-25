@@ -97,6 +97,7 @@ func (m *Miniredis) runLuaScript(c *server.Peer, sha, script string, readOnly bo
 		l.Push(mod)
 		return 1
 	}))
+	l.RegisterModule("os", mkLuaOS())
 
 	_ = doScript(l, protectGlobals)
 

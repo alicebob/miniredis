@@ -4,6 +4,7 @@ package miniredis
 
 import (
 	"math/big"
+	"math/bits"
 	"strconv"
 	"strings"
 	"time"
@@ -804,6 +805,10 @@ func (m *Miniredis) cmdBitcount(c *server.Peer, cmd string, args []string) {
 		}
 		args = args[2:]
 	}
+	if len(args) != 0 {
+		c.WriteError(msgSyntaxError)
+		return
+	}
 
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
@@ -1114,10 +1119,7 @@ func withRange(v string, start, end int) string {
 func countBits(v []byte) int {
 	count := 0
 	for _, b := range []byte(v) {
-		for b > 0 {
-			count += int((b % uint8(2)))
-			b = b >> 1
-		}
+		count += bits.OnesCount8(uint8(b))
 	}
 	return count
 }
