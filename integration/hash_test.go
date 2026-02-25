@@ -54,6 +54,21 @@ func TestHash(t *testing.T) {
 			c.Do("EXEC")
 		})
 	})
+
+	t.Run("expire", func(t *testing.T) {
+		testRaw(t, func(c *client) {
+			c.Do("HSET", "aap", "noot", "mies")
+			c.Do("HEXPIRE", "aap", "3", "FIELDS", "2", "noot", "vuur")
+
+			c.Error("wrong number", "HEXPIRE", "aap", "3", "FIELDS", "0")
+			c.Error("wrong number", "HEXPIRE", "aap", "3")
+			c.Error("wrong number", "HEXPIRE", "aap", "3", "FIELDS")
+			c.Error("wrong number", "HEXPIRE", "aap", "-3", "FIELDS", "0")
+			c.Error("wrong number", "HEXPIRE", "aap", "noot", "3")
+			c.Error("not an int", "HEXPIRE", "aap", "3.14", "FIELDS", "noot", "3.14")
+			c.Error("numfields", "HEXPIRE", "aap", "3", "FIELDS", "3", "noot", "vuur")
+		})
+	})
 }
 
 func TestHashSetnx(t *testing.T) {
