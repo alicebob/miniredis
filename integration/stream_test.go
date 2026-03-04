@@ -536,6 +536,30 @@ func TestStreamGroup(t *testing.T) {
 		})
 	})
 
+	t.Run("XREADGROUP XDEL XINFO lag", func(t *testing.T) {
+		testRaw(t, func(c *client) {
+			// TODO ALL INFO needs to be uncommented, even DoLoosely is not enough
+			//  for some of them becase Nil is returned instead of Int
+			c.Do("XGROUP", "CREATE", "planets", "processing", "$", "MKSTREAM")
+			c.Do("XADD", "planets", "0-1", "name", "Mercury")
+			c.Do("XADD", "planets", "0-2", "name", "Venus")
+			c.Do("XREADGROUP", "GROUP", "processing", "alice", "STREAMS", "planets", ">")
+			//c.Do("XINFO", "GROUPS", "planets") //SPEC entries-added 2,  entries-read = 2, lag = 0
+			c.Do("XADD", "planets", "0-3", "name", "Earth")
+			c.Do("XADD", "planets", "0-4", "name", "Jupiter")
+			//c.Do("XINFO", "GROUPS", "planets") //SPEC entries-added 4,  entries-read = 2, lag = 2
+
+			c.Do("XDEL", "planets", "0-1")
+			//c.Do("XINFO", "GROUPS", "planets") // SPEC entries-added 4, entries-read = 2, lag = 2
+			c.Do("XDEL", "planets", "0-2")
+			//c.Do("XINFO", "GROUPS", "planets") // SPEC entries-added 4,  entries-read = 2, lag = 2
+			c.Do("XDEL", "planets", "0-3")
+			//c.Do("XINFO", "GROUPS", "planets") // SPEC entries-added 4,  entries-read = 2, lag = nil
+			c.Do("XREADGROUP", "GROUP", "processing", "alice", "STREAMS", "planets", ">")
+			//c.Do("XINFO", "GROUPS", "planets") // SPEC entries-added 4,  entries-read = 4,  lag = 0
+		})
+	})
+
 	t.Run("XACK", func(t *testing.T) {
 		testRaw(t, func(c *client) {
 			c.Do("XGROUP", "CREATE", "planets", "processing", "$", "MKSTREAM")
