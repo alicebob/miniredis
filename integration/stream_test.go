@@ -79,6 +79,8 @@ func TestStream(t *testing.T) {
 			c.Do("XADD", "planets", "MAXLEN", "4", "456-6", "name", "Mercury")
 			c.Do("XLEN", "planets")
 			c.Do("XADD", "planets", "MAXLEN", "~", "4", "456-7", "name", "Mercury")
+			c.Do("XADD", "planets", "MAXLEN", "=", "4", "456-8", "name", "Mercury")
+			c.Do("XRANGE", "planets", "-", "+")
 
 			c.Error("not an integer", "XADD", "planets", "MAXLEN", "!", "4", "*", "name", "Mercury")
 			c.Error("not an integer", "XADD", "planets", "MAXLEN", " ~", "4", "*", "name", "Mercury")
@@ -89,7 +91,7 @@ func TestStream(t *testing.T) {
 			c.Error("wrong number", "XADD", "planets", "MAXLEN", "~")
 			c.Error("wrong number", "XADD", "planets", "MAXLEN")
 
-			c.Do("XADD", "planets", "MAXLEN", "0", "456-8", "name", "Mercury")
+			c.Do("XADD", "planets", "MAXLEN", "0", "456-9", "name", "Mercury")
 			c.Do("XLEN", "planets")
 
 			c.Do("SET", "str", "I am a string")
@@ -107,6 +109,8 @@ func TestStream(t *testing.T) {
 			c.Do("XADD", "planets", "MINID", "450", "456-6", "name", "Mercury")
 			c.Do("XADD", "planets", "MINID", "~", "450", "456-7", "name", "Mercury")
 			c.Do("XLEN", "planets")
+			c.Do("XADD", "planets", "MINID", "=", "456-8", "456-8", "name", "Mercury")
+			c.Do("XRANGE", "planets", "-", "+")
 
 			c.Error("equal or smaller than the target", "XADD", "planets", "MINID", "450", "449-0", "name", "Earth")
 			c.Error("equal or smaller than the target", "XADD", "planets", "MINID", "450", "450", "name", "Earth")
