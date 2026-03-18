@@ -789,6 +789,37 @@ func parseHExpireArgs(args []string) (hexpireOpts, string) {
 	return opts, ""
 }
 
+// parseFieldsArgs parses "FIELDS numfields field [field ...]" from args.
+// Returns the parsed field names, or an error string.
+func parseFieldsArgs(args []string) ([]string, string) {
+	if len(args) < 2 {
+		return nil, fmt.Sprintf(msgMandatoryArgument, "FIELDS")
+	}
+
+	if strings.ToLower(args[0]) != "fields" {
+		return nil, fmt.Sprintf(msgMandatoryArgument, "FIELDS")
+	}
+
+	var numFields int
+	if err := optIntSimple(args[1], &numFields); err != nil {
+		return nil, msgNumFieldsInvalid
+	}
+	if numFields <= 0 {
+		return nil, msgNumFieldsInvalid
+	}
+
+	if len(args) < 2+numFields {
+		return nil, msgNumFieldsParameter
+	}
+
+	// Reject trailing args after the declared fields
+	if len(args) > 2+numFields {
+		return nil, msgNumFieldsParameter
+	}
+
+	return append([]string{}, args[2:2+numFields]...), ""
+}
+
 func abs(n int) int {
 	if n < 0 {
 		return -n
