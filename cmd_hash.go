@@ -31,6 +31,7 @@ func commandsHash(m *Miniredis) {
 	m.srv.Register("HSCAN", m.cmdHscan, server.ReadOnlyOption())
 	m.srv.Register("HRANDFIELD", m.cmdHrandfield, server.ReadOnlyOption())
 	m.srv.Register("HEXPIRE", m.cmdHexpire)
+	m.srv.Register("HPERSIST", m.cmdHpersist)
 }
 
 // HSET
@@ -787,6 +788,59 @@ func parseHExpireArgs(args []string) (hexpireOpts, string) {
 	}
 
 	return opts, ""
+}
+
+// HPERSIST
+func (m *Miniredis) cmdHpersist(c *server.Peer, cmd string, args []string) {
+	if !m.isValidCMD(c, cmd, args, atLeast(3)) {
+		return
+	}
+
+	key := args[0]
+	fields, errMsg := parseFieldsArgs(args[1:])
+	if errMsg != "" {
+		setDirty(c)
+		c.WriteError(errMsg)
+		return
+	}
+
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
+		db := m.db(ctx.selectedDB)
+
+		if _, ok := db.keys[key]; !ok {
+			c.WriteLen(len(fields))
+			for range fields {
+				c.WriteInt(-2)
+			}
+			return
+		}
+
+		if db.t(key) != keyTypeHash {
+			c.WriteError(msgWrongType)
+			return
+		}
+
+		c.WriteLen(len(fields))
+		for _, field := range fields {
+			if _, ok := db.hashKeys[key][field]; !ok {
+				c.WriteInt(-2)
+				continue
+			}
+
+			fieldTTLs := db.hashTTLs[key]
+			if fieldTTLs == nil {
+				c.WriteInt(-1)
+				continue
+			}
+			if _, ok := fieldTTLs[field]; !ok {
+				c.WriteInt(-1)
+				continue
+			}
+
+			delete(fieldTTLs, field)
+			c.WriteInt(1)
+		}
+	})
 }
 
 // parseFieldsArgs parses "FIELDS numfields field [field ...]" from args.

@@ -1388,3 +1388,88 @@ func TestCheckHashFieldTTL(t *testing.T) {
 		assert(t, !s.Exists("hash8"), "hash8 should be deleted")
 	})
 }
+
+func TestHpersist(t *testing.T) {
+	s, c := runWithClient(t)
+
+	t.Run("remove expiration from field", func(t *testing.T) {
+		must1(t, c, "HSET", "h1", "f1", "v1")
+		mustDo(t, c,
+			"HEXPIRE", "h1", "10", "FIELDS", "1", "f1",
+			proto.Ints(1),
+		)
+		mustDo(t, c,
+			"HPERSIST", "h1", "FIELDS", "1", "f1",
+			proto.Ints(1),
+		)
+		// Field should survive past original TTL
+		s.FastForward(20 * time.Second)
+		mustDo(t, c,
+			"HGET", "h1", "f1",
+			proto.String("v1"),
+		)
+	})
+
+	t.Run("field without TTL", func(t *testing.T) {
+		must1(t, c, "HSET", "h2", "f1", "v1")
+		mustDo(t, c,
+			"HPERSIST", "h2", "FIELDS", "1", "f1",
+			proto.Ints(-1),
+		)
+	})
+
+	t.Run("non-existent field", func(t *testing.T) {
+		must1(t, c, "HSET", "h3", "f1", "v1")
+		mustDo(t, c,
+			"HPERSIST", "h3", "FIELDS", "1", "nosuch",
+			proto.Ints(-2),
+		)
+	})
+
+	t.Run("non-existent key", func(t *testing.T) {
+		mustDo(t, c,
+			"HPERSIST", "nokey", "FIELDS", "1", "f1",
+			proto.Ints(-2),
+		)
+	})
+
+	t.Run("multiple fields mixed", func(t *testing.T) {
+		mustDo(t, c, "HSET", "h4", "f1", "v1", "f2", "v2", proto.Int(2))
+		// Only f1 gets a TTL
+		mustDo(t, c,
+			"HEXPIRE", "h4", "10", "FIELDS", "1", "f1",
+			proto.Ints(1),
+		)
+		mustDo(t, c,
+			"HPERSIST", "h4", "FIELDS", "3", "f1", "f2", "nosuch",
+			proto.Ints(1, -1, -2),
+		)
+	})
+
+	t.Run("wrong type", func(t *testing.T) {
+		mustOK(t, c, "SET", "str", "value")
+		mustDo(t, c,
+			"HPERSIST", "str", "FIELDS", "1", "f1",
+			proto.Error(msgWrongType),
+		)
+	})
+
+	t.Run("error cases", func(t *testing.T) {
+		mustDo(t, c,
+			"HPERSIST",
+			proto.Error(errWrongNumber("hpersist")),
+		)
+		mustDo(t, c,
+			"HPERSIST", "h1",
+			proto.Error(errWrongNumber("hpersist")),
+		)
+		mustDo(t, c,
+			"HPERSIST", "h1", "FIELDS", "0", "dummy",
+			proto.Error(msgNumFieldsInvalid),
+		)
+		mustDo(t, c,
+			"HPERSIST", "h1", "FIELDS", "2", "f1",
+			proto.Error(msgNumFieldsParameter),
+		)
+	})
+}
