@@ -1473,3 +1473,140 @@ func TestHpersist(t *testing.T) {
 		)
 	})
 }
+
+func TestHttl(t *testing.T) {
+	s, c := runWithClient(t)
+
+	t.Run("field with TTL", func(t *testing.T) {
+		must1(t, c, "HSET", "h1", "f1", "v1")
+		mustDo(t, c,
+			"HEXPIRE", "h1", "300", "FIELDS", "1", "f1",
+			proto.Ints(1),
+		)
+		mustDo(t, c,
+			"HTTL", "h1", "FIELDS", "1", "f1",
+			proto.Ints(300),
+		)
+	})
+
+	t.Run("field without TTL", func(t *testing.T) {
+		must1(t, c, "HSET", "h2", "f1", "v1")
+		mustDo(t, c,
+			"HTTL", "h2", "FIELDS", "1", "f1",
+			proto.Ints(-1),
+		)
+	})
+
+	t.Run("non-existent field", func(t *testing.T) {
+		must1(t, c, "HSET", "h3", "f1", "v1")
+		mustDo(t, c,
+			"HTTL", "h3", "FIELDS", "1", "nosuch",
+			proto.Ints(-2),
+		)
+	})
+
+	t.Run("non-existent key", func(t *testing.T) {
+		mustDo(t, c,
+			"HTTL", "nokey", "FIELDS", "1", "f1",
+			proto.Ints(-2),
+		)
+	})
+
+	t.Run("TTL decreases after FastForward", func(t *testing.T) {
+		must1(t, c, "HSET", "h5", "f1", "v1")
+		mustDo(t, c,
+			"HEXPIRE", "h5", "100", "FIELDS", "1", "f1",
+			proto.Ints(1),
+		)
+		s.FastForward(30 * time.Second)
+		mustDo(t, c,
+			"HTTL", "h5", "FIELDS", "1", "f1",
+			proto.Ints(70),
+		)
+	})
+
+	t.Run("multiple fields mixed", func(t *testing.T) {
+		mustDo(t, c, "HSET", "h6", "f1", "v1", "f2", "v2", proto.Int(2))
+		mustDo(t, c,
+			"HEXPIRE", "h6", "60", "FIELDS", "1", "f1",
+			proto.Ints(1),
+		)
+		mustDo(t, c,
+			"HTTL", "h6", "FIELDS", "3", "f1", "f2", "nosuch",
+			proto.Ints(60, -1, -2),
+		)
+	})
+
+	t.Run("wrong type", func(t *testing.T) {
+		mustOK(t, c, "SET", "str", "value")
+		mustDo(t, c,
+			"HTTL", "str", "FIELDS", "1", "f1",
+			proto.Error(msgWrongType),
+		)
+	})
+
+	t.Run("error cases", func(t *testing.T) {
+		mustDo(t, c,
+			"HTTL",
+			proto.Error(errWrongNumber("httl")),
+		)
+		mustDo(t, c,
+			"HTTL", "h1",
+			proto.Error(errWrongNumber("httl")),
+		)
+		mustDo(t, c,
+			"HTTL", "h1", "FIELDS", "0", "dummy",
+			proto.Error(msgNumFieldsInvalid),
+		)
+	})
+}
+
+func TestHpttl(t *testing.T) {
+	_, c := runWithClient(t)
+
+	t.Run("field with TTL in milliseconds", func(t *testing.T) {
+		must1(t, c, "HSET", "h1", "f1", "v1")
+		mustDo(t, c,
+			"HEXPIRE", "h1", "10", "FIELDS", "1", "f1",
+			proto.Ints(1),
+		)
+		mustDo(t, c,
+			"HPTTL", "h1", "FIELDS", "1", "f1",
+			proto.Ints(10000),
+		)
+	})
+
+	t.Run("field without TTL", func(t *testing.T) {
+		must1(t, c, "HSET", "h2", "f1", "v1")
+		mustDo(t, c,
+			"HPTTL", "h2", "FIELDS", "1", "f1",
+			proto.Ints(-1),
+		)
+	})
+
+	t.Run("non-existent key", func(t *testing.T) {
+		mustDo(t, c,
+			"HPTTL", "nokey", "FIELDS", "1", "f1",
+			proto.Ints(-2),
+		)
+	})
+
+	t.Run("wrong type", func(t *testing.T) {
+		mustOK(t, c, "SET", "str", "value")
+		mustDo(t, c,
+			"HPTTL", "str", "FIELDS", "1", "f1",
+			proto.Error(msgWrongType),
+		)
+	})
+
+	t.Run("error cases", func(t *testing.T) {
+		mustDo(t, c,
+			"HPTTL",
+			proto.Error(errWrongNumber("hpttl")),
+		)
+		mustDo(t, c,
+			"HPTTL", "h1",
+			proto.Error(errWrongNumber("hpttl")),
+		)
+	})
+}
