@@ -34,6 +34,7 @@ func commandsHash(m *Miniredis) {
 	m.srv.Register("HPERSIST", m.cmdHpersist)
 	m.srv.Register("HTTL", m.cmdHttl, server.ReadOnlyOption())
 	m.srv.Register("HPTTL", m.cmdHpttl, server.ReadOnlyOption())
+	m.srv.Register("HSETEX", m.cmdHsetex)
 }
 
 // HSET
@@ -904,6 +905,185 @@ func (m *Miniredis) cmdHttlGeneric(c *server.Peer, cmd string, args []string, un
 
 			c.WriteInt(int(ttl / unit))
 		}
+	})
+}
+
+type hsetexOpts struct {
+	key     string
+	fnx     bool
+	fxx     bool
+	ttlMode string // "", "EX", "PX", "EXAT", "PXAT", "KEEPTTL"
+	ttlVal  int    // raw value for EX/PX/EXAT/PXAT
+	fields  []string
+	values  []string
+}
+
+func parseHSetEXArgs(args []string) (hsetexOpts, string) {
+	var opts hsetexOpts
+	opts.key = args[0]
+	args = args[1:]
+
+	for len(args) > 0 {
+		switch strings.ToUpper(args[0]) {
+		case "FNX":
+			opts.fnx = true
+			args = args[1:]
+		case "FXX":
+			opts.fxx = true
+			args = args[1:]
+		case "KEEPTTL":
+			if opts.ttlMode != "" {
+				return hsetexOpts{}, msgSyntaxError
+			}
+			opts.ttlMode = "KEEPTTL"
+			args = args[1:]
+		case "EX", "PX", "EXAT", "PXAT":
+			if opts.ttlMode != "" {
+				return hsetexOpts{}, msgSyntaxError
+			}
+			mode := strings.ToUpper(args[0])
+			if len(args) < 2 {
+				return hsetexOpts{}, msgInvalidInt
+			}
+			var val int
+			if err := optIntSimple(args[1], &val); err != nil {
+				return hsetexOpts{}, msgInvalidInt
+			}
+			if val <= 0 {
+				return hsetexOpts{}, msgInvalidHSETEXTime
+			}
+			opts.ttlMode = mode
+			opts.ttlVal = val
+			args = args[2:]
+		case "FIELDS":
+			if len(args) < 2 {
+				return hsetexOpts{}, msgNumFieldsInvalid
+			}
+			var numFields int
+			if err := optIntSimple(args[1], &numFields); err != nil {
+				return hsetexOpts{}, msgNumFieldsInvalid
+			}
+			if numFields <= 0 {
+				return hsetexOpts{}, msgNumFieldsInvalid
+			}
+			// Need numFields * 2 args (field value pairs)
+			if len(args) < 2+numFields*2 {
+				return hsetexOpts{}, msgNumFieldsParameter
+			}
+			if len(args) > 2+numFields*2 {
+				return hsetexOpts{}, msgNumFieldsParameter
+			}
+			fvArgs := args[2 : 2+numFields*2]
+			for i := 0; i < len(fvArgs); i += 2 {
+				opts.fields = append(opts.fields, fvArgs[i])
+				opts.values = append(opts.values, fvArgs[i+1])
+			}
+			args = args[2+numFields*2:]
+		default:
+			return hsetexOpts{}, msgSyntaxError
+		}
+	}
+
+	if opts.fnx && opts.fxx {
+		return hsetexOpts{}, msgSyntaxError
+	}
+
+	if len(opts.fields) == 0 {
+		return hsetexOpts{}, fmt.Sprintf(msgMandatoryArgument, "FIELDS")
+	}
+
+	return opts, ""
+}
+
+// HSETEX
+func (m *Miniredis) cmdHsetex(c *server.Peer, cmd string, args []string) {
+	if !m.isValidCMD(c, cmd, args, atLeast(4)) {
+		return
+	}
+
+	opts, errMsg := parseHSetEXArgs(args)
+	if errMsg != "" {
+		setDirty(c)
+		c.WriteError(errMsg)
+		return
+	}
+
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
+		db := m.db(ctx.selectedDB)
+
+		if t, ok := db.keys[opts.key]; ok && t != keyTypeHash {
+			c.WriteError(msgWrongType)
+			return
+		}
+
+		// FNX: only set if none of the specified fields exist
+		if opts.fnx {
+			for _, field := range opts.fields {
+				if _, ok := db.hashKeys[opts.key][field]; ok {
+					c.WriteInt(0)
+					return
+				}
+			}
+		}
+
+		// FXX: only set if all of the specified fields exist
+		if opts.fxx {
+			for _, field := range opts.fields {
+				if _, ok := db.hashKeys[opts.key][field]; !ok {
+					c.WriteInt(0)
+					return
+				}
+			}
+		}
+
+		// Resolve TTL
+		var ttl time.Duration
+		hasTTL := false
+		keepTTL := false
+		switch opts.ttlMode {
+		case "EX":
+			ttl = time.Duration(opts.ttlVal) * time.Second
+			hasTTL = true
+		case "PX":
+			ttl = time.Duration(opts.ttlVal) * time.Millisecond
+			hasTTL = true
+		case "EXAT":
+			ttl = m.at(opts.ttlVal, time.Second)
+			hasTTL = true
+		case "PXAT":
+			ttl = m.at(opts.ttlVal, time.Millisecond)
+			hasTTL = true
+		case "KEEPTTL":
+			keepTTL = true
+		}
+
+		// Set all fields
+		for i, field := range opts.fields {
+			db.hashSet(opts.key, field, opts.values[i])
+
+			if keepTTL {
+				// Don't touch existing TTL
+				continue
+			}
+
+			// Initialize TTL map if needed
+			if db.hashTTLs[opts.key] == nil {
+				if hasTTL {
+					db.hashTTLs[opts.key] = map[string]time.Duration{}
+				}
+			}
+
+			if hasTTL {
+				db.hashTTLs[opts.key][field] = ttl
+			} else {
+				// No TTL option: remove any existing TTL
+				if fieldTTLs := db.hashTTLs[opts.key]; fieldTTLs != nil {
+					delete(fieldTTLs, field)
+				}
+			}
+		}
+
+		c.WriteInt(1)
 	})
 }
 
