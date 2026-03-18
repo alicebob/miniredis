@@ -1808,3 +1808,84 @@ func TestHsetex(t *testing.T) {
 		)
 	})
 }
+
+func TestDirectHashFieldTTL(t *testing.T) {
+	s := NewMiniRedis()
+	defer s.Close()
+
+	t.Run("HExpire", func(t *testing.T) {
+		s.HSet("h1", "f1", "v1")
+
+		// Set TTL
+		assert(t, s.HExpire("h1", "f1", 10*time.Second), "HExpire should return true")
+
+		// Verify with HTTL
+		equals(t, 10*time.Second, s.HTTL("h1", "f1"))
+
+		// Non-existent field
+		assert(t, !s.HExpire("h1", "nosuch", 10*time.Second), "HExpire should return false for missing field")
+
+		// Non-existent key
+		assert(t, !s.HExpire("nokey", "f1", 10*time.Second), "HExpire should return false for missing key")
+	})
+
+	t.Run("HPersist", func(t *testing.T) {
+		s.HSet("h2", "f1", "v1")
+		s.HExpire("h2", "f1", 10*time.Second)
+
+		// Remove TTL
+		assert(t, s.HPersist("h2", "f1"), "HPersist should return true")
+		equals(t, time.Duration(0), s.HTTL("h2", "f1"))
+
+		// No TTL to remove
+		assert(t, !s.HPersist("h2", "f1"), "HPersist should return false when no TTL")
+
+		// Non-existent field
+		assert(t, !s.HPersist("h2", "nosuch"), "HPersist should return false for missing field")
+	})
+
+	t.Run("HTTL", func(t *testing.T) {
+		s.HSet("h3", "f1", "v1")
+
+		// No TTL
+		equals(t, time.Duration(0), s.HTTL("h3", "f1"))
+
+		// With TTL
+		s.HExpire("h3", "f1", 30*time.Second)
+		equals(t, 30*time.Second, s.HTTL("h3", "f1"))
+
+		// Non-existent
+		equals(t, time.Duration(0), s.HTTL("h3", "nosuch"))
+		equals(t, time.Duration(0), s.HTTL("nokey", "f1"))
+	})
+
+	t.Run("HSetEX", func(t *testing.T) {
+		s.HSetEX("h4", 10*time.Second, "f1", "v1", "f2", "v2")
+
+		equals(t, "v1", s.HGet("h4", "f1"))
+		equals(t, "v2", s.HGet("h4", "f2"))
+		equals(t, 10*time.Second, s.HTTL("h4", "f1"))
+		equals(t, 10*time.Second, s.HTTL("h4", "f2"))
+	})
+
+	t.Run("HSetEX overwrites and sets new TTL", func(t *testing.T) {
+		s.HSet("h5", "f1", "old")
+		s.HExpire("h5", "f1", 100*time.Second)
+
+		s.HSetEX("h5", 5*time.Second, "f1", "new")
+		equals(t, "new", s.HGet("h5", "f1"))
+		equals(t, 5*time.Second, s.HTTL("h5", "f1"))
+	})
+
+	t.Run("DB-level methods", func(t *testing.T) {
+		db := s.DB(0)
+		db.HSet("h6", "f1", "v1")
+		assert(t, db.HExpire("h6", "f1", 10*time.Second), "DB.HExpire should return true")
+		equals(t, 10*time.Second, db.HTTL("h6", "f1"))
+		assert(t, db.HPersist("h6", "f1"), "DB.HPersist should return true")
+		equals(t, time.Duration(0), db.HTTL("h6", "f1"))
+		db.HSetEX("h7", 5*time.Second, "f1", "v1")
+		equals(t, "v1", db.HGet("h7", "f1"))
+		equals(t, 5*time.Second, db.HTTL("h7", "f1"))
+	})
+}
