@@ -2,13 +2,19 @@
 
 ## Summary
 
-Add four new Redis wire commands (HSETEX, HPERSIST, HTTL, HPTTL) and five direct API methods (HExpire, HPersist, HTTL, HSetEX, plus the wire commands) to miniredis. These complement the existing HEXPIRE command to provide full hash-field-TTL support.
+Add four new Redis wire commands (HSETEX, HPERSIST, HTTL, HPTTL) and four direct API methods (HExpire, HPersist, HTTL, HSetEX) to miniredis. These complement the existing HEXPIRE command to provide full hash-field-TTL support.
+
+Note: no direct HPTTL method is needed because the HTTL direct method returns `time.Duration`, which already has full precision.
 
 ## Background
 
 PR #424 added HEXPIRE support, including the internal `db.hashTTLs` storage (`map[string]map[string]time.Duration`) and TTL expiration logic in `db.checkHashFieldTTL()`. The infrastructure is in place; we need to add the remaining commands that operate on hash field TTLs.
 
 ## Wire Commands
+
+### Key-does-not-exist behavior
+
+For HPERSIST, HTTL, and HPTTL: when the key does not exist, return an array of `-2` values (one per requested field). This matches the existing HEXPIRE implementation in this codebase. Note: real Redis may return a nil response for non-existent keys in some versions; we follow the HEXPIRE precedent for internal consistency.
 
 ### HPERSIST
 
@@ -61,19 +67,23 @@ HSETEX key [FNX | FXX] [EX seconds | PX milliseconds | EXAT unix-time-seconds | 
 - `0` — no fields were set (FNX/FXX condition not met)
 
 **Options:**
-- `FNX` — only set if *none* of the specified fields exist
-- `FXX` — only set if *all* of the specified fields exist
+- `FNX` — only set if *none* of the specified fields exist. If the key doesn't exist, FNX succeeds (no fields can exist).
+- `FXX` — only set if *all* of the specified fields exist. If the key doesn't exist, FXX fails (returns 0, key is not created).
 - `EX seconds` — set expiration in seconds
 - `PX milliseconds` — set expiration in milliseconds
 - `EXAT unix-time-seconds` — set expiration as Unix timestamp (seconds)
 - `PXAT unix-time-milliseconds` — set expiration as Unix timestamp (milliseconds)
-- `KEEPTTL` — retain each field's existing TTL
-- Expiration options are mutually exclusive
+- `KEEPTTL` — retain each field's existing TTL (if any)
+- Expiration options (`EX`, `PX`, `EXAT`, `PXAT`, `KEEPTTL`) are mutually exclusive
 - `FNX` and `FXX` are mutually exclusive
+
+**When no expiration option is provided:** Fields are set with no TTL (persistent). Any existing field TTLs are removed.
+
+**TTL validation:** `EX` and `PX` values must be positive integers (> 0). Zero or negative values return an error (reuse `msgInvalidSETime` pattern). `EXAT` and `PXAT` must be valid positive timestamps.
 
 **Atomicity:** Either all fields are set (with the specified expiration) or none are.
 
-**Argument parsing:** Extracted into a `parseHSetEXArgs` function, following the pattern of `parseHExpireArgs`. Uses a `for/switch` loop like the `SET` command.
+**Argument parsing:** Extracted into a `parseHSetEXArgs` function. Uses a `for/switch` loop like the `SET` command. The parse function returns the raw timestamp value for `EXAT`/`PXAT` options (not a resolved duration), since converting absolute timestamps to relative durations requires `m.at()` which is only available on the `*Miniredis` receiver. The command handler calls `m.at()` to resolve EXAT/PXAT to a duration before applying. Mutual exclusivity of options is validated after the full parse loop completes.
 
 ## Direct API Methods
 
@@ -112,14 +122,15 @@ Reuse existing error constants from `redis.go`:
 - `msgNumFieldsParameter` / `msgNumFieldsInvalid` — FIELDS block parsing
 - `msgInvalidInt` — non-integer TTL values
 - `msgMandatoryArgument` — missing FIELDS keyword
+- `msgInvalidSETime` — zero or negative EX/PX values (or add a HSETEX-specific variant following the `msgInvalidSETEXTime` pattern)
 
-No new error constants needed.
+No new error constants needed beyond potentially `msgInvalidHSETEXTime`.
 
 ## Files Modified
 
 - `cmd_hash.go` — new command implementations + registration
 - `cmd_hash_test.go` — unit tests for all 4 wire commands
-- `direct.go` — 5 new direct methods (HExpire, HPersist, HTTL, HSetEX)
+- `direct.go` — 4 new direct methods (HExpire, HPersist, HTTL, HSetEX)
 - `integration/hash_test.go` — integration tests against real Redis
 - `README.md` — add new commands to the command list
 
@@ -136,7 +147,7 @@ Per command:
 Command-specific:
 - **HPERSIST:** field with TTL (returns 1), field without TTL (returns -1)
 - **HTTL/HPTTL:** correct value in seconds/milliseconds, field without TTL returns -1
-- **HSETEX:** FNX when fields exist (returns 0), FXX when fields missing (returns 0), all EX/PX/EXAT/PXAT/KEEPTTL variants, mutual exclusivity errors
+- **HSETEX:** FNX when fields exist (returns 0, nothing set), FXX when fields missing (returns 0, nothing set), FXX on non-existent key (returns 0, key not created), all EX/PX/EXAT/PXAT/KEEPTTL variants, no expiration option (fields set with no TTL), mutual exclusivity errors (EX+PX, FNX+FXX), zero/negative TTL errors
 
 ### Integration tests (`integration/hash_test.go`)
 One test per command covering core behavior, run against both miniredis and real Redis.
