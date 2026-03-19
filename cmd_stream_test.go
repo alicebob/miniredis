@@ -150,6 +150,16 @@ func TestStreamAdd(t *testing.T) {
 		}
 		nowz, _ := s.Stream("nowz")
 		equals(t, 10, len(nowz))
+
+		// MAXLEN with "=" (exact trim, as sent by go-redis when Approx is false)
+		for i := 0; i < 100; i++ {
+			_, err := c.Do("XADD", "noweq", "MAXLEN", "=", "10", "*", "one", "1")
+			ok(t, err)
+			noweq, _ := s.Stream("noweq")
+			assert(t, len(noweq) <= 10, "deleted entries")
+		}
+		noweq, _ := s.Stream("noweq")
+		equals(t, 10, len(noweq))
 	})
 
 	t.Run("XADD MINID", func(t *testing.T) {
@@ -193,6 +203,22 @@ func TestStreamAdd(t *testing.T) {
 				proto.Array(proto.String("1672545848004-0"), proto.Strings("five", "5")),
 			),
 		)
+
+		// MINID with "=" (exact trim, as sent by go-redis when Approx is false)
+		now = time.Date(2023, 1, 1, 4, 4, 10, 0, time.UTC)
+		s.SetTime(now)
+		minIDEq := strconv.FormatInt(now.Add(-time.Second).UnixMilli(), 10) + "-0"
+		_, err = c.Do("XADD", "mideq", "MINID", "=", minIDEq, "*", "one", "1")
+		ok(t, err)
+		_, err = c.Do("XADD", "mideq", "MINID", "=", minIDEq, "*", "two", "2")
+		ok(t, err)
+		now = now.Add(2 * time.Second)
+		s.SetTime(now)
+		minIDEq = strconv.FormatInt(now.Add(-time.Second).UnixMilli(), 10) + "-0"
+		_, err = c.Do("XADD", "mideq", "MINID", "=", minIDEq, "*", "three", "3")
+		ok(t, err)
+		mideq, _ := s.Stream("mideq")
+		equals(t, 1, len(mideq)) // only three kept after exact MINID trim
 	})
 
 	t.Run("XADD NOMKSTREAM", func(t *testing.T) {
