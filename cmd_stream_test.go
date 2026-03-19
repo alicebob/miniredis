@@ -35,7 +35,7 @@ func TestStream(t *testing.T) {
 
 	mustDo(t, c,
 		"XINFO", "STREAM", "s",
-		proto.Array(proto.String("length"), proto.Int(1)),
+		proto.Array(proto.String("length"), proto.Int(1), proto.String("last-generated-id"), proto.String("1234567-89")),
 	)
 
 	now := time.Date(2001, 1, 1, 4, 4, 5, 4000000, time.UTC)
@@ -81,7 +81,7 @@ func TestStream(t *testing.T) {
 	t.Run("resp3", func(t *testing.T) {
 		mustDo(t, c,
 			"XINFO", "STREAM", "s",
-			proto.Map(proto.String("length"), proto.Int(1)),
+			proto.Map(proto.String("length"), proto.Int(1), proto.String("last-generated-id"), proto.String("1234567-89")),
 		)
 	})
 }
@@ -554,7 +554,7 @@ func TestStreamInfo(t *testing.T) {
 
 	mustDo(t, c,
 		"XINFO", "STREAM", "planets",
-		proto.Array(proto.String("length"), proto.Int(1)),
+		proto.Array(proto.String("length"), proto.Int(1), proto.String("last-generated-id"), proto.String("0-1")),
 	)
 
 	mustDo(t, c,

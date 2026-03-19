@@ -529,9 +529,11 @@ func (m *Miniredis) cmdXinfoStream(c *server.Peer, args []string) {
 			return
 		}
 
-		c.WriteMapLen(1)
+		c.WriteMapLen(2)
 		c.WriteBulk("length")
 		c.WriteInt(len(s.entries))
+		c.WriteBulk("last-generated-id")
+		c.WriteBulk(s.lastAllocatedID)
 	})
 }
 
