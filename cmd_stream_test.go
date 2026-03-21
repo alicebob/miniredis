@@ -150,6 +150,15 @@ func TestStreamAdd(t *testing.T) {
 		}
 		nowz, _ := s.Stream("nowz")
 		equals(t, 10, len(nowz))
+
+		for i := 0; i < 100; i++ {
+			_, err := c.Do("XADD", "nowexact", "MAXLEN", "=", "10", "*", "one", "1")
+			ok(t, err)
+			nowexact, _ := s.Stream("nowexact")
+			assert(t, len(nowexact) <= 10, "deleted entries")
+		}
+		nowexact, _ := s.Stream("nowexact")
+		equals(t, 10, len(nowexact))
 	})
 
 	t.Run("XADD MINID", func(t *testing.T) {
@@ -191,6 +200,20 @@ func TestStreamAdd(t *testing.T) {
 			proto.Array(
 				proto.Array(proto.String("1672545847004-0"), proto.Strings("four", "4")),
 				proto.Array(proto.String("1672545848004-0"), proto.Strings("five", "5")),
+			),
+		)
+
+		now = now.Add(time.Second)
+		s.SetTime(now)
+		minID = strconv.FormatInt(now.Add(-time.Second).UnixNano()/time.Millisecond.Nanoseconds(), 10)
+		_, err = c.Do("XADD", "mid", "MINID", "=", minID, "*", "six", "6")
+		ok(t, err)
+
+		mustDo(t, c,
+			"XRANGE", "mid", "-", "+",
+			proto.Array(
+				proto.Array(proto.String("1672545848004-0"), proto.Strings("five", "5")),
+				proto.Array(proto.String("1672545849004-0"), proto.Strings("six", "6")),
 			),
 		)
 	})
