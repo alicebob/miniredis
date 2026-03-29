@@ -83,6 +83,11 @@ func TestEval(t *testing.T) {
 			"EVAL", "return redis.call('expire','foo',1000000)", "0",
 		)
 	})
+
+	// check that server is an alias for redis
+	must1(t, c,
+		"EVAL", "return redis == server", "0",
+	)
 }
 
 func TestEvalCall(t *testing.T) {
