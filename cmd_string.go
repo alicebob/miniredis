@@ -20,6 +20,7 @@ func commandsString(m *Miniredis) {
 	m.srv.Register("BITPOS", m.cmdBitpos, server.ReadOnlyOption())
 	m.srv.Register("DECRBY", m.cmdDecrby)
 	m.srv.Register("DECR", m.cmdDecr)
+	m.srv.Register("DELIFEQ", m.cmdDelifeq)
 	m.srv.Register("GETBIT", m.cmdGetbit, server.ReadOnlyOption())
 	m.srv.Register("GET", m.cmdGet, server.ReadOnlyOption())
 	m.srv.Register("GETEX", m.cmdGetex)
@@ -1163,4 +1164,32 @@ func toBits(s byte) [8]bool {
 		}
 	}
 	return r
+}
+
+// DELIFEQ
+func (m *Miniredis) cmdDelifeq(c *server.Peer, cmd string, args []string) {
+	if !m.isValidCMD(c, cmd, args, exactly(2)) {
+		return
+	}
+
+	key, value := args[0], args[1]
+
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
+		db := m.db(ctx.selectedDB)
+
+		if !db.exists(key) {
+			c.WriteInt(0)
+			return
+		}
+		if db.t(key) != keyTypeString {
+			c.WriteError(msgWrongType)
+			return
+		}
+		if db.stringGet(key) != value {
+			c.WriteInt(0)
+			return
+		}
+		db.del(key, true)
+		c.WriteInt(1)
+	})
 }

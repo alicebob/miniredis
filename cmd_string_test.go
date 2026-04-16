@@ -918,6 +918,60 @@ func TestGetdel(t *testing.T) {
 	}
 }
 
+func TestDelifeq(t *testing.T) {
+	s, c := runWithClient(t)
+
+	// Missing key returns 0
+	{
+		must0(t, c, "DELIFEQ", "foo", "bar")
+	}
+
+	// Value matches: key is deleted
+	{
+		s.Set("foo", "bar")
+		mustDo(t, c,
+			"DELIFEQ", "foo", "bar",
+			proto.Int(1),
+		)
+		must0(t, c, "EXISTS", "foo")
+	}
+
+	// Value does not match: key is kept
+	{
+		s.Set("foo", "bar")
+		mustDo(t, c,
+			"DELIFEQ", "foo", "other",
+			proto.Int(0),
+		)
+		must1(t, c, "EXISTS", "foo")
+	}
+
+	// Wrong type returns WRONGTYPE error
+	{
+		s.HSet("wrong", "field", "val")
+		mustDo(t, c,
+			"DELIFEQ", "wrong", "val",
+			proto.Error(msgWrongType),
+		)
+	}
+
+	// Wrong number of arguments
+	{
+		mustDo(t, c,
+			"DELIFEQ",
+			proto.Error(errWrongNumber("delifeq")),
+		)
+		mustDo(t, c,
+			"DELIFEQ", "foo",
+			proto.Error(errWrongNumber("delifeq")),
+		)
+		mustDo(t, c,
+			"DELIFEQ", "foo", "bar", "extra",
+			proto.Error(errWrongNumber("delifeq")),
+		)
+	}
+}
+
 func TestStrlen(t *testing.T) {
 	s, c := runWithClient(t)
 
