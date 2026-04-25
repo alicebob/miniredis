@@ -736,7 +736,7 @@ func TestDelx(t *testing.T) {
 		// c.Error("unsupported condition", "DELEX", "key6", "IFDEQ", "somehash")
 
 		c.Do("LPUSH", "delexlist", "item")
-		c.Error("wrong kind of value", "DELEX", "delexlist", "IFEQ", "item")
+		c.Error("of string type if conditions", "DELEX", "delexlist", "IFEQ", "item")
 		c.Error("wrong number", "DELEX")
 		c.Error("wrong number", "DELEX", "key", "IFEQ")
 		c.Error("wrong number", "DELEX", "key", "IFEQ", "value", "extra")

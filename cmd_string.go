@@ -103,7 +103,7 @@ func (m *Miniredis) cmdDelex(c *server.Peer, cmd string, args []string) {
 		
 		// Check if key is of string type when conditions are specified
 		if db.t(opts.key) != keyTypeString {
-			c.WriteError(msgWrongType)
+			c.WriteError("ERR Key should be of string type if conditions are specified")
 			return
 		}
 		
