@@ -39,6 +39,90 @@ func commandsString(m *Miniredis) {
 	m.srv.Register("SETNX", m.cmdSetnx)
 	m.srv.Register("SETRANGE", m.cmdSetrange)
 	m.srv.Register("STRLEN", m.cmdStrlen, server.ReadOnlyOption())
+	m.srv.Register("DELEX", m.cmdDelex)
+}
+
+// DELEX
+func (m *Miniredis) cmdDelex(c *server.Peer, cmd string, args []string) {
+	if !m.isValidCMD(c, cmd, args, between(1, 4)) {
+		return
+	}
+
+	var opts struct {
+		key         string
+		ifeq        bool
+		ifne        bool
+		matchValue  string
+	}
+	
+	// Parse arguments
+	if len(args) != 1 && len(args) != 3 {
+		c.WriteError("wrong number of arguments for 'delex' command")
+		return
+	}
+	
+	if len(args) == 3 {
+		opts.key = args[0]
+		condition := strings.ToUpper(args[1])
+		opts.matchValue = args[2]
+		
+		switch condition {
+		case "IFEQ":
+			opts.ifeq = true
+		case "IFNE":
+			opts.ifne = true
+		case "IFDEQ", "IFDNE":
+			c.WriteError("ERR unsupported condition for DELEX: " + condition)
+			return
+		default:
+			c.WriteError("Invalid condition. Use IFEQ, IFNE, IFDEQ, or IFDNE")
+			return
+		}
+	}
+
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
+		db := m.db(ctx.selectedDB)
+		
+		// If no condition is specified, behave like DEL
+		if opts.key == "" {
+			key := args[0]
+			if db.exists(key) {
+				db.del(key, true) // delete expire
+				c.WriteInt(1)
+			} else {
+				c.WriteInt(0)
+			}
+			return
+		}
+		
+		// Check if key exists
+		if !db.exists(opts.key) {
+			c.WriteInt(0)
+			return
+		}
+		
+		// Check if key is of string type when conditions are specified
+		if db.t(opts.key) != keyTypeString {
+			c.WriteError("Key should be of string type if conditions are specified")
+			return
+		}
+		
+		currentValue := db.stringKeys[opts.key]
+		shouldDelete := false
+		
+		if opts.ifeq {
+			shouldDelete = (currentValue == opts.matchValue)
+		} else if opts.ifne {
+			shouldDelete = (currentValue != opts.matchValue)
+		}
+		
+		if shouldDelete {
+			db.del(opts.key, true) // delete expire
+			c.WriteInt(1)
+		} else {
+			c.WriteInt(0)
+		}
+	})
 }
 
 // SET
