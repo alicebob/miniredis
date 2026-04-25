@@ -57,7 +57,7 @@ func (m *Miniredis) cmdDelex(c *server.Peer, cmd string, args []string) {
 	
 	// Parse arguments
 	if len(args) != 1 && len(args) != 3 {
-		c.WriteError("wrong number of arguments for 'delex' command")
+		c.WriteError(errWrongNumber("delex"))
 		return
 	}
 	
@@ -103,7 +103,7 @@ func (m *Miniredis) cmdDelex(c *server.Peer, cmd string, args []string) {
 		
 		// Check if key is of string type when conditions are specified
 		if db.t(opts.key) != keyTypeString {
-			c.WriteError("Key should be of string type if conditions are specified")
+			c.WriteError(msgWrongType)
 			return
 		}
 		

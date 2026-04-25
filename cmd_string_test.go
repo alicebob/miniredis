@@ -1651,3 +1651,49 @@ func TestMsetnx(t *testing.T) {
 		)
 	}
 }
+
+// Test DELEX command
+func TestDelex(t *testing.T) {
+	_, c := runWithClient(t)
+
+	// Test DELEX with IFEQ - matching value should delete
+	mustOK(t, c, "SET", "mykey", "hello")
+	mustDo(t, c, "DELEX", "mykey", "IFEQ", "hello", proto.Int(1))
+	mustDo(t, c, "GET", "mykey", proto.Nil)
+
+	// Test DELEX with IFEQ - non-matching value should not delete
+	mustOK(t, c, "SET", "mykey", "hello")
+	mustDo(t, c, "DELEX", "mykey", "IFEQ", "world", proto.Int(0))
+	mustDo(t, c, "GET", "mykey", proto.String("hello"))
+
+	// Test DELEX with IFNE - non-matching value should delete
+	mustOK(t, c, "SET", "mykey", "hello")
+	mustDo(t, c, "DELEX", "mykey", "IFNE", "world", proto.Int(1))
+	mustDo(t, c, "GET", "mykey", proto.Nil)
+
+	// Test DELEX with IFNE - matching value should not delete
+	mustOK(t, c, "SET", "mykey", "hello")
+	mustDo(t, c, "DELEX", "mykey", "IFNE", "hello", proto.Int(0))
+	mustDo(t, c, "GET", "mykey", proto.String("hello"))
+
+	// Test DELEX on non-existent key
+	mustDo(t, c, "DELEX", "nonexistent", "IFEQ", "hello", proto.Int(0))
+
+	// Test DELEX without condition (behave like DEL)
+	mustOK(t, c, "SET", "mykey", "hello")
+	mustDo(t, c, "DELEX", "mykey", proto.Int(1))
+	mustDo(t, c, "GET", "mykey", proto.Nil)
+
+	// Test DELEX with unsupported condition
+	mustOK(t, c, "SET", "mykey", "hello")
+	mustDo(t, c, "DELEX", "mykey", "IFDEQ", "somehash", proto.Error("ERR unsupported condition for DELEX: IFDEQ"))
+
+	// Test DELEX on non-string key
+	mustDo(t, c, "LPUSH", "mylist", "item", proto.Int(1))
+	mustDo(t, c, "DELEX", "mylist", "IFEQ", "item", proto.Error(msgWrongType))
+
+	// Test DELEX with wrong number of arguments
+	mustDo(t, c, "DELEX", proto.Error("ERR wrong number of arguments for 'delex' command"))
+	mustDo(t, c, "DELEX", "mykey", "IFEQ", proto.Error("ERR wrong number of arguments for 'delex' command"))
+	mustDo(t, c, "DELEX", "mykey", "IFEQ", "value", "extra", proto.Error("ERR wrong number of arguments for 'delex' command"))
+}
