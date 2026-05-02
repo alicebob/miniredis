@@ -704,3 +704,41 @@ func TestMove(t *testing.T) {
 		c.Error("the same", "MOVE", "foo", "0")
 	})
 }
+
+func TestDelx(t *testing.T) {
+	skip(t)
+	testRaw(t, func(c *client) {
+		c.Do("SET", "delex1", "value1")
+		c.Do("DELEX", "delex1", "IFEQ", "value1")
+		c.Do("GET", "delex1")
+
+		c.Do("SET", "delex2", "value2")
+		c.Do("DELEX", "delex2", "IFEQ", "wrongvalue")
+		c.Do("GET", "delex2")
+
+		c.Do("SET", "delex3", "value3")
+		c.Do("DELEX", "delex3", "IFNE", "wrongvalue")
+		c.Do("GET", "delex3")
+
+		// DELEX IFNE - matching value should not delete key
+		c.Do("SET", "delex4", "value4")
+		c.Do("DELEX", "delex4", "IFNE", "value4")
+		c.Do("GET", "delex4")
+
+		c.Do("DELEX", "nonexistent", "IFEQ", "value")
+
+		// without condition (behave like DEL)
+		c.Do("SET", "delex5", "value5")
+		c.Do("DELEX", "delex5")
+		c.Do("GET", "delex5")
+
+		// not supported in miniredis yet
+		// c.Error("unsupported condition", "DELEX", "key6", "IFDEQ", "somehash")
+
+		c.Do("LPUSH", "delexlist", "item")
+		c.Error("of string type if conditions", "DELEX", "delexlist", "IFEQ", "item")
+		c.Error("wrong number", "DELEX")
+		c.Error("wrong number", "DELEX", "key", "IFEQ")
+		c.Error("wrong number", "DELEX", "key", "IFEQ", "value", "extra")
+	})
+}

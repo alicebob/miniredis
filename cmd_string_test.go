@@ -1651,3 +1651,39 @@ func TestMsetnx(t *testing.T) {
 		)
 	}
 }
+
+func TestDelex(t *testing.T) {
+	_, c := runWithClient(t)
+
+	mustOK(t, c, "SET", "mykey", "hello")
+	mustDo(t, c, "DELEX", "mykey", "IFEQ", "hello", proto.Int(1))
+	mustDo(t, c, "GET", "mykey", proto.Nil)
+
+	mustOK(t, c, "SET", "mykey", "hello")
+	mustDo(t, c, "DELEX", "mykey", "IFEQ", "world", proto.Int(0))
+	mustDo(t, c, "GET", "mykey", proto.String("hello"))
+
+	mustOK(t, c, "SET", "mykey", "hello")
+	mustDo(t, c, "DELEX", "mykey", "IFNE", "world", proto.Int(1))
+	mustDo(t, c, "GET", "mykey", proto.Nil)
+
+	mustOK(t, c, "SET", "mykey", "hello")
+	mustDo(t, c, "DELEX", "mykey", "IFNE", "hello", proto.Int(0))
+	mustDo(t, c, "GET", "mykey", proto.String("hello"))
+
+	mustDo(t, c, "DELEX", "nonexistent", "IFEQ", "hello", proto.Int(0))
+
+	mustOK(t, c, "SET", "mykey", "hello")
+	mustDo(t, c, "DELEX", "mykey", proto.Int(1))
+	mustDo(t, c, "GET", "mykey", proto.Nil)
+
+	mustOK(t, c, "SET", "mykey", "hello")
+	mustDo(t, c, "DELEX", "mykey", "IFDEQ", "somehash", proto.Error("ERR unsupported condition for DELEX: IFDEQ"))
+
+	mustDo(t, c, "LPUSH", "mylist", "item", proto.Int(1))
+	mustDo(t, c, "DELEX", "mylist", "IFEQ", "item", proto.Error("ERR Key should be of string type if conditions are specified"))
+
+	mustDo(t, c, "DELEX", proto.Error("ERR wrong number of arguments for 'delex' command"))
+	mustDo(t, c, "DELEX", "mykey", "IFEQ", proto.Error("ERR wrong number of arguments for 'delex' command"))
+	mustDo(t, c, "DELEX", "mykey", "IFEQ", "value", "extra", proto.Error("ERR wrong number of arguments for 'delex' command"))
+}
