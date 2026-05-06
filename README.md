@@ -101,6 +101,7 @@ Implemented commands:
  - Hash keys
    - HDEL
    - HEXISTS
+   - HEXPIRE
    - HGET
    - HGETALL
    - HINCRBY
@@ -109,10 +110,14 @@ Implemented commands:
    - HLEN
    - HMGET
    - HMSET
+   - HPERSIST
+   - HPTTL
    - HRANDFIELD
    - HSET
+   - HSETEX
    - HSETNX
    - HSTRLEN
+   - HTTL
    - HVALS
    - HSCAN
  - List keys

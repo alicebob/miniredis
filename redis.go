@@ -42,6 +42,7 @@ const (
 	msgInvalidSETime        = "ERR invalid expire time in set"
 	msgInvalidSETEXTime     = "ERR invalid expire time in setex"
 	msgInvalidPSETEXTime    = "ERR invalid expire time in psetex"
+	msgInvalidHSETEXTime    = "ERR invalid expire time in HSETEX"
 	msgInvalidKeysNumber    = "ERR Number of keys can't be greater than number of args"
 	msgNegativeKeysNumber   = "ERR Number of keys can't be negative"
 	msgFScriptUsage         = "ERR unknown subcommand or wrong number of arguments for '%s'. Try SCRIPT HELP."
