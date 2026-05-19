@@ -2,6 +2,7 @@ package miniredis
 
 import (
 	"sort"
+	"strconv"
 	"testing"
 	"time"
 
@@ -1386,5 +1387,505 @@ func TestCheckHashFieldTTL(t *testing.T) {
 		// field should be deleted
 		equals(t, "", s.HGet("hash8", "field1"))
 		assert(t, !s.Exists("hash8"), "hash8 should be deleted")
+	})
+}
+
+func TestHpersist(t *testing.T) {
+	s, c := runWithClient(t)
+
+	t.Run("remove expiration from field", func(t *testing.T) {
+		must1(t, c, "HSET", "h1", "f1", "v1")
+		mustDo(t, c,
+			"HEXPIRE", "h1", "10", "FIELDS", "1", "f1",
+			proto.Ints(1),
+		)
+		mustDo(t, c,
+			"HPERSIST", "h1", "FIELDS", "1", "f1",
+			proto.Ints(1),
+		)
+		// Field should survive past original TTL
+		s.FastForward(20 * time.Second)
+		mustDo(t, c,
+			"HGET", "h1", "f1",
+			proto.String("v1"),
+		)
+	})
+
+	t.Run("field without TTL", func(t *testing.T) {
+		must1(t, c, "HSET", "h2", "f1", "v1")
+		mustDo(t, c,
+			"HPERSIST", "h2", "FIELDS", "1", "f1",
+			proto.Ints(-1),
+		)
+	})
+
+	t.Run("non-existent field", func(t *testing.T) {
+		must1(t, c, "HSET", "h3", "f1", "v1")
+		mustDo(t, c,
+			"HPERSIST", "h3", "FIELDS", "1", "nosuch",
+			proto.Ints(-2),
+		)
+	})
+
+	t.Run("non-existent key", func(t *testing.T) {
+		mustDo(t, c,
+			"HPERSIST", "nokey", "FIELDS", "1", "f1",
+			proto.Ints(-2),
+		)
+	})
+
+	t.Run("multiple fields mixed", func(t *testing.T) {
+		mustDo(t, c, "HSET", "h4", "f1", "v1", "f2", "v2", proto.Int(2))
+		// Only f1 gets a TTL
+		mustDo(t, c,
+			"HEXPIRE", "h4", "10", "FIELDS", "1", "f1",
+			proto.Ints(1),
+		)
+		mustDo(t, c,
+			"HPERSIST", "h4", "FIELDS", "3", "f1", "f2", "nosuch",
+			proto.Ints(1, -1, -2),
+		)
+	})
+
+	t.Run("wrong type", func(t *testing.T) {
+		mustOK(t, c, "SET", "str", "value")
+		mustDo(t, c,
+			"HPERSIST", "str", "FIELDS", "1", "f1",
+			proto.Error(msgWrongType),
+		)
+	})
+
+	t.Run("error cases", func(t *testing.T) {
+		mustDo(t, c,
+			"HPERSIST",
+			proto.Error(errWrongNumber("hpersist")),
+		)
+		mustDo(t, c,
+			"HPERSIST", "h1",
+			proto.Error(errWrongNumber("hpersist")),
+		)
+		mustDo(t, c,
+			"HPERSIST", "h1", "FIELDS", "0", "dummy",
+			proto.Error(msgNumFieldsInvalid),
+		)
+		mustDo(t, c,
+			"HPERSIST", "h1", "FIELDS", "2", "f1",
+			proto.Error(msgNumFieldsParameter),
+		)
+	})
+}
+
+func TestHttl(t *testing.T) {
+	s, c := runWithClient(t)
+
+	t.Run("field with TTL", func(t *testing.T) {
+		must1(t, c, "HSET", "h1", "f1", "v1")
+		mustDo(t, c,
+			"HEXPIRE", "h1", "300", "FIELDS", "1", "f1",
+			proto.Ints(1),
+		)
+		mustDo(t, c,
+			"HTTL", "h1", "FIELDS", "1", "f1",
+			proto.Ints(300),
+		)
+	})
+
+	t.Run("field without TTL", func(t *testing.T) {
+		must1(t, c, "HSET", "h2", "f1", "v1")
+		mustDo(t, c,
+			"HTTL", "h2", "FIELDS", "1", "f1",
+			proto.Ints(-1),
+		)
+	})
+
+	t.Run("non-existent field", func(t *testing.T) {
+		must1(t, c, "HSET", "h3", "f1", "v1")
+		mustDo(t, c,
+			"HTTL", "h3", "FIELDS", "1", "nosuch",
+			proto.Ints(-2),
+		)
+	})
+
+	t.Run("non-existent key", func(t *testing.T) {
+		mustDo(t, c,
+			"HTTL", "nokey", "FIELDS", "1", "f1",
+			proto.Ints(-2),
+		)
+	})
+
+	t.Run("TTL decreases after FastForward", func(t *testing.T) {
+		must1(t, c, "HSET", "h5", "f1", "v1")
+		mustDo(t, c,
+			"HEXPIRE", "h5", "100", "FIELDS", "1", "f1",
+			proto.Ints(1),
+		)
+		s.FastForward(30 * time.Second)
+		mustDo(t, c,
+			"HTTL", "h5", "FIELDS", "1", "f1",
+			proto.Ints(70),
+		)
+	})
+
+	t.Run("multiple fields mixed", func(t *testing.T) {
+		mustDo(t, c, "HSET", "h6", "f1", "v1", "f2", "v2", proto.Int(2))
+		mustDo(t, c,
+			"HEXPIRE", "h6", "60", "FIELDS", "1", "f1",
+			proto.Ints(1),
+		)
+		mustDo(t, c,
+			"HTTL", "h6", "FIELDS", "3", "f1", "f2", "nosuch",
+			proto.Ints(60, -1, -2),
+		)
+	})
+
+	t.Run("wrong type", func(t *testing.T) {
+		mustOK(t, c, "SET", "str", "value")
+		mustDo(t, c,
+			"HTTL", "str", "FIELDS", "1", "f1",
+			proto.Error(msgWrongType),
+		)
+	})
+
+	t.Run("error cases", func(t *testing.T) {
+		mustDo(t, c,
+			"HTTL",
+			proto.Error(errWrongNumber("httl")),
+		)
+		mustDo(t, c,
+			"HTTL", "h1",
+			proto.Error(errWrongNumber("httl")),
+		)
+		mustDo(t, c,
+			"HTTL", "h1", "FIELDS", "0", "dummy",
+			proto.Error(msgNumFieldsInvalid),
+		)
+	})
+}
+
+func TestHpttl(t *testing.T) {
+	_, c := runWithClient(t)
+
+	t.Run("field with TTL in milliseconds", func(t *testing.T) {
+		must1(t, c, "HSET", "h1", "f1", "v1")
+		mustDo(t, c,
+			"HEXPIRE", "h1", "10", "FIELDS", "1", "f1",
+			proto.Ints(1),
+		)
+		mustDo(t, c,
+			"HPTTL", "h1", "FIELDS", "1", "f1",
+			proto.Ints(10000),
+		)
+	})
+
+	t.Run("field without TTL", func(t *testing.T) {
+		must1(t, c, "HSET", "h2", "f1", "v1")
+		mustDo(t, c,
+			"HPTTL", "h2", "FIELDS", "1", "f1",
+			proto.Ints(-1),
+		)
+	})
+
+	t.Run("non-existent key", func(t *testing.T) {
+		mustDo(t, c,
+			"HPTTL", "nokey", "FIELDS", "1", "f1",
+			proto.Ints(-2),
+		)
+	})
+
+	t.Run("wrong type", func(t *testing.T) {
+		mustOK(t, c, "SET", "str", "value")
+		mustDo(t, c,
+			"HPTTL", "str", "FIELDS", "1", "f1",
+			proto.Error(msgWrongType),
+		)
+	})
+
+	t.Run("error cases", func(t *testing.T) {
+		mustDo(t, c,
+			"HPTTL",
+			proto.Error(errWrongNumber("hpttl")),
+		)
+		mustDo(t, c,
+			"HPTTL", "h1",
+			proto.Error(errWrongNumber("hpttl")),
+		)
+	})
+}
+
+func TestHsetex(t *testing.T) {
+	s, c := runWithClient(t)
+
+	t.Run("basic with EX", func(t *testing.T) {
+		must1(t, c, "HSETEX", "h1", "EX", "10", "FIELDS", "1", "f1", "v1")
+		mustDo(t, c,
+			"HGET", "h1", "f1",
+			proto.String("v1"),
+		)
+		// Verify TTL is set
+		mustDo(t, c,
+			"HTTL", "h1", "FIELDS", "1", "f1",
+			proto.Ints(10),
+		)
+	})
+
+	t.Run("multiple fields with EX", func(t *testing.T) {
+		must1(t, c, "HSETEX", "h2", "EX", "60", "FIELDS", "2", "f1", "v1", "f2", "v2")
+		mustDo(t, c, "HGET", "h2", "f1", proto.String("v1"))
+		mustDo(t, c, "HGET", "h2", "f2", proto.String("v2"))
+		mustDo(t, c,
+			"HTTL", "h2", "FIELDS", "2", "f1", "f2",
+			proto.Ints(60, 60),
+		)
+	})
+
+	t.Run("with PX", func(t *testing.T) {
+		must1(t, c, "HSETEX", "h3", "PX", "5000", "FIELDS", "1", "f1", "v1")
+		mustDo(t, c,
+			"HPTTL", "h3", "FIELDS", "1", "f1",
+			proto.Ints(5000),
+		)
+	})
+
+	t.Run("with EXAT", func(t *testing.T) {
+		now := time.Now().UTC().Truncate(time.Second)
+		s.SetTime(now)
+		exat := now.Add(30 * time.Second).Unix()
+		must1(t, c, "HSETEX", "h_exat", "EXAT", strconv.FormatInt(exat, 10), "FIELDS", "1", "f1", "v1")
+		mustDo(t, c, "HGET", "h_exat", "f1", proto.String("v1"))
+		mustDo(t, c,
+			"HTTL", "h_exat", "FIELDS", "1", "f1",
+			proto.Ints(30),
+		)
+	})
+
+	t.Run("with PXAT", func(t *testing.T) {
+		now := time.Now().UTC().Truncate(time.Millisecond)
+		s.SetTime(now)
+		pxat := now.Add(10 * time.Second).UnixMilli()
+		must1(t, c, "HSETEX", "h_pxat", "PXAT", strconv.FormatInt(pxat, 10), "FIELDS", "1", "f1", "v1")
+		mustDo(t, c, "HGET", "h_pxat", "f1", proto.String("v1"))
+		mustDo(t, c,
+			"HPTTL", "h_pxat", "FIELDS", "1", "f1",
+			proto.Ints(10000),
+		)
+	})
+
+	t.Run("no expiration option", func(t *testing.T) {
+		must1(t, c, "HSETEX", "h4", "FIELDS", "1", "f1", "v1")
+		mustDo(t, c, "HGET", "h4", "f1", proto.String("v1"))
+		mustDo(t, c,
+			"HTTL", "h4", "FIELDS", "1", "f1",
+			proto.Ints(-1),
+		)
+	})
+
+	t.Run("FNX - fields don't exist", func(t *testing.T) {
+		must1(t, c, "HSETEX", "h5", "FNX", "EX", "10", "FIELDS", "1", "f1", "v1")
+		mustDo(t, c, "HGET", "h5", "f1", proto.String("v1"))
+	})
+
+	t.Run("FNX - some fields exist", func(t *testing.T) {
+		must1(t, c, "HSET", "h6", "f1", "old")
+		must0(t, c, "HSETEX", "h6", "FNX", "EX", "10", "FIELDS", "2", "f1", "new", "f2", "v2")
+		// Nothing should have changed
+		mustDo(t, c, "HGET", "h6", "f1", proto.String("old"))
+		mustDo(t, c, "HGET", "h6", "f2", proto.Nil)
+	})
+
+	t.Run("FXX - all fields exist", func(t *testing.T) {
+		mustDo(t, c, "HSET", "h7", "f1", "old1", "f2", "old2", proto.Int(2))
+		must1(t, c, "HSETEX", "h7", "FXX", "EX", "10", "FIELDS", "2", "f1", "new1", "f2", "new2")
+		mustDo(t, c, "HGET", "h7", "f1", proto.String("new1"))
+		mustDo(t, c, "HGET", "h7", "f2", proto.String("new2"))
+	})
+
+	t.Run("FXX - some fields missing", func(t *testing.T) {
+		must1(t, c, "HSET", "h8", "f1", "old")
+		must0(t, c, "HSETEX", "h8", "FXX", "EX", "10", "FIELDS", "2", "f1", "new", "f2", "v2")
+		// Nothing should have changed
+		mustDo(t, c, "HGET", "h8", "f1", proto.String("old"))
+	})
+
+	t.Run("FXX - key doesn't exist", func(t *testing.T) {
+		must0(t, c, "HSETEX", "nokey", "FXX", "EX", "10", "FIELDS", "1", "f1", "v1")
+		mustDo(t, c, "EXISTS", "nokey", proto.Int(0))
+	})
+
+	t.Run("KEEPTTL", func(t *testing.T) {
+		must1(t, c, "HSET", "h9", "f1", "v1")
+		mustDo(t, c,
+			"HEXPIRE", "h9", "100", "FIELDS", "1", "f1",
+			proto.Ints(1),
+		)
+		// Update value with KEEPTTL
+		must1(t, c, "HSETEX", "h9", "KEEPTTL", "FIELDS", "1", "f1", "newval")
+		mustDo(t, c, "HGET", "h9", "f1", proto.String("newval"))
+		mustDo(t, c,
+			"HTTL", "h9", "FIELDS", "1", "f1",
+			proto.Ints(100),
+		)
+	})
+
+	t.Run("expiration actually expires", func(t *testing.T) {
+		must1(t, c, "HSETEX", "h10", "EX", "1", "FIELDS", "1", "f1", "v1")
+		s.FastForward(2 * time.Second)
+		mustDo(t, c, "HGET", "h10", "f1", proto.Nil)
+	})
+
+	t.Run("overwrites existing field and clears old TTL", func(t *testing.T) {
+		must1(t, c, "HSET", "h11", "f1", "old")
+		mustDo(t, c,
+			"HEXPIRE", "h11", "100", "FIELDS", "1", "f1",
+			proto.Ints(1),
+		)
+		// Set without expiration option - should clear TTL
+		must1(t, c, "HSETEX", "h11", "FIELDS", "1", "f1", "new")
+		mustDo(t, c,
+			"HTTL", "h11", "FIELDS", "1", "f1",
+			proto.Ints(-1),
+		)
+	})
+
+	t.Run("wrong type", func(t *testing.T) {
+		mustOK(t, c, "SET", "str", "value")
+		mustDo(t, c,
+			"HSETEX", "str", "EX", "10", "FIELDS", "1", "f1", "v1",
+			proto.Error(msgWrongType),
+		)
+	})
+
+	t.Run("error cases", func(t *testing.T) {
+		// Not enough args
+		mustDo(t, c,
+			"HSETEX",
+			proto.Error(errWrongNumber("hsetex")),
+		)
+		mustDo(t, c,
+			"HSETEX", "k",
+			proto.Error(errWrongNumber("hsetex")),
+		)
+
+		// Invalid EX value
+		mustDo(t, c,
+			"HSETEX", "k", "EX", "notanumber", "FIELDS", "1", "f1", "v1",
+			proto.Error(msgInvalidInt),
+		)
+
+		// Zero EX
+		mustDo(t, c,
+			"HSETEX", "k", "EX", "0", "FIELDS", "1", "f1", "v1",
+			proto.Error("ERR invalid expire time in HSETEX"),
+		)
+
+		// Negative EX
+		mustDo(t, c,
+			"HSETEX", "k", "EX", "-1", "FIELDS", "1", "f1", "v1",
+			proto.Error("ERR invalid expire time in HSETEX"),
+		)
+
+		// FNX + FXX
+		mustDo(t, c,
+			"HSETEX", "k", "FNX", "FXX", "EX", "10", "FIELDS", "1", "f1", "v1",
+			proto.Error(msgSyntaxError),
+		)
+
+		// EX + PX
+		mustDo(t, c,
+			"HSETEX", "k", "EX", "10", "PX", "1000", "FIELDS", "1", "f1", "v1",
+			proto.Error(msgSyntaxError),
+		)
+
+		// Invalid numfields
+		mustDo(t, c,
+			"HSETEX", "k", "FIELDS", "0", "f1", "v1",
+			proto.Error(msgNumFieldsInvalid),
+		)
+
+		// Odd number of field-value args
+		mustDo(t, c,
+			"HSETEX", "k", "FIELDS", "1", "f1",
+			proto.Error(msgNumFieldsParameter),
+		)
+	})
+}
+
+func TestDirectHashFieldTTL(t *testing.T) {
+	s := NewMiniRedis()
+	defer s.Close()
+
+	t.Run("HExpire", func(t *testing.T) {
+		s.HSet("h1", "f1", "v1")
+
+		// Set TTL
+		assert(t, s.HExpire("h1", "f1", 10*time.Second), "HExpire should return true")
+
+		// Verify with HTTL
+		equals(t, 10*time.Second, s.HTTL("h1", "f1"))
+
+		// Non-existent field
+		assert(t, !s.HExpire("h1", "nosuch", 10*time.Second), "HExpire should return false for missing field")
+
+		// Non-existent key
+		assert(t, !s.HExpire("nokey", "f1", 10*time.Second), "HExpire should return false for missing key")
+	})
+
+	t.Run("HPersist", func(t *testing.T) {
+		s.HSet("h2", "f1", "v1")
+		s.HExpire("h2", "f1", 10*time.Second)
+
+		// Remove TTL
+		assert(t, s.HPersist("h2", "f1"), "HPersist should return true")
+		equals(t, time.Duration(0), s.HTTL("h2", "f1"))
+
+		// No TTL to remove
+		assert(t, !s.HPersist("h2", "f1"), "HPersist should return false when no TTL")
+
+		// Non-existent field
+		assert(t, !s.HPersist("h2", "nosuch"), "HPersist should return false for missing field")
+	})
+
+	t.Run("HTTL", func(t *testing.T) {
+		s.HSet("h3", "f1", "v1")
+
+		// No TTL
+		equals(t, time.Duration(0), s.HTTL("h3", "f1"))
+
+		// With TTL
+		s.HExpire("h3", "f1", 30*time.Second)
+		equals(t, 30*time.Second, s.HTTL("h3", "f1"))
+
+		// Non-existent
+		equals(t, time.Duration(0), s.HTTL("h3", "nosuch"))
+		equals(t, time.Duration(0), s.HTTL("nokey", "f1"))
+	})
+
+	t.Run("HSetEX", func(t *testing.T) {
+		s.HSetEX("h4", 10*time.Second, "f1", "v1", "f2", "v2")
+
+		equals(t, "v1", s.HGet("h4", "f1"))
+		equals(t, "v2", s.HGet("h4", "f2"))
+		equals(t, 10*time.Second, s.HTTL("h4", "f1"))
+		equals(t, 10*time.Second, s.HTTL("h4", "f2"))
+	})
+
+	t.Run("HSetEX overwrites and sets new TTL", func(t *testing.T) {
+		s.HSet("h5", "f1", "old")
+		s.HExpire("h5", "f1", 100*time.Second)
+
+		s.HSetEX("h5", 5*time.Second, "f1", "new")
+		equals(t, "new", s.HGet("h5", "f1"))
+		equals(t, 5*time.Second, s.HTTL("h5", "f1"))
+	})
+
+	t.Run("DB-level methods", func(t *testing.T) {
+		db := s.DB(0)
+		db.HSet("h6", "f1", "v1")
+		assert(t, db.HExpire("h6", "f1", 10*time.Second), "DB.HExpire should return true")
+		equals(t, 10*time.Second, db.HTTL("h6", "f1"))
+		assert(t, db.HPersist("h6", "f1"), "DB.HPersist should return true")
+		equals(t, time.Duration(0), db.HTTL("h6", "f1"))
+		db.HSetEX("h7", 5*time.Second, "f1", "v1")
+		equals(t, "v1", db.HGet("h7", "f1"))
+		equals(t, 5*time.Second, db.HTTL("h7", "f1"))
 	})
 }
