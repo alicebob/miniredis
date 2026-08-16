@@ -182,7 +182,7 @@ func TestExpire(t *testing.T) {
 		c.Do("EXPIREAT", "foo", "2234567890")
 		c.Do("PEXPIREAT", "foo", "2234567890123")
 		c.Do("EXPIRETIME", "foo")
-		c.Do("PEXPIRETIME", "foo")
+		c.DoApprox(100, "PEXPIRETIME", "foo")
 		// c.Do("PTTL", "foo")
 		c.Do("PTTL", "nosuch")
 

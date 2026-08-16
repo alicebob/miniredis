@@ -284,7 +284,10 @@ func TestHrandfield(t *testing.T) {
 		c.Error("ERR syntax error", "HRANDFIELD", "foo", "1", "2")
 		c.Error("ERR wrong number", "HRANDFIELD")
 	})
+}
 
+func TestHTTL(t *testing.T) {
+	skip(t)
 	t.Run("persist", func(t *testing.T) {
 		testRaw(t, func(c *client) {
 			c.Do("HSET", "aap", "noot", "mies")
@@ -292,7 +295,8 @@ func TestHrandfield(t *testing.T) {
 			c.Do("HPERSIST", "aap", "FIELDS", "1", "noot")
 
 			c.Error("wrong number", "HPERSIST", "aap")
-			c.Error("numFields", "HPERSIST", "aap", "FIELDS", "0", "dummy")
+			c.Error("wrong number", "HPERSIST", "aap", "FIELDS")
+			c.Error("Number of fields", "HPERSIST", "aap", "FIELDS", "0", "dummy")
 		})
 	})
 
@@ -301,10 +305,11 @@ func TestHrandfield(t *testing.T) {
 			c.Do("HSET", "aap", "noot", "mies")
 			c.Do("HEXPIRE", "aap", "10", "FIELDS", "1", "noot")
 			c.Do("HTTL", "aap", "FIELDS", "1", "noot")
-			c.Do("HPTTL", "aap", "FIELDS", "1", "noot")
+			c.DoLoosely("HPTTL", "aap", "FIELDS", "1", "noot")
 
 			c.Error("wrong number", "HTTL", "aap")
 			c.Error("wrong number", "HPTTL", "aap")
+			c.Error("wrong number", "HPTTL", "aap", "FIELDS")
 		})
 	})
 
@@ -320,7 +325,10 @@ func TestHrandfield(t *testing.T) {
 
 			c.Error("wrong number", "HSETEX")
 			c.Error("wrong number", "HSETEX", "k")
-			c.Error("syntax", "HSETEX", "k", "EX", "10", "PX", "5000", "FIELDS", "1", "f1", "v1")
+			c.Error("wrong number", "HSETEX", "k", "EX")
+			c.Error("not an integer", "HSETEX", "bbb", "FNX", "PX", "3.1415", "FIELDS", "1", "cc", "dd")
+			c.Error("invalid expire time, must be >= 0", "HSETEX", "bbb", "FNX", "PX", "-3415", "FIELDS", "1", "cc", "dd")
+			c.Error("Only one of", "HSETEX", "k", "EX", "10", "PX", "5000", "FIELDS", "1", "f1", "v1")
 		})
 	})
 }

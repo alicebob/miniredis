@@ -794,14 +794,14 @@ func TestParseHExpireArgs(t *testing.T) {
 			name:        "zero numFields",
 			args:        []string{"mykey", "300", "FIELDS", "0"},
 			want:        hexpireOpts{},
-			wantErr:     msgNumFieldsInvalid,
+			wantErr:     msgNumFieldsPositive,
 			description: "Zero numFields should return error",
 		},
 		{
 			name:        "negative numFields",
 			args:        []string{"mykey", "300", "FIELDS", "-1"},
 			want:        hexpireOpts{},
-			wantErr:     msgNumFieldsInvalid,
+			wantErr:     msgNumFieldsPositive,
 			description: "Negative numFields should return error",
 		},
 		{
@@ -1143,7 +1143,7 @@ func TestHexpire(t *testing.T) {
 		// Zero numFields - needs at least one dummy field to pass atLeast(5) check
 		mustDo(t, c,
 			"HEXPIRE", "myhash", "10", "FIELDS", "0", "dummy",
-			proto.Error(msgNumFieldsInvalid),
+			proto.Error(msgNumFieldsPositive),
 		)
 
 		// Not enough fields
@@ -1466,7 +1466,7 @@ func TestHpersist(t *testing.T) {
 		)
 		mustDo(t, c,
 			"HPERSIST", "h1", "FIELDS", "0", "dummy",
-			proto.Error(msgNumFieldsInvalid),
+			proto.Error(msgNumFieldsPositive),
 		)
 		mustDo(t, c,
 			"HPERSIST", "h1", "FIELDS", "2", "f1",
@@ -1557,7 +1557,7 @@ func TestHttl(t *testing.T) {
 		)
 		mustDo(t, c,
 			"HTTL", "h1", "FIELDS", "0", "dummy",
-			proto.Error(msgNumFieldsInvalid),
+			proto.Error(msgNumFieldsPositive),
 		)
 	})
 }
@@ -1774,13 +1774,13 @@ func TestHsetex(t *testing.T) {
 		// Zero EX
 		mustDo(t, c,
 			"HSETEX", "k", "EX", "0", "FIELDS", "1", "f1", "v1",
-			proto.Error("ERR invalid expire time in HSETEX"),
+			proto.Error("ERR invalid expire time, must be >= 0"),
 		)
 
 		// Negative EX
 		mustDo(t, c,
 			"HSETEX", "k", "EX", "-1", "FIELDS", "1", "f1", "v1",
-			proto.Error("ERR invalid expire time in HSETEX"),
+			proto.Error("ERR invalid expire time, must be >= 0"),
 		)
 
 		// FNX + FXX
@@ -1792,13 +1792,13 @@ func TestHsetex(t *testing.T) {
 		// EX + PX
 		mustDo(t, c,
 			"HSETEX", "k", "EX", "10", "PX", "1000", "FIELDS", "1", "f1", "v1",
-			proto.Error(msgSyntaxError),
+			proto.Error("ERR Only one of EX, PX, EXAT, PXAT or KEEPTTL arguments can be specified"),
 		)
 
 		// Invalid numfields
 		mustDo(t, c,
 			"HSETEX", "k", "FIELDS", "0", "f1", "v1",
-			proto.Error(msgNumFieldsInvalid),
+			proto.Error(msgNumFieldsPositive),
 		)
 
 		// Odd number of field-value args

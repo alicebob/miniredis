@@ -767,7 +767,7 @@ func parseHExpireArgs(args []string) (hexpireOpts, string) {
 				return hexpireOpts{}, msgNumFieldsInvalid
 			}
 			if numFields <= 0 {
-				return hexpireOpts{}, msgNumFieldsInvalid
+				return hexpireOpts{}, msgNumFieldsPositive
 			}
 
 			// FIELDS numFields field1 field2 ...
@@ -939,7 +939,7 @@ func parseHSetEXArgs(args []string) (hsetexOpts, string) {
 			args = args[1:]
 		case "EX", "PX", "EXAT", "PXAT":
 			if opts.ttlMode != "" {
-				return hsetexOpts{}, msgSyntaxError
+				return hsetexOpts{}, "ERR Only one of EX, PX, EXAT, PXAT or KEEPTTL arguments can be specified"
 			}
 			mode := strings.ToUpper(args[0])
 			if len(args) < 2 {
@@ -950,7 +950,7 @@ func parseHSetEXArgs(args []string) (hsetexOpts, string) {
 				return hsetexOpts{}, msgInvalidInt
 			}
 			if val <= 0 {
-				return hsetexOpts{}, msgInvalidHSETEXTime
+				return hsetexOpts{}, "ERR invalid expire time, must be >= 0"
 			}
 			opts.ttlMode = mode
 			opts.ttlVal = val
@@ -964,7 +964,7 @@ func parseHSetEXArgs(args []string) (hsetexOpts, string) {
 				return hsetexOpts{}, msgNumFieldsInvalid
 			}
 			if numFields <= 0 {
-				return hsetexOpts{}, msgNumFieldsInvalid
+				return hsetexOpts{}, msgNumFieldsPositive
 			}
 			// Need numFields * 2 args (field value pairs)
 			if len(args) < 2+numFields*2 {
@@ -1103,7 +1103,7 @@ func parseFieldsArgs(args []string) ([]string, string) {
 		return nil, msgNumFieldsInvalid
 	}
 	if numFields <= 0 {
-		return nil, msgNumFieldsInvalid
+		return nil, msgNumFieldsPositive
 	}
 
 	if len(args) < 2+numFields {
