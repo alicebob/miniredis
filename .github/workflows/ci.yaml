@@ -9,11 +9,11 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        go: [ '1.17', '1.23', '1.24', '1.25' ]
+        go: [ '1.17', '1.25', '1.26', '1.27' ]
     name: Go ${{ matrix.go }}
     steps:
-    - uses: actions/checkout@v4
-    - uses: actions/setup-go@v5
+    - uses: actions/checkout@v7
+    - uses: actions/setup-go@v7
       with:
         go-version: ${{ matrix.go }}
 
@@ -37,7 +37,7 @@ jobs:
 
     - name: Cache redis server binary save
       if: steps.cache-redis-server-binary-restore.outputs.cache-hit != 'true'
-      uses: actions/cache/save@v4
+      uses: actions/cache/save@v6
       with:
         path: integration/redis_src/redis-server
         key: ${{ steps.cache-redis-server-binary-restore.outputs.cache-primary-key }}
