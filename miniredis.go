@@ -58,6 +58,7 @@ type RedisDB struct {
 type Miniredis struct {
 	sync.Mutex
 	srv         *server.Server
+	nextPreHook server.Hook
 	port        int
 	passwords   map[string]string // username password
 	dbs         map[int]*RedisDB
@@ -217,6 +218,8 @@ func (m *Miniredis) start(s *server.Server) error {
 
 func (m *Miniredis) startLocked(s *server.Server) error {
 	m.srv = s
+	s.SetPreHook(m.nextPreHook)
+	m.nextPreHook = nil
 	if a := s.Addr(); a != nil {
 		m.port = a.Port
 	}
@@ -560,6 +563,13 @@ func (m *Miniredis) SetError(msg string) {
 			c.WriteError(msg)
 			return true
 		}
+	}
+
+	m.Lock()
+	defer m.Unlock()
+	if m.srv == nil {
+		m.nextPreHook = cb
+		return
 	}
 	m.srv.SetPreHook(cb)
 }

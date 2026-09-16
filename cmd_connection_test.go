@@ -233,6 +233,46 @@ func TestSetError(t *testing.T) {
 	)
 }
 
+func TestSetErrorBeforeDial(t *testing.T) {
+	s := NewMiniRedis()
+	defer s.Close()
+
+	s.SetError("LOADING Redis is loading the dataset in memory")
+
+	conn, err := s.Dial()
+	ok(t, err)
+	c := proto.NewClient(conn)
+	defer c.Close()
+
+	mustDo(t, c,
+		"PING",
+		proto.Error("LOADING Redis is loading the dataset in memory"),
+	)
+}
+
+func TestSetErrorDoesNotSurviveRestart(t *testing.T) {
+	s, c := runWithClient(t)
+
+	s.SetError("LOADING Redis is loading the dataset in memory")
+	mustDo(t, c,
+		"PING",
+		proto.Error("LOADING Redis is loading the dataset in memory"),
+	)
+
+	s.Close()
+	err := s.Restart()
+	ok(t, err)
+
+	c, err = proto.Dial(s.Addr())
+	ok(t, err)
+	defer c.Close()
+
+	mustDo(t, c,
+		"PING",
+		proto.Inline("PONG"),
+	)
+}
+
 func TestHello(t *testing.T) {
 	t.Run("default user", func(t *testing.T) {
 		s, c := runWithClient(t)
