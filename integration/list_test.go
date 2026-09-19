@@ -168,6 +168,13 @@ func TestLinxed(t *testing.T) {
 func TestLpos(t *testing.T) {
 	skip(t)
 	testRaw(t, func(c *client) {
+		c.Do("LPOS", "missing", "value")
+		c.Do("LPOS", "missing", "value", "RANK", "-1")
+		for _, count := range []string{"0", "1", "3"} {
+			c.Do("LPOS", "missing", "value", "COUNT", count)
+			c.Do("LPOS", "missing", "value", "RANK", "-1", "COUNT", count, "MAXLEN", "2")
+		}
+
 		c.Do("RPUSH", "l", "aap", "noot", "aap", "mies", "aap", "vuur", "aap", "aap")
 		c.Do("LPOS", "l", "app")
 		c.Do("LPOS", "l", "noot")

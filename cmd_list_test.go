@@ -412,6 +412,26 @@ func TestLindex(t *testing.T) {
 	})
 }
 
+func TestLposMissingKey(t *testing.T) {
+	for _, protocol := range []string{"2", "3"} {
+		t.Run("RESP"+protocol, func(t *testing.T) {
+			s, c := runWithClient(t)
+			null := proto.Nil
+			if protocol == "3" {
+				useRESP3(t, c)
+				null = proto.NilResp3
+			}
+			mustDo(t, c, "LPOS", "missing", "value", null)
+			mustDo(t, c, "LPOS", "missing", "value", "RANK", "-1", null)
+			for _, count := range []string{"0", "1", "3"} {
+				mustDo(t, c, "LPOS", "missing", "value", "COUNT", count, proto.Ints())
+				mustDo(t, c, "LPOS", "missing", "value", "RANK", "-1", "COUNT", count, "MAXLEN", "2", proto.Ints())
+			}
+			assert(t, !s.Exists("missing"), "LPOS should not create a key")
+		})
+	}
+}
+
 func TestLpos(t *testing.T) {
 	s, c := runWithClient(t)
 

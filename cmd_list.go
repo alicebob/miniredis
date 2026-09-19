@@ -211,6 +211,10 @@ func (m *Miniredis) cmdLpos(c *server.Peer, cmd string, args []string) {
 		t, ok := db.keys[key]
 		if !ok {
 			// No such key
+			if countSpecified {
+				c.WriteLen(0)
+				return
+			}
 			c.WriteNull()
 			return
 		}
