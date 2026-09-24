@@ -150,6 +150,10 @@ func TestParseReply(t *testing.T) {
 			res:     "abcd",
 		},
 		{
+			payload: "*-1\r\n",
+			res:     nil,
+		},
+		{
 			payload: fmt.Sprintf("$%d\r\n%s\r\n", len(bigPayload), bigPayload),
 			res:     bigPayload,
 		},
