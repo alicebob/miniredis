@@ -2149,6 +2149,327 @@ func TestSortedSetPopMax(t *testing.T) {
 	})
 }
 
+func TestZmpop(t *testing.T) {
+	t.Run("min with default count", func(t *testing.T) {
+		s, c := runWithClient(t)
+		s.ZAdd("z", 1, "one")
+		s.ZAdd("z", 2, "two")
+
+		mustDo(t, c,
+			"ZMPOP", "1", "z", "min",
+			proto.Array(
+				proto.String("z"),
+				proto.Array(proto.Array(proto.String("one"), proto.String("1"))),
+			),
+		)
+	})
+
+	t.Run("max with default count", func(t *testing.T) {
+		s, c := runWithClient(t)
+		s.ZAdd("z", 1, "one")
+		s.ZAdd("z", 2, "two")
+
+		mustDo(t, c,
+			"ZMPOP", "1", "z", "MAX",
+			proto.Array(
+				proto.String("z"),
+				proto.Array(proto.Array(proto.String("two"), proto.String("2"))),
+			),
+		)
+	})
+
+	t.Run("count", func(t *testing.T) {
+		s, c := runWithClient(t)
+		s.ZAdd("z", 1, "one")
+		s.ZAdd("z", 2, "two")
+		s.ZAdd("z", 3, "three")
+
+		mustDo(t, c,
+			"ZMPOP", "1", "z", "MIN", "COUNT", "1",
+			proto.Array(
+				proto.String("z"),
+				proto.Array(proto.Array(proto.String("one"), proto.String("1"))),
+			),
+		)
+		mustDo(t, c,
+			"ZMPOP", "1", "z", "MIN", "COUNT", "2",
+			proto.Array(
+				proto.String("z"),
+				proto.Array(
+					proto.Array(proto.String("two"), proto.String("2")),
+					proto.Array(proto.String("three"), proto.String("3")),
+				),
+			),
+		)
+	})
+
+	t.Run("count larger than cardinality", func(t *testing.T) {
+		s, c := runWithClient(t)
+		s.ZAdd("z", 1, "one")
+		s.ZAdd("z", 2, "two")
+
+		mustDo(t, c,
+			"ZMPOP", "1", "z", "MAX", "COUNT", "10",
+			proto.Array(
+				proto.String("z"),
+				proto.Array(
+					proto.Array(proto.String("two"), proto.String("2")),
+					proto.Array(proto.String("one"), proto.String("1")),
+				),
+			),
+		)
+		equals(t, false, s.Exists("z"))
+	})
+
+	t.Run("first non-empty key", func(t *testing.T) {
+		s, c := runWithClient(t)
+		s.ZAdd("z1", 1, "one")
+		s.ZAdd("z2", 2, "two")
+
+		mustDo(t, c,
+			"ZMPOP", "3", "missing", "z1", "z2", "MIN",
+			proto.Array(
+				proto.String("z1"),
+				proto.Array(proto.Array(proto.String("one"), proto.String("1"))),
+			),
+		)
+		equals(t, true, s.Exists("z2"))
+	})
+
+	t.Run("no members", func(t *testing.T) {
+		_, c := runWithClient(t)
+		mustDo(t, c, "ZMPOP", "2", "missing1", "missing2", "MIN", proto.NilList)
+	})
+
+	t.Run("wrong type", func(t *testing.T) {
+		s, c := runWithClient(t)
+		s.Set("str", "value")
+		s.ZAdd("z", 1, "one")
+		mustDo(t, c, "ZMPOP", "2", "str", "z", "MIN", proto.Error(msgWrongType))
+
+		s.ZAdd("first", 1, "one")
+		mustDo(t, c,
+			"ZMPOP", "2", "first", "str", "MIN",
+			proto.Array(
+				proto.String("first"),
+				proto.Array(proto.Array(proto.String("one"), proto.String("1"))),
+			),
+		)
+	})
+
+	t.Run("errors", func(t *testing.T) {
+		_, c := runWithClient(t)
+		for _, args := range [][]string{
+			{"ZMPOP", "0", "z", "MIN"},
+			{"ZMPOP", "-1", "z", "MIN"},
+			{"ZMPOP", "nope", "z", "MIN"},
+		} {
+			mustDo(t, c, append(args, proto.Error("ERR numkeys should be greater than 0"))...)
+		}
+		mustDo(t, c, "ZMPOP", "2", "z", "MIN", proto.Error(msgSyntaxError))
+		mustDo(t, c, "ZMPOP", "1", "z", "MIDDLE", proto.Error(msgSyntaxError))
+		mustDo(t, c, "ZMPOP", "1", "z", "MIN", "COUNT", "0", proto.Error("ERR count should be greater than 0"))
+		mustDo(t, c, "ZMPOP", "1", "z", "MIN", "COUNT", "-1", proto.Error("ERR count should be greater than 0"))
+		mustDo(t, c, "ZMPOP", "1", "z", "MIN", "COUNT", "nope", proto.Error("ERR count should be greater than 0"))
+		mustDo(t, c, "ZMPOP", "1", "z", "MIN", "COUNT", proto.Error(msgSyntaxError))
+		mustDo(t, c, "ZMPOP", "1", "z", "MIN", "trailing", proto.Error(msgSyntaxError))
+	})
+}
+
+func TestZmpopWatch(t *testing.T) {
+	s, c := runWithClient(t)
+	c2, err := proto.Dial(s.Addr())
+	ok(t, err)
+	defer c2.Close()
+
+	s.ZAdd("z", 1, "one")
+	s.ZAdd("z", 2, "two")
+	mustOK(t, c, "WATCH", "z")
+	mustDo(t, c2,
+		"ZMPOP", "1", "z", "MIN",
+		proto.Array(
+			proto.String("z"),
+			proto.Array(proto.Array(proto.String("one"), proto.String("1"))),
+		),
+	)
+
+	mustOK(t, c, "MULTI")
+	mustDo(t, c, "SET", "transaction", "value", proto.Inline("QUEUED"))
+	mustNilList(t, c, "EXEC")
+}
+
+func TestBzmpop(t *testing.T) {
+	t.Run("immediate min", func(t *testing.T) {
+		s, c := runWithClient(t)
+		s.ZAdd("z", 1, "one")
+		s.ZAdd("z", 2, "two")
+
+		mustDo(t, c,
+			"BZMPOP", "1", "1", "z", "MIN",
+			proto.Array(
+				proto.String("z"),
+				proto.Array(proto.Array(proto.String("one"), proto.String("1"))),
+			),
+		)
+	})
+
+	t.Run("immediate max", func(t *testing.T) {
+		s, c := runWithClient(t)
+		s.ZAdd("z", 1, "one")
+		s.ZAdd("z", 2, "two")
+
+		mustDo(t, c,
+			"BZMPOP", "1", "1", "z", "MAX",
+			proto.Array(
+				proto.String("z"),
+				proto.Array(proto.Array(proto.String("two"), proto.String("2"))),
+			),
+		)
+	})
+
+	t.Run("count", func(t *testing.T) {
+		s, c := runWithClient(t)
+		s.ZAdd("z", 1, "one")
+		s.ZAdd("z", 2, "two")
+		s.ZAdd("z", 3, "three")
+
+		mustDo(t, c,
+			"BZMPOP", "1", "1", "z", "MIN", "COUNT", "2",
+			proto.Array(
+				proto.String("z"),
+				proto.Array(
+					proto.Array(proto.String("one"), proto.String("1")),
+					proto.Array(proto.String("two"), proto.String("2")),
+				),
+			),
+		)
+	})
+
+	t.Run("first non-empty key", func(t *testing.T) {
+		s, c := runWithClient(t)
+		s.ZAdd("z1", 1, "one")
+		s.ZAdd("z2", 2, "two")
+
+		mustDo(t, c,
+			"BZMPOP", "1", "3", "missing", "z1", "z2", "MIN",
+			proto.Array(
+				proto.String("z1"),
+				proto.Array(proto.Array(proto.String("one"), proto.String("1"))),
+			),
+		)
+		equals(t, true, s.Exists("z2"))
+	})
+
+	t.Run("blocking", func(t *testing.T) {
+		s, c := runWithClient(t)
+		got := goStrings(t, s, "BZMPOP", "0", "2", "z1", "z2", "MIN", "COUNT", "2")
+		mustDo(t, c, "ZADD", "z2", "1", "one", "2", "two", proto.Int(2))
+
+		select {
+		case have := <-got:
+			equals(t,
+				proto.Array(
+					proto.String("z2"),
+					proto.Array(
+						proto.Array(proto.String("one"), proto.String("1")),
+						proto.Array(proto.String("two"), proto.String("2")),
+					),
+				),
+				have,
+			)
+		case <-time.After(500 * time.Millisecond):
+			t.Error("BZMPOP took too long")
+		}
+	})
+
+	t.Run("timeout", func(t *testing.T) {
+		s := RunT(t)
+		got := goStrings(t, s, "BZMPOP", "0.1", "1", "z", "MIN")
+
+		select {
+		case have := <-got:
+			equals(t, proto.NilList, have)
+		case <-time.After(500 * time.Millisecond):
+			t.Error("BZMPOP took too long")
+		}
+	})
+
+	t.Run("lua", func(t *testing.T) {
+		t.Run("no members", func(t *testing.T) {
+			s := RunT(t)
+			got := goStrings(t, s,
+				"EVAL", `return redis.call("BZMPOP", "0", "1", "z", "MIN")`, "0",
+			)
+
+			select {
+			case have := <-got:
+				equals(t, proto.Nil, have)
+			case <-time.After(500 * time.Millisecond):
+				t.Error("BZMPOP in Lua took too long")
+			}
+		})
+
+		t.Run("member", func(t *testing.T) {
+			s, c := runWithClient(t)
+			s.ZAdd("z", 1, "one")
+
+			mustDo(t, c,
+				"EVAL", `return redis.call("BZMPOP", "0", "1", "z", "MIN")`, "0",
+				proto.Array(
+					proto.String("z"),
+					proto.Array(proto.Array(proto.String("one"), proto.String("1"))),
+				),
+			)
+		})
+	})
+
+	t.Run("wrong type", func(t *testing.T) {
+		s, c := runWithClient(t)
+		s.Set("str", "value")
+		s.ZAdd("z", 1, "one")
+		mustDo(t, c, "BZMPOP", "1", "2", "str", "z", "MIN", proto.Error(msgWrongType))
+
+		s.ZAdd("first", 1, "one")
+		mustDo(t, c,
+			"BZMPOP", "1", "2", "first", "str", "MIN",
+			proto.Array(
+				proto.String("first"),
+				proto.Array(proto.Array(proto.String("one"), proto.String("1"))),
+			),
+		)
+	})
+
+	t.Run("errors", func(t *testing.T) {
+		_, c := runWithClient(t)
+		mustDo(t, c, "BZMPOP", "notafloat", "1", "z", "MIN", proto.Error(msgInvalidTimeout))
+		for _, numkeys := range []string{"0", "-1", "nope"} {
+			mustDo(t, c, "BZMPOP", "1", numkeys, "z", "MIN", proto.Error("ERR numkeys should be greater than 0"))
+		}
+		mustDo(t, c, "BZMPOP", "1", "1", "z", "MIN", "COUNT", "0", proto.Error("ERR count should be greater than 0"))
+		mustDo(t, c, "BZMPOP", "1", "1", "z", "MIN", "COUNT", "nope", proto.Error("ERR count should be greater than 0"))
+	})
+
+	t.Run("transaction", func(t *testing.T) {
+		s, c := runWithClient(t)
+		mustOK(t, c, "MULTI")
+		mustDo(t, c, "BZMPOP", "1", "1", "z", "MIN", proto.Inline("QUEUED"))
+		mustDo(t, c, "EXEC", proto.Array(proto.NilList))
+
+		s.ZAdd("z", 1, "one")
+		mustOK(t, c, "MULTI")
+		mustDo(t, c, "BZMPOP", "1", "1", "z", "MIN", proto.Inline("QUEUED"))
+		mustDo(t, c,
+			"EXEC",
+			proto.Array(
+				proto.Array(
+					proto.String("z"),
+					proto.Array(proto.Array(proto.String("one"), proto.String("1"))),
+				),
+			),
+		)
+	})
+}
+
 // Test ZRANDMEMBER
 func TestSortedSetRandmember(t *testing.T) {
 	s, c := runWithClient(t)

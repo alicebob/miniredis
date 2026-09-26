@@ -1007,3 +1007,51 @@ func TestBzpopminmax(t *testing.T) {
 		c.Error("wrong kind", "BZPOPMIN", "str", "1")
 	})
 }
+
+func TestZmpop(t *testing.T) {
+	skip(t)
+	testRaw(t, func(c *client) {
+		c.Do("ZADD", "zmin", "1", "one", "2", "two")
+		c.Do("ZMPOP", "1", "zmin", "MIN")
+
+		c.Do("ZADD", "zmax", "1", "one", "2", "two")
+		c.Do("ZMPOP", "1", "zmax", "MAX")
+
+		c.Do("ZADD", "zcount", "1", "one", "2", "two", "3", "three")
+		c.Do("ZMPOP", "1", "zcount", "MIN", "COUNT", "2")
+
+		c.Do("ZADD", "zfirst", "1", "one")
+		c.Do("ZADD", "zsecond", "2", "two")
+		c.Do("ZMPOP", "3", "missing", "zfirst", "zsecond", "MIN")
+
+		c.Do("ZMPOP", "2", "missing1", "missing2", "MIN")
+
+		c.Do("SET", "str", "value")
+		c.Error("wrong kind", "ZMPOP", "2", "str", "zsecond", "MIN")
+		c.Error("numkeys should be greater than 0", "ZMPOP", "0", "z", "MIN")
+		c.Error("count should be greater than 0", "ZMPOP", "1", "z", "MIN", "COUNT", "0")
+	})
+}
+
+func TestBzmpop(t *testing.T) {
+	skip(t)
+	testRaw(t, func(c *client) {
+		c.Do("ZADD", "zmin", "1", "one", "2", "two")
+		c.Do("BZMPOP", "1", "1", "zmin", "MIN")
+
+		c.Do("ZADD", "zcount", "1", "one", "2", "two", "3", "three")
+		c.Do("BZMPOP", "1", "1", "zcount", "MAX", "COUNT", "2")
+
+		c.Do("ZADD", "zfirst", "1", "one")
+		c.Do("ZADD", "zsecond", "2", "two")
+		c.Do("BZMPOP", "1", "3", "missing", "zfirst", "zsecond", "MIN")
+
+		c.Do("BZMPOP", "0.1", "1", "missing", "MIN")
+
+		c.Do("SET", "str", "value")
+		c.Error("wrong kind", "BZMPOP", "1", "2", "str", "zsecond", "MIN")
+		c.Error("not a float", "BZMPOP", "notafloat", "1", "z", "MIN")
+		c.Error("numkeys should be greater than 0", "BZMPOP", "1", "0", "z", "MIN")
+		c.Error("count should be greater than 0", "BZMPOP", "1", "1", "z", "MIN", "COUNT", "0")
+	})
+}
