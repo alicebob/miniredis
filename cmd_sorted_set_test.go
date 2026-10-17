@@ -1950,6 +1950,238 @@ func TestZinterstore(t *testing.T) {
 	})
 }
 
+func TestZdiff(t *testing.T) {
+	s, c := runWithClient(t)
+
+	s.ZAdd("h1", 1.0, "field1")
+	s.ZAdd("h1", 2.0, "field2")
+	s.ZAdd("h1", 3.0, "field3")
+	s.ZAdd("h1", 3.0, "field0")
+	s.ZAdd("h2", 1.0, "field1")
+	s.SAdd("s1", "field2")
+
+	t.Run("simple case", func(t *testing.T) {
+		mustDo(t, c,
+			"ZDIFF", "2", "h1", "h2",
+			proto.Strings("field2", "field0", "field3"),
+		)
+		mustDo(t, c,
+			"ZDIFF", "3", "h1", "h2", "s1",
+			proto.Strings("field0", "field3"),
+		)
+		mustDo(t, c,
+			"ZDIFF", "1", "h1",
+			proto.Strings("field1", "field2", "field0", "field3"),
+		)
+	})
+
+	t.Run("WITHSCORES", func(t *testing.T) {
+		mustDo(t, c,
+			"ZDIFF", "2", "h1", "h2", "WiThScOrEs",
+			proto.Strings("field2", "2", "field0", "3", "field3", "3"),
+		)
+		mustDo(t, c,
+			"ZDIFF", "1", "s1", "WITHSCORES",
+			proto.Strings("field2", "1"),
+		)
+	})
+
+	t.Run("missing keys", func(t *testing.T) {
+		mustDo(t, c,
+			"ZDIFF", "2", "nosuch", "h1",
+			proto.Strings(),
+		)
+		mustDo(t, c,
+			"ZDIFF", "2", "h2", "nosuch",
+			proto.Strings("field1"),
+		)
+		mustDo(t, c,
+			"ZDIFF", "2", "h2", "h1",
+			proto.Strings(),
+		)
+	})
+
+	t.Run("errors", func(t *testing.T) {
+		mustDo(t, c,
+			"ZDIFF",
+			proto.Error(errWrongNumber("zdiff")),
+		)
+		mustDo(t, c,
+			"ZDIFF", "1",
+			proto.Error(errWrongNumber("zdiff")),
+		)
+		mustDo(t, c,
+			"ZDIFF", "noint", "h1",
+			proto.Error(msgInvalidInt),
+		)
+		mustDo(t, c,
+			"ZDIFF", "0", "h1",
+			proto.Error("ERR at least 1 input key is needed for 'zdiff' command"),
+		)
+		mustDo(t, c,
+			"ZDIFF", "-1", "h1",
+			proto.Error("ERR at least 1 input key is needed for 'zdiff' command"),
+		)
+		mustDo(t, c,
+			"ZDIFF", "2", "h1",
+			proto.Error(msgSyntaxError),
+		)
+		mustDo(t, c,
+			"ZDIFF", "1", "h1", "h2",
+			proto.Error(msgSyntaxError),
+		)
+		mustDo(t, c,
+			"ZDIFF", "1", "h1", "WEIGHTS", "1",
+			proto.Error(msgSyntaxError),
+		)
+		mustDo(t, c,
+			"ZDIFF", "1", "h1", "AGGREGATE", "sum",
+			proto.Error(msgSyntaxError),
+		)
+
+		s.Set("str", "value")
+		mustDo(t, c,
+			"ZDIFF", "1", "str",
+			proto.Error(msgWrongType),
+		)
+		mustDo(t, c,
+			"ZDIFF", "2", "h1", "str",
+			proto.Error(msgWrongType),
+		)
+		mustDo(t, c,
+			"ZDIFF", "2", "nosuch", "str",
+			proto.Error(msgWrongType),
+		)
+	})
+
+	useRESP3(t, c)
+	t.Run("RESP3", func(t *testing.T) {
+		mustDo(t, c,
+			"ZDIFF", "2", "h1", "h2",
+			proto.Strings("field2", "field0", "field3"),
+		)
+		mustDo(t, c,
+			"ZDIFF", "2", "h1", "h2", "WITHSCORES",
+			proto.Array(
+				proto.Array(proto.String("field2"), proto.Float(2)),
+				proto.Array(proto.String("field0"), proto.Float(3)),
+				proto.Array(proto.String("field3"), proto.Float(3)),
+			),
+		)
+	})
+}
+
+func TestZdiffstore(t *testing.T) {
+	s, c := runWithClient(t)
+
+	s.ZAdd("h1", 1.0, "field1")
+	s.ZAdd("h1", 2.0, "field2")
+	s.ZAdd("h1", 3.0, "field3")
+	s.ZAdd("h2", 1.0, "field1")
+	s.SAdd("s1", "field2")
+
+	t.Run("simple case", func(t *testing.T) {
+		mustDo(t, c,
+			"ZDIFFSTORE", "new", "2", "h1", "h2",
+			proto.Int(2),
+		)
+		ss, err := s.SortedSet("new")
+		ok(t, err)
+		equals(t, map[string]float64{"field2": 2, "field3": 3}, ss)
+
+		mustDo(t, c,
+			"ZDIFFSTORE", "new", "3", "h1", "h2", "s1",
+			proto.Int(1),
+		)
+		ss, err = s.SortedSet("new")
+		ok(t, err)
+		equals(t, map[string]float64{"field3": 3}, ss)
+	})
+
+	t.Run("normal set", func(t *testing.T) {
+		mustDo(t, c,
+			"ZDIFFSTORE", "fromset", "1", "s1",
+			proto.Int(1),
+		)
+		ss, err := s.SortedSet("fromset")
+		ok(t, err)
+		equals(t, map[string]float64{"field2": 1}, ss)
+	})
+
+	t.Run("overwrite", func(t *testing.T) {
+		s.Set("str", "value")
+		s.SetTTL("str", time.Minute)
+		mustDo(t, c,
+			"ZDIFFSTORE", "str", "2", "h1", "h2",
+			proto.Int(2),
+		)
+		ss, err := s.SortedSet("str")
+		ok(t, err)
+		equals(t, map[string]float64{"field2": 2, "field3": 3}, ss)
+		equals(t, time.Duration(0), s.TTL("str"))
+	})
+
+	t.Run("empty result deletes destination", func(t *testing.T) {
+		s.ZAdd("dest", 1.0, "field1")
+		mustDo(t, c,
+			"ZDIFFSTORE", "dest", "2", "h2", "h1",
+			proto.Int(0),
+		)
+		equals(t, false, s.Exists("dest"))
+
+		mustDo(t, c,
+			"ZDIFFSTORE", "dest", "1", "nosuch",
+			proto.Int(0),
+		)
+		equals(t, false, s.Exists("dest"))
+	})
+
+	t.Run("store into source", func(t *testing.T) {
+		s.ZAdd("src", 1.0, "field1")
+		s.ZAdd("src", 5.0, "field5")
+		mustDo(t, c,
+			"ZDIFFSTORE", "src", "2", "src", "h2",
+			proto.Int(1),
+		)
+		ss, err := s.SortedSet("src")
+		ok(t, err)
+		equals(t, map[string]float64{"field5": 5}, ss)
+	})
+
+	t.Run("errors", func(t *testing.T) {
+		mustDo(t, c,
+			"ZDIFFSTORE",
+			proto.Error(errWrongNumber("zdiffstore")),
+		)
+		mustDo(t, c,
+			"ZDIFFSTORE", "dest", "1",
+			proto.Error(errWrongNumber("zdiffstore")),
+		)
+		mustDo(t, c,
+			"ZDIFFSTORE", "dest", "noint", "h1",
+			proto.Error(msgInvalidInt),
+		)
+		mustDo(t, c,
+			"ZDIFFSTORE", "dest", "0", "h1",
+			proto.Error("ERR at least 1 input key is needed for 'zdiffstore' command"),
+		)
+		mustDo(t, c,
+			"ZDIFFSTORE", "dest", "2", "h1",
+			proto.Error(msgSyntaxError),
+		)
+		mustDo(t, c,
+			"ZDIFFSTORE", "dest", "1", "h1", "WITHSCORES",
+			proto.Error(msgSyntaxError),
+		)
+
+		s.Set("string", "value")
+		mustDo(t, c,
+			"ZDIFFSTORE", "dest", "2", "h1", "string",
+			proto.Error(msgWrongType),
+		)
+	})
+}
+
 func TestSSRange(t *testing.T) {
 	ss := newSortedSet()
 	ss.set(1.0, "key1")

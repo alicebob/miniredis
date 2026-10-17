@@ -22,6 +22,8 @@ func commandsSortedSet(m *Miniredis) {
 	m.srv.Register("ZADD", m.cmdZadd)
 	m.srv.Register("ZCARD", m.cmdZcard, server.ReadOnlyOption())
 	m.srv.Register("ZCOUNT", m.cmdZcount, server.ReadOnlyOption())
+	m.srv.Register("ZDIFF", m.cmdZdiff, server.ReadOnlyOption())
+	m.srv.Register("ZDIFFSTORE", m.cmdZdiffstore)
 	m.srv.Register("ZINCRBY", m.cmdZincrby)
 	m.srv.Register("ZINTER", m.makeCmdZinter(false), server.ReadOnlyOption())
 	m.srv.Register("ZINTERSTORE", m.makeCmdZinter(true))
@@ -262,6 +264,146 @@ func (m *Miniredis) cmdZcount(c *server.Peer, cmd string, args []string) {
 		members = withSSRange(members, opts.min, opts.minIncl, opts.max, opts.maxIncl)
 		c.WriteInt(len(members))
 	})
+}
+
+// ZDIFF
+func (m *Miniredis) cmdZdiff(c *server.Peer, cmd string, args []string) {
+	if !m.isValidCMD(c, cmd, args, atLeast(2)) {
+		return
+	}
+
+	keys, args, ok := parseZdiffKeys(c, cmd, args)
+	if !ok {
+		return
+	}
+	withScores := false
+	for _, arg := range args {
+		if strings.ToUpper(arg) != "WITHSCORES" {
+			setDirty(c)
+			c.WriteError(msgSyntaxError)
+			return
+		}
+		withScores = true
+	}
+
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
+		db := m.db(ctx.selectedDB)
+
+		sset, err := executeZDiff(db, keys)
+		if err != nil {
+			c.WriteError(err.Error())
+			return
+		}
+
+		elems := sset.byScore(asc)
+		if withScores && !c.Resp3 {
+			c.WriteLen(len(elems) * 2)
+		} else {
+			c.WriteLen(len(elems))
+		}
+		for _, el := range elems {
+			if withScores && c.Resp3 {
+				c.WriteLen(2)
+			}
+			c.WriteBulk(el.member)
+			if withScores {
+				c.WriteFloat(el.score)
+			}
+		}
+	})
+}
+
+// ZDIFFSTORE
+func (m *Miniredis) cmdZdiffstore(c *server.Peer, cmd string, args []string) {
+	if !m.isValidCMD(c, cmd, args, atLeast(3)) {
+		return
+	}
+
+	destination := args[0]
+	keys, args, ok := parseZdiffKeys(c, cmd, args[1:])
+	if !ok {
+		return
+	}
+	if len(args) > 0 {
+		setDirty(c)
+		c.WriteError(msgSyntaxError)
+		return
+	}
+
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
+		db := m.db(ctx.selectedDB)
+
+		sset, err := executeZDiff(db, keys)
+		if err != nil {
+			c.WriteError(err.Error())
+			return
+		}
+
+		db.del(destination, true)
+		if sset.card() > 0 {
+			db.ssetSet(destination, sset)
+		}
+		c.WriteInt(sset.card())
+	})
+}
+
+// parseZdiffKeys parses the "numkeys key [key ...]" arguments of ZDIFF and
+// ZDIFFSTORE. It returns the keys and the remaining arguments.
+func parseZdiffKeys(c *server.Peer, cmd string, args []string) ([]string, []string, bool) {
+	numKeys, err := strconv.Atoi(args[0])
+	if err != nil {
+		setDirty(c)
+		c.WriteError(msgInvalidInt)
+		return nil, nil, false
+	}
+	if numKeys < 1 {
+		setDirty(c)
+		c.WriteError(fmt.Sprintf("ERR at least 1 input key is needed for '%s' command", strings.ToLower(cmd)))
+		return nil, nil, false
+	}
+	args = args[1:]
+	if len(args) < numKeys {
+		setDirty(c)
+		c.WriteError(msgSyntaxError)
+		return nil, nil, false
+	}
+	return args[:numKeys], args[numKeys:], true
+}
+
+// executeZDiff returns the members of the first key which are not in any of
+// the other keys, with their scores from the first key. Normal sets are
+// handled as sorted sets with all scores set to 1.
+func executeZDiff(db *RedisDB, keys []string) (sortedSet, error) {
+	sets := make([]map[string]float64, len(keys))
+	for i, key := range keys {
+		if !db.exists(key) {
+			continue
+		}
+		switch db.t(key) {
+		case keyTypeSet:
+			set := map[string]float64{}
+			for elem := range db.setKeys[key] {
+				set[elem] = 1.0
+			}
+			sets[i] = set
+		case keyTypeSortedSet:
+			sets[i] = db.sortedSet(key)
+		default:
+			return nil, errors.New(msgWrongType)
+		}
+	}
+
+	sset := sortedSet{}
+outer:
+	for member, score := range sets[0] {
+		for _, other := range sets[1:] {
+			if _, ok := other[member]; ok {
+				continue outer
+			}
+		}
+		sset[member] = score
+	}
+	return sset, nil
 }
 
 // ZINCRBY

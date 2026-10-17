@@ -884,6 +884,121 @@ func TestZinter(t *testing.T) {
 	})
 }
 
+func TestZdiff(t *testing.T) {
+	skip(t)
+	// ZDIFF
+	testRaw(t, func(c *client) {
+		// example from the docs https://redis.io/commands/zdiff
+		c.Do("ZADD", "zset1", "1", "one")
+		c.Do("ZADD", "zset1", "2", "two")
+		c.Do("ZADD", "zset1", "3", "three")
+		c.Do("ZADD", "zset2", "1", "one")
+		c.Do("ZADD", "zset2", "2", "two")
+		c.Do("ZDIFF", "2", "zset1", "zset2")
+		c.Do("ZDIFF", "2", "zset1", "zset2", "WITHSCORES")
+
+		c.Do("ZADD", "h1", "1.0", "key1")
+		c.Do("ZADD", "h1", "2.0", "key2")
+		c.Do("ZADD", "h1", "3.0", "key3")
+		c.Do("ZADD", "h1", "3.0", "key0")
+		c.Do("ZADD", "h1", "-inf", "key4")
+		c.Do("ZADD", "h2", "1.0", "key1")
+		c.Do("ZDIFF", "1", "h1", "WITHSCORES")
+		c.Do("ZDIFF", "2", "h1", "h2", "withscores", "WITHSCORES")
+		c.Do("ZDIFF", "3", "h1", "h2", "zset1")
+		c.Do("ZDIFF", "2", "h2", "h1")
+		c.Do("ZDIFF", "2", "nosuch", "h1")
+		c.Do("ZDIFF", "2", "h1", "nosuch")
+
+		// normal set
+		c.Do("SADD", "s1", "key2", "key5")
+		c.Do("ZDIFF", "2", "h1", "s1", "WITHSCORES")
+		c.Do("ZDIFF", "2", "s1", "h1", "WITHSCORES")
+
+		// Error cases
+		c.Error("wrong number", "ZDIFF")
+		c.Error("wrong number", "ZDIFF", "1")
+		c.Error("not an integer", "ZDIFF", "noint", "h1")
+		c.Error("at least 1", "ZDIFF", "0", "h1")
+		c.Error("at least 1", "ZDIFF", "-1", "h1")
+		c.Error("syntax error", "ZDIFF", "2", "h1")
+		c.Error("syntax error", "ZDIFF", "1", "h1", "h2")
+		c.Error("syntax error", "ZDIFF", "1", "h1", "WEIGHTS", "1")
+		c.Error("syntax error", "ZDIFF", "1", "h1", "AGGREGATE", "sum")
+		c.Do("SET", "str", "1")
+		c.Error("wrong kind", "ZDIFF", "1", "str")
+		c.Error("wrong kind", "ZDIFF", "2", "h1", "str")
+		c.Error("wrong kind", "ZDIFF", "2", "nosuch", "str")
+	})
+
+	testRESP3(t, func(c *client) {
+		c.Do("ZADD", "h1", "1.0", "key1")
+		c.Do("ZADD", "h1", "2.0", "key2")
+		c.Do("ZADD", "h2", "1.0", "key1")
+		c.Do("ZDIFF", "2", "h1", "h2")
+		c.Do("ZDIFF", "2", "h1", "h2", "WITHSCORES")
+		c.Do("ZDIFF", "2", "nosuch", "h2", "WITHSCORES")
+	})
+
+	// ZDIFFSTORE
+	testRaw(t, func(c *client) {
+		c.Do("ZADD", "h1", "1.0", "key1")
+		c.Do("ZADD", "h1", "2.0", "key2")
+		c.Do("ZADD", "h1", "3.0", "key3")
+		c.Do("ZADD", "h2", "1.0", "key1")
+		c.Do("ZDIFFSTORE", "res", "2", "h1", "h2")
+		c.Do("ZRANGE", "res", "0", "-1", "WITHSCORES")
+
+		// normal set
+		c.Do("SADD", "s1", "key2")
+		c.Do("ZDIFFSTORE", "res", "3", "h1", "h2", "s1")
+		c.Do("ZRANGE", "res", "0", "-1", "WITHSCORES")
+		c.Do("ZDIFFSTORE", "fromset", "1", "s1")
+		c.Do("ZRANGE", "fromset", "0", "-1", "WITHSCORES")
+
+		// overwrite, TTL is gone
+		c.Do("SET", "str", "1")
+		c.Do("EXPIRE", "str", "100")
+		c.Do("ZDIFFSTORE", "str", "2", "h1", "h2")
+		c.Do("TYPE", "str")
+		c.Do("TTL", "str")
+
+		// empty result removes the destination
+		c.Do("ZDIFFSTORE", "res", "2", "h2", "h1")
+		c.Do("EXISTS", "res")
+		c.Do("ZDIFFSTORE", "res", "1", "nosuch")
+		c.Do("EXISTS", "res")
+
+		// store into self
+		c.Do("ZDIFFSTORE", "h1", "2", "h1", "h2")
+		c.Do("ZRANGE", "h1", "0", "-1", "WITHSCORES")
+
+		// Error cases
+		c.Error("wrong number", "ZDIFFSTORE")
+		c.Error("wrong number", "ZDIFFSTORE", "dest")
+		c.Error("wrong number", "ZDIFFSTORE", "dest", "1")
+		c.Error("not an integer", "ZDIFFSTORE", "dest", "noint", "h1")
+		c.Error("at least 1", "ZDIFFSTORE", "dest", "0", "h1")
+		c.Error("syntax error", "ZDIFFSTORE", "dest", "2", "h1")
+		c.Error("syntax error", "ZDIFFSTORE", "dest", "1", "h1", "WITHSCORES")
+		c.Do("SET", "str", "1")
+		c.Error("wrong kind", "ZDIFFSTORE", "dest", "2", "h1", "str")
+	})
+
+	testRaw(t, func(c *client) {
+		c.Do("ZADD", "h1", "1.0", "key1", "2.0", "key2", "3.0", "key3")
+		c.Do("ZADD", "h2", "1.0", "key1")
+		c.Do("MULTI")
+		c.Do("ZDIFF", "2", "h1", "h2", "WITHSCORES")
+		c.Do("ZDIFFSTORE", "res", "2", "h1", "h2")
+		c.Do("ZRANGE", "res", "0", "-1", "WITHSCORES")
+		c.Do("EXEC")
+
+		c.Do("EVAL", "return redis.call('ZDIFF', '2', KEYS[1], KEYS[2], 'WITHSCORES')", "2", "h1", "h2")
+		c.Do("EVAL", "return redis.call('ZDIFFSTORE', KEYS[1], '2', KEYS[2], KEYS[3])", "3", "res2", "h1", "h2")
+	})
+}
+
 func TestZpopminmax(t *testing.T) {
 	skip(t)
 	testRaw(t, func(c *client) {
