@@ -283,6 +283,8 @@ func TestHrandfield(t *testing.T) {
 
 		c.Error("ERR syntax error", "HRANDFIELD", "foo", "1", "2")
 		c.Error("ERR wrong number", "HRANDFIELD")
+		c.Do("SET", "nothash", "1")
+		c.Error("wrong kind of value", "HRANDFIELD", "nothash")
 	})
 }
 

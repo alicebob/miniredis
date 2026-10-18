@@ -714,6 +714,120 @@ func TestLlen(t *testing.T) {
 	)
 }
 
+func TestLmpop(t *testing.T) {
+	t.Run("left and right", func(t *testing.T) {
+		s, c := runWithClient(t)
+		s.Push("l", "aap", "noot", "mies", "vuur")
+
+		mustDo(t, c,
+			"LMPOP", "1", "l", "LEFT",
+			proto.Array(proto.String("l"), proto.Strings("aap")),
+		)
+		mustDo(t, c,
+			"LMPOP", "1", "l", "right",
+			proto.Array(proto.String("l"), proto.Strings("vuur")),
+		)
+		l, err := s.List("l")
+		ok(t, err)
+		equals(t, []string{"noot", "mies"}, l)
+	})
+
+	t.Run("count", func(t *testing.T) {
+		s, c := runWithClient(t)
+		s.Push("l", "aap", "noot", "mies", "vuur")
+
+		mustDo(t, c,
+			"LMPOP", "1", "l", "LEFT", "COUNT", "2",
+			proto.Array(proto.String("l"), proto.Strings("aap", "noot")),
+		)
+		mustDo(t, c,
+			"LMPOP", "1", "l", "RIGHT", "count", "10",
+			proto.Array(proto.String("l"), proto.Strings("vuur", "mies")),
+		)
+		equals(t, false, s.Exists("l"))
+	})
+
+	t.Run("first non-empty key", func(t *testing.T) {
+		s, c := runWithClient(t)
+		s.Push("l1", "aap")
+		s.Push("l2", "noot")
+
+		mustDo(t, c,
+			"LMPOP", "3", "nosuch", "l1", "l2", "LEFT", "COUNT", "5",
+			proto.Array(proto.String("l1"), proto.Strings("aap")),
+		)
+		equals(t, false, s.Exists("l1"))
+		equals(t, true, s.Exists("l2"))
+	})
+
+	t.Run("no elements", func(t *testing.T) {
+		_, c := runWithClient(t)
+		mustNilList(t, c, "LMPOP", "2", "nosuch1", "nosuch2", "LEFT")
+	})
+
+	t.Run("wrong type", func(t *testing.T) {
+		s, c := runWithClient(t)
+		s.Set("str", "value")
+		s.Push("l", "aap")
+
+		mustDo(t, c, "LMPOP", "2", "str", "l", "LEFT", proto.Error(msgWrongType))
+		mustDo(t, c, "LMPOP", "2", "nosuch", "str", "LEFT", proto.Error(msgWrongType))
+		mustDo(t, c,
+			"LMPOP", "2", "l", "str", "LEFT",
+			proto.Array(proto.String("l"), proto.Strings("aap")),
+		)
+	})
+
+	t.Run("errors", func(t *testing.T) {
+		_, c := runWithClient(t)
+		mustDo(t, c, "LMPOP", proto.Error(errWrongNumber("lmpop")))
+		mustDo(t, c, "LMPOP", "1", "l", proto.Error(errWrongNumber("lmpop")))
+		for _, args := range [][]string{
+			{"LMPOP", "0", "l", "LEFT"},
+			{"LMPOP", "-1", "l", "LEFT"},
+			{"LMPOP", "noint", "l", "LEFT"},
+		} {
+			mustDo(t, c, append(args, proto.Error("ERR numkeys should be greater than 0"))...)
+		}
+		mustDo(t, c, "LMPOP", "2", "l", "LEFT", proto.Error(msgSyntaxError))
+		mustDo(t, c, "LMPOP", "1", "l", "MIDDLE", proto.Error(msgSyntaxError))
+		mustDo(t, c, "LMPOP", "1", "l", "LEFT", "COUNT", "0", proto.Error("ERR count should be greater than 0"))
+		mustDo(t, c, "LMPOP", "1", "l", "LEFT", "COUNT", "-1", proto.Error("ERR count should be greater than 0"))
+		mustDo(t, c, "LMPOP", "1", "l", "LEFT", "COUNT", "noint", proto.Error("ERR count should be greater than 0"))
+		mustDo(t, c, "LMPOP", "1", "l", "LEFT", "COUNT", proto.Error(msgSyntaxError))
+		mustDo(t, c, "LMPOP", "1", "l", "LEFT", "COUNT", "1", "COUNT", "2", proto.Error(msgSyntaxError))
+		mustDo(t, c, "LMPOP", "1", "l", "LEFT", "trailing", proto.Error(msgSyntaxError))
+	})
+
+	t.Run("MULTI", func(t *testing.T) {
+		s, c := runWithClient(t)
+		s.Push("l", "aap", "noot")
+
+		mustOK(t, c, "MULTI")
+		mustDo(t, c, "LMPOP", "1", "l", "LEFT", proto.Inline("QUEUED"))
+		mustDo(t, c, "LMPOP", "1", "nosuch", "LEFT", proto.Inline("QUEUED"))
+		mustDo(t, c,
+			"EXEC",
+			proto.Array(
+				proto.Array(proto.String("l"), proto.Strings("aap")),
+				proto.NilList,
+			),
+		)
+	})
+
+	t.Run("RESP3", func(t *testing.T) {
+		s, c := runWithClient(t)
+		s.Push("l", "aap", "noot")
+
+		useRESP3(t, c)
+		mustDo(t, c,
+			"LMPOP", "1", "l", "RIGHT",
+			proto.Array(proto.String("l"), proto.Strings("noot")),
+		)
+		mustDo(t, c, "LMPOP", "1", "nosuch", "LEFT", proto.NilResp3)
+	})
+}
+
 func TestLtrim(t *testing.T) {
 	s, c := runWithClient(t)
 

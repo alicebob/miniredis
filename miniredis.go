@@ -59,6 +59,7 @@ type Miniredis struct {
 	sync.Mutex
 	srv         *server.Server
 	nextPreHook server.Hook
+	ip          string
 	port        int
 	passwords   map[string]string // username password
 	dbs         map[int]*RedisDB
@@ -221,6 +222,7 @@ func (m *Miniredis) startLocked(s *server.Server) error {
 	s.SetPreHook(m.nextPreHook)
 	m.nextPreHook = nil
 	if a := s.Addr(); a != nil {
+		m.ip = a.IP.String()
 		m.port = a.Port
 	}
 
@@ -296,7 +298,6 @@ func (m *Miniredis) Close() {
 
 	// the OnDisconnect callbacks can lock m, so run Close() outside the lock.
 	srv.Close()
-
 }
 
 // RequireAuth makes every connection need to AUTH first. This is the old 'AUTH [password] command.

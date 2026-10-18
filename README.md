@@ -127,6 +127,7 @@ Implemented commands:
    - LINDEX
    - LINSERT
    - LLEN
+   - LMPOP
    - LPOP
    - LPUSH
    - LPUSHX
@@ -172,6 +173,8 @@ Implemented commands:
    - ZADD
    - ZCARD
    - ZCOUNT
+   - ZDIFF
+   - ZDIFFSTORE
    - ZINCRBY
    - ZINTER
    - ZINTERCARD

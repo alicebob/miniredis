@@ -256,6 +256,68 @@ func TestLlen(t *testing.T) {
 	})
 }
 
+func TestLmpop(t *testing.T) {
+	skip(t)
+	testRaw(t, func(c *client) {
+		c.Do("RPUSH", "l", "aap", "noot", "mies", "vuur", "wim")
+		c.Do("LMPOP", "1", "l", "LEFT")
+		c.Do("LMPOP", "1", "l", "right")
+		c.Do("LMPOP", "1", "l", "LEFT", "COUNT", "2")
+		c.Do("LMPOP", "1", "l", "LEFT", "count", "10")
+		c.Do("EXISTS", "l")
+
+		c.Do("RPUSH", "l1", "aap")
+		c.Do("RPUSH", "l2", "noot", "mies")
+		c.Do("LMPOP", "3", "nosuch", "l2", "l1", "RIGHT", "COUNT", "5")
+		c.Do("LMPOP", "3", "nosuch", "l2", "l1", "RIGHT")
+		c.Do("LMPOP", "2", "nosuch1", "nosuch2", "LEFT")
+
+		// failure cases
+		c.Do("SET", "str", "I am a string")
+		c.Error("wrong kind", "LMPOP", "2", "str", "l1", "LEFT")
+		c.Error("wrong kind", "LMPOP", "2", "nosuch", "str", "LEFT")
+		c.Do("RPUSH", "l3", "aap")
+		c.Do("LMPOP", "2", "l3", "str", "LEFT")
+		c.Error("wrong number", "LMPOP")
+		c.Error("wrong number", "LMPOP", "1")
+		c.Error("wrong number", "LMPOP", "1", "l")
+		c.Error("numkeys should be greater than 0", "LMPOP", "0", "l", "LEFT")
+		c.Error("numkeys should be greater than 0", "LMPOP", "-1", "l", "LEFT")
+		c.Error("numkeys should be greater than 0", "LMPOP", "noint", "l", "LEFT")
+		c.Error("syntax error", "LMPOP", "2", "l", "LEFT")
+		c.Error("syntax error", "LMPOP", "1", "l", "MIDDLE")
+		c.Error("count should be greater than 0", "LMPOP", "1", "l", "LEFT", "COUNT", "0")
+		c.Error("count should be greater than 0", "LMPOP", "1", "l", "LEFT", "COUNT", "-1")
+		c.Error("count should be greater than 0", "LMPOP", "1", "l", "LEFT", "COUNT", "noint")
+		c.Error("syntax error", "LMPOP", "1", "l", "LEFT", "COUNT")
+		c.Error("syntax error", "LMPOP", "1", "l", "LEFT", "COUNT", "1", "COUNT", "2")
+		c.Error("syntax error", "LMPOP", "1", "l", "LEFT", "foo")
+	})
+
+	testRaw(t, func(c *client) {
+		c.Do("RPUSH", "l", "aap", "noot")
+		c.Do("MULTI")
+		c.Do("LMPOP", "1", "l", "LEFT")
+		c.Do("LMPOP", "1", "nosuch", "LEFT")
+		c.Do("EXEC")
+	})
+
+	testRaw(t, func(c *client) {
+		c.Do("RPUSH", "l", "aap", "noot")
+		c.Do("EVAL", "return redis.call('LMPOP', '1', KEYS[1], 'LEFT', 'COUNT', '5')", "1", "l")
+		c.Do("EVAL", "return redis.call('LMPOP', '1', KEYS[1], 'LEFT')", "1", "l")
+	})
+
+	t.Run("resp3", func(t *testing.T) {
+		testRESP3(t, func(c *client) {
+			c.Do("RPUSH", "l", "aap", "noot", "mies")
+			c.Do("LMPOP", "1", "l", "LEFT")
+			c.Do("LMPOP", "1", "l", "RIGHT", "COUNT", "9")
+			c.Do("LMPOP", "1", "nosuch", "LEFT")
+		})
+	})
+}
+
 func TestLtrim(t *testing.T) {
 	skip(t)
 	testRaw(t, func(c *client) {

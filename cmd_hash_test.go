@@ -679,11 +679,30 @@ func TestHashRandField(t *testing.T) {
 		assert(t, len(keyMap) <= 4, "HRANDFIELD looks sane")
 	}
 
-	// Wrong key type
+	// Non-integer count
 	mustDo(t, c,
 		"HRANDFIELD", "wim", "zus",
 		proto.Error(msgInvalidInt),
 	)
+
+	t.Run("wrong type", func(t *testing.T) {
+		s, c := runWithClient(t)
+
+		s.HSet("wim", "zus", "jet")
+		s.Set("str", "not a hash")
+
+		// HRANDFIELD is a hash command: it must reject other key types, just like
+		// HGET/HKEYS/HVALS/HSCAN/... do.
+		mustDo(t, c, "HRANDFIELD", "str", proto.Error(msgWrongType))
+		mustDo(t, c, "HRANDFIELD", "str", "3", proto.Error(msgWrongType))
+		mustDo(t, c, "HRANDFIELD", "str", "-3", proto.Error(msgWrongType))
+		mustDo(t, c, "HRANDFIELD", "str", "3", "WITHVALUES", proto.Error(msgWrongType))
+		mustDo(t, c, "HRANDFIELD", "str", "-3", "WITHVALUES", proto.Error(msgWrongType))
+
+		// a missing key is not a wrong type
+		mustNil(t, c, "HRANDFIELD", "nosuch")
+		mustDo(t, c, "HRANDFIELD", "nosuch", "2", proto.Strings())
+	})
 }
 
 func TestParseHExpireArgs(t *testing.T) {
