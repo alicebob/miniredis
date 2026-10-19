@@ -935,6 +935,18 @@ func TestZinter(t *testing.T) {
 		c.Error("wrong kind", "ZINTERCARD", "2", "h1", "str")
 		c.Error("wrong kind", "ZINTERCARD", "2", "nosuch", "str")
 	})
+
+	testRaw(t, func(c *client) {
+		c.Do("ZADD", "h1", "1.0", "key1", "2.0", "key2", "3.0", "key3")
+		c.Do("ZADD", "h2", "1.0", "key1", "2.0", "key2")
+		c.Do("MULTI")
+		c.Do("ZINTERCARD", "2", "h1", "h2")
+		c.Do("ZINTERCARD", "2", "h1", "h2", "LIMIT", "1")
+		c.Do("EXEC")
+
+		c.Do("EVAL", "return redis.call('ZINTERCARD', '2', KEYS[1], KEYS[2])", "2", "h1", "h2")
+		c.Do("EVAL", "return redis.call('ZINTERCARD', '2', KEYS[1], KEYS[2], 'LIMIT', '1')", "2", "h1", "h2")
+	})
 }
 
 func TestZdiff(t *testing.T) {
