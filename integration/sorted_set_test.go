@@ -882,6 +882,71 @@ func TestZinter(t *testing.T) {
 		c.Do("SET", "str", "1")
 		c.Error("wrong kind", "ZINTERSTORE", "h", "1", "str")
 	})
+
+	// ZINTERCARD
+	testRaw(t, func(c *client) {
+		// example from the docs https://redis.io/commands/zintercard
+		c.Do("ZADD", "zset1", "1", "one")
+		c.Do("ZADD", "zset1", "2", "two")
+		c.Do("ZADD", "zset2", "1", "one")
+		c.Do("ZADD", "zset2", "2", "two")
+		c.Do("ZADD", "zset2", "3", "three")
+		c.Do("ZINTER", "2", "zset1", "zset2")
+		c.Do("ZINTERCARD", "2", "zset1", "zset2")
+		c.Do("ZINTERCARD", "2", "zset1", "zset2", "LIMIT", "1")
+
+		c.Do("ZADD", "h1", "1.0", "key1")
+		c.Do("ZADD", "h1", "2.0", "key2")
+		c.Do("ZADD", "h1", "3.0", "key3")
+		c.Do("ZADD", "h1", "4.0", "key4")
+		c.Do("ZADD", "h2", "1.0", "key1")
+		c.Do("ZADD", "h2", "5.0", "key2")
+		c.Do("ZADD", "h2", "6.0", "key3")
+		c.Do("ZINTERCARD", "1", "h1")
+		c.Do("ZINTERCARD", "2", "h1", "h2")
+		c.Do("ZINTERCARD", "2", "h1", "h2", "LIMIT", "0")
+		c.Do("ZINTERCARD", "2", "h1", "h2", "limit", "2")
+		c.Do("ZINTERCARD", "2", "h1", "h2", "LIMIT", "3")
+		c.Do("ZINTERCARD", "2", "h1", "h2", "LIMIT", "10")
+		c.Do("ZINTERCARD", "2", "h1", "h2", "LIMIT", "1", "LIMIT", "2")
+		c.Do("ZINTERCARD", "2", "h1", "nosuch")
+		c.Do("ZINTERCARD", "2", "nosuch", "h1")
+
+		// normal set
+		c.Do("SADD", "s1", "key1", "key2", "other")
+		c.Do("ZINTERCARD", "3", "h1", "h2", "s1")
+		c.Do("ZINTERCARD", "1", "s1")
+
+		// Error cases
+		c.Error("wrong number", "ZINTERCARD")
+		c.Error("wrong number", "ZINTERCARD", "1")
+		c.Error("not an integer", "ZINTERCARD", "noint", "h1")
+		c.Error("at least 1", "ZINTERCARD", "0", "h1")
+		c.Error("at least 1", "ZINTERCARD", "-1", "h1")
+		c.Error("syntax error", "ZINTERCARD", "3", "h1", "h2")
+		c.Error("syntax error", "ZINTERCARD", "2", "h1", "h2", "LIMIT")
+		c.Error("syntax error", "ZINTERCARD", "2", "h1", "h2", "foo")
+		c.Error("syntax error", "ZINTERCARD", "2", "h1", "h2", "WITHSCORES")
+		c.Error("syntax error", "ZINTERCARD", "2", "h1", "h2", "WEIGHTS", "1", "2")
+		c.Error("can't be negative", "ZINTERCARD", "2", "h1", "h2", "LIMIT", "-1")
+		c.Error("can't be negative", "ZINTERCARD", "2", "h1", "h2", "LIMIT", "noint")
+		c.Do("SET", "str", "1")
+		c.Error("wrong kind", "ZINTERCARD", "1", "str")
+		c.Error("wrong kind", "ZINTERCARD", "2", "h1", "str")
+		c.Error("wrong kind", "ZINTERCARD", "2", "nosuch", "str")
+	})
+
+	testRaw(t, func(c *client) {
+		c.Do("ZADD", "h1", "1.0", "key1", "2.0", "key2", "3.0", "key3")
+		c.Do("ZADD", "h2", "1.0", "key1", "2.0", "key2")
+		c.Do("MULTI")
+		c.Do("ZINTERCARD", "2", "h1", "h2")
+		c.Do("ZINTERCARD", "2", "h1", "h2", "LIMIT", "1")
+		c.Do("EXEC")
+
+		c.Do("EVAL", "return redis.call('ZINTERCARD', '2', KEYS[1], KEYS[2])", "2", "h1", "h2")
+		c.Do("EVAL", "return redis.call('ZINTERCARD', '2', KEYS[1], KEYS[2], 'LIMIT', '1')", "2", "h1", "h2")
+	})
 }
 
 func TestZdiff(t *testing.T) {

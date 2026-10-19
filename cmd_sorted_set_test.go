@@ -1823,6 +1823,133 @@ func TestZinter(t *testing.T) {
 	// it's the same code as ZINTERSTORE, so see TestZinterstore()
 }
 
+func TestZintercard(t *testing.T) {
+	s, c := runWithClient(t)
+
+	s.ZAdd("h1", 1.0, "field1")
+	s.ZAdd("h1", 2.0, "field2")
+	s.ZAdd("h1", 3.0, "field3")
+	s.ZAdd("h1", 4.0, "field4")
+	s.ZAdd("h2", 1.0, "field1")
+	s.ZAdd("h2", 5.0, "field2")
+	s.ZAdd("h2", 6.0, "field3")
+	s.SAdd("s1", "field1", "field2", "other")
+
+	t.Run("simple case", func(t *testing.T) {
+		mustDo(t, c,
+			"ZINTERCARD", "2", "h1", "h2",
+			proto.Int(3),
+		)
+		mustDo(t, c,
+			"ZINTERCARD", "1", "h1",
+			proto.Int(4),
+		)
+		mustDo(t, c,
+			"ZINTERCARD", "3", "h1", "h2", "s1",
+			proto.Int(2),
+		)
+		mustDo(t, c,
+			"ZINTERCARD", "1", "s1",
+			proto.Int(3),
+		)
+	})
+
+	t.Run("LIMIT", func(t *testing.T) {
+		mustDo(t, c,
+			"ZINTERCARD", "2", "h1", "h2", "LIMIT", "0",
+			proto.Int(3),
+		)
+		mustDo(t, c,
+			"ZINTERCARD", "2", "h1", "h2", "limit", "1",
+			proto.Int(1),
+		)
+		mustDo(t, c,
+			"ZINTERCARD", "2", "h1", "h2", "LIMIT", "2",
+			proto.Int(2),
+		)
+		mustDo(t, c,
+			"ZINTERCARD", "2", "h1", "h2", "LIMIT", "10",
+			proto.Int(3),
+		)
+		mustDo(t, c,
+			"ZINTERCARD", "2", "h1", "h2", "LIMIT", "1", "LIMIT", "2",
+			proto.Int(2),
+		)
+	})
+
+	t.Run("missing keys", func(t *testing.T) {
+		mustDo(t, c,
+			"ZINTERCARD", "2", "h1", "nosuch",
+			proto.Int(0),
+		)
+		mustDo(t, c,
+			"ZINTERCARD", "1", "nosuch",
+			proto.Int(0),
+		)
+	})
+
+	t.Run("errors", func(t *testing.T) {
+		mustDo(t, c,
+			"ZINTERCARD",
+			proto.Error(errWrongNumber("zintercard")),
+		)
+		mustDo(t, c,
+			"ZINTERCARD", "1",
+			proto.Error(errWrongNumber("zintercard")),
+		)
+		mustDo(t, c,
+			"ZINTERCARD", "noint", "h1",
+			proto.Error(msgInvalidInt),
+		)
+		mustDo(t, c,
+			"ZINTERCARD", "0", "h1",
+			proto.Error("ERR at least 1 input key is needed for 'zintercard' command"),
+		)
+		mustDo(t, c,
+			"ZINTERCARD", "-1", "h1",
+			proto.Error("ERR at least 1 input key is needed for 'zintercard' command"),
+		)
+		mustDo(t, c,
+			"ZINTERCARD", "3", "h1", "h2",
+			proto.Error(msgSyntaxError),
+		)
+		mustDo(t, c,
+			"ZINTERCARD", "2", "h1", "h2", "LIMIT",
+			proto.Error(msgSyntaxError),
+		)
+		mustDo(t, c,
+			"ZINTERCARD", "2", "h1", "h2", "foo",
+			proto.Error(msgSyntaxError),
+		)
+		mustDo(t, c,
+			"ZINTERCARD", "2", "h1", "h2", "WITHSCORES",
+			proto.Error(msgSyntaxError),
+		)
+		mustDo(t, c,
+			"ZINTERCARD", "2", "h1", "h2", "LIMIT", "-1",
+			proto.Error(msgLimitIsNegative),
+		)
+		mustDo(t, c,
+			"ZINTERCARD", "2", "h1", "h2", "LIMIT", "noint",
+			proto.Error(msgLimitIsNegative),
+		)
+
+		s.Set("str", "value")
+		mustDo(t, c,
+			"ZINTERCARD", "1", "str",
+			proto.Error(msgWrongType),
+		)
+		mustDo(t, c,
+			"ZINTERCARD", "2", "h1", "str",
+			proto.Error(msgWrongType),
+		)
+		mustDo(t, c,
+			"ZINTERCARD", "2", "nosuch", "str",
+			proto.Error(msgWrongType),
+		)
+	})
+}
+
 func TestZinterstore(t *testing.T) {
 	s, c := runWithClient(t)
 

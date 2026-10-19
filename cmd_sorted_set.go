@@ -26,6 +26,7 @@ func commandsSortedSet(m *Miniredis) {
 	m.srv.Register("ZDIFFSTORE", m.cmdZdiffstore)
 	m.srv.Register("ZINCRBY", m.cmdZincrby)
 	m.srv.Register("ZINTER", m.makeCmdZinter(false), server.ReadOnlyOption())
+	m.srv.Register("ZINTERCARD", m.cmdZintercard, server.ReadOnlyOption())
 	m.srv.Register("ZINTERSTORE", m.makeCmdZinter(true))
 	m.srv.Register("ZLEXCOUNT", m.cmdZlexcount, server.ReadOnlyOption())
 	m.srv.Register("ZRANGE", m.cmdZrange, server.ReadOnlyOption())
@@ -616,6 +617,97 @@ func (m *Miniredis) makeCmdZinter(store bool) func(c *server.Peer, cmd string, a
 			}
 		})
 	}
+}
+
+// ZINTERCARD
+func (m *Miniredis) cmdZintercard(c *server.Peer, cmd string, args []string) {
+	if !m.isValidCMD(c, cmd, args, atLeast(2)) {
+		return
+	}
+
+	numKeys, err := strconv.Atoi(args[0])
+	if err != nil {
+		setDirty(c)
+		c.WriteError(msgInvalidInt)
+		return
+	}
+	if numKeys < 1 {
+		setDirty(c)
+		c.WriteError("ERR at least 1 input key is needed for 'zintercard' command")
+		return
+	}
+	args = args[1:]
+	if len(args) < numKeys {
+		setDirty(c)
+		c.WriteError(msgSyntaxError)
+		return
+	}
+	keys := args[:numKeys]
+	args = args[numKeys:]
+
+	limit := 0
+	for len(args) > 0 {
+		if len(args) < 2 || strings.ToUpper(args[0]) != "LIMIT" {
+			setDirty(c)
+			c.WriteError(msgSyntaxError)
+			return
+		}
+		l, err := strconv.Atoi(args[1])
+		if err != nil || l < 0 {
+			setDirty(c)
+			c.WriteError(msgLimitIsNegative)
+			return
+		}
+		limit = l
+		args = args[2:]
+	}
+
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
+		db := m.db(ctx.selectedDB)
+
+		var (
+			sets    []map[string]float64
+			missing bool
+		)
+		for _, key := range keys {
+			if !db.exists(key) {
+				missing = true
+				continue
+			}
+			switch db.t(key) {
+			case keyTypeSet:
+				set := map[string]float64{}
+				for elem := range db.setKeys[key] {
+					set[elem] = 1.0
+				}
+				sets = append(sets, set)
+			case keyTypeSortedSet:
+				sets = append(sets, db.sortedSet(key))
+			default:
+				c.WriteError(msgWrongType)
+				return
+			}
+		}
+		if missing {
+			c.WriteInt(0)
+			return
+		}
+
+		count := 0
+	outer:
+		for member := range sets[0] {
+			for _, other := range sets[1:] {
+				if _, ok := other[member]; !ok {
+					continue outer
+				}
+			}
+			count++
+			if count == limit {
+				break
+			}
+		}
+		c.WriteInt(count)
+	})
 }
 
 // ZLEXCOUNT

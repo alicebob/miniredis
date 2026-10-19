@@ -177,6 +177,7 @@ Implemented commands:
    - ZDIFFSTORE
    - ZINCRBY
    - ZINTER
+   - ZINTERCARD
    - ZINTERSTORE
    - ZLEXCOUNT
    - ZMPOP
