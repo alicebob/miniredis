@@ -991,7 +991,7 @@ func (m *Miniredis) makeCmdZrank(reverse bool) server.Cmd {
 
 			if !db.exists(key) {
 				if withScore {
-					c.WriteLen(-1)
+					c.WriteNullArray()
 				} else {
 					c.WriteNull()
 				}
@@ -1010,7 +1010,7 @@ func (m *Miniredis) makeCmdZrank(reverse bool) server.Cmd {
 			rank, ok := db.ssetRank(key, member, direction)
 			if !ok {
 				if withScore {
-					c.WriteLen(-1)
+					c.WriteNullArray()
 				} else {
 					c.WriteNull()
 				}

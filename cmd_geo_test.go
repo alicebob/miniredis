@@ -75,6 +75,18 @@ func TestGeopos(t *testing.T) {
 			proto.Error(msgWrongType),
 		)
 	})
+
+	t.Run("RESP3", func(t *testing.T) {
+		useRESP3(t, c)
+		mustDo(t, c,
+			"GEOPOS", "Sicily", "Corleone",
+			proto.Array(proto.NilResp3),
+		)
+		mustDo(t, c,
+			"GEOPOS", "nosuch", "Palermo",
+			proto.Array(proto.NilResp3),
+		)
+	})
 }
 
 // Test GEOADD / GEORADIUS / GEORADIUS_RO

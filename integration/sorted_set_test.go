@@ -105,6 +105,15 @@ func TestSortedSet(t *testing.T) {
 		c.DoRounded(1, "ZADD", "a_zset", "incr", "1.2", "one") // real: 3.5999999999999996, mini: 3.6
 		c.Do("ZADD", "a_zset", "incr", "1.2", "one")
 	})
+
+	testRESP3(t, func(c *client) {
+		c.Do("ZADD", "z", "1", "aap")
+		c.Do("ZRANK", "z", "aap", "WITHSCORE")
+		c.Do("ZRANK", "z", "nosuch", "WITHSCORE")
+		c.Do("ZRANK", "nosuch", "nosuch", "WITHSCORE")
+		c.Do("ZREVRANK", "z", "nosuch", "WITHSCORE")
+		c.Do("ZREVRANK", "nosuch", "nosuch", "WITHSCORE")
+	})
 }
 
 func TestSortedSetAdd(t *testing.T) {

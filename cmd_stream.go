@@ -777,7 +777,7 @@ parsing:
 			return true
 		},
 		func(c *server.Peer) { // timeout
-			c.WriteLen(-1)
+			c.WriteNullArray()
 		},
 	)
 }
@@ -974,7 +974,7 @@ parsing:
 			return true
 		},
 		func(c *server.Peer) { // timeout
-			c.WriteLen(-1)
+			c.WriteNullArray()
 		},
 	)
 }
@@ -1021,7 +1021,7 @@ func xread(db *RedisDB, streams []string, ids []string, count int) map[string][]
 
 func writeXread(c *server.Peer, streams []string, res map[string][]StreamEntry) {
 	if len(res) == 0 {
-		c.WriteLen(-1)
+		c.WriteNullArray()
 		return
 	}
 	c.WriteLen(len(res))
@@ -1140,7 +1140,7 @@ func writeXpendingSummary(c *server.Peer, g streamGroup) {
 		c.WriteInt(0)
 		c.WriteNull()
 		c.WriteNull()
-		c.WriteLen(-1)
+		c.WriteNullArray()
 		return
 	}
 

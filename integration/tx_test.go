@@ -178,4 +178,12 @@ func TestTx(t *testing.T) {
 		c2.Error("without", "EXEC") // nil
 		c1.Do("EXEC")               // 0-length
 	})
+
+	testRESP3(t, func(c *client) {
+		c.Do("WATCH", "foo")
+		c.Do("SET", "foo", "bar")
+		c.Do("MULTI")
+		c.Do("GET", "foo")
+		c.Do("EXEC")
+	})
 }
