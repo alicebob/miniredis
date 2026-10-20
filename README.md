@@ -121,6 +121,7 @@ Implemented commands:
    - HVALS
    - HSCAN
  - List keys
+   - BLMPOP
    - BLPOP
    - BRPOP
    - BRPOPLPUSH
