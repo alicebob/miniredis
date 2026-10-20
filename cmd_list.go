@@ -101,7 +101,7 @@ func (m *Miniredis) cmdBXpop(c *server.Peer, cmd string, args []string, lr leftr
 		},
 		func(c *server.Peer) {
 			// timeout
-			c.WriteLen(-1)
+			c.WriteNullArray()
 		},
 	)
 }
@@ -908,7 +908,7 @@ func (m *Miniredis) cmdBrpoplpush(c *server.Peer, cmd string, args []string) {
 		},
 		func(c *server.Peer) {
 			// timeout
-			c.WriteLen(-1)
+			c.WriteNullArray()
 		},
 	)
 }
@@ -1035,7 +1035,7 @@ func (m *Miniredis) cmdBlmove(c *server.Peer, cmd string, args []string) {
 		},
 		func(c *server.Peer) {
 			// timeout
-			c.WriteLen(-1)
+			c.WriteNullArray()
 		},
 	)
 }

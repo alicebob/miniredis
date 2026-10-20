@@ -1770,7 +1770,7 @@ func (m *Miniredis) cmdZmpop(c *server.Peer, cmd string, args []string) {
 
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		if !m.zmpop(c, ctx, keys, reverse, count) {
-			c.WriteLen(-1)
+			c.WriteNullArray()
 		}
 	})
 }
@@ -1876,7 +1876,7 @@ func (m *Miniredis) cmdBzmpop(c *server.Peer, cmd string, args []string) {
 	ctx := getCtx(c)
 	if ctx.nested {
 		if !m.zmpop(c, ctx, keys, reverse, count) {
-			c.WriteLen(-1)
+			c.WriteNullArray()
 		}
 		return
 	}
@@ -1889,7 +1889,7 @@ func (m *Miniredis) cmdBzmpop(c *server.Peer, cmd string, args []string) {
 			return m.zmpop(c, ctx, keys, reverse, count)
 		},
 		func(c *server.Peer) {
-			c.WriteLen(-1)
+			c.WriteNullArray()
 		},
 	)
 }
@@ -1956,7 +1956,7 @@ func (m *Miniredis) cmdBzpop(c *server.Peer, cmd string, args []string, reverse 
 		},
 		func(c *server.Peer) {
 			// timeout
-			c.WriteLen(-1)
+			c.WriteNullArray()
 		},
 	)
 }
