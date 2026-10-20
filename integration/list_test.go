@@ -503,6 +503,16 @@ func TestBrpop(t *testing.T) {
 		c.Error("wrong number", "BRPOP", "1")
 		c.Error("timeout is negative", "BRPOP", "key", "-1")
 	})
+
+	t.Run("resp3", func(t *testing.T) {
+		testRESP3(t, func(c *client) {
+			c.Do("BRPOP", "nosuch", "0.1")
+
+			c.Do("MULTI")
+			c.Do("BRPOP", "nosuch", "10")
+			c.Do("EXEC")
+		})
+	})
 }
 
 func TestBrpopMulti(t *testing.T) {
@@ -553,6 +563,12 @@ func TestBlpop(t *testing.T) {
 		c.Error("timeout is negative", "BLPOP", "key", "-1")
 	})
 
+	t.Run("resp3", func(t *testing.T) {
+		testRESP3(t, func(c *client) {
+			c.Do("BLPOP", "nosuch", "0.1")
+		})
+	})
+
 	testMulti(t,
 		func(c *client) {
 			c.Do("BLPOP", "key", "1")
@@ -587,6 +603,12 @@ func TestBrpoplpush(t *testing.T) {
 		c.Error("timeout is negative", "BRPOPLPUSH", "from", "to", "-1")
 		c.Error("out of range", "BRPOPLPUSH", "from", "to", "inf")
 		c.Error("wrong number", "BRPOPLPUSH", "from", "to", "-1", "xxx")
+	})
+
+	t.Run("resp3", func(t *testing.T) {
+		testRESP3(t, func(c *client) {
+			c.Do("BRPOPLPUSH", "nosuch", "to", "0.1")
+		})
 	})
 
 	wg := &sync.WaitGroup{}
@@ -715,6 +737,12 @@ func TestBlmove(t *testing.T) {
 		c.Error("wrong kind", "BLMOVE", "chk", "str", "LEFT", "LEFT", "0")
 		c.Error("wrong kind", "BLMOVE", "str", "chk", "LEFT", "LEFT", "0")
 		c.Do("LRANGE", "chk", "0", "-1")
+	})
+
+	t.Run("resp3", func(t *testing.T) {
+		testRESP3(t, func(c *client) {
+			c.Do("BLMOVE", "nosuch", "to", "RIGHT", "LEFT", "0.1")
+		})
 	})
 
 	wg := &sync.WaitGroup{}

@@ -370,6 +370,13 @@ func (c *Peer) WriteNull() {
 	})
 }
 
+// WriteNullArray writes a redis Null array: "*-1" in RESP2, and a Null in RESP3
+func (c *Peer) WriteNullArray() {
+	c.Block(func(w *Writer) {
+		w.WriteNullArray()
+	})
+}
+
 // WriteLen starts an array with the given length
 func (c *Peer) WriteLen(n int) {
 	c.Block(func(w *Writer) {
@@ -508,6 +515,15 @@ func (w *Writer) WriteNull() {
 		return
 	}
 	fmt.Fprintf(w.w, "$-1\r\n")
+}
+
+// WriteNullArray writes a redis Null array: "*-1" in RESP2, and a Null in RESP3
+func (w *Writer) WriteNullArray() {
+	if w.resp3 {
+		w.WriteNull()
+		return
+	}
+	w.WriteLen(-1)
 }
 
 // WriteInline writes a redis inline string

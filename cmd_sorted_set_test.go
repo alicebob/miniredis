@@ -2633,6 +2633,16 @@ func TestZmpop(t *testing.T) {
 		mustDo(t, c, "ZMPOP", "1", "z", "MIN", "COUNT", proto.Error(msgSyntaxError))
 		mustDo(t, c, "ZMPOP", "1", "z", "MIN", "trailing", proto.Error(msgSyntaxError))
 	})
+
+	t.Run("RESP3", func(t *testing.T) {
+		_, c := runWithClient(t)
+		useRESP3(t, c)
+		mustDo(t, c, "ZMPOP", "2", "missing1", "missing2", "MIN", proto.NilResp3)
+
+		mustOK(t, c, "MULTI")
+		mustDo(t, c, "ZMPOP", "1", "missing", "MAX", proto.Inline("QUEUED"))
+		mustDo(t, c, "EXEC", proto.Array(proto.NilResp3))
+	})
 }
 
 func TestZmpopWatch(t *testing.T) {
@@ -2827,6 +2837,16 @@ func TestBzmpop(t *testing.T) {
 			),
 		)
 	})
+
+	t.Run("RESP3", func(t *testing.T) {
+		_, c := runWithClient(t)
+		useRESP3(t, c)
+		mustDo(t, c, "BZMPOP", "0.01", "1", "z", "MIN", proto.NilResp3)
+
+		mustOK(t, c, "MULTI")
+		mustDo(t, c, "BZMPOP", "1", "1", "z", "MIN", proto.Inline("QUEUED"))
+		mustDo(t, c, "EXEC", proto.Array(proto.NilResp3))
+	})
 }
 
 // Test ZRANDMEMBER
@@ -2992,6 +3012,18 @@ func TestBzpopmin(t *testing.T) {
 		mustDo(t, c,
 			"BZPOPMIN", "str", "1",
 			proto.Error(msgWrongType),
+		)
+	})
+
+	t.Run("RESP3", func(t *testing.T) {
+		useRESP3(t, c)
+		mustDo(t, c,
+			"BZPOPMIN", "nosuch", "0.01",
+			proto.NilResp3,
+		)
+		mustDo(t, c,
+			"BZPOPMAX", "nosuch", "0.01",
+			proto.NilResp3,
 		)
 	})
 }

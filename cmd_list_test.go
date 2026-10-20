@@ -1315,6 +1315,24 @@ func TestBrpop(t *testing.T) {
 			proto.Error("ERR timeout is out of range"),
 		)
 	})
+
+	t.Run("RESP3", func(t *testing.T) {
+		useRESP3(t, c)
+		mustDo(t, c,
+			"BRPOP", "nosuch", "0.01",
+			proto.NilResp3,
+		)
+
+		mustOK(t, c, "MULTI")
+		mustDo(t, c,
+			"BRPOP", "nosuch", "1",
+			proto.Inline("QUEUED"),
+		)
+		mustDo(t, c,
+			"EXEC",
+			proto.Array(proto.NilResp3),
+		)
+	})
 }
 
 func TestBrpopSimple(t *testing.T) {
@@ -1452,6 +1470,14 @@ func TestBlpop(t *testing.T) {
 			proto.Error("ERR timeout is out of range"),
 		)
 	})
+
+	t.Run("RESP3", func(t *testing.T) {
+		useRESP3(t, c)
+		mustDo(t, c,
+			"BLPOP", "nosuch", "0.01",
+			proto.NilResp3,
+		)
+	})
 }
 
 func TestBlpopResourceCleanup(t *testing.T) {
@@ -1511,6 +1537,14 @@ func TestBrpoplpush(t *testing.T) {
 		mustDo(t, c,
 			"BRPOPLPUSH", "key", "foo", "1", "baz",
 			proto.Error(errWrongNumber("brpoplpush")),
+		)
+	})
+
+	t.Run("RESP3", func(t *testing.T) {
+		useRESP3(t, c)
+		mustDo(t, c,
+			"BRPOPLPUSH", "nosuch", "l2", "0.01",
+			proto.NilResp3,
 		)
 	})
 }
@@ -1836,5 +1870,13 @@ func TestBlmove(t *testing.T) {
 		case <-time.After(200 * time.Millisecond):
 			t.Error("BLMOVE took too long")
 		}
+	})
+
+	t.Run("RESP3", func(t *testing.T) {
+		useRESP3(t, c)
+		mustDo(t, c,
+			"BLMOVE", "empty", "dst", "RIGHT", "LEFT", "0.01",
+			proto.NilResp3,
+		)
 	})
 }

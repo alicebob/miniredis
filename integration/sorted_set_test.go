@@ -1186,6 +1186,15 @@ func TestBzpopminmax(t *testing.T) {
 		c.Do("SET", "str", "I am a string")
 		c.Error("wrong kind", "BZPOPMIN", "str", "1")
 	})
+
+	testRESP3(t, func(c *client) {
+		c.Do("BZPOPMIN", "nosuch", "0.1")
+		c.Do("BZPOPMAX", "nosuch", "0.1")
+
+		c.Do("MULTI")
+		c.Do("BZPOPMIN", "nosuch", "10")
+		c.Do("EXEC")
+	})
 }
 
 func TestZmpop(t *testing.T) {
@@ -1211,6 +1220,16 @@ func TestZmpop(t *testing.T) {
 		c.Error("numkeys should be greater than 0", "ZMPOP", "0", "z", "MIN")
 		c.Error("count should be greater than 0", "ZMPOP", "1", "z", "MIN", "COUNT", "0")
 	})
+
+	testRESP3(t, func(c *client) {
+		c.Do("ZADD", "z", "1", "one")
+		c.Do("ZMPOP", "1", "z", "MIN")
+		c.Do("ZMPOP", "2", "missing1", "missing2", "MIN")
+
+		c.Do("MULTI")
+		c.Do("ZMPOP", "1", "missing", "MAX")
+		c.Do("EXEC")
+	})
 }
 
 func TestBzmpop(t *testing.T) {
@@ -1233,5 +1252,13 @@ func TestBzmpop(t *testing.T) {
 		c.Error("not a float", "BZMPOP", "notafloat", "1", "z", "MIN")
 		c.Error("numkeys should be greater than 0", "BZMPOP", "1", "0", "z", "MIN")
 		c.Error("count should be greater than 0", "BZMPOP", "1", "1", "z", "MIN", "COUNT", "0")
+	})
+
+	testRESP3(t, func(c *client) {
+		c.Do("BZMPOP", "0.1", "1", "missing", "MIN")
+
+		c.Do("MULTI")
+		c.Do("BZMPOP", "10", "1", "missing", "MAX")
+		c.Do("EXEC")
 	})
 }
