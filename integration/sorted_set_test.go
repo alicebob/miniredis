@@ -52,6 +52,12 @@ func TestSortedSet(t *testing.T) {
 		c.Do("ZPOPMIN", "zz", "0")
 		c.Do("ZPOPMIN", "zz", "100")
 
+		// zero count on a non-empty set
+		c.Do("ZADD", "zz", "1", "aap", "2", "noot")
+		c.Do("ZPOPMAX", "zz", "0")
+		c.Do("ZPOPMIN", "zz", "0")
+		c.Do("ZCARD", "zz")
+
 		// failure cases
 		c.Do("SET", "str", "I am a string")
 		c.Error("wrong number", "ZADD")

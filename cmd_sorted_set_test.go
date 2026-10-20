@@ -2408,6 +2408,12 @@ func TestSortedSetPopMin(t *testing.T) {
 		proto.Strings("zwei", "2"),
 	)
 
+	// Zero count pops nothing
+	mustDo(t, c,
+		"ZPOPMIN", "z", "0",
+		proto.Strings(),
+	)
+
 	// Nonexistent key
 	mustDo(t, c,
 		"ZPOPMIN", "nosuch", "1",
@@ -2466,6 +2472,12 @@ func TestSortedSetPopMax(t *testing.T) {
 	mustDo(t, c,
 		"ZPOPMAX", "z",
 		proto.Strings("drei", "3"),
+	)
+
+	// Zero count pops nothing
+	mustDo(t, c,
+		"ZPOPMAX", "z", "0",
+		proto.Strings(),
 	)
 
 	// Nonexistent key
