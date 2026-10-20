@@ -19,6 +19,7 @@ const (
 
 // commandsList handles list commands (mostly L*)
 func commandsList(m *Miniredis) {
+	m.srv.Register("BLMPOP", m.cmdBlmpop)
 	m.srv.Register("BLPOP", m.cmdBlpop)
 	m.srv.Register("BRPOP", m.cmdBrpop)
 	m.srv.Register("BRPOPLPUSH", m.cmdBrpoplpush)
@@ -387,11 +388,7 @@ func (m *Miniredis) cmdLmpop(c *server.Peer, cmd string, args []string) {
 
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		if !m.lmpop(c, ctx, keys, lr, count) {
-			if c.Resp3 {
-				c.WriteNull()
-			} else {
-				c.WriteLen(-1)
-			}
+			writeLmpopNil(c)
 		}
 	})
 }
@@ -477,6 +474,54 @@ func (m *Miniredis) lmpop(c *server.Peer, ctx *connCtx, keys []string, lr leftri
 		return true
 	}
 	return false
+}
+
+// writeLmpopNil is the (B)LMPOP reply when there is nothing to pop.
+func writeLmpopNil(c *server.Peer) {
+	if c.Resp3 {
+		c.WriteNull()
+	} else {
+		c.WriteLen(-1)
+	}
+}
+
+// BLMPOP
+func (m *Miniredis) cmdBlmpop(c *server.Peer, cmd string, args []string) {
+	if !m.isValidCMD(c, cmd, args, atLeast(4)) {
+		return
+	}
+
+	// Redis checks the timeout after the other arguments.
+	keys, lr, count, ok := parseLmpop(c, args[1:])
+	if !ok {
+		return
+	}
+	var timeout time.Duration
+	if ok := optDuration(c, args[0], &timeout); !ok {
+		return
+	}
+
+	ctx := getCtx(c)
+	if ctx.nested {
+		// never blocks from Lua
+		if !m.lmpop(c, ctx, keys, lr, count) {
+			writeLmpopNil(c)
+		}
+		return
+	}
+
+	blocking(
+		m,
+		c,
+		timeout,
+		func(c *server.Peer, ctx *connCtx) bool {
+			return m.lmpop(c, ctx, keys, lr, count)
+		},
+		func(c *server.Peer) {
+			// timeout
+			writeLmpopNil(c)
+		},
+	)
 }
 
 // LPOP

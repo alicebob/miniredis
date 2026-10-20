@@ -828,6 +828,149 @@ func TestLmpop(t *testing.T) {
 	})
 }
 
+func TestBlmpop(t *testing.T) {
+	t.Run("like LMPOP", func(t *testing.T) {
+		s, c := runWithClient(t)
+		s.Push("l", "aap", "noot", "mies", "vuur")
+
+		mustDo(t, c,
+			"BLMPOP", "1", "1", "l", "LEFT",
+			proto.Array(proto.String("l"), proto.Strings("aap")),
+		)
+		mustDo(t, c,
+			"BLMPOP", "0", "1", "l", "right",
+			proto.Array(proto.String("l"), proto.Strings("vuur")),
+		)
+		mustDo(t, c,
+			"BLMPOP", "0", "1", "l", "LEFT", "COUNT", "10",
+			proto.Array(proto.String("l"), proto.Strings("noot", "mies")),
+		)
+		equals(t, false, s.Exists("l"))
+	})
+
+	t.Run("first non-empty key", func(t *testing.T) {
+		s, c := runWithClient(t)
+		s.Push("l1", "aap")
+		s.Push("l2", "noot")
+
+		mustDo(t, c,
+			"BLMPOP", "0", "3", "nosuch", "l1", "l2", "LEFT", "COUNT", "5",
+			proto.Array(proto.String("l1"), proto.Strings("aap")),
+		)
+		equals(t, false, s.Exists("l1"))
+		equals(t, true, s.Exists("l2"))
+	})
+
+	t.Run("blocking", func(t *testing.T) {
+		s, c := runWithClient(t)
+		got := goStrings(t, s, "BLMPOP", "0", "2", "l1", "l2", "RIGHT", "COUNT", "2")
+		time.Sleep(30 * time.Millisecond)
+		mustDo(t, c, "RPUSH", "l2", "aap", "noot", "mies", proto.Int(3))
+
+		select {
+		case have := <-got:
+			equals(t, proto.Array(proto.String("l2"), proto.Strings("mies", "noot")), have)
+		case <-time.After(500 * time.Millisecond):
+			t.Error("BLMPOP took too long")
+		}
+		s.CheckList(t, "l2", "aap")
+	})
+
+	t.Run("timeout", func(t *testing.T) {
+		s := RunT(t)
+		got := goStrings(t, s, "BLMPOP", "0.1", "1", "l", "LEFT")
+
+		select {
+		case have := <-got:
+			equals(t, proto.NilList, have)
+		case <-time.After(500 * time.Millisecond):
+			t.Error("BLMPOP took too long")
+		}
+	})
+
+	t.Run("wrong type", func(t *testing.T) {
+		s, c := runWithClient(t)
+		s.Set("str", "value")
+		s.Push("l", "aap")
+
+		mustDo(t, c, "BLMPOP", "0", "2", "str", "l", "LEFT", proto.Error(msgWrongType))
+		mustDo(t, c, "BLMPOP", "0", "2", "nosuch", "str", "LEFT", proto.Error(msgWrongType))
+		mustDo(t, c,
+			"BLMPOP", "0", "2", "l", "str", "LEFT",
+			proto.Array(proto.String("l"), proto.Strings("aap")),
+		)
+	})
+
+	t.Run("errors", func(t *testing.T) {
+		_, c := runWithClient(t)
+		mustDo(t, c, "BLMPOP", proto.Error(errWrongNumber("blmpop")))
+		mustDo(t, c, "BLMPOP", "1", "1", "l", proto.Error(errWrongNumber("blmpop")))
+		mustDo(t, c, "BLMPOP", "notafloat", "1", "l", "LEFT", proto.Error(msgInvalidTimeout))
+		mustDo(t, c, "BLMPOP", "-1", "1", "l", "LEFT", proto.Error(msgTimeoutNegative))
+		mustDo(t, c, "BLMPOP", "inf", "1", "l", "LEFT", proto.Error(msgTimeoutIsOutOfRange))
+		for _, numkeys := range []string{"0", "-1", "noint"} {
+			mustDo(t, c, "BLMPOP", "1", numkeys, "l", "LEFT", proto.Error("ERR numkeys should be greater than 0"))
+		}
+		mustDo(t, c, "BLMPOP", "1", "2", "l", "LEFT", proto.Error(msgSyntaxError))
+		mustDo(t, c, "BLMPOP", "1", "1", "l", "MIDDLE", proto.Error(msgSyntaxError))
+		mustDo(t, c, "BLMPOP", "1", "1", "l", "LEFT", "COUNT", "0", proto.Error("ERR count should be greater than 0"))
+		mustDo(t, c, "BLMPOP", "1", "1", "l", "LEFT", "COUNT", proto.Error(msgSyntaxError))
+		mustDo(t, c, "BLMPOP", "1", "1", "l", "LEFT", "trailing", proto.Error(msgSyntaxError))
+		// the timeout is checked last
+		mustDo(t, c, "BLMPOP", "notafloat", "0", "l", "LEFT", proto.Error("ERR numkeys should be greater than 0"))
+		mustDo(t, c, "BLMPOP", "notafloat", "1", "l", "MIDDLE", proto.Error(msgSyntaxError))
+	})
+
+	t.Run("MULTI", func(t *testing.T) {
+		// BLMPOP in a transaction doesn't block
+		s, c := runWithClient(t)
+		s.Push("l", "aap", "noot")
+
+		mustOK(t, c, "MULTI")
+		mustDo(t, c, "BLMPOP", "10", "1", "l", "LEFT", proto.Inline("QUEUED"))
+		mustDo(t, c, "BLMPOP", "10", "1", "nosuch", "LEFT", proto.Inline("QUEUED"))
+		mustDo(t, c,
+			"EXEC",
+			proto.Array(
+				proto.Array(proto.String("l"), proto.Strings("aap")),
+				proto.NilList,
+			),
+		)
+	})
+
+	t.Run("lua", func(t *testing.T) {
+		s, c := runWithClient(t)
+		s.Push("l", "aap")
+
+		mustDo(t, c,
+			"EVAL", `return redis.call("BLMPOP", "0", "1", KEYS[1], "LEFT", "COUNT", "5")`, "1", "l",
+			proto.Array(proto.String("l"), proto.Strings("aap")),
+		)
+		// doesn't block
+		got := goStrings(t, s,
+			"EVAL", `return redis.call("BLMPOP", "0", "1", KEYS[1], "LEFT")`, "1", "l",
+		)
+		select {
+		case have := <-got:
+			equals(t, proto.Nil, have)
+		case <-time.After(500 * time.Millisecond):
+			t.Error("BLMPOP in Lua took too long")
+		}
+	})
+
+	t.Run("RESP3", func(t *testing.T) {
+		s, c := runWithClient(t)
+		s.Push("l", "aap", "noot")
+
+		useRESP3(t, c)
+		mustDo(t, c,
+			"BLMPOP", "0", "1", "l", "RIGHT",
+			proto.Array(proto.String("l"), proto.Strings("noot")),
+		)
+		mustDo(t, c, "BLMPOP", "0.01", "1", "nosuch", "LEFT", proto.NilResp3)
+	})
+}
+
 func TestLtrim(t *testing.T) {
 	s, c := runWithClient(t)
 

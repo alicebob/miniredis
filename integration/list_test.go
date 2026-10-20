@@ -318,6 +318,89 @@ func TestLmpop(t *testing.T) {
 	})
 }
 
+func TestBlmpop(t *testing.T) {
+	skip(t)
+	testRaw(t, func(c *client) {
+		c.Do("RPUSH", "l", "aap", "noot", "mies", "vuur", "wim")
+		c.Do("BLMPOP", "1", "1", "l", "LEFT")
+		c.Do("BLMPOP", "0", "1", "l", "right")
+		c.Do("BLMPOP", "0", "1", "l", "LEFT", "COUNT", "2")
+		c.Do("BLMPOP", "0", "1", "l", "LEFT", "count", "10")
+		c.Do("EXISTS", "l")
+
+		c.Do("RPUSH", "l1", "aap")
+		c.Do("RPUSH", "l2", "noot", "mies")
+		c.Do("BLMPOP", "0", "3", "nosuch", "l2", "l1", "RIGHT", "COUNT", "5")
+		c.Do("BLMPOP", "0", "3", "nosuch", "l2", "l1", "RIGHT")
+		c.Do("BLMPOP", "0.1", "2", "nosuch1", "nosuch2", "LEFT")
+
+		// failure cases
+		c.Do("SET", "str", "I am a string")
+		c.Error("wrong kind", "BLMPOP", "0", "2", "str", "l1", "LEFT")
+		c.Error("wrong kind", "BLMPOP", "0", "2", "nosuch", "str", "LEFT")
+		c.Do("RPUSH", "l3", "aap")
+		c.Do("BLMPOP", "0", "2", "l3", "str", "LEFT")
+		c.Error("wrong number", "BLMPOP")
+		c.Error("wrong number", "BLMPOP", "1")
+		c.Error("wrong number", "BLMPOP", "1", "1")
+		c.Error("wrong number", "BLMPOP", "1", "1", "l")
+		c.Error("not a float", "BLMPOP", "X", "1", "l", "LEFT")
+		c.Error("not a float", "BLMPOP", "", "1", "l", "LEFT")
+		c.Error("timeout is negative", "BLMPOP", "-1", "1", "l", "LEFT")
+		c.Error("timeout is out of range", "BLMPOP", "inf", "1", "l", "LEFT")
+		c.Error("numkeys should be greater than 0", "BLMPOP", "1", "0", "l", "LEFT")
+		c.Error("numkeys should be greater than 0", "BLMPOP", "1", "-1", "l", "LEFT")
+		c.Error("numkeys should be greater than 0", "BLMPOP", "1", "noint", "l", "LEFT")
+		c.Error("numkeys should be greater than 0", "BLMPOP", "X", "0", "l", "LEFT")
+		c.Error("syntax error", "BLMPOP", "1", "2", "l", "LEFT")
+		c.Error("syntax error", "BLMPOP", "1", "1", "l", "MIDDLE")
+		c.Error("syntax error", "BLMPOP", "X", "1", "l", "MIDDLE")
+		c.Error("count should be greater than 0", "BLMPOP", "1", "1", "l", "LEFT", "COUNT", "0")
+		c.Error("count should be greater than 0", "BLMPOP", "1", "1", "l", "LEFT", "COUNT", "-1")
+		c.Error("count should be greater than 0", "BLMPOP", "1", "1", "l", "LEFT", "COUNT", "noint")
+		c.Error("syntax error", "BLMPOP", "1", "1", "l", "LEFT", "COUNT")
+		c.Error("syntax error", "BLMPOP", "1", "1", "l", "LEFT", "COUNT", "1", "COUNT", "2")
+		c.Error("syntax error", "BLMPOP", "1", "1", "l", "LEFT", "foo")
+	})
+
+	testRaw(t, func(c *client) {
+		c.Do("RPUSH", "l", "aap", "noot")
+		c.Do("MULTI")
+		c.Do("BLMPOP", "10", "1", "l", "LEFT")
+		c.Do("BLMPOP", "10", "1", "nosuch", "LEFT")
+		c.Do("EXEC")
+	})
+
+	testRaw(t, func(c *client) {
+		c.Do("RPUSH", "l", "aap", "noot")
+		c.Do("EVAL", "return redis.call('BLMPOP', '0', '1', KEYS[1], 'LEFT', 'COUNT', '5')", "1", "l")
+		c.Do("EVAL", "return redis.call('BLMPOP', '0', '1', KEYS[1], 'LEFT')", "1", "l")
+	})
+
+	t.Run("resp3", func(t *testing.T) {
+		testRESP3(t, func(c *client) {
+			c.Do("RPUSH", "l", "aap", "noot", "mies")
+			c.Do("BLMPOP", "0", "1", "l", "LEFT")
+			c.Do("BLMPOP", "0", "1", "l", "RIGHT", "COUNT", "9")
+			c.Do("BLMPOP", "0.1", "1", "nosuch", "LEFT")
+		})
+	})
+
+	testMulti(t,
+		func(c *client) {
+			c.Do("BLMPOP", "1", "2", "l1", "l2", "LEFT", "COUNT", "2")
+			c.Do("BLMPOP", "1", "2", "l1", "l2", "RIGHT", "COUNT", "2")
+			c.Do("BLMPOP", "1", "2", "l1", "l2", "LEFT")
+			c.Do("BLMPOP", "1", "2", "l1", "l2", "LEFT") // will timeout
+		},
+		func(c *client) {
+			c.Do("RPUSH", "l2", "aap", "noot", "mies")
+			time.Sleep(10 * time.Millisecond)
+			c.Do("RPUSH", "l1", "vuur")
+		},
+	)
+}
+
 func TestLtrim(t *testing.T) {
 	skip(t)
 	testRaw(t, func(c *client) {
