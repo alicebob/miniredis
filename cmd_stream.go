@@ -922,21 +922,11 @@ parsing:
 			}
 
 			opts.streams, opts.ids = args[0:len(args)/2], args[len(args)/2:]
-			for i, id := range opts.ids {
+			for _, id := range opts.ids {
 				if _, err := parseStreamID(id); id != `$` && err != nil {
 					setDirty(c)
 					c.WriteError(msgInvalidStreamID)
 					return
-				} else if id == "$" {
-					withTx(m, c, func(c *server.Peer, ctx *connCtx) {
-						db := m.db(getCtx(c).selectedDB)
-						stream, ok := db.streamKeys[opts.streams[i]]
-						if ok {
-							opts.ids[i] = stream.lastID()
-						} else {
-							opts.ids[i] = "0-0"
-						}
-					})
 				}
 			}
 			args = nil
@@ -966,6 +956,16 @@ parsing:
 		opts.blockTimeout,
 		func(c *server.Peer, ctx *connCtx) bool {
 			db := m.db(ctx.selectedDB)
+			// '$' is the last ID when the command starts. Replace it on the
+			// first run, so the next runs wait for entries after that ID.
+			for i, id := range opts.ids {
+				if id == "$" {
+					opts.ids[i] = "0-0"
+					if stream, ok := db.streamKeys[opts.streams[i]]; ok {
+						opts.ids[i] = stream.lastID()
+					}
+				}
+			}
 			res := xread(db, opts.streams, opts.ids, opts.count)
 			if len(res) == 0 {
 				return false
