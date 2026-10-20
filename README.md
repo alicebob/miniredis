@@ -130,6 +130,7 @@ Implemented commands:
    - LLEN
    - LMPOP
    - LPOP
+   - LPOS
    - LPUSH
    - LPUSHX
    - LRANGE
