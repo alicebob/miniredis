@@ -198,6 +198,21 @@ func TestTxWatchErr(t *testing.T) {
 		"GET", "one",
 		proto.String("three"),
 	)
+
+	t.Run("RESP3", func(t *testing.T) {
+		useRESP3(t, c)
+		mustOK(t, c, "WATCH", "one")
+		mustOK(t, c2, "SET", "one", "four")
+		mustOK(t, c, "MULTI")
+		mustDo(t, c,
+			"GET", "one",
+			proto.Inline("QUEUED"),
+		)
+		mustDo(t, c,
+			"EXEC",
+			proto.NilResp3,
+		)
+	})
 }
 
 func TestUnwatch(t *testing.T) {
