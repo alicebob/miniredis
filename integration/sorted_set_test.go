@@ -1262,3 +1262,24 @@ func TestBzmpop(t *testing.T) {
 		c.Do("EXEC")
 	})
 }
+
+func TestZaddIncrConditions(t *testing.T) {
+	skip(t)
+	for _, option := range []string{"GT", "LT"} {
+		t.Run(option, func(t *testing.T) {
+			testRaw(t, func(c *client) {
+				c.Do("ZADD", "z", "10", "member")
+				rejected, accepted := "-2", "2"
+				if option == "LT" {
+					rejected, accepted = "2", "-2"
+				}
+				c.Do("ZADD", "z", "INCR", option, rejected, "member")
+				c.Do("ZADD", "z", "INCR", option, "0", "member")
+				c.Do("ZSCORE", "z", "member")
+				c.Do("ZADD", "z", "INCR", option, accepted, "member")
+				c.Do("ZSCORE", "z", "member")
+				c.Do("ZADD", "z", "INCR", option, rejected, "new")
+			})
+		})
+	}
+}
