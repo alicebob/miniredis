@@ -398,3 +398,20 @@ func TestSetNoAuth(t *testing.T) {
 		},
 	)
 }
+
+func TestSmoveSameKey(t *testing.T) {
+	skip(t)
+	testRaw(t, func(c *client) {
+		c.Do("SADD", "s", "member")
+		c.Do("EXPIRE", "s", "30")
+		c.Do("SMOVE", "s", "s", "member")
+		c.Do("TTL", "s")
+		c.Do("SMEMBERS", "s")
+		c.Do("SMOVE", "s", "s", "missing")
+		c.Do("WATCH", "s")
+		c.Do("SMOVE", "s", "s", "member")
+		c.Do("MULTI")
+		c.Do("PING")
+		c.Do("EXEC")
+	})
+}
