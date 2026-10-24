@@ -1113,6 +1113,10 @@ func TestStreamTrim(t *testing.T) {
 	ok(t, err)
 
 	mustDo(t, c,
+		"XTRIM", "planets", "MAXLEN", "-1",
+		proto.Error("ERR The MAXLEN argument must be >= 0."))
+
+	mustDo(t, c,
 		"XTRIM", "planets", "MAXLEN", "=", "5", proto.Int(3))
 
 	mustDo(t, c,

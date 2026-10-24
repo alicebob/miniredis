@@ -767,6 +767,7 @@ func TestStreamTrim(t *testing.T) {
 
 			// error cases
 			c.Error("not an integer", "XTRIM", "planets", "MAXLEN", "abc")
+			c.Error("must be >= 0", "XTRIM", "planets", "MAXLEN", "-1")
 			c.Error("arguments", "XTRIM", "planets", "MAXLEN")
 			c.Error("without the special", "XTRIM", "planets", "MAXLEN", "3", "LIMIT", "1")
 		})
