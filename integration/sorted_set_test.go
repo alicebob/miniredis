@@ -752,6 +752,10 @@ func TestZunionstore(t *testing.T) {
 		c.Do("ZUNIONSTORE", "asum", "2", "h1", "h2", "AGGREGATE", "sum")
 		c.Do("ZRANGE", "asum", "0", "-1", "WITHSCORES")
 
+		// empty result removes the destination
+		c.Do("ZUNIONSTORE", "res", "2", "nosuch", "nosuch2")
+		c.Do("EXISTS", "res")
+
 		// Error cases
 		c.Error("wrong number", "ZUNIONSTORE")
 		c.Error("wrong number", "ZUNIONSTORE", "h")
@@ -854,6 +858,10 @@ func TestZinter(t *testing.T) {
 		c.Do("ZRANGE", "amax", "0", "-1", "WITHSCORES")
 		c.Do("ZINTERSTORE", "asum", "2", "h1", "h2", "AGGREGATE", "sum")
 		c.Do("ZRANGE", "asum", "0", "-1", "WITHSCORES")
+
+		// empty result removes the destination
+		c.Do("ZINTERSTORE", "res", "2", "h1", "h3")
+		c.Do("EXISTS", "res")
 
 		// normal set
 		c.Do("ZADD", "q1", "2", "f1")

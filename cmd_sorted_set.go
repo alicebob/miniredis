@@ -599,7 +599,9 @@ func (m *Miniredis) makeCmdZinter(store bool) func(c *server.Peer, cmd string, a
 			if opts.Store {
 				// ZINTERSTORE mode
 				db.del(opts.Destination, true)
-				db.ssetSet(opts.Destination, sset)
+				if len(sset) > 0 {
+					db.ssetSet(opts.Destination, sset)
+				}
 				c.WriteInt(len(sset))
 				return
 			}
@@ -1498,7 +1500,9 @@ func (m *Miniredis) cmdZunionstore(c *server.Peer, cmd string, args []string) {
 			c.WriteError(err.Error())
 			return
 		}
-		db.ssetSet(destination, sset)
+		if sset.card() > 0 {
+			db.ssetSet(destination, sset)
+		}
 		c.WriteInt(sset.card())
 	})
 }

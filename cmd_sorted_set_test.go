@@ -1609,6 +1609,15 @@ func TestZunionstore(t *testing.T) {
 		equals(t, map[string]float64{"field1": 2, "field2": 2, "field3": 3}, ss)
 	})
 
+	t.Run("empty result deletes destination", func(t *testing.T) {
+		s.ZAdd("dest", 1.0, "field1")
+		mustDo(t, c,
+			"ZUNIONSTORE", "dest", "2", "nosuch", "nosuch2",
+			proto.Int(0),
+		)
+		equals(t, false, s.Exists("dest"))
+	})
+
 	t.Run("WEIGHTS", func(t *testing.T) {
 		mustDo(t, c,
 			"ZUNIONSTORE", "weighted", "2", "h1", "h2", "WeIgHtS", "4.5", "12",
@@ -2008,6 +2017,15 @@ func TestZinterstore(t *testing.T) {
 		ok(t, err)
 		equals(t, map[string]float64{"field1": 2}, ss)
 	}
+
+	t.Run("empty result deletes destination", func(t *testing.T) {
+		s.ZAdd("dest", 1.0, "field1")
+		mustDo(t, c,
+			"ZINTERSTORE", "dest", "2", "h1", "nosuch",
+			proto.Int(0),
+		)
+		equals(t, false, s.Exists("dest"))
+	})
 
 	t.Run("errors", func(t *testing.T) {
 		mustDo(t, c,
