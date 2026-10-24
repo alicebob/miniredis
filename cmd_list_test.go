@@ -1853,6 +1853,11 @@ func TestLmove(t *testing.T) {
 			"LMOVE", "src", "dst", "left", "invalid",
 			proto.Error("ERR syntax error"),
 		)
+		s.CheckList(t, "src", "aap", "noot", "mies")
+		mustDo(t, c,
+			"LMOVE", "missing", "dst", "left", "invalid",
+			proto.Error("ERR syntax error"),
+		)
 	})
 }
 
@@ -1985,6 +1990,7 @@ func TestBlmove(t *testing.T) {
 			"BLMOVE", "src", "dst", "left", "invalid", "0",
 			proto.Error("ERR syntax error"),
 		)
+		s.CheckList(t, "src", "aap", "noot", "mies")
 	})
 
 	t.Run("Blocking: simple case", func(t *testing.T) {
