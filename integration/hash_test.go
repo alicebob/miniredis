@@ -334,3 +334,27 @@ func TestHTTL(t *testing.T) {
 		})
 	})
 }
+
+func TestHashIncrbyOverflow(t *testing.T) {
+	skip(t)
+	for _, tc := range []struct{ name, initial, delta string }{
+		{"positive", "9223372036854775807", "1"},
+		{"negative", "-9223372036854775808", "-1"},
+		{"positive large delta", "1", "9223372036854775807"},
+		{"negative large delta", "-1", "-9223372036854775808"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			testRaw2(t, func(c, watcher *client) {
+				c.Do("HSET", "hash", "field", tc.initial)
+				c.Do("EXPIRE", "hash", "60")
+				watcher.Do("WATCH", "hash")
+				c.Error("overflow", "HINCRBY", "hash", "field", tc.delta)
+				c.Do("HGET", "hash", "field")
+				c.Do("TTL", "hash")
+				watcher.Do("MULTI")
+				watcher.Do("HGET", "hash", "field")
+				watcher.Do("EXEC")
+			})
+		})
+	}
+}
