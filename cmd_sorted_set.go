@@ -157,6 +157,14 @@ outer:
 					c.WriteNull()
 					return
 				}
+				if db.ssetExists(opts.key, member) {
+					old := db.ssetScore(opts.key, member)
+					score := old + delta
+					if opts.gt && score <= old || opts.lt && score >= old {
+						c.WriteNull()
+						return
+					}
+				}
 				newScore := db.ssetIncrby(opts.key, member, delta)
 				c.WriteFloat(newScore)
 			}

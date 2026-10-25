@@ -3144,3 +3144,27 @@ func TestBzpopTx(t *testing.T) {
 		)
 	}
 }
+
+func TestZaddIncrConditions(t *testing.T) {
+	for _, option := range []string{"GT", "LT"} {
+		t.Run(option, func(t *testing.T) {
+			_, c := runWithClient(t)
+			must1(t, c, "ZADD", "z", "10", "member")
+			rejected, accepted := "-2", "2"
+			if option == "LT" {
+				rejected, accepted = "2", "-2"
+			}
+			mustNil(t, c, "ZADD", "z", "INCR", option, rejected, "member")
+			mustNil(t, c, "ZADD", "z", "INCR", option, "0", "member")
+			mustDo(t, c, "ZSCORE", "z", "member", proto.String("10"))
+			want := "12"
+			if option == "LT" {
+				want = "8"
+			}
+			mustDo(t, c, "ZADD", "z", "INCR", option, accepted, "member", proto.String(want))
+			mustDo(t, c, "ZSCORE", "z", "member", proto.String(want))
+			// GT/LT do not prevent insertion of a new member.
+			mustDo(t, c, "ZADD", "z", "INCR", option, rejected, "new", proto.String(rejected))
+		})
+	}
+}
