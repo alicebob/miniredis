@@ -52,6 +52,12 @@ func TestSortedSet(t *testing.T) {
 		c.Do("ZPOPMIN", "zz", "0")
 		c.Do("ZPOPMIN", "zz", "100")
 
+		// zero count on a non-empty set
+		c.Do("ZADD", "zz", "1", "aap", "2", "noot")
+		c.Do("ZPOPMAX", "zz", "0")
+		c.Do("ZPOPMIN", "zz", "0")
+		c.Do("ZCARD", "zz")
+
 		// failure cases
 		c.Do("SET", "str", "I am a string")
 		c.Error("wrong number", "ZADD")
@@ -104,6 +110,15 @@ func TestSortedSet(t *testing.T) {
 		c.Do("ZADD", "a_zset", "incr", "1.2", "one")
 		c.DoRounded(1, "ZADD", "a_zset", "incr", "1.2", "one") // real: 3.5999999999999996, mini: 3.6
 		c.Do("ZADD", "a_zset", "incr", "1.2", "one")
+	})
+
+	testRESP3(t, func(c *client) {
+		c.Do("ZADD", "z", "1", "aap")
+		c.Do("ZRANK", "z", "aap", "WITHSCORE")
+		c.Do("ZRANK", "z", "nosuch", "WITHSCORE")
+		c.Do("ZRANK", "nosuch", "nosuch", "WITHSCORE")
+		c.Do("ZREVRANK", "z", "nosuch", "WITHSCORE")
+		c.Do("ZREVRANK", "nosuch", "nosuch", "WITHSCORE")
 	})
 }
 
@@ -752,6 +767,10 @@ func TestZunionstore(t *testing.T) {
 		c.Do("ZUNIONSTORE", "asum", "2", "h1", "h2", "AGGREGATE", "sum")
 		c.Do("ZRANGE", "asum", "0", "-1", "WITHSCORES")
 
+		// empty result removes the destination
+		c.Do("ZUNIONSTORE", "res", "2", "nosuch", "nosuch2")
+		c.Do("EXISTS", "res")
+
 		// Error cases
 		c.Error("wrong number", "ZUNIONSTORE")
 		c.Error("wrong number", "ZUNIONSTORE", "h")
@@ -854,6 +873,10 @@ func TestZinter(t *testing.T) {
 		c.Do("ZRANGE", "amax", "0", "-1", "WITHSCORES")
 		c.Do("ZINTERSTORE", "asum", "2", "h1", "h2", "AGGREGATE", "sum")
 		c.Do("ZRANGE", "asum", "0", "-1", "WITHSCORES")
+
+		// empty result removes the destination
+		c.Do("ZINTERSTORE", "res", "2", "h1", "h3")
+		c.Do("EXISTS", "res")
 
 		// normal set
 		c.Do("ZADD", "q1", "2", "f1")
@@ -1261,4 +1284,25 @@ func TestBzmpop(t *testing.T) {
 		c.Do("BZMPOP", "10", "1", "missing", "MAX")
 		c.Do("EXEC")
 	})
+}
+
+func TestZaddIncrConditions(t *testing.T) {
+	skip(t)
+	for _, option := range []string{"GT", "LT"} {
+		t.Run(option, func(t *testing.T) {
+			testRaw(t, func(c *client) {
+				c.Do("ZADD", "z", "10", "member")
+				rejected, accepted := "-2", "2"
+				if option == "LT" {
+					rejected, accepted = "2", "-2"
+				}
+				c.Do("ZADD", "z", "INCR", option, rejected, "member")
+				c.Do("ZADD", "z", "INCR", option, "0", "member")
+				c.Do("ZSCORE", "z", "member")
+				c.Do("ZADD", "z", "INCR", option, accepted, "member")
+				c.Do("ZSCORE", "z", "member")
+				c.Do("ZADD", "z", "INCR", option, rejected, "new")
+			})
+		})
+	}
 }

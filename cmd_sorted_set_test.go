@@ -113,6 +113,14 @@ func TestSortedSet(t *testing.T) {
 		mustNil(t, c,
 			"ZRANK", "nosuch", "nosuch",
 		)
+
+		mustNilList(t, c,
+			"ZRANK", "z", "nosuch", "withscore",
+		)
+
+		mustNilList(t, c,
+			"ZREVRANK", "nosuch", "nosuch", "withscore",
+		)
 	}
 
 	// Direct usage
@@ -164,6 +172,26 @@ func TestSortedSet(t *testing.T) {
 		mustDo(t, c,
 			"ZCARD", "set", "spurious",
 			proto.Error(errWrongNumber("zcard")),
+		)
+	})
+
+	t.Run("RESP3", func(t *testing.T) {
+		useRESP3(t, c)
+		mustDo(t, c,
+			"ZRANK", "z", "nosuch", "withscore",
+			proto.NilResp3,
+		)
+		mustDo(t, c,
+			"ZRANK", "nosuch", "nosuch", "withscore",
+			proto.NilResp3,
+		)
+		mustDo(t, c,
+			"ZREVRANK", "z", "nosuch", "withscore",
+			proto.NilResp3,
+		)
+		mustDo(t, c,
+			"ZREVRANK", "nosuch", "nosuch", "withscore",
+			proto.NilResp3,
 		)
 	})
 }
@@ -1609,6 +1637,15 @@ func TestZunionstore(t *testing.T) {
 		equals(t, map[string]float64{"field1": 2, "field2": 2, "field3": 3}, ss)
 	})
 
+	t.Run("empty result deletes destination", func(t *testing.T) {
+		s.ZAdd("dest", 1.0, "field1")
+		mustDo(t, c,
+			"ZUNIONSTORE", "dest", "2", "nosuch", "nosuch2",
+			proto.Int(0),
+		)
+		equals(t, false, s.Exists("dest"))
+	})
+
 	t.Run("WEIGHTS", func(t *testing.T) {
 		mustDo(t, c,
 			"ZUNIONSTORE", "weighted", "2", "h1", "h2", "WeIgHtS", "4.5", "12",
@@ -2009,6 +2046,15 @@ func TestZinterstore(t *testing.T) {
 		equals(t, map[string]float64{"field1": 2}, ss)
 	}
 
+	t.Run("empty result deletes destination", func(t *testing.T) {
+		s.ZAdd("dest", 1.0, "field1")
+		mustDo(t, c,
+			"ZINTERSTORE", "dest", "2", "h1", "nosuch",
+			proto.Int(0),
+		)
+		equals(t, false, s.Exists("dest"))
+	})
+
 	t.Run("errors", func(t *testing.T) {
 		mustDo(t, c,
 			"ZINTERSTORE",
@@ -2408,6 +2454,12 @@ func TestSortedSetPopMin(t *testing.T) {
 		proto.Strings("zwei", "2"),
 	)
 
+	// Zero count pops nothing
+	mustDo(t, c,
+		"ZPOPMIN", "z", "0",
+		proto.Strings(),
+	)
+
 	// Nonexistent key
 	mustDo(t, c,
 		"ZPOPMIN", "nosuch", "1",
@@ -2466,6 +2518,12 @@ func TestSortedSetPopMax(t *testing.T) {
 	mustDo(t, c,
 		"ZPOPMAX", "z",
 		proto.Strings("drei", "3"),
+	)
+
+	// Zero count pops nothing
+	mustDo(t, c,
+		"ZPOPMAX", "z", "0",
+		proto.Strings(),
 	)
 
 	// Nonexistent key
@@ -3114,5 +3172,29 @@ func TestBzpopTx(t *testing.T) {
 				proto.Inline("OK"),
 			),
 		)
+	}
+}
+
+func TestZaddIncrConditions(t *testing.T) {
+	for _, option := range []string{"GT", "LT"} {
+		t.Run(option, func(t *testing.T) {
+			_, c := runWithClient(t)
+			must1(t, c, "ZADD", "z", "10", "member")
+			rejected, accepted := "-2", "2"
+			if option == "LT" {
+				rejected, accepted = "2", "-2"
+			}
+			mustNil(t, c, "ZADD", "z", "INCR", option, rejected, "member")
+			mustNil(t, c, "ZADD", "z", "INCR", option, "0", "member")
+			mustDo(t, c, "ZSCORE", "z", "member", proto.String("10"))
+			want := "12"
+			if option == "LT" {
+				want = "8"
+			}
+			mustDo(t, c, "ZADD", "z", "INCR", option, accepted, "member", proto.String(want))
+			mustDo(t, c, "ZSCORE", "z", "member", proto.String(want))
+			// GT/LT do not prevent insertion of a new member.
+			mustDo(t, c, "ZADD", "z", "INCR", option, rejected, "new", proto.String(rejected))
+		})
 	}
 }

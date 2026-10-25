@@ -328,6 +328,17 @@ func TestStream(t *testing.T) {
 			wg.Wait()
 			c.Do("XREAD", "BLOCK", "1000", "STREAMS", "nosuch", "$")
 		})
+
+		testRESP3(t, func(c *client) {
+			c.Do("XADD", "pl", "55-88", "name", "Mercury")
+			c.Do("XREAD", "STREAMS", "pl", "60")
+			c.Do("XREAD", "STREAMS", "nosuch", "0")
+			c.Do("XREAD", "BLOCK", "10", "STREAMS", "pl", "60")
+
+			c.Do("MULTI")
+			c.Do("XREAD", "BLOCK", "10", "STREAMS", "pl", "60")
+			c.Do("EXEC")
+		})
 	})
 }
 
@@ -551,6 +562,16 @@ func TestStreamGroup(t *testing.T) {
 			c.Error("No such", "XREADGROUP", "GROUP", "foo", "bar", "BLOCK", "999999", "STREAMS", "pl", "invalid")
 			c.Error("negative", "XREADGROUP", "GROUP", "foo", "bar", "BLOCK", "-1", "STREAMS", "foo", ">")
 		})
+
+		testRESP3(t, func(c *client) {
+			c.Do("XGROUP", "CREATE", "pl", "processing", "$", "MKSTREAM")
+			c.Do("XREADGROUP", "GROUP", "processing", "alice", "STREAMS", "pl", ">")
+			c.Do("XREADGROUP", "GROUP", "processing", "alice", "BLOCK", "10", "STREAMS", "pl", ">")
+
+			c.Do("MULTI")
+			c.Do("XREADGROUP", "GROUP", "processing", "alice", "BLOCK", "10", "STREAMS", "pl", ">")
+			c.Do("EXEC")
+		})
 	})
 
 	t.Run("XACK", func(t *testing.T) {
@@ -654,6 +675,11 @@ func TestStreamGroup(t *testing.T) {
 			c.Error("Invalid", "XPENDING", "planets", "processing", "-", "foo", "999")
 			c.Error("not an integer", "XPENDING", "planets", "processing", "-", "+", "foo")
 			c.Error("not an integer", "XPENDING", "planets", "processing", "IDLE", "abc", "-", "+", "999")
+		})
+
+		testRESP3(t, func(c *client) {
+			c.Do("XGROUP", "CREATE", "planets", "processing", "$", "MKSTREAM")
+			c.Do("XPENDING", "planets", "processing")
 		})
 	})
 
@@ -780,6 +806,7 @@ func TestStreamTrim(t *testing.T) {
 
 			// error cases
 			c.Error("not an integer", "XTRIM", "planets", "MAXLEN", "abc")
+			c.Error("must be >= 0", "XTRIM", "planets", "MAXLEN", "-1")
 			c.Error("arguments", "XTRIM", "planets", "MAXLEN")
 			c.Error("without the special", "XTRIM", "planets", "MAXLEN", "3", "LIMIT", "1")
 		})

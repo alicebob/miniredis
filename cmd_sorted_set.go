@@ -157,6 +157,14 @@ outer:
 					c.WriteNull()
 					return
 				}
+				if db.ssetExists(opts.key, member) {
+					old := db.ssetScore(opts.key, member)
+					score := old + delta
+					if opts.gt && score <= old || opts.lt && score >= old {
+						c.WriteNull()
+						return
+					}
+				}
 				newScore := db.ssetIncrby(opts.key, member, delta)
 				c.WriteFloat(newScore)
 			}
@@ -599,7 +607,9 @@ func (m *Miniredis) makeCmdZinter(store bool) func(c *server.Peer, cmd string, a
 			if opts.Store {
 				// ZINTERSTORE mode
 				db.del(opts.Destination, true)
-				db.ssetSet(opts.Destination, sset)
+				if len(sset) > 0 {
+					db.ssetSet(opts.Destination, sset)
+				}
 				c.WriteInt(len(sset))
 				return
 			}
@@ -991,7 +1001,7 @@ func (m *Miniredis) makeCmdZrank(reverse bool) server.Cmd {
 
 			if !db.exists(key) {
 				if withScore {
-					c.WriteLen(-1)
+					c.WriteNullArray()
 				} else {
 					c.WriteNull()
 				}
@@ -1010,7 +1020,7 @@ func (m *Miniredis) makeCmdZrank(reverse bool) server.Cmd {
 			rank, ok := db.ssetRank(key, member, direction)
 			if !ok {
 				if withScore {
-					c.WriteLen(-1)
+					c.WriteNullArray()
 				} else {
 					c.WriteNull()
 				}
@@ -1498,7 +1508,9 @@ func (m *Miniredis) cmdZunionstore(c *server.Peer, cmd string, args []string) {
 			c.WriteError(err.Error())
 			return
 		}
-		db.ssetSet(destination, sset)
+		if sset.card() > 0 {
+			db.ssetSet(destination, sset)
+		}
 		c.WriteInt(sset.card())
 	})
 }
@@ -1733,6 +1745,11 @@ func (m *Miniredis) cmdZpopmax(reverse bool) server.Cmd {
 
 			if db.t(key) != keyTypeSortedSet {
 				c.WriteError(ErrWrongType.Error())
+				return
+			}
+
+			if count == 0 {
+				c.WriteLen(0)
 				return
 			}
 
