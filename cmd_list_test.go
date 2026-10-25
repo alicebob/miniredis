@@ -1,6 +1,9 @@
 package miniredis
 
 import (
+	"fmt"
+	"math"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -2022,4 +2025,15 @@ func TestBlmove(t *testing.T) {
 			proto.NilResp3,
 		)
 	})
+}
+
+func TestLremMinimumCount(t *testing.T) {
+	s, c := runWithClient(t)
+	s.Push("list", "a", "b", "a")
+	s.SetTTL("list", time.Minute)
+	mustDo(t, c, "LREM", "list", strconv.Itoa(math.MinInt), "a", proto.Error(fmt.Sprintf("ERR value is out of range, value must between %d and %d", -math.MaxInt, math.MaxInt)))
+	mustDo(t, c, "LRANGE", "list", "0", "-1", proto.Strings("a", "b", "a"))
+	equals(t, time.Minute, s.TTL("list"))
+	mustDo(t, c, "LREM", "list", strconv.Itoa(-math.MaxInt), "a", proto.Int(2))
+	mustDo(t, c, "LRANGE", "list", "0", "-1", proto.Strings("b"))
 }
