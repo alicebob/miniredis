@@ -113,6 +113,14 @@ func TestSortedSet(t *testing.T) {
 		mustNil(t, c,
 			"ZRANK", "nosuch", "nosuch",
 		)
+
+		mustNilList(t, c,
+			"ZRANK", "z", "nosuch", "withscore",
+		)
+
+		mustNilList(t, c,
+			"ZREVRANK", "nosuch", "nosuch", "withscore",
+		)
 	}
 
 	// Direct usage
@@ -164,6 +172,26 @@ func TestSortedSet(t *testing.T) {
 		mustDo(t, c,
 			"ZCARD", "set", "spurious",
 			proto.Error(errWrongNumber("zcard")),
+		)
+	})
+
+	t.Run("RESP3", func(t *testing.T) {
+		useRESP3(t, c)
+		mustDo(t, c,
+			"ZRANK", "z", "nosuch", "withscore",
+			proto.NilResp3,
+		)
+		mustDo(t, c,
+			"ZRANK", "nosuch", "nosuch", "withscore",
+			proto.NilResp3,
+		)
+		mustDo(t, c,
+			"ZREVRANK", "z", "nosuch", "withscore",
+			proto.NilResp3,
+		)
+		mustDo(t, c,
+			"ZREVRANK", "nosuch", "nosuch", "withscore",
+			proto.NilResp3,
 		)
 	})
 }
