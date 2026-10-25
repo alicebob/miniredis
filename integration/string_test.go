@@ -742,3 +742,31 @@ func TestDelx(t *testing.T) {
 		c.Error("wrong number", "DELEX", "key", "IFEQ", "value", "extra")
 	})
 }
+
+func TestFloatIncrementRejectsInfinity(t *testing.T) {
+	skip(t)
+	for _, delta := range []string{"inf", "+inf", "-inf"} {
+		t.Run(delta, func(t *testing.T) {
+			testRaw2(t, func(c, watcher *client) {
+				c.Error("NaN or Infinity", "INCRBYFLOAT", "missing", delta)
+				c.Do("EXISTS", "missing")
+				c.Error("NaN or Infinity", "HINCRBYFLOAT", "missinghash", "field", delta)
+				c.Do("EXISTS", "missinghash")
+				c.Do("SET", "value", "1.5")
+				c.Do("HSET", "hash", "field", "1.5")
+				c.Do("EXPIRE", "value", "60")
+				c.Do("EXPIRE", "hash", "60")
+				watcher.Do("WATCH", "value", "hash")
+				c.Error("NaN or Infinity", "INCRBYFLOAT", "value", delta)
+				c.Error("NaN or Infinity", "HINCRBYFLOAT", "hash", "field", delta)
+				c.Do("GET", "value")
+				c.Do("HGET", "hash", "field")
+				c.Do("TTL", "value")
+				c.Do("TTL", "hash")
+				watcher.Do("MULTI")
+				watcher.Do("GET", "value")
+				watcher.Do("EXEC")
+			})
+		})
+	}
+}
