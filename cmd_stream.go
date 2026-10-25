@@ -1275,6 +1275,11 @@ func (m *Miniredis) cmdXtrim(c *server.Peer, cmd string, args []string) {
 			c.WriteError(msgXtrimInvalidMaxLen)
 			return
 		}
+		if maxLen < 0 {
+			setDirty(c)
+			c.WriteError("ERR The MAXLEN argument must be >= 0.")
+			return
+		}
 		opts.maxLen = maxLen
 	case "MINID":
 		opts.threshold = args[0]
