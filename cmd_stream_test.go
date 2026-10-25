@@ -559,6 +559,18 @@ func TestStreamRead(t *testing.T) {
 			proto.Error(msgXreadUnbalanced),
 		)
 	})
+
+	t.Run("RESP3", func(t *testing.T) {
+		useRESP3(t, c)
+		mustDo(t, c,
+			"XREAD", "STREAMS", "planets", "99",
+			proto.NilResp3,
+		)
+		mustDo(t, c,
+			"XREAD", "BLOCK", "10", "STREAMS", "planets", "99",
+			proto.NilResp3,
+		)
+	})
 }
 
 // Test XINFO
@@ -822,6 +834,18 @@ func TestStreamReadGroup(t *testing.T) {
 			proto.Array(proto.String("planets"), proto.Array(proto.Array(proto.String("0-1"), proto.Strings("name", "Mercury")))),
 		),
 	)
+
+	t.Run("RESP3", func(t *testing.T) {
+		useRESP3(t, c)
+		mustDo(t, c,
+			"XREADGROUP", "GROUP", "processing", "alice", "STREAMS", "planets", ">",
+			proto.NilResp3,
+		)
+		mustDo(t, c,
+			"XREADGROUP", "GROUP", "processing", "alice", "BLOCK", "10", "STREAMS", "planets", ">",
+			proto.NilResp3,
+		)
+	})
 }
 
 // Test XDEL
@@ -1077,6 +1101,20 @@ func TestStreamXpending(t *testing.T) {
 			proto.Error("ERR syntax error"),
 		)
 	})
+
+	t.Run("RESP3", func(t *testing.T) {
+		useRESP3(t, c)
+		mustOK(t, c, "XGROUP", "CREATE", "empty", "processing", "$", "MKSTREAM")
+		mustDo(t, c,
+			"XPENDING", "empty", "processing",
+			proto.Array(
+				proto.Int(0),
+				proto.NilResp3,
+				proto.NilResp3,
+				proto.NilResp3,
+			),
+		)
+	})
 }
 
 // Test XTRIM
@@ -1111,6 +1149,10 @@ func TestStreamTrim(t *testing.T) {
 	ok(t, err)
 	_, err = c.Do("XADD", "planets", "5-11", "name", "Pluto")
 	ok(t, err)
+
+	mustDo(t, c,
+		"XTRIM", "planets", "MAXLEN", "-1",
+		proto.Error("ERR The MAXLEN argument must be >= 0."))
 
 	mustDo(t, c,
 		"XTRIM", "planets", "MAXLEN", "=", "5", proto.Int(3))

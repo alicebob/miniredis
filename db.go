@@ -11,7 +11,9 @@ import (
 )
 
 var (
-	errInvalidEntryID = errors.New("stream ID is invalid")
+	errInvalidEntryID      = errors.New("stream ID is invalid")
+	errFloatResultInfinity = errors.New("ERR increment would produce NaN or Infinity")
+	errFloatValueInfinity  = errors.New("ERR value is NaN or Infinity")
 )
 
 // exists also updates the lru
@@ -210,6 +212,9 @@ func (db *RedisDB) stringIncr(k string, delta int) (int, error) {
 
 // change float key value
 func (db *RedisDB) stringIncrfloat(k string, delta *big.Float) (*big.Float, error) {
+	if delta.IsInf() {
+		return nil, errFloatResultInfinity
+	}
 	v := big.NewFloat(0.0)
 	v.SetPrec(128)
 	if sv, ok := db.stringKeys[k]; ok {
@@ -220,6 +225,9 @@ func (db *RedisDB) stringIncrfloat(k string, delta *big.Float) (*big.Float, erro
 		}
 	}
 	v.Add(v, delta)
+	if v.IsInf() {
+		return nil, errFloatResultInfinity
+	}
 	db.stringSet(k, formatBig(v))
 	return v, nil
 }
@@ -411,6 +419,9 @@ func (db *RedisDB) hashIncr(key, field string, delta int) (int, error) {
 
 // hashIncrfloat changes float key value
 func (db *RedisDB) hashIncrfloat(key, field string, delta *big.Float) (*big.Float, error) {
+	if delta.IsInf() {
+		return nil, errFloatValueInfinity
+	}
 	v := big.NewFloat(0.0)
 	v.SetPrec(128)
 	if h, ok := db.hashKeys[key]; ok {
@@ -423,6 +434,9 @@ func (db *RedisDB) hashIncrfloat(key, field string, delta *big.Float) (*big.Floa
 		}
 	}
 	v.Add(v, delta)
+	if v.IsInf() {
+		return nil, errFloatResultInfinity
+	}
 	db.hashSet(key, field, formatBig(v))
 	return v, nil
 }

@@ -287,6 +287,24 @@ func TestSmove(t *testing.T) {
 	})
 }
 
+func TestSmoveSameKey(t *testing.T) {
+	_, c := runWithClient(t)
+	must1(t, c, "SADD", "s", "member")
+	must1(t, c, "EXPIRE", "s", "30")
+
+	must1(t, c, "SMOVE", "s", "s", "member")
+	mustDo(t, c, "TTL", "s", proto.Int(30))
+	mustDo(t, c, "SMEMBERS", "s", proto.Strings("member"))
+	must0(t, c, "SMOVE", "s", "s", "missing")
+
+	// A no-op must not invalidate a transaction watching the set.
+	mustOK(t, c, "WATCH", "s")
+	must1(t, c, "SMOVE", "s", "s", "member")
+	mustOK(t, c, "MULTI")
+	mustDo(t, c, "PING", proto.Inline("QUEUED"))
+	mustDo(t, c, "EXEC", proto.Array(proto.Inline("PONG")))
+}
+
 // Test SPOP
 func TestSpop(t *testing.T) {
 	s, c := runWithClient(t)
@@ -493,6 +511,19 @@ func TestSdiffstore(t *testing.T) {
 		s.CheckSet(t, "res", "noot")
 	}
 
+	// An empty result deletes the destination
+	{
+		must0(t, c,
+			"SDIFFSTORE", "res", "s1", "s1",
+		)
+		equals(t, false, s.Exists("res"))
+
+		must0(t, c,
+			"SDIFFSTORE", "res", "nosuch", "s1",
+		)
+		equals(t, false, s.Exists("res"))
+	}
+
 	t.Run("errors", func(t *testing.T) {
 		s.SetAdd("chk", "aap", "noot")
 		s.Set("str", "value")
@@ -590,12 +621,22 @@ func TestSinterstore(t *testing.T) {
 		s.CheckSet(t, "res", "aap", "mies")
 	}
 
-	// With one of the keys being an empty set, the resulting set is also empty
+	// With one of the keys being an empty set, the resulting set is also empty,
+	// and an empty result deletes the destination
 	{
 		must0(t, c,
 			"SINTERSTORE", "res", "s1", "s9",
 		)
-		s.CheckSet(t, "res", []string{}...)
+		equals(t, false, s.Exists("res"))
+
+		must0(t, c,
+			"SINTERSTORE", "res", "s9", "s1",
+		)
+		equals(t, false, s.Exists("res"))
+		must1(t, c,
+			"SADD", "res", "aap",
+		)
+		s.CheckSet(t, "res", "aap")
 	}
 
 	t.Run("errors", func(t *testing.T) {
@@ -800,6 +841,14 @@ func TestSunionstore(t *testing.T) {
 			proto.Int(4),
 		)
 		s.CheckSet(t, "res", "aap", "mies", "noot", "wim")
+	}
+
+	// An empty result deletes the destination
+	{
+		must0(t, c,
+			"SUNIONSTORE", "res", "nosuch", "nosuch2",
+		)
+		equals(t, false, s.Exists("res"))
 	}
 
 	t.Run("errors", func(t *testing.T) {

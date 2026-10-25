@@ -1687,3 +1687,21 @@ func TestDelex(t *testing.T) {
 	mustDo(t, c, "DELEX", "mykey", "IFEQ", proto.Error("ERR wrong number of arguments for 'delex' command"))
 	mustDo(t, c, "DELEX", "mykey", "IFEQ", "value", "extra", proto.Error("ERR wrong number of arguments for 'delex' command"))
 }
+
+func TestFloatIncrementsRejectInfinity(t *testing.T) {
+	for _, delta := range []string{"inf", "+inf", "-inf"} {
+		t.Run(delta, func(t *testing.T) {
+			s, c := runWithClient(t)
+			mustDo(t, c, "INCRBYFLOAT", "missing", delta, proto.Error(errFloatResultInfinity.Error()))
+			mustDo(t, c, "HINCRBYFLOAT", "missinghash", "field", delta, proto.Error(errFloatValueInfinity.Error()))
+			equals(t, false, s.Exists("missing"))
+			equals(t, false, s.Exists("missinghash"))
+			s.Set("value", "1.5")
+			s.HSet("hash", "field", "1.5")
+			mustDo(t, c, "INCRBYFLOAT", "value", delta, proto.Error(errFloatResultInfinity.Error()))
+			mustDo(t, c, "HINCRBYFLOAT", "hash", "field", delta, proto.Error(errFloatValueInfinity.Error()))
+			mustDo(t, c, "GET", "value", proto.String("1.5"))
+			mustDo(t, c, "HGET", "hash", "field", proto.String("1.5"))
+		})
+	}
+}

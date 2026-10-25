@@ -226,6 +226,8 @@ func TestSetSdiff(t *testing.T) {
 
 		c.Do("SDIFFSTORE", "res", "s3", "nosuch", "s1")
 		c.Do("SMEMBERS", "res")
+		c.Do("SDIFFSTORE", "res", "s1", "s1")
+		c.Do("EXISTS", "res")
 
 		// failure cases
 		c.Error("wrong number", "SDIFF")
@@ -265,6 +267,10 @@ func TestSetSinter(t *testing.T) {
 
 		c.Do("SINTERSTORE", "res", "s3", "nosuch", "s1")
 		c.Do("SMEMBERS", "res")
+		c.Do("EXISTS", "res")
+		c.Do("SINTERSTORE", "res", "nosuch", "s1")
+		c.Do("EXISTS", "res")
+		c.Do("SADD", "res", "aap")
 
 		// failure cases
 		c.Error("wrong number", "SINTER")
@@ -336,6 +342,8 @@ func TestSetSunion(t *testing.T) {
 
 		c.Do("SUNIONSTORE", "res", "s3", "nosuch", "s1")
 		c.Do("SMEMBERS", "res")
+		c.Do("SUNIONSTORE", "res", "nosuch", "nosuch2")
+		c.Do("EXISTS", "res")
 
 		// failure cases
 		c.Error("wrong number", "SUNION")
@@ -397,4 +405,21 @@ func TestSetNoAuth(t *testing.T) {
 			c.Do("SET", "foo", "bar")
 		},
 	)
+}
+
+func TestSmoveSameKey(t *testing.T) {
+	skip(t)
+	testRaw(t, func(c *client) {
+		c.Do("SADD", "s", "member")
+		c.Do("EXPIRE", "s", "30")
+		c.Do("SMOVE", "s", "s", "member")
+		c.Do("TTL", "s")
+		c.Do("SMEMBERS", "s")
+		c.Do("SMOVE", "s", "s", "missing")
+		c.Do("WATCH", "s")
+		c.Do("SMOVE", "s", "s", "member")
+		c.Do("MULTI")
+		c.Do("PING")
+		c.Do("EXEC")
+	})
 }

@@ -86,6 +86,12 @@ func TestGeopos(t *testing.T) {
 		c.Do("SET", "foo", "bar")
 		c.Error("wrong kind", "GEOPOS", "foo", "Palermo")
 	})
+
+	testRESP3(t, func(c *client) {
+		c.Do("GEOADD", "Sicily", "13.361389", "38.115556", "Palermo")
+		c.Do("GEOPOS", "Sicily", "nosuch")
+		c.Do("GEOPOS", "nosuch", "Palermo")
+	})
 }
 
 func TestGeodist(t *testing.T) {
