@@ -287,6 +287,24 @@ func TestSmove(t *testing.T) {
 	})
 }
 
+func TestSmoveSameKey(t *testing.T) {
+	_, c := runWithClient(t)
+	must1(t, c, "SADD", "s", "member")
+	must1(t, c, "EXPIRE", "s", "30")
+
+	must1(t, c, "SMOVE", "s", "s", "member")
+	mustDo(t, c, "TTL", "s", proto.Int(30))
+	mustDo(t, c, "SMEMBERS", "s", proto.Strings("member"))
+	must0(t, c, "SMOVE", "s", "s", "missing")
+
+	// A no-op must not invalidate a transaction watching the set.
+	mustOK(t, c, "WATCH", "s")
+	must1(t, c, "SMOVE", "s", "s", "member")
+	mustOK(t, c, "MULTI")
+	mustDo(t, c, "PING", proto.Inline("QUEUED"))
+	mustDo(t, c, "EXEC", proto.Array(proto.Inline("PONG")))
+}
+
 // Test SPOP
 func TestSpop(t *testing.T) {
 	s, c := runWithClient(t)

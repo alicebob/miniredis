@@ -360,6 +360,10 @@ func (m *Miniredis) cmdSmove(c *server.Peer, cmd string, args []string) {
 			c.WriteInt(0)
 			return
 		}
+		if src == dst {
+			c.WriteInt(1)
+			return
+		}
 		db.setRem(src, member)
 		db.setAdd(dst, member)
 		c.WriteInt(1)
