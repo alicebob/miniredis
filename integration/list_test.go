@@ -763,6 +763,9 @@ func TestLmove(t *testing.T) {
 		c.Error("wrong kind", "LMOVE", "chk", "str", "LEFT", "LEFT")
 		c.Error("wrong kind", "LMOVE", "str", "chk", "LEFT", "LEFT")
 		c.Do("LRANGE", "chk", "0", "-1")
+		c.Error("syntax error", "LMOVE", "chk", "dst", "LEFT", "MIDDLE")
+		c.Error("syntax error", "LMOVE", "nosuch", "dst", "LEFT", "MIDDLE")
+		c.Do("LRANGE", "chk", "0", "-1")
 	})
 }
 
@@ -819,6 +822,8 @@ func TestBlmove(t *testing.T) {
 		c.Do("SET", "str", "I am a string")
 		c.Error("wrong kind", "BLMOVE", "chk", "str", "LEFT", "LEFT", "0")
 		c.Error("wrong kind", "BLMOVE", "str", "chk", "LEFT", "LEFT", "0")
+		c.Do("LRANGE", "chk", "0", "-1")
+		c.Error("syntax error", "BLMOVE", "chk", "dst", "LEFT", "MIDDLE", "0")
 		c.Do("LRANGE", "chk", "0", "-1")
 	})
 

@@ -975,6 +975,11 @@ func (m *Miniredis) cmdLmove(c *server.Peer, cmd string, args []string) {
 		srcDir: strings.ToLower(args[2]),
 		dstDir: strings.ToLower(args[3]),
 	}
+	if (opts.srcDir != "left" && opts.srcDir != "right") || (opts.dstDir != "left" && opts.dstDir != "right") {
+		setDirty(c)
+		c.WriteError(msgSyntaxError)
+		return
+	}
 
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
@@ -993,9 +998,6 @@ func (m *Miniredis) cmdLmove(c *server.Peer, cmd string, args []string) {
 			elem = db.listLpop(opts.src)
 		case "right":
 			elem = db.listPop(opts.src)
-		default:
-			c.WriteError(msgSyntaxError)
-			return
 		}
 
 		switch opts.dstDir {
@@ -1003,9 +1005,6 @@ func (m *Miniredis) cmdLmove(c *server.Peer, cmd string, args []string) {
 			db.listLpush(opts.dst, elem)
 		case "right":
 			db.listPush(opts.dst, elem)
-		default:
-			c.WriteError(msgSyntaxError)
-			return
 		}
 		c.WriteBulk(elem)
 	})
@@ -1030,6 +1029,11 @@ func (m *Miniredis) cmdBlmove(c *server.Peer, cmd string, args []string) {
 		dstDir: strings.ToLower(args[3]),
 	}
 	if ok := optDuration(c, args[len(args)-1], &opts.timeout); !ok {
+		return
+	}
+	if (opts.srcDir != "left" && opts.srcDir != "right") || (opts.dstDir != "left" && opts.dstDir != "right") {
+		setDirty(c)
+		c.WriteError(msgSyntaxError)
 		return
 	}
 
@@ -1057,9 +1061,6 @@ func (m *Miniredis) cmdBlmove(c *server.Peer, cmd string, args []string) {
 				elem = db.listLpop(opts.src)
 			case "right":
 				elem = db.listPop(opts.src)
-			default:
-				c.WriteError(msgSyntaxError)
-				return true
 			}
 
 			switch opts.dstDir {
@@ -1067,9 +1068,6 @@ func (m *Miniredis) cmdBlmove(c *server.Peer, cmd string, args []string) {
 				db.listLpush(opts.dst, elem)
 			case "right":
 				db.listPush(opts.dst, elem)
-			default:
-				c.WriteError(msgSyntaxError)
-				return true
 			}
 			if ttl > 0 {
 				db.ttl[opts.dst] = ttl
