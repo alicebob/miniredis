@@ -1748,6 +1748,11 @@ func (m *Miniredis) cmdZpopmax(reverse bool) server.Cmd {
 				return
 			}
 
+			if count == 0 {
+				c.WriteLen(0)
+				return
+			}
+
 			members := db.ssetMembers(key)
 			if reverse {
 				reverseSlice(members)
