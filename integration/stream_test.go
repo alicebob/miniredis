@@ -828,3 +828,30 @@ func TestStreamTrim(t *testing.T) {
 		})
 	})
 }
+
+func TestXautoclaimDeletedEntries(t *testing.T) {
+	skip(t)
+	for _, justID := range []bool{false, true} {
+		testRaw(t, func(c *client) {
+			c.Do("XADD", "s", "1-0", "field", "deleted")
+			c.Do("XADD", "s", "2-0", "field", "live")
+			c.Do("XGROUP", "CREATE", "s", "g", "0")
+			c.Do("XREADGROUP", "GROUP", "g", "old", "STREAMS", "s", ">")
+			c.Do("XDEL", "s", "1-0")
+			args := []string{"XAUTOCLAIM", "s", "g", "new", "0", "0"}
+			if justID {
+				args = append(args, "JUSTID")
+			}
+			c.Do(args[0], args[1:]...)
+			c.Do(args[0], args[1:]...)
+			c.Do("XACK", "s", "g", "2-0")
+			c.Do(args[0], args[1:]...)
+			c.Do("XADD", "s", "3-0", "field", "deleted")
+			c.Do("XREADGROUP", "GROUP", "g", "old", "STREAMS", "s", ">")
+			c.Do("XDEL", "s", "3-0")
+			c.Do("XAUTOCLAIM", "s", "g", "new", "100000", "0")
+			c.Do("XAUTOCLAIM", "s", "g", "new", "0", "0")
+			c.Do("XPENDING", "s", "g")
+		})
+	}
+}
