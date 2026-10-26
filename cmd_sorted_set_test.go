@@ -3198,3 +3198,34 @@ func TestZaddIncrConditions(t *testing.T) {
 		})
 	}
 }
+
+func TestZaddRepeatedMembers(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		options []string
+		initial string
+		scores  []string
+		count   int
+		score   string
+	}{
+		{"nx keeps first", []string{"NX"}, "", []string{"1", "2"}, 1, "1"},
+		{"gt keeps highest", []string{"GT"}, "0", []string{"3", "2"}, 0, "3"},
+		{"lt keeps lowest", []string{"LT"}, "4", []string{"1", "2"}, 0, "1"},
+		{"ch counts changes", []string{"CH"}, "1", []string{"2", "1"}, 2, "1"},
+		{"xx ch counts changes", []string{"XX", "CH"}, "1", []string{"2", "1"}, 2, "1"},
+		{"new member counted once", nil, "", []string{"1", "2"}, 1, "2"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, c := runWithClient(t)
+			if tc.initial != "" {
+				must1(t, c, "ZADD", "z", tc.initial, "a")
+			}
+			args := append([]string{"ZADD", "z"}, tc.options...)
+			for _, score := range tc.scores {
+				args = append(args, score, "a")
+			}
+			mustDo(t, c, append(args, proto.Int(tc.count))...)
+			mustDo(t, c, "ZSCORE", "z", "a", proto.String(tc.score))
+		})
+	}
+}
