@@ -3,6 +3,8 @@
 package miniredis
 
 import (
+	"fmt"
+	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -743,6 +745,11 @@ func (m *Miniredis) cmdLrem(c *server.Peer, cmd string, args []string) {
 	}
 	opts.key = args[0]
 	if ok := optInt(c, args[1], &opts.count); !ok {
+		return
+	}
+	if opts.count == math.MinInt {
+		setDirty(c)
+		c.WriteError(fmt.Sprintf("ERR value is out of range, value must between %d and %d", -math.MaxInt, math.MaxInt))
 		return
 	}
 	opts.value = args[2]

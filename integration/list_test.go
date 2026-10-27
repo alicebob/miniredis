@@ -854,3 +854,20 @@ func TestBlmove(t *testing.T) {
 		},
 	)
 }
+
+func TestLremMinimumCount(t *testing.T) {
+	skip(t)
+	testRaw2(t, func(c, watcher *client) {
+		c.Do("RPUSH", "list", "a", "b", "a", "c", "a")
+		c.Do("EXPIRE", "list", "60")
+		watcher.Do("WATCH", "list")
+		c.ErrorTheSame("ERR value is out of range, value must between -9223372036854775807 and 9223372036854775807", "LREM", "list", "-9223372036854775808", "a")
+		c.Do("LRANGE", "list", "0", "-1")
+		c.Do("TTL", "list")
+		watcher.Do("MULTI")
+		watcher.Do("LRANGE", "list", "0", "-1")
+		watcher.Do("EXEC")
+		c.Do("LREM", "list", "-9223372036854775807", "a")
+		c.Do("LRANGE", "list", "0", "-1")
+	})
+}
