@@ -195,7 +195,7 @@ func (m *Miniredis) makeCmdXrange(reverse bool) server.Cmd {
 			}
 		}
 
-		countArg := "0"
+		countArg := ""
 		if len(args) == 5 {
 			if strings.ToLower(args[3]) != "count" {
 				setDirty(c)
@@ -216,10 +216,16 @@ func (m *Miniredis) makeCmdXrange(reverse bool) server.Cmd {
 				c.WriteError(msgInvalidStreamID)
 				return
 			}
-			count, err := strconv.Atoi(countArg)
-			if err != nil {
-				c.WriteError(msgInvalidInt)
-				return
+			count := -1 // no COUNT: return everything
+			if countArg != "" {
+				count, err = strconv.Atoi(countArg)
+				if err != nil {
+					c.WriteError(msgInvalidInt)
+					return
+				}
+				if count < 0 {
+					count = 0
+				}
 			}
 
 			db := m.db(ctx.selectedDB)
@@ -234,11 +240,17 @@ func (m *Miniredis) makeCmdXrange(reverse bool) server.Cmd {
 				return
 			}
 
+			if count == 0 {
+				// Redis replies with a null array for COUNT 0 or less
+				c.WriteNullArray()
+				return
+			}
+
 			var entries = db.streamKeys[opts.key].entries
 			if reverse {
 				entries = reversedStreamEntries(entries)
 			}
-			if count == 0 {
+			if count == -1 {
 				count = len(entries)
 			}
 

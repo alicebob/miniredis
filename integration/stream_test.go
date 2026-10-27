@@ -405,6 +405,11 @@ func TestStreamRange(t *testing.T) {
 		c.Do("XREVRANGE", "ordplanets", "2-2", "2-1")
 		c.Do("XREVRANGE", "ordplanets", "1-0", "0")
 		c.Do("XREVRANGE", "ordplanets", "3-42", "1-0", "COUNT", "2")
+		c.Do("XRANGE", "ordplanets", "-", "+", "COUNT", "0")
+		c.Do("XRANGE", "ordplanets", "-", "+", "COUNT", "-1")
+		c.Do("XREVRANGE", "ordplanets", "+", "-", "COUNT", "0")
+		c.Do("XREVRANGE", "ordplanets", "+", "-", "COUNT", "-1")
+		c.Do("XRANGE", "nosuch", "-", "+", "COUNT", "0")
 		c.Do("DEL", "ordplanets")
 
 		// failure cases
