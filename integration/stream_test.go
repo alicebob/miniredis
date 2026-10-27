@@ -65,6 +65,8 @@ func TestStream(t *testing.T) {
 			c.Do("SET", "str", "I am a string")
 			// c.Do("XADD", "str", "1000", "foo", "bar")
 			// c.Do("XADD", "str", "invalid-key", "foo", "bar")
+			c.Error("wrong kind", "XLEN", "str")
+			c.Do("GET", "str")
 
 			c.Error("wrong number", "XADD", "planets")
 			c.Error("wrong number", "XADD")

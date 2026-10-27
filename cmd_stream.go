@@ -141,6 +141,7 @@ func (m *Miniredis) cmdXlen(c *server.Peer, cmd string, args []string) {
 		s, err := db.stream(key)
 		if err != nil {
 			c.WriteError(err.Error())
+			return
 		}
 		if s == nil {
 			// No such key. That's zero length.

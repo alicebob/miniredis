@@ -322,6 +322,11 @@ func TestStreamLen(t *testing.T) {
 			"XLEN", "str",
 			proto.Error(msgWrongType),
 		)
+		// the error is the only reply
+		mustDo(t, c,
+			"XLEN", "s",
+			proto.Int(2),
+		)
 	})
 }
 
