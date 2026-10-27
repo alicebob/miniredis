@@ -520,6 +520,38 @@ func TestStreamRead(t *testing.T) {
 		})
 	})
 
+	t.Run("MULTI", func(t *testing.T) {
+		s, c := runWithClient(t)
+		_, err := s.XAdd("planets", "1-1", []string{"name", "Mercury"})
+		ok(t, err)
+		_, err = s.XAdd("planets2", "1-1", []string{"name", "Venus"})
+		ok(t, err)
+
+		// '$' is resolved when the transaction runs, so it never finds anything
+		mustOK(t, c, "MULTI")
+		mustDo(t, c, "XREAD", "BLOCK", "0", "STREAMS", "planets", "$", proto.Inline("QUEUED"))
+		mustDo(t, c, "XREAD", "BLOCK", "10", "STREAMS", "planets", "planets2", "$", "0", proto.Inline("QUEUED"))
+		mustDo(t, c, "XREAD", "STREAMS", "planets", "$", proto.Inline("QUEUED"))
+		mustDo(t, c, "XADD", "planets", "2-1", "name", "Earth", proto.Inline("QUEUED"))
+		mustDo(t, c, "XREAD", "BLOCK", "0", "STREAMS", "planets", "nosuch", "$", "$", proto.Inline("QUEUED"))
+		mustDo(t, c,
+			"EXEC",
+			proto.Array(
+				proto.NilList,
+				proto.Array(
+					proto.Array(proto.String("planets2"),
+						proto.Array(
+							proto.Array(proto.String("1-1"), proto.Strings("name", "Venus")),
+						),
+					),
+				),
+				proto.NilList,
+				proto.String("2-1"),
+				proto.NilList,
+			),
+		)
+	})
+
 	t.Run("error cases", func(t *testing.T) {
 		mustOK(t, c, "SET", "str", "value")
 		mustDo(t, c,

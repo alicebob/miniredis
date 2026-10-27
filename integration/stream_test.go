@@ -290,6 +290,19 @@ func TestStream(t *testing.T) {
 			c.Error("negative", "XREAD", "BLOCK", "-12", "STREAMS", "pl", "0")
 		})
 
+		// blocking and '$' in a transaction
+		testRaw(t, func(c *client) {
+			c.Do("XADD", "pl", "55-88", "name", "Mercury")
+			c.Do("XADD", "pl2", "55-88", "name", "Venus")
+			c.Do("MULTI")
+			c.Do("XREAD", "BLOCK", "0", "STREAMS", "pl", "$")
+			c.Do("XREAD", "BLOCK", "10", "STREAMS", "pl", "pl2", "$", "0")
+			c.Do("XREAD", "STREAMS", "pl", "$")
+			c.Do("XADD", "pl", "60-1", "name", "Earth")
+			c.Do("XREAD", "BLOCK", "0", "STREAMS", "pl", "nosuch", "$", "$")
+			c.Do("EXEC")
+		})
+
 		// special '$' ID
 		testRaw2(t, func(c, c2 *client) {
 			var wg sync.WaitGroup
