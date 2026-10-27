@@ -421,10 +421,6 @@ func (g *streamGroup) ack(ids []string) (int, error) {
 		consumer.numPendingEntries--
 
 		g.pending = append(g.pending[:pos], g.pending[pos+1:]...)
-		// don't count deleted entries
-		if _, e := g.stream.get(id); e == nil {
-			continue
-		}
 		count++
 	}
 	return count, nil
