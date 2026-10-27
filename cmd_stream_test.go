@@ -1001,6 +1001,32 @@ func TestStreamAck(t *testing.T) {
 	)
 }
 
+func TestStreamAckDeletedEntries(t *testing.T) {
+	for _, remove := range [][]string{
+		{"XDEL", "stream", "1-0"},
+		{"XTRIM", "stream", "MINID", "2-0"},
+	} {
+		t.Run(remove[0], func(t *testing.T) {
+			_, c := runWithClient(t)
+			mustOK(t, c, "XGROUP", "CREATE", "stream", "group", "0", "MKSTREAM")
+			mustDo(t, c, "XADD", "stream", "1-0", "field", "deleted", proto.String("1-0"))
+			mustDo(t, c, "XADD", "stream", "2-0", "field", "retained", proto.String("2-0"))
+			mustDo(t, c, "XREADGROUP", "GROUP", "group", "alice", "STREAMS", "stream", ">",
+				proto.Array(proto.Array(proto.String("stream"), proto.Array(
+					proto.Array(proto.String("1-0"), proto.Strings("field", "deleted")),
+					proto.Array(proto.String("2-0"), proto.Strings("field", "retained")),
+				))),
+			)
+			mustDo(t, c, append(remove, proto.Int(1))...)
+			mustDo(t, c, "XACK", "stream", "group", "1-0", "1-0", "2-0", "3-0", proto.Int(2))
+			mustDo(t, c, "XPENDING", "stream", "group",
+				proto.Array(proto.Int(0), proto.Nil, proto.Nil, proto.NilList))
+			mustDo(t, c, "XGROUP", "DELCONSUMER", "stream", "group", "alice", proto.Int(0))
+			mustDo(t, c, "XACK", "stream", "group", "1-0", "2-0", proto.Int(0))
+		})
+	}
+}
+
 // Test XPENDING
 func TestStreamXpending(t *testing.T) {
 	s, c := runWithClient(t)
@@ -1649,12 +1675,6 @@ func TestStreamClaim(t *testing.T) {
 		"XPENDING", "planets", "processing", "-", "+", "999",
 		proto.Array(
 			proto.Array(
-				proto.String("0-1"),
-				proto.String("bob"),
-				proto.Int(0),
-				proto.Int(3),
-			),
-			proto.Array(
 				proto.String("0-2"),
 				proto.String("alice"),
 				proto.Int(20000),
@@ -1687,12 +1707,6 @@ func TestStreamClaim(t *testing.T) {
 		"XPENDING", "planets", "processing", "-", "+", "999",
 		proto.Array(
 			proto.Array(
-				proto.String("0-1"),
-				proto.String("bob"),
-				proto.Int(0),
-				proto.Int(3),
-			),
-			proto.Array(
 				proto.String("0-2"),
 				proto.String("alice"),
 				proto.Int(20000),
@@ -1723,12 +1737,6 @@ func TestStreamClaim(t *testing.T) {
 	mustDo(t, c,
 		"XPENDING", "planets", "processing", "-", "+", "999",
 		proto.Array(
-			proto.Array(
-				proto.String("0-1"),
-				proto.String("bob"),
-				proto.Int(0),
-				proto.Int(3),
-			),
 			proto.Array(
 				proto.String("0-2"),
 				proto.String("alice"),
@@ -1780,12 +1788,6 @@ func TestStreamClaim(t *testing.T) {
 	mustDo(t, c,
 		"XPENDING", "planets", "processing", "-", "+", "999",
 		proto.Array(
-			proto.Array(
-				proto.String("0-1"),
-				proto.String("alice"),
-				proto.Int(10000),
-				proto.Int(1),
-			),
 			proto.Array(
 				proto.String("0-2"),
 				proto.String("alice"),

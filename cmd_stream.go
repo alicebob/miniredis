@@ -1614,6 +1614,13 @@ func (m *Miniredis) xclaim(
 ) (claimedEntryIDs []string) {
 	for _, id := range ids {
 		pelPos, pelEntry := group.searchPending(id)
+		if _, entry := group.stream.get(id); entry == nil {
+			if pelEntry != nil {
+				group.consumers[pelEntry.consumer].numPendingEntries--
+				group.pending = append(group.pending[:pelPos], group.pending[pelPos+1:]...)
+			}
+			continue
+		}
 		if pelEntry == nil {
 			group.setLastSeen(consumerName, m.effectiveNow())
 			if !force {
@@ -1644,11 +1651,6 @@ func (m *Miniredis) xclaim(
 			pelEntry.deliveryCount++
 		}
 		pelEntry.lastDelivery = newLastDelivery
-
-		// redis7: don't report entries which are deleted by now
-		if _, e := group.stream.get(id); e == nil {
-			continue
-		}
 
 		claimedEntryIDs = append(claimedEntryIDs, id)
 	}

@@ -601,6 +601,27 @@ func TestStreamGroup(t *testing.T) {
 		})
 	})
 
+	t.Run("XACK deleted entries", func(t *testing.T) {
+		for _, remove := range [][]string{
+			{"XDEL", "stream", "1-0"},
+			{"XTRIM", "stream", "MINID", "2-0"},
+		} {
+			t.Run(remove[0], func(t *testing.T) {
+				testRaw(t, func(c *client) {
+					c.Do("XGROUP", "CREATE", "stream", "group", "0", "MKSTREAM")
+					c.Do("XADD", "stream", "1-0", "field", "deleted")
+					c.Do("XADD", "stream", "2-0", "field", "retained")
+					c.Do("XREADGROUP", "GROUP", "group", "alice", "STREAMS", "stream", ">")
+					c.Do(remove[0], remove[1:]...)
+					c.Do("XACK", "stream", "group", "1-0", "1-0", "2-0", "3-0")
+					c.Do("XPENDING", "stream", "group")
+					c.Do("XGROUP", "DELCONSUMER", "stream", "group", "alice")
+					c.Do("XACK", "stream", "group", "1-0", "2-0")
+				})
+			})
+		}
+	})
+
 	t.Run("XPENDING", func(t *testing.T) {
 		// summary mode
 		testRaw(t, func(c *client) {
