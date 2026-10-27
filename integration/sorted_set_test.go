@@ -1306,3 +1306,22 @@ func TestZaddIncrConditions(t *testing.T) {
 		})
 	}
 }
+
+func TestZaddRepeatedMembers(t *testing.T) {
+	skip(t)
+	testRaw(t, func(c *client) {
+		c.Do("ZADD", "nx", "NX", "1", "a", "2", "a")
+		c.Do("ZSCORE", "nx", "a")
+		c.Do("ZADD", "gt", "0", "a")
+		c.Do("ZADD", "gt", "GT", "3", "a", "2", "a")
+		c.Do("ZSCORE", "gt", "a")
+		c.Do("ZADD", "lt", "4", "a")
+		c.Do("ZADD", "lt", "LT", "1", "a", "2", "a")
+		c.Do("ZSCORE", "lt", "a")
+		c.Do("ZADD", "ch", "1", "a")
+		c.Do("ZADD", "ch", "CH", "2", "a", "1", "a")
+		c.Do("ZSCORE", "ch", "a")
+		c.Error("single increment-element pair", "ZADD", "incr", "INCR", "1", "a", "2", "a")
+		c.Do("EXISTS", "incr")
+	})
+}

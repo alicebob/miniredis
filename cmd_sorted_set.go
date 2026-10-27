@@ -67,7 +67,11 @@ func (m *Miniredis) cmdZadd(c *server.Peer, cmd string, args []string) {
 		ch   bool
 		incr bool
 	}
-	elems := map[string]float64{}
+	type memberScore struct {
+		member string
+		score  float64
+	}
+	var elems []memberScore
 
 	opts.key = args[0]
 	args = args[1:]
@@ -115,7 +119,7 @@ outer:
 			c.WriteError(msgInvalidFloat)
 			return
 		}
-		elems[args[1]] = score
+		elems = append(elems, memberScore{args[1], score})
 		args = args[2:]
 	}
 
@@ -148,7 +152,8 @@ outer:
 		}
 
 		if opts.incr {
-			for member, delta := range elems {
+			for _, elem := range elems {
+				member, delta := elem.member, elem.score
 				if opts.nx && db.ssetExists(opts.key, member) {
 					c.WriteNull()
 					return
@@ -172,7 +177,8 @@ outer:
 		}
 
 		res := 0
-		for member, score := range elems {
+		for _, elem := range elems {
+			member, score := elem.member, elem.score
 			exists := db.ssetExists(opts.key, member)
 			if opts.nx && exists {
 				continue
