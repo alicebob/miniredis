@@ -882,15 +882,11 @@ func TestParseHExpireArgs(t *testing.T) {
 			description: "Should handle multiple fields correctly",
 		},
 		{
-			name: "negative TTL",
-			args: []string{"mykey", "-1", "FIELDS", "1", "field1"},
-			want: hexpireOpts{
-				key:    "mykey",
-				ttl:    -1,
-				fields: []string{"field1"},
-			},
-			wantErr:     "",
-			description: "Negative TTL should be accepted (for immediate expiration)",
+			name:        "negative TTL",
+			args:        []string{"mykey", "-1", "FIELDS", "1", "field1"},
+			want:        hexpireOpts{},
+			wantErr:     "ERR invalid expire time, must be >= 0",
+			description: "Negative TTL should return error",
 		},
 	}
 
@@ -1184,22 +1180,51 @@ func TestHexpire(t *testing.T) {
 		)
 	})
 
-	t.Run("negative TTL for immediate expiration", func(t *testing.T) {
+	t.Run("zero TTL deletes the fields", func(t *testing.T) {
 		mustDo(t, c, "HSET", "hash8", "f1", "v1", "f2", "v2", proto.Int(2))
 
-		// Set negative expiration (immediate expiration)
 		mustDo(t, c,
-			"HEXPIRE", "hash8", "-1", "FIELDS", "1", "f1",
-			proto.Ints(1),
+			"HEXPIRE", "hash8", "0", "FIELDS", "2", "f1", "nonexistent",
+			proto.Ints(2, -2),
 		)
 
-		// Fast forward a tiny bit
-		s.FastForward(100 * time.Millisecond)
-
-		// Field should be gone
+		// Field should be gone, without a fast forward
 		mustDo(t, c,
 			"HGET", "hash8", "f1",
 			proto.Nil,
+		)
+		mustDo(t, c,
+			"HGET", "hash8", "f2",
+			proto.String("v2"),
+		)
+
+		// GT doesn't match a field without an expiration
+		mustDo(t, c,
+			"HEXPIRE", "hash8", "0", "GT", "FIELDS", "1", "f2",
+			proto.Ints(0),
+		)
+		mustDo(t, c,
+			"HEXPIRE", "hash8", "0", "LT", "FIELDS", "1", "f2",
+			proto.Ints(2),
+		)
+
+		// Hash should be gone
+		mustDo(t, c,
+			"EXISTS", "hash8",
+			proto.Int(0),
+		)
+	})
+
+	t.Run("negative TTL", func(t *testing.T) {
+		must1(t, c, "HSET", "hash11", "f1", "v1")
+
+		mustDo(t, c,
+			"HEXPIRE", "hash11", "-1", "FIELDS", "1", "f1",
+			proto.Error("ERR invalid expire time, must be >= 0"),
+		)
+		mustDo(t, c,
+			"HTTL", "hash11", "FIELDS", "1", "f1",
+			proto.Ints(-1),
 		)
 	})
 
