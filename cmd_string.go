@@ -423,9 +423,13 @@ func (m *Miniredis) cmdGetex(c *server.Peer, cmd string, args []string) {
 		}
 		switch {
 		case opts.persist:
-			delete(db.ttl, opts.key)
+			if _, ok := db.ttl[opts.key]; ok {
+				delete(db.ttl, opts.key)
+				db.incr(opts.key)
+			}
 		case opts.ttl != 0:
 			db.ttl[opts.key] = opts.ttl
+			db.incr(opts.key)
 		}
 
 		if db.t(opts.key) != keyTypeString {
