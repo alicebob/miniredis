@@ -59,6 +59,10 @@ func (m *Miniredis) cmdHset(c *server.Peer, cmd string, args []string) {
 		}
 
 		new := db.hashSet(key, pairs...)
+		// Setting a field removes its TTL.
+		for i := 0; i < len(pairs); i += 2 {
+			delete(db.hashTTLs[key], pairs[i])
+		}
 		c.WriteInt(new)
 	})
 }
@@ -127,6 +131,7 @@ func (m *Miniredis) cmdHmset(c *server.Peer, cmd string, args []string) {
 			field, value := args[0], args[1]
 			args = args[2:]
 			db.hashSet(key, field, value)
+			delete(db.hashTTLs[key], field)
 		}
 		c.WriteOK()
 	})
@@ -196,6 +201,7 @@ func (m *Miniredis) cmdHdel(c *server.Peer, cmd string, args []string) {
 				continue
 			}
 			delete(db.hashKeys[opts.key], f)
+			delete(db.hashTTLs[opts.key], f)
 			deleted++
 		}
 		c.WriteInt(deleted)

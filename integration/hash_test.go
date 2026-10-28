@@ -302,6 +302,27 @@ func TestHTTL(t *testing.T) {
 		})
 	})
 
+	t.Run("set and delete", func(t *testing.T) {
+		testRaw(t, func(c *client) {
+			c.Do("HSET", "aap", "noot", "1", "vuur", "2", "zus", "3")
+			c.Do("HEXPIRE", "aap", "100", "FIELDS", "3", "noot", "vuur", "zus")
+			c.Do("HSET", "aap", "noot", "4")
+			c.Do("HMSET", "aap", "vuur", "5")
+			c.Do("HINCRBY", "aap", "zus", "1")
+			c.Do("HTTL", "aap", "FIELDS", "3", "noot", "vuur", "zus")
+
+			c.Do("HDEL", "aap", "zus")
+			c.Do("HSETNX", "aap", "zus", "6")
+			c.Do("HTTL", "aap", "FIELDS", "1", "zus")
+
+			c.Do("HEXPIRE", "aap", "100", "FIELDS", "1", "noot")
+			c.Do("MULTI")
+			c.Do("HSET", "aap", "noot", "7")
+			c.Do("HTTL", "aap", "FIELDS", "1", "noot")
+			c.Do("EXEC")
+		})
+	})
+
 	t.Run("ttl", func(t *testing.T) {
 		testRaw(t, func(c *client) {
 			c.Do("HSET", "aap", "noot", "mies")

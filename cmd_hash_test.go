@@ -1557,6 +1557,39 @@ func TestHttl(t *testing.T) {
 		)
 	})
 
+	t.Run("HSET and HMSET remove the TTL", func(t *testing.T) {
+		mustDo(t, c, "HSET", "h7", "f1", "v1", "f2", "v2", "f3", "1", proto.Int(3))
+		mustDo(t, c,
+			"HEXPIRE", "h7", "60", "FIELDS", "3", "f1", "f2", "f3",
+			proto.Ints(1, 1, 1),
+		)
+		must0(t, c, "HSET", "h7", "f1", "new")
+		mustOK(t, c, "HMSET", "h7", "f2", "new")
+		// HINCRBY keeps it
+		mustDo(t, c, "HINCRBY", "h7", "f3", "1", proto.Int(2))
+		mustDo(t, c,
+			"HTTL", "h7", "FIELDS", "3", "f1", "f2", "f3",
+			proto.Ints(-1, -1, 60),
+		)
+
+		s.FastForward(time.Minute)
+		mustDo(t, c, "HKEYS", "h7", proto.Strings("f1", "f2"))
+	})
+
+	t.Run("HDEL removes the TTL", func(t *testing.T) {
+		mustDo(t, c, "HSET", "h8", "f1", "v1", "f2", "v2", proto.Int(2))
+		mustDo(t, c,
+			"HEXPIRE", "h8", "60", "FIELDS", "1", "f1",
+			proto.Ints(1),
+		)
+		must1(t, c, "HDEL", "h8", "f1")
+		must1(t, c, "HSETNX", "h8", "f1", "again")
+		mustDo(t, c,
+			"HTTL", "h8", "FIELDS", "1", "f1",
+			proto.Ints(-1),
+		)
+	})
+
 	t.Run("wrong type", func(t *testing.T) {
 		mustOK(t, c, "SET", "str", "value")
 		mustDo(t, c,
@@ -1894,6 +1927,18 @@ func TestDirectHashFieldTTL(t *testing.T) {
 		s.HSetEX("h5", 5*time.Second, "f1", "new")
 		equals(t, "new", s.HGet("h5", "f1"))
 		equals(t, 5*time.Second, s.HTTL("h5", "f1"))
+	})
+
+	t.Run("HSet and HDel remove the TTL", func(t *testing.T) {
+		s.HSet("h8", "f1", "v1", "f2", "v2")
+		s.HExpire("h8", "f1", 10*time.Second)
+		s.HExpire("h8", "f2", 10*time.Second)
+
+		s.HSet("h8", "f1", "new")
+		equals(t, time.Duration(0), s.HTTL("h8", "f1"))
+
+		s.HDel("h8", "f2")
+		equals(t, time.Duration(0), s.HTTL("h8", "f2"))
 	})
 
 	t.Run("DB-level methods", func(t *testing.T) {
