@@ -535,9 +535,9 @@ func TestCopyStreamIsolation(t *testing.T) {
 			c.Do("XREADGROUP", "GROUP", "group", "alice", "STREAMS", "source", ">")
 			c.Do("COPY", "source", "copy")
 			c.Do("XCLAIM", "copy", "group", "bob", "0", "1-0", "JUSTID")
-			c.Do("XPENDING", "source", "group", "-", "+", "10")
+			c.Do("XPENDING", "source", "group")
 			c.Do("XACK", "copy", "group", "1-0")
-			c.Do("XPENDING", "source", "group", "-", "+", "10")
+			c.Do("XPENDING", "source", "group")
 		})
 	})
 }
