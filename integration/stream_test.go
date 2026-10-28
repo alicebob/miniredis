@@ -512,6 +512,21 @@ func TestStreamGroup(t *testing.T) {
 				c.Do("XACK", "colors", "p", "42-2")
 			}
 
+			// pending entries deleted with XDEL
+			{
+				c.Do("XGROUP", "CREATE", "moons", "pr", "$", "MKSTREAM")
+				c.Do("XADD", "moons", "1-1", "name", "Io")
+				c.Do("XADD", "moons", "1-2", "name", "Europa")
+				c.Do("XADD", "moons", "1-3", "name", "Ganymede")
+				c.Do("XREADGROUP", "GROUP", "pr", "alice", "STREAMS", "moons", ">")
+				c.Do("XDEL", "moons", "1-2")
+				c.Do("XREADGROUP", "GROUP", "pr", "alice", "STREAMS", "moons", "0")
+				c.Do("XREADGROUP", "GROUP", "pr", "alice", "COUNT", "0", "STREAMS", "moons", "0")
+				c.Do("XREADGROUP", "GROUP", "pr", "alice", "COUNT", "1", "STREAMS", "moons", "0")
+				c.Do("XREADGROUP", "GROUP", "pr", "alice", "COUNT", "2", "STREAMS", "moons", "1-1")
+				c.Do("XREADGROUP", "GROUP", "pr", "bob", "STREAMS", "moons", "0")
+			}
+
 			// errors
 			c.Error("wrong number", "XREADGROUP")
 			c.Error("wrong number", "XREADGROUP", "GROUP")
