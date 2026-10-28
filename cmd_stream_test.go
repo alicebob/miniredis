@@ -385,6 +385,31 @@ func TestStreamRange(t *testing.T) {
 		)
 	})
 
+	t.Run("COUNT", func(t *testing.T) {
+		mustDo(t, c,
+			"XRANGE", "planets", "-", "+", "COUNT", "1",
+			proto.Array(
+				proto.Array(proto.String("0-1"), proto.Strings("name", "Mercury", "greek-god", "Hermes", "idx", "1")),
+			),
+		)
+		mustDo(t, c,
+			"XRANGE", "planets", "-", "+", "COUNT", "0",
+			proto.NilList,
+		)
+		mustDo(t, c,
+			"XRANGE", "planets", "-", "+", "COUNT", "-1",
+			proto.NilList,
+		)
+		mustDo(t, c,
+			"XREVRANGE", "planets", "+", "-", "COUNT", "0",
+			proto.NilList,
+		)
+		mustDo(t, c,
+			"XRANGE", "nosuch", "-", "+", "COUNT", "0",
+			proto.Array(),
+		)
+	})
+
 	t.Run("error cases", func(t *testing.T) {
 		mustOK(t, c, "SET", "str", "value")
 		mustDo(t, c,
