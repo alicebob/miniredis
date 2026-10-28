@@ -96,7 +96,14 @@ func (s *streamKey) copy() *streamKey {
 	defer s.mu.Unlock()
 
 	cpy := &streamKey{
-		entries: s.entries,
+		entries:         make([]StreamEntry, len(s.entries)),
+		lastAllocatedID: s.lastAllocatedID,
+	}
+	for i, entry := range s.entries {
+		cpy.entries[i] = StreamEntry{
+			ID:     entry.ID,
+			Values: append([]string(nil), entry.Values...),
+		}
 	}
 	groups := map[string]*streamGroup{}
 	for k, v := range s.groups {
@@ -491,7 +498,7 @@ func (g *streamGroup) copy() *streamGroup {
 	return &streamGroup{
 		// don't copy stream
 		lastID:    g.lastID,
-		pending:   g.pending,
+		pending:   append([]pendingEntry(nil), g.pending...),
 		consumers: cns,
 	}
 }

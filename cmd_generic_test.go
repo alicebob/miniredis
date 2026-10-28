@@ -1032,3 +1032,52 @@ func TestWait(t *testing.T) {
 		)
 	})
 }
+
+func TestCopyStreamIsolation(t *testing.T) {
+	t.Run("entries", func(t *testing.T) {
+		s, c := runWithClient(t)
+		want := []StreamEntry{
+			{ID: "1-0", Values: []string{"field", "one"}},
+			{ID: "2-0", Values: []string{"field", "two"}},
+			{ID: "3-0", Values: []string{"field", "three"}},
+		}
+		for _, entry := range want {
+			_, err := s.XAdd("source", entry.ID, entry.Values)
+			ok(t, err)
+		}
+		must1(t, c, "COPY", "source", "copy")
+		must1(t, c, "XDEL", "source", "1-0")
+		got, err := s.Stream("copy")
+		ok(t, err)
+		equals(t, want, got)
+		got[0].Values[1] = "changed"
+		original, err := s.Stream("source")
+		ok(t, err)
+		equals(t, "two", original[0].Values[1])
+	})
+
+	t.Run("pending entries", func(t *testing.T) {
+		_, c := runWithClient(t)
+		mustOK(t, c, "XGROUP", "CREATE", "source", "group", "0", "MKSTREAM")
+		mustDo(t, c, "XADD", "source", "1-0", "field", "one", proto.String("1-0"))
+		mustDo(t, c, "XREADGROUP", "GROUP", "group", "alice", "STREAMS", "source", ">",
+			proto.Array(proto.Array(proto.String("source"), proto.Array(
+				proto.Array(proto.String("1-0"), proto.Strings("field", "one")),
+			))),
+		)
+		must1(t, c, "COPY", "source", "copy")
+		mustDo(t, c, "XCLAIM", "copy", "group", "bob", "0", "1-0", "JUSTID", proto.Strings("1-0"))
+		mustContain(t, c, "XPENDING", "source", "group", "-", "+", "10", proto.String("alice"))
+		must1(t, c, "XACK", "source", "group", "1-0")
+		must1(t, c, "XACK", "copy", "group", "1-0")
+	})
+
+	t.Run("last generated ID", func(t *testing.T) {
+		s, c := runWithClient(t)
+		s.SetTime(time.UnixMilli(1))
+		mustDo(t, c, "XADD", "source", "100-0", "field", "one", proto.String("100-0"))
+		must1(t, c, "XDEL", "source", "100-0")
+		must1(t, c, "COPY", "source", "copy")
+		mustDo(t, c, "XADD", "copy", "*", "field", "two", proto.String("100-1"))
+	})
+}

@@ -513,3 +513,31 @@ func TestObject(t *testing.T) {
 		c.Error("Transaction discarded", "EXEC")
 	})
 }
+
+func TestCopyStreamIsolation(t *testing.T) {
+	skip(t)
+	t.Run("entries", func(t *testing.T) {
+		testRaw(t, func(c *client) {
+			c.Do("XADD", "source", "1-0", "field", "one")
+			c.Do("XADD", "source", "2-0", "field", "two")
+			c.Do("XADD", "source", "3-0", "field", "three")
+			c.Do("COPY", "source", "copy")
+			c.Do("XDEL", "source", "1-0")
+			c.Do("XRANGE", "copy", "-", "+")
+			c.Do("XDEL", "copy", "2-0")
+			c.Do("XRANGE", "source", "-", "+")
+		})
+	})
+	t.Run("pending entries", func(t *testing.T) {
+		testRaw(t, func(c *client) {
+			c.Do("XGROUP", "CREATE", "source", "group", "0", "MKSTREAM")
+			c.Do("XADD", "source", "1-0", "field", "one")
+			c.Do("XREADGROUP", "GROUP", "group", "alice", "STREAMS", "source", ">")
+			c.Do("COPY", "source", "copy")
+			c.Do("XCLAIM", "copy", "group", "bob", "0", "1-0", "JUSTID")
+			c.Do("XPENDING", "source", "group")
+			c.Do("XACK", "copy", "group", "1-0")
+			c.Do("XPENDING", "source", "group")
+		})
+	})
+}
