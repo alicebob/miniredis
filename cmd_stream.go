@@ -24,6 +24,7 @@ func commandsStream(m *Miniredis) {
 	m.srv.Register("XINFO", m.cmdXinfo)
 	m.srv.Register("XREADGROUP", m.cmdXreadgroup)
 	m.srv.Register("XACK", m.cmdXack)
+	m.srv.Register("XACKDEL", m.cmdXackdel)
 	m.srv.Register("XDEL", m.cmdXdel)
 	m.srv.Register("XPENDING", m.cmdXpending, server.ReadOnlyOption())
 	m.srv.Register("XTRIM", m.cmdXtrim)
@@ -569,7 +570,7 @@ func (m *Miniredis) cmdXinfoGroups(c *server.Peer, args []string) {
 			c.WriteBulk("consumers")
 			c.WriteInt(len(g.consumers))
 			c.WriteBulk("pending")
-			c.WriteInt(len(g.activePending()))
+			c.WriteInt(len(g.pending))
 			c.WriteBulk("last-delivered-id")
 			c.WriteBulk(g.lastID)
 			c.WriteBulk("entries-read")
@@ -816,6 +817,91 @@ func xreadgroup(
 		res[key] = entries
 	}
 	return res, nil
+}
+
+// XACKDEL acknowledges pending entries and applies a deletion policy.
+func (m *Miniredis) cmdXackdel(c *server.Peer, cmd string, args []string) {
+	if !m.isValidCMD(c, cmd, args, atLeast(5)) {
+		return
+	}
+	key, group := args[0], args[1]
+	strategy := "KEEPREF"
+	pos := 2
+	switch strings.ToUpper(args[pos]) {
+	case "KEEPREF", "DELREF", "ACKED":
+		strategy = strings.ToUpper(args[pos])
+		pos++
+	}
+	if len(args) < pos+2 || !strings.EqualFold(args[pos], "IDS") {
+		c.WriteError(msgSyntaxError)
+		return
+	}
+	n, err := strconv.Atoi(args[pos+1])
+	if err != nil || n <= 0 {
+		c.WriteError("ERR Number of IDs must be a positive integer")
+		return
+	}
+	ids := args[pos+2:]
+	if n != len(ids) {
+		c.WriteError("ERR The `numids` parameter must match the number of arguments")
+		return
+	}
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
+		db := m.db(ctx.selectedDB)
+		s, err := db.stream(key)
+		if err != nil {
+			c.WriteError(err.Error())
+			return
+		}
+		var g *streamGroup
+		if s != nil {
+			g = s.groups[group]
+		}
+		if g == nil {
+			c.WriteLen(n)
+			for range ids {
+				c.WriteInt(-1)
+			}
+			return
+		}
+		normalized := make([]string, len(ids))
+		for i, id := range ids {
+			var err error
+			normalized[i], err = formatStreamID(id)
+			if err != nil {
+				c.WriteError(msgInvalidStreamID)
+				return
+			}
+		}
+		c.WriteLen(n)
+		for _, id := range normalized {
+			_, pending := g.searchPending(id)
+			if pending == nil {
+				c.WriteInt(-1)
+				continue
+			}
+			g.ack([]string{id})
+			canDelete := true
+			for _, other := range s.groups {
+				if strategy == "DELREF" {
+					other.ack([]string{id})
+				}
+				if strategy == "ACKED" {
+					_, p := other.searchPending(id)
+					if p != nil || streamCmp(other.lastID, id) < 0 {
+						canDelete = false
+					}
+				}
+			}
+			if canDelete {
+				s.delete([]string{id})
+				db.incr(key)
+				c.WriteInt(1)
+			} else {
+				c.WriteInt(2)
+			}
+		}
+	})
 }
 
 // XACK
@@ -1135,7 +1221,7 @@ func (m *Miniredis) cmdXpending(c *server.Peer, cmd string, args []string) {
 }
 
 func writeXpendingSummary(c *server.Peer, g streamGroup) {
-	pend := g.activePending()
+	pend := g.pending
 	if len(pend) == 0 {
 		c.WriteLen(4)
 		c.WriteInt(0)
