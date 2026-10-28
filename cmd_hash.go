@@ -733,8 +733,21 @@ func (m *Miniredis) cmdHexpire(c *server.Peer, cmd string, args []string) {
 				continue
 			}
 
+			// A TTL of 0 is already in the past, so the field is deleted.
+			if newTTL == 0 {
+				delete(db.hashKeys[opts.key], field)
+				delete(fieldTTLs, field)
+				c.WriteInt(2)
+				continue
+			}
+
 			fieldTTLs[field] = newTTL
 			c.WriteInt(1)
+		}
+
+		// Nothing left. Remove the whole key.
+		if len(db.hashKeys[opts.key]) == 0 {
+			db.del(opts.key, true)
 		}
 	})
 }
@@ -755,6 +768,9 @@ func parseHExpireArgs(args []string) (hexpireOpts, string) {
 
 	if err := optIntSimple(args[1], &opts.ttl); err != nil {
 		return hexpireOpts{}, err.Error()
+	}
+	if opts.ttl < 0 {
+		return hexpireOpts{}, "ERR invalid expire time, must be >= 0"
 	}
 
 	args = args[2:]

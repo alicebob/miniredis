@@ -67,6 +67,29 @@ func TestHash(t *testing.T) {
 			c.Error("wrong number", "HEXPIRE", "aap", "noot", "3")
 			c.Error("not an int", "HEXPIRE", "aap", "3.14", "FIELDS", "noot", "3.14")
 			c.Error("numfields", "HEXPIRE", "aap", "3", "FIELDS", "3", "noot", "vuur")
+			c.Error("invalid expire time", "HEXPIRE", "aap", "-3", "FIELDS", "1", "noot")
+		})
+	})
+
+	t.Run("expire now", func(t *testing.T) {
+		testRaw(t, func(c *client) {
+			c.Do("HSET", "aap", "noot", "mies", "vuur", "wim", "zus", "jet")
+			c.Do("HEXPIRE", "aap", "0", "FIELDS", "2", "noot", "nosuch")
+			c.Do("HGET", "aap", "noot")
+			c.Do("HLEN", "aap")
+
+			c.Do("HEXPIRE", "aap", "0", "GT", "FIELDS", "1", "vuur")
+			c.Do("HEXPIRE", "aap", "0", "LT", "FIELDS", "1", "vuur")
+			c.Do("HEXPIRE", "aap", "10", "FIELDS", "1", "zus")
+			c.Do("HEXPIRE", "aap", "0", "NX", "FIELDS", "1", "zus")
+			c.Do("HEXPIRE", "aap", "0", "XX", "FIELDS", "1", "zus")
+			c.Do("EXISTS", "aap") // key is gone
+
+			c.Do("HSET", "aap", "noot", "mies")
+			c.Do("MULTI")
+			c.Do("HEXPIRE", "aap", "0", "FIELDS", "1", "noot")
+			c.Do("EXISTS", "aap")
+			c.Do("EXEC")
 		})
 	})
 }
