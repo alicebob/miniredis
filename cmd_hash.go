@@ -209,6 +209,8 @@ func (m *Miniredis) cmdHdel(c *server.Peer, cmd string, args []string) {
 		// Nothing left. Remove the whole key.
 		if len(db.hashKeys[opts.key]) == 0 {
 			db.del(opts.key, true)
+		} else if deleted > 0 {
+			db.incr(opts.key)
 		}
 	})
 }
@@ -695,6 +697,7 @@ func (m *Miniredis) cmdHexpire(c *server.Peer, cmd string, args []string) {
 			db.hashTTLs[opts.key] = fieldTTLs
 		}
 
+		changed := 0
 		c.WriteLen(len(opts.fields))
 		for _, field := range opts.fields {
 			if _, ok := db.hashKeys[opts.key][field]; !ok {
@@ -737,17 +740,21 @@ func (m *Miniredis) cmdHexpire(c *server.Peer, cmd string, args []string) {
 			if newTTL == 0 {
 				delete(db.hashKeys[opts.key], field)
 				delete(fieldTTLs, field)
+				changed++
 				c.WriteInt(2)
 				continue
 			}
 
 			fieldTTLs[field] = newTTL
+			changed++
 			c.WriteInt(1)
 		}
 
 		// Nothing left. Remove the whole key.
 		if len(db.hashKeys[opts.key]) == 0 {
 			db.del(opts.key, true)
+		} else if changed > 0 {
+			db.incr(opts.key)
 		}
 	})
 }
@@ -851,6 +858,7 @@ func (m *Miniredis) cmdHpersist(c *server.Peer, cmd string, args []string) {
 			return
 		}
 
+		persisted := 0
 		c.WriteLen(len(fields))
 		for _, field := range fields {
 			if _, ok := db.hashKeys[key][field]; !ok {
@@ -869,7 +877,11 @@ func (m *Miniredis) cmdHpersist(c *server.Peer, cmd string, args []string) {
 			}
 
 			delete(fieldTTLs, field)
+			persisted++
 			c.WriteInt(1)
+		}
+		if persisted > 0 {
+			db.incr(key)
 		}
 	})
 }

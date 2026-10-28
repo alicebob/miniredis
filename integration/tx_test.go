@@ -187,3 +187,45 @@ func TestTx(t *testing.T) {
 		c.Do("EXEC")
 	})
 }
+
+func TestTxWatchModified(t *testing.T) {
+	skip(t)
+	hash := [][]string{{"HSET", "k", "a", "1", "b", "2"}}
+	zset := [][]string{{"ZADD", "k", "1", "a", "2", "b", "3", "c"}}
+	stream := [][]string{{"XADD", "k", "1-0", "f", "v"}, {"XADD", "k", "2-0", "f", "v"}}
+	for _, tc := range []struct {
+		setup [][]string
+		cmd   []string
+	}{
+		{hash, []string{"HDEL", "k", "a"}},
+		{hash, []string{"HDEL", "k", "nosuch"}},
+		{hash, []string{"HEXPIRE", "k", "100", "FIELDS", "1", "a"}},
+		{hash, []string{"HEXPIRE", "k", "0", "FIELDS", "1", "a"}},
+		{append(hash, []string{"HEXPIRE", "k", "100", "FIELDS", "1", "a"}), []string{"HPERSIST", "k", "FIELDS", "1", "a"}},
+		{hash, []string{"HPERSIST", "k", "FIELDS", "1", "a"}},
+		{zset, []string{"ZREM", "k", "a"}},
+		{zset, []string{"ZREM", "k", "nosuch"}},
+		{zset, []string{"ZPOPMIN", "k"}},
+		{zset, []string{"ZPOPMAX", "k"}},
+		{zset, []string{"ZREMRANGEBYSCORE", "k", "1", "1"}},
+		{zset, []string{"ZREMRANGEBYRANK", "k", "0", "0"}},
+		{[][]string{{"ZADD", "k", "0", "a", "0", "b"}}, []string{"ZREMRANGEBYLEX", "k", "[a", "[a"}},
+		{[][]string{{"SET", "k", "v"}}, []string{"GETEX", "k", "EX", "100"}},
+		{[][]string{{"SET", "k", "v", "EX", "100"}}, []string{"GETEX", "k", "PERSIST"}},
+		{[][]string{{"SET", "k", "v"}}, []string{"GETEX", "k", "PERSIST"}},
+		{stream, []string{"XTRIM", "k", "MAXLEN", "1"}},
+		{stream, []string{"XTRIM", "k", "MINID", "2-0"}},
+		{stream, []string{"XTRIM", "k", "MAXLEN", "10"}},
+	} {
+		testRaw2(t, func(c1, c2 *client) {
+			for _, args := range tc.setup {
+				c1.Do(args[0], args[1:]...)
+			}
+			c1.Do("WATCH", "k")
+			c2.Do(tc.cmd[0], tc.cmd[1:]...)
+			c1.Do("MULTI")
+			c1.Do("PING")
+			c1.Do("EXEC")
+		})
+	}
+}
