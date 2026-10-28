@@ -1049,6 +1049,11 @@ func writeXread(c *server.Peer, streams []string, res map[string][]StreamEntry) 
 		for _, entry := range entries {
 			c.WriteLen(2)
 			c.WriteBulk(entry.ID)
+			if entry.Values == nil {
+				// pending entry which was deleted from the stream
+				c.WriteNullArray()
+				continue
+			}
 			c.WriteLen(len(entry.Values))
 			for _, v := range entry.Values {
 				c.WriteBulk(v)
