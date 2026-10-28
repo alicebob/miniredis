@@ -691,6 +691,69 @@ func unwatch(ctx *connCtx) {
 	ctx.watch = nil
 }
 
+// WithTx exposes withTx, so a command registered externally
+// via Server().Register can use MULTI/EXEC and Lua-script
+// nesting correctly.
+// Without this, an externally registered command cannot
+// honour MULTI: it always executes immediately
+// and replies with its own reply type instead of "+QUEUED",
+// which desync the RESP stream a transactional client
+// expects and surfaces as a "transaction failed".
+//
+// cb receives the selected RedisDB directly:
+// withTx already holds m's lock for the duration of cb,
+// and every built-in command reaches its DB from inside
+// that same lock via the lock-free, unexported m.db(...),
+// never the self-locking exported DB(...).
+// A caller that fetched its DB via DB(...) from inside cb
+// would deadlock, since sync.Mutex is not reentrant;
+// passing it in here is what keeps external commands
+// from having to know that.
+func WithTx(m *Miniredis, c *server.Peer, cb func(db *RedisDB)) {
+	withTx(m, c, func(_ *server.Peer, ctx *connCtx) {
+		cb(m.db(ctx.selectedDB))
+	})
+}
+
+// GetNoLock is a lock-free copy of Get, meant to be used by
+// callers which would otherwise deadlock.
+func (db *RedisDB) GetNoLock(k string) (string, error) {
+	if !db.exists(k) {
+		return "", ErrKeyNotFound
+	}
+	if db.t(k) != keyTypeString {
+		return "", ErrWrongType
+	}
+	return db.stringGet(k), nil
+}
+
+// SetNoLock is a lock-free copy of Set, meant to be used by
+// callers which would otherwise deadlock.
+func (db *RedisDB) SetNoLock(k, v string) error {
+	if db.exists(k) && db.t(k) != keyTypeString {
+		return ErrWrongType
+	}
+	db.del(k, true) // Remove expire
+	db.stringSet(k, v)
+	return nil
+}
+
+// DelNoLock is a lock-free copy of Del, meant to be used by
+// callers which would otherwise deadlock.
+func (db *RedisDB) DelNoLock(k string) bool {
+	if !db.exists(k) {
+		return false
+	}
+	db.del(k, true)
+	return true
+}
+
+// ExistsNoLock is a lock-free copy of Exists, meant to be used by
+// callers which would otherwise deadlock.
+func (db *RedisDB) ExistsNoLock(k string) bool {
+	return db.exists(k)
+}
+
 // setDirty can be called even when not in an tx. Is an no-op then.
 func setDirty(c *server.Peer) {
 	if c.Ctx == nil {
