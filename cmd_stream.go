@@ -1426,27 +1426,37 @@ parsing:
 			return
 		}
 
-		nextCallId, entries := xautoclaim(m.effectiveNow(), *g, opts.minIdleTime, opts.start, opts.count, opts.consumer)
-		writeXautoclaim(c, nextCallId, entries, opts.justId)
+		nextCallId, entries, deleted := xautoclaim(m.effectiveNow(), g, opts.minIdleTime, opts.start, opts.count, opts.consumer)
+		writeXautoclaim(c, nextCallId, entries, deleted, opts.justId)
 	})
 }
 
 func xautoclaim(
 	now time.Time,
-	g streamGroup,
+	g *streamGroup,
 	minIdleTime time.Duration,
 	start string,
 	count int,
 	consumerID string,
-) (string, []StreamEntry) {
+) (string, []StreamEntry, []string) {
 	nextCallId := "0-0"
 	if len(g.pending) == 0 || count < 0 {
-		return nextCallId, nil
+		return nextCallId, nil, nil
 	}
 
-	msgs := g.pendingAfterOrEqual(start)
+	// Removing deleted entries changes the pending slice while it is scanned.
+	msgs := append([]pendingEntry(nil), g.pendingAfterOrEqual(start)...)
 	var res []StreamEntry
+	var deleted []string
 	for i, p := range msgs {
+		_, entry := g.stream.get(p.id)
+		if entry == nil {
+			g.consumers[p.consumer].numPendingEntries--
+			pos, _ := g.searchPending(p.id)
+			g.pending = append(g.pending[:pos], g.pending[pos+1:]...)
+			deleted = append(deleted, p.id)
+			continue
+		}
 		if minIdleTime > 0 && now.Before(p.lastDelivery.Add(minIdleTime)) {
 			continue
 		}
@@ -1456,23 +1466,14 @@ func xautoclaim(
 			g.consumers[consumerID] = &consumer{}
 		}
 		p.consumer = consumerID
-
-		_, entry := g.stream.get(p.id)
-		// not found. Weird?
-		if entry == nil {
-			// TODO: support third element of return from XAUTOCLAIM, which
-			// should delete entries not found in the PEL during XAUTOCLAIM.
-			// (Introduced in Redis 7.0)
-			continue
-		}
-
 		p.deliveryCount += 1
 		p.lastDelivery = now
 
 		g.consumers[prevConsumerID].numPendingEntries--
 		g.consumers[consumerID].numPendingEntries++
 
-		msgs[i] = p
+		_, pending := g.searchPending(p.id)
+		*pending = p
 		res = append(res, *entry)
 
 		if len(res) >= count {
@@ -1482,10 +1483,10 @@ func xautoclaim(
 			break
 		}
 	}
-	return nextCallId, res
+	return nextCallId, res, deleted
 }
 
-func writeXautoclaim(c *server.Peer, nextCallId string, res []StreamEntry, justId bool) {
+func writeXautoclaim(c *server.Peer, nextCallId string, res []StreamEntry, deleted []string, justId bool) {
 	c.WriteLen(3)
 	c.WriteBulk(nextCallId)
 	c.WriteLen(len(res))
@@ -1502,8 +1503,10 @@ func writeXautoclaim(c *server.Peer, nextCallId string, res []StreamEntry, justI
 			c.WriteBulk(v)
 		}
 	}
-	// TODO: see "Redis 7" note
-	c.WriteLen(0)
+	c.WriteLen(len(deleted))
+	for _, id := range deleted {
+		c.WriteBulk(id)
+	}
 }
 
 // XCLAIM

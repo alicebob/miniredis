@@ -1843,3 +1843,35 @@ func TestStreamClaim(t *testing.T) {
 		proto.Array(),
 	)
 }
+
+func TestStreamAutoClaimDeletedEntries(t *testing.T) {
+	for _, justID := range []bool{false, true} {
+		name := "entries"
+		if justID {
+			name = "justid"
+		}
+		t.Run(name, func(t *testing.T) {
+			_, c := runWithClient(t)
+			mustDo(t, c, "XADD", "stream", "1-0", "field", "deleted", proto.String("1-0"))
+			mustDo(t, c, "XADD", "stream", "2-0", "field", "live", proto.String("2-0"))
+			mustOK(t, c, "XGROUP", "CREATE", "stream", "group", "0")
+			mustDo(t, c, "XREADGROUP", "GROUP", "group", "old", "STREAMS", "stream", ">", proto.Array(
+				proto.Array(proto.String("stream"), proto.Array(
+					proto.Array(proto.String("1-0"), proto.Strings("field", "deleted")),
+					proto.Array(proto.String("2-0"), proto.Strings("field", "live")),
+				)),
+			))
+			must1(t, c, "XDEL", "stream", "1-0")
+			args := []string{"XAUTOCLAIM", "stream", "group", "new", "0", "0"}
+			claimed := proto.Array(proto.Array(proto.String("2-0"), proto.Strings("field", "live")))
+			if justID {
+				args = append(args, "JUSTID")
+				claimed = proto.Strings("2-0")
+			}
+			mustDo(t, c, append(args, proto.Array(proto.String("0-0"), claimed, proto.Strings("1-0")))...)
+			mustDo(t, c, append(args, proto.Array(proto.String("0-0"), claimed, proto.Array()))...)
+			must1(t, c, "XACK", "stream", "group", "2-0")
+			mustDo(t, c, append(args, proto.Array(proto.String("0-0"), proto.Array(), proto.Array()))...)
+		})
+	}
+}
