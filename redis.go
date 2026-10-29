@@ -27,6 +27,7 @@ const (
 	msgNotValidHllValue     = "WRONGTYPE Key is not a valid HyperLogLog string value."
 	msgInvalidInt           = "ERR value is not an integer or out of range"
 	msgIntOverflow          = "ERR increment or decrement would overflow"
+	msgStringTooLong        = "ERR string exceeds maximum allowed size (proto-max-bulk-len)"
 	msgInvalidFloat         = "ERR value is not a valid float"
 	msgInvalidMinMax        = "ERR min or max is not a float"
 	msgInvalidRangeItem     = "ERR min or max not valid string range item"

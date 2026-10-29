@@ -1089,6 +1089,35 @@ func TestSetrange(t *testing.T) {
 		s.CheckGet(t, "nosuch", "\x00\x00\x00bar")
 	}
 
+	// An empty value changes nothing
+	{
+		mustDo(t, c,
+			"SETRANGE", "empty", "3", "",
+			proto.Int(0),
+		)
+		equals(t, false, s.Exists("empty"))
+
+		s.Set("short", "ab")
+		mustDo(t, c,
+			"SETRANGE", "short", "10", "",
+			proto.Int(2),
+		)
+		s.CheckGet(t, "short", "ab")
+	}
+
+	// Past the size limit of a string
+	{
+		mustDo(t, c,
+			"SETRANGE", "short", "536870911", "xy",
+			proto.Error(msgStringTooLong),
+		)
+		mustDo(t, c,
+			"SETRANGE", "short", "9223372036854775807", "x",
+			proto.Error(msgStringTooLong),
+		)
+		s.CheckGet(t, "short", "ab")
+	}
+
 	// Wrong type of existing key
 	{
 		s.HSet("wrong", "aap", "noot")
@@ -1527,6 +1556,10 @@ func TestGetbit(t *testing.T) {
 			"GETBIT", "many", "noint",
 			proto.Error("ERR bit offset is not an integer or out of range"),
 		)
+		mustDo(t, c,
+			"GETBIT", "many", "4294967296",
+			proto.Error("ERR bit offset is not an integer or out of range"),
+		)
 	}
 }
 
@@ -1596,6 +1629,14 @@ func TestSetbit(t *testing.T) {
 		)
 		mustDo(t, c,
 			"SETBIT", "many", "-3", "0",
+			proto.Error("ERR bit offset is not an integer or out of range"),
+		)
+		mustDo(t, c,
+			"SETBIT", "many", "4294967296", "1",
+			proto.Error("ERR bit offset is not an integer or out of range"),
+		)
+		mustDo(t, c,
+			"SETBIT", "many", "9223372036854775807", "1",
 			proto.Error("ERR bit offset is not an integer or out of range"),
 		)
 		mustDo(t, c,
