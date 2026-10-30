@@ -421,16 +421,16 @@ func (m *Miniredis) cmdGetex(c *server.Peer, cmd string, args []string) {
 			c.WriteNull()
 			return
 		}
+		if db.t(opts.key) != keyTypeString {
+			c.WriteError(msgWrongType)
+			return
+		}
+
 		switch {
 		case opts.persist:
 			delete(db.ttl, opts.key)
 		case opts.ttl != 0:
 			db.ttl[opts.key] = opts.ttl
-		}
-
-		if db.t(opts.key) != keyTypeString {
-			c.WriteError(msgWrongType)
-			return
 		}
 
 		c.WriteBulk(db.stringGet(opts.key))

@@ -1705,3 +1705,23 @@ func TestFloatIncrementsRejectInfinity(t *testing.T) {
 		})
 	}
 }
+
+func TestGetexWrongTypePreservesTTL(t *testing.T) {
+	for _, keyType := range []string{"hash", "list"} {
+		for _, option := range [][]string{{"EX", "10"}, {"PX", "10000"}, {"EXAT", "1"}, {"PXAT", "1"}, {"PERSIST"}} {
+			t.Run(keyType+"/"+option[0], func(t *testing.T) {
+				s, c := runWithClient(t)
+				if keyType == "hash" {
+					must1(t, c, "HSET", "key", "field", "value")
+				} else {
+					must1(t, c, "LPUSH", "key", "value")
+				}
+				s.SetTTL("key", time.Hour)
+				args := append([]string{"GETEX", "key"}, option...)
+				mustDo(t, c, append(args, proto.Error(msgWrongType))...)
+				equals(t, time.Hour, s.TTL("key"))
+				must1(t, c, "EXISTS", "key")
+			})
+		}
+	}
+}
