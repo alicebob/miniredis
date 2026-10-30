@@ -770,3 +770,18 @@ func TestFloatIncrementRejectsInfinity(t *testing.T) {
 		})
 	}
 }
+
+func TestGetexWrongTypePreservesTTL(t *testing.T) {
+	skip(t)
+	for _, option := range [][]string{{"EX", "10"}, {"PX", "10000"}, {"EXAT", "1"}, {"PXAT", "1"}, {"PERSIST"}} {
+		t.Run(option[0], func(t *testing.T) {
+			testRaw(t, func(c *client) {
+				c.Do("HSET", "key", "field", "value")
+				c.Do("EXPIRE", "key", "3600")
+				c.Error("wrong kind", "GETEX", append([]string{"key"}, option...)...)
+				c.DoApprox(10, "TTL", "key")
+				c.Do("HGET", "key", "field")
+			})
+		})
+	}
+}
