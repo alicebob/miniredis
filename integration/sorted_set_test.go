@@ -1286,6 +1286,34 @@ func TestBzmpop(t *testing.T) {
 	})
 }
 
+func TestSortedSetNaNScores(t *testing.T) {
+	skip(t)
+	testRaw2(t, func(c, watcher *client) {
+		c.Error("not a valid float", "ZADD", "missing", "NaN", "member")
+		c.Do("EXISTS", "missing")
+		c.Error("not a valid float", "ZINCRBY", "missing", "NaN", "member")
+		c.Do("EXISTS", "missing")
+		c.Do("ZADD", "z", "1", "member")
+		watcher.Do("WATCH", "z")
+		c.Error("not a valid float", "ZADD", "z", "2", "other", "NaN", "member")
+		c.Error("not a valid float", "ZINCRBY", "z", "NaN", "member")
+		c.Do("ZRANGE", "z", "0", "-1", "WITHSCORES")
+		watcher.Do("MULTI")
+		watcher.Do("ZSCORE", "z", "member")
+		watcher.Do("EXEC")
+		c.Do("ZADD", "inf", "+inf", "member")
+		c.Error("NaN", "ZINCRBY", "inf", "-inf", "member")
+		c.Do("ZSCORE", "inf", "member")
+		c.Error("NaN", "ZADD", "inf", "INCR", "-inf", "member")
+		c.Do("ZSCORE", "inf", "member")
+		c.Do("ZINCRBY", "inf", "1", "member")
+		for _, option := range []string{"GT", "LT"} {
+			c.Error("NaN", "ZADD", "inf", "INCR", option, "-inf", "member")
+			c.Do("ZSCORE", "inf", "member")
+		}
+	})
+}
+
 func TestZaddIncrConditions(t *testing.T) {
 	skip(t)
 	for _, option := range []string{"GT", "LT"} {

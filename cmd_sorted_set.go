@@ -114,7 +114,7 @@ outer:
 	}
 	for len(args) > 0 {
 		score, err := strconv.ParseFloat(args[0], 64)
-		if err != nil {
+		if err != nil || math.IsNaN(score) {
 			setDirty(c)
 			c.WriteError(msgInvalidFloat)
 			return
@@ -160,6 +160,10 @@ outer:
 				}
 				if opts.xx && !db.ssetExists(opts.key, member) {
 					c.WriteNull()
+					return
+				}
+				if math.IsNaN(db.ssetScore(opts.key, member) + delta) {
+					c.WriteError("ERR resulting score is not a number (NaN)")
 					return
 				}
 				if db.ssetExists(opts.key, member) {
@@ -435,7 +439,7 @@ func (m *Miniredis) cmdZincrby(c *server.Peer, cmd string, args []string) {
 
 	opts.key = args[0]
 	d, err := strconv.ParseFloat(args[1], 64)
-	if err != nil {
+	if err != nil || math.IsNaN(d) {
 		setDirty(c)
 		c.WriteError(msgInvalidFloat)
 		return
@@ -448,6 +452,10 @@ func (m *Miniredis) cmdZincrby(c *server.Peer, cmd string, args []string) {
 
 		if db.exists(opts.key) && db.t(opts.key) != keyTypeSortedSet {
 			c.WriteError(msgWrongType)
+			return
+		}
+		if math.IsNaN(db.ssetScore(opts.key, opts.member) + opts.delta) {
+			c.WriteError("ERR resulting score is not a number (NaN)")
 			return
 		}
 		newScore := db.ssetIncrby(opts.key, opts.member, opts.delta)
