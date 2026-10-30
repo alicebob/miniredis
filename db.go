@@ -412,6 +412,10 @@ func (db *RedisDB) hashIncr(key, field string, delta int) (int, error) {
 			}
 		}
 	}
+	if delta > 0 && v > math.MaxInt-delta ||
+		delta < 0 && v < math.MinInt-delta {
+		return 0, ErrIntValueOverflowError
+	}
 	v += delta
 	db.hashSet(key, field, strconv.Itoa(v))
 	return v, nil

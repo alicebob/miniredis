@@ -1,6 +1,7 @@
 package miniredis
 
 import (
+	"math"
 	"sort"
 	"strconv"
 	"testing"
@@ -1977,4 +1978,37 @@ func TestDirectHashFieldTTL(t *testing.T) {
 		equals(t, "v1", db.HGet("h7", "f1"))
 		equals(t, 5*time.Second, db.HTTL("h7", "f1"))
 	})
+}
+
+func TestHashIncrOverflow(t *testing.T) {
+	for _, tc := range []struct {
+		name           string
+		initial, delta int
+		overflow       bool
+	}{
+		{"maximum", math.MaxInt, 1, true},
+		{"minimum", math.MinInt, -1, true},
+		{"large positive", 1, math.MaxInt, true},
+		{"large negative", -1, math.MinInt, true},
+		{"reach maximum", math.MaxInt - 1, 1, false},
+		{"reach minimum", math.MinInt + 1, -1, false},
+		{"maximum delta", 0, math.MaxInt, false},
+		{"minimum delta", 0, math.MinInt, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			s, c := runWithClient(t)
+			initial := strconv.Itoa(tc.initial)
+			s.HSet("hash", "field", initial)
+			s.SetTTL("hash", time.Minute)
+			if tc.overflow {
+				mustDo(t, c, "HINCRBY", "hash", "field", strconv.Itoa(tc.delta), proto.Error(msgIntOverflow))
+				_, err := s.HIncr("hash", "field", tc.delta)
+				equals(t, ErrIntValueOverflowError, err)
+				equals(t, initial, s.HGet("hash", "field"))
+			} else {
+				mustDo(t, c, "HINCRBY", "hash", "field", strconv.Itoa(tc.delta), proto.Int(tc.initial+tc.delta))
+			}
+			equals(t, time.Minute, s.TTL("hash"))
+		})
+	}
 }
