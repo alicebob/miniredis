@@ -123,6 +123,10 @@ func (m *Miniredis) cmdSet(c *server.Peer, cmd string, args []string) {
 	}
 
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
+		if (opts.nx && opts.xx) || (opts.keepttl && opts.ttlSet) {
+			c.WriteError(msgSyntaxError)
+			return
+		}
 		db := m.db(ctx.selectedDB)
 
 		readonly := false

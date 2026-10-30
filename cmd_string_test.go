@@ -2,6 +2,7 @@ package miniredis
 
 import (
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -1702,6 +1703,25 @@ func TestFloatIncrementsRejectInfinity(t *testing.T) {
 			mustDo(t, c, "HINCRBYFLOAT", "hash", "field", delta, proto.Error(errFloatValueInfinity.Error()))
 			mustDo(t, c, "GET", "value", proto.String("1.5"))
 			mustDo(t, c, "HGET", "hash", "field", proto.String("1.5"))
+		})
+	}
+}
+
+func TestSetConflictingOptions(t *testing.T) {
+	for _, options := range [][]string{{"NX", "XX"}, {"XX", "NX"}, {"KEEPTTL", "EX", "10"}, {"EX", "10", "KEEPTTL"}, {"PX", "10000", "KEEPTTL"}, {"KEEPTTL", "EXAT", "2345678901"}, {"PXAT", "2345678901000", "KEEPTTL"}} {
+		t.Run(strings.Join(options, "_"), func(t *testing.T) {
+			s, c := runWithClient(t)
+			mustOK(t, c, "SET", "key", "old")
+			s.SetTTL("key", time.Hour)
+			args := append([]string{"SET", "key", "new"}, options...)
+			mustDo(t, c, append(args, proto.Error(msgSyntaxError))...)
+			mustDo(t, c, "GET", "key", proto.String("old"))
+			equals(t, time.Hour, s.TTL("key"))
+			mustDo(t, c, append(append([]string{"SET", "missing", "new"}, options...), proto.Error(msgSyntaxError))...)
+			must0(t, c, "EXISTS", "missing")
+			mustOK(t, c, "MULTI")
+			mustDo(t, c, append(args, proto.Inline("QUEUED"))...)
+			mustDo(t, c, "EXEC", proto.Array(proto.Error(msgSyntaxError)))
 		})
 	}
 }
