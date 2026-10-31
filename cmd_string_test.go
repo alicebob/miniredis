@@ -1705,3 +1705,19 @@ func TestFloatIncrementsRejectInfinity(t *testing.T) {
 		})
 	}
 }
+
+func TestBitposInvalidBit(t *testing.T) {
+	for _, bit := range []string{"-1", "2", "2147483647"} {
+		t.Run(bit, func(t *testing.T) {
+			_, c := runWithClient(t)
+			mustOK(t, c, "SET", "str", "abc")
+			must1(t, c, "LPUSH", "list", "x")
+			for _, key := range []string{"missing", "str", "list"} {
+				mustDo(t, c, "BITPOS", key, bit, proto.Error("ERR The bit argument must be 1 or 0."))
+			}
+			mustOK(t, c, "MULTI")
+			mustDo(t, c, "BITPOS", "str", bit, proto.Inline("QUEUED"))
+			mustDo(t, c, "EXEC", proto.Array(proto.Error("ERR The bit argument must be 1 or 0.")))
+		})
+	}
+}
