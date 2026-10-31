@@ -988,3 +988,16 @@ func TestGeosearch(t *testing.T) {
 		c.Error("syntax error", "GEOSEARCH", "stations", "FROMLONLAT", "-73.9718893", "40.7728773", "BYRADIUS", "4", "km", "FOOBAR")
 	})
 }
+
+func TestGeoaddNaN(t *testing.T) {
+	skip(t)
+	testRaw(t, func(c *client) {
+		for _, coords := range [][2]string{{"NaN", "20"}, {"10", "NaN"}, {"nan", "20"}, {"10", "NAN"}} {
+			c.Error("not a valid float", "GEOADD", "new", "1", "2", "valid", coords[0], coords[1], "invalid")
+			c.Do("EXISTS", "new")
+			c.Do("GEOADD", "existing", "13.361389", "38.115556", "Palermo")
+			c.Error("not a valid float", "GEOADD", "existing", "1", "2", "Palermo", coords[0], coords[1], "invalid")
+			c.Do("ZRANGE", "existing", "0", "-1", "WITHSCORES")
+		}
+	})
+}
