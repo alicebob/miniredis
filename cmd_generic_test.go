@@ -98,6 +98,34 @@ func TestTTL(t *testing.T) {
 	}
 }
 
+func TestExpireLTEqual(t *testing.T) {
+	now := time.Unix(1700000000, 0)
+	for _, tc := range []struct {
+		cmd   string
+		value int64
+		unit  int64
+	}{
+		{"EXPIRE", 10, 1},
+		{"PEXPIRE", 10000, 1000},
+		{"EXPIREAT", now.Unix() + 10, 1},
+		{"PEXPIREAT", now.UnixMilli() + 10000, 1000},
+	} {
+		t.Run(tc.cmd, func(t *testing.T) {
+			s, c := runWithClient(t)
+			s.SetTime(now)
+			mustOK(t, c, "SET", "key", "value")
+			arg := strconv.FormatInt(tc.value, 10)
+			must1(t, c, tc.cmd, "key", arg)
+			must0(t, c, tc.cmd, "key", arg, "LT")
+			equals(t, 10*time.Second, s.TTL("key"))
+			must0(t, c, tc.cmd, "key", arg, "GT")
+			must0(t, c, tc.cmd, "key", strconv.FormatInt(tc.value+tc.unit, 10), "LT")
+			must1(t, c, tc.cmd, "key", strconv.FormatInt(tc.value-tc.unit, 10), "LT")
+			equals(t, 9*time.Second, s.TTL("key"))
+		})
+	}
+}
+
 func TestExpireat(t *testing.T) {
 	s, c := runWithClient(t)
 
