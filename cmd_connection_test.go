@@ -332,3 +332,13 @@ func TestHello(t *testing.T) {
 		})
 	})
 }
+
+func TestPingEmptyPayload(t *testing.T) {
+	_, c := runWithClient(t)
+	mustDo(t, c, "PING", proto.Inline("PONG"))
+	mustDo(t, c, "PING", "", proto.String(""))
+	mustDo(t, c, "PING", "PONG", proto.String("PONG"))
+	mustOK(t, c, "MULTI")
+	mustDo(t, c, "PING", "", proto.Inline("QUEUED"))
+	mustDo(t, c, "EXEC", proto.Array(proto.String("")))
+}
