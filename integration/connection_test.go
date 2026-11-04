@@ -210,3 +210,15 @@ func TestHello(t *testing.T) {
 		},
 	)
 }
+
+func TestPingEmptyPayload(t *testing.T) {
+	skip(t)
+	testRaw(t, func(c *client) {
+		c.Do("PING")
+		c.Do("PING", "")
+		c.Do("PING", "PONG")
+		c.Do("MULTI")
+		c.Do("PING", "")
+		c.Do("EXEC")
+	})
+}
