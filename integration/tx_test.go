@@ -193,6 +193,10 @@ func TestTxWatchModified(t *testing.T) {
 	hash := [][]string{{"HSET", "k", "a", "1", "b", "2"}}
 	zset := [][]string{{"ZADD", "k", "1", "a", "2", "b", "3", "c"}}
 	stream := [][]string{{"XADD", "k", "1-0", "f", "v"}, {"XADD", "k", "2-0", "f", "v"}}
+	set := [][]string{{"SADD", "k", "a", "b", "c"}}
+	list := [][]string{{"RPUSH", "k", "a", "b", "c"}}
+	hll := [][]string{{"PFADD", "k", "a"}}
+	geo := [][]string{{"GEOADD", "k", "13.361389", "38.115556", "a"}}
 	for _, tc := range []struct {
 		setup [][]string
 		cmd   []string
@@ -216,6 +220,23 @@ func TestTxWatchModified(t *testing.T) {
 		{stream, []string{"XTRIM", "k", "MAXLEN", "1"}},
 		{stream, []string{"XTRIM", "k", "MINID", "2-0"}},
 		{stream, []string{"XTRIM", "k", "MAXLEN", "10"}},
+		{set, []string{"SADD", "k", "z"}},
+		{set, []string{"SADD", "k", "a"}},
+		{set, []string{"SREM", "k", "a"}},
+		{set, []string{"SREM", "k", "nosuch"}},
+		{list, []string{"LREM", "k", "0", "b"}},
+		{list, []string{"LREM", "k", "0", "nosuch"}},
+		{list, []string{"LREM", "k", "-1", "nosuch"}},
+		{zset, []string{"ZADD", "k", "9", "a"}},
+		{zset, []string{"ZADD", "k", "1", "a"}},
+		{zset, []string{"ZINCRBY", "k", "1", "a"}},
+		{zset, []string{"ZINCRBY", "k", "0", "a"}},
+		{stream, []string{"XDEL", "k", "1-0"}},
+		{stream, []string{"XDEL", "k", "99-0"}},
+		{hll, []string{"PFADD", "k", "b"}},
+		{hll, []string{"PFADD", "k", "a"}},
+		{geo, []string{"GEOADD", "k", "15.087269", "37.502669", "b"}},
+		{geo, []string{"GEOADD", "k", "13.361389", "38.115556", "a"}},
 	} {
 		testRaw2(t, func(c1, c2 *client) {
 			for _, args := range tc.setup {

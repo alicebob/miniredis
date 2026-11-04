@@ -226,6 +226,10 @@ func TestTxWatchModified(t *testing.T) {
 	hash := [][]string{{"HSET", "k", "a", "1", "b", "2"}}
 	zset := [][]string{{"ZADD", "k", "1", "a", "2", "b", "3", "c"}}
 	stream := [][]string{{"XADD", "k", "1-0", "f", "v"}, {"XADD", "k", "2-0", "f", "v"}}
+	set := [][]string{{"SADD", "k", "a", "b", "c"}}
+	list := [][]string{{"RPUSH", "k", "a", "b", "c"}}
+	hll := [][]string{{"PFADD", "k", "a"}}
+	geo := [][]string{{"GEOADD", "k", "13.361389", "38.115556", "a"}}
 	for _, tc := range []struct {
 		setup    [][]string
 		cmd      []string
@@ -251,6 +255,23 @@ func TestTxWatchModified(t *testing.T) {
 		{stream, []string{"XTRIM", "k", "MAXLEN", "1"}, true},
 		{stream, []string{"XTRIM", "k", "MINID", "2-0"}, true},
 		{stream, []string{"XTRIM", "k", "MAXLEN", "10"}, false},
+		{set, []string{"SADD", "k", "z"}, true},
+		{set, []string{"SADD", "k", "a"}, false},
+		{set, []string{"SREM", "k", "a"}, true},
+		{set, []string{"SREM", "k", "nosuch"}, false},
+		{list, []string{"LREM", "k", "0", "b"}, true},
+		{list, []string{"LREM", "k", "0", "nosuch"}, false},
+		{list, []string{"LREM", "k", "-1", "nosuch"}, false},
+		{zset, []string{"ZADD", "k", "9", "a"}, true},
+		{zset, []string{"ZADD", "k", "1", "a"}, false},
+		{zset, []string{"ZINCRBY", "k", "1", "a"}, true},
+		{zset, []string{"ZINCRBY", "k", "0", "a"}, false},
+		{stream, []string{"XDEL", "k", "1-0"}, true},
+		{stream, []string{"XDEL", "k", "99-0"}, false},
+		{hll, []string{"PFADD", "k", "b"}, true},
+		{hll, []string{"PFADD", "k", "a"}, false},
+		{geo, []string{"GEOADD", "k", "15.087269", "37.502669", "b"}, true},
+		{geo, []string{"GEOADD", "k", "13.361389", "38.115556", "a"}, false},
 	} {
 		t.Run(strings.Join(tc.cmd, " "), func(t *testing.T) {
 			s.FlushAll()
