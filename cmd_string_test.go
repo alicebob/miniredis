@@ -1707,6 +1707,26 @@ func TestFloatIncrementsRejectInfinity(t *testing.T) {
 	}
 }
 
+func TestGetexWrongTypePreservesTTL(t *testing.T) {
+	for _, keyType := range []string{"hash", "list"} {
+		for _, option := range [][]string{{"EX", "10"}, {"PX", "10000"}, {"EXAT", "1"}, {"PXAT", "1"}, {"PERSIST"}} {
+			t.Run(keyType+"/"+option[0], func(t *testing.T) {
+				s, c := runWithClient(t)
+				if keyType == "hash" {
+					must1(t, c, "HSET", "key", "field", "value")
+				} else {
+					must1(t, c, "LPUSH", "key", "value")
+				}
+				s.SetTTL("key", time.Hour)
+				args := append([]string{"GETEX", "key"}, option...)
+				mustDo(t, c, append(args, proto.Error(msgWrongType))...)
+				equals(t, time.Hour, s.TTL("key"))
+				must1(t, c, "EXISTS", "key")
+			})
+		}
+  }
+}
+
 func TestSetConflictingOptions(t *testing.T) {
 	for _, options := range [][]string{{"NX", "XX"}, {"XX", "NX"}, {"KEEPTTL", "EX", "10"}, {"EX", "10", "KEEPTTL"}, {"PX", "10000", "KEEPTTL"}, {"KEEPTTL", "EXAT", "2345678901"}, {"PXAT", "2345678901000", "KEEPTTL"}} {
 		t.Run(strings.Join(options, "_"), func(t *testing.T) {
