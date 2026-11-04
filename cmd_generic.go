@@ -151,7 +151,7 @@ func makeCmdExpire(m *Miniredis, unix bool, d time.Duration) func(*server.Peer, 
 				return
 			}
 			// > LT -- Set expiry only when the new expiry is less than current one
-			if opts.lt && ok && newTTL > oldTTL {
+			if opts.lt && ok && newTTL >= oldTTL {
 				c.WriteInt(0)
 				return
 			}
