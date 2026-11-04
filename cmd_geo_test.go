@@ -431,3 +431,37 @@ func TestGeobymember(t *testing.T) {
 		)
 	})
 }
+
+func TestGeoaddNaN(t *testing.T) {
+	for _, coordinate := range []string{"longitude", "latitude"} {
+		for _, nan := range []string{"NaN", "nan", "NAN"} {
+			t.Run(coordinate+"/"+nan, func(t *testing.T) {
+				s, c := runWithClient(t)
+				longitude, latitude := "10", "20"
+				if coordinate == "longitude" {
+					longitude = nan
+				} else {
+					latitude = nan
+				}
+				mustDo(t, c, "GEOADD", "new", "1", "2", "valid", longitude, latitude, "invalid", proto.Error("ERR value is not a valid float"))
+				if s.Exists("new") {
+					t.Fatal("invalid coordinates created a key")
+				}
+				must1(t, c, "GEOADD", "existing", "13.361389", "38.115556", "Palermo")
+				before, err := s.ZScore("existing", "Palermo")
+				if err != nil {
+					t.Fatal(err)
+				}
+				mustDo(t, c, "GEOADD", "existing", "1", "2", "Palermo", longitude, latitude, "invalid", proto.Error("ERR value is not a valid float"))
+				after, err := s.ZScore("existing", "Palermo")
+				if err != nil {
+					t.Fatal(err)
+				}
+				if before != after {
+					t.Fatalf("existing location changed: %v to %v", before, after)
+				}
+				mustDo(t, c, "ZCARD", "existing", proto.Int(1))
+			})
+		}
+	}
+}
