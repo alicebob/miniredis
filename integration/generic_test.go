@@ -541,3 +541,12 @@ func TestCopyStreamIsolation(t *testing.T) {
 		})
 	})
 }
+
+func TestTTLRoundsMilliseconds(t *testing.T) {
+	testRaw(t, func(c *client) {
+		c.Do("SET", "rounded", "value", "PX", "1800")
+		c.Do("TTL", "rounded")
+		c.Do("SET", "rounded", "value", "PX", "800")
+		c.Do("TTL", "rounded")
+	})
+}
