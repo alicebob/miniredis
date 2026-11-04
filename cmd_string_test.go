@@ -1725,4 +1725,6 @@ func TestDecrbyMinimumInteger(t *testing.T) {
 	mustDo(t, c, "EXEC", proto.Array(proto.Error("ERR decrement would overflow")))
 	equals(t, false, s.Exists("missing"))
 	mustDo(t, c, "DECRBY", "nearby", "-9223372036854775807", proto.Int(9223372036854775807))
+	s.HSet("hash", "field", "value")
+	mustDo(t, c, "DECRBY", "hash", "-9223372036854775808", proto.Error("ERR decrement would overflow"))
 }

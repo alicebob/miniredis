@@ -649,15 +649,15 @@ func (m *Miniredis) cmdDecrby(c *server.Peer, cmd string, args []string) {
 	}
 
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
+		if opts.delta == math.MinInt {
+			c.WriteError("ERR decrement would overflow")
+			return
+		}
+
 		db := m.db(ctx.selectedDB)
 
 		if t, ok := db.keys[opts.key]; ok && t != keyTypeString {
 			c.WriteError(msgWrongType)
-			return
-		}
-
-		if opts.delta == math.MinInt {
-			c.WriteError("ERR decrement would overflow")
 			return
 		}
 
