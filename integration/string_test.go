@@ -770,3 +770,19 @@ func TestFloatIncrementRejectsInfinity(t *testing.T) {
 		})
 	}
 }
+
+func TestBitposInvalidBit(t *testing.T) {
+	skip(t)
+	testRaw(t, func(c *client) {
+		c.Do("SET", "str", "abc")
+		c.Do("LPUSH", "list", "x")
+		for _, bit := range []string{"-1", "2", "2147483647"} {
+			for _, key := range []string{"missing", "str", "list"} {
+				c.Error("bit argument must be 1 or 0", "BITPOS", key, bit)
+			}
+			c.Do("MULTI")
+			c.Do("BITPOS", "str", bit)
+			c.Do("EXEC")
+		}
+	})
+}
