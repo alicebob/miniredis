@@ -897,6 +897,31 @@ func TestStreamReadGroup(t *testing.T) {
 		),
 	)
 
+	t.Run("PEL with COUNT", func(t *testing.T) {
+		mustDo(t, c,
+			"XADD", "planets", "0-2", "name", "Venus",
+			proto.String("0-2"),
+		)
+		mustDo(t, c,
+			"XREADGROUP", "GROUP", "processing", "alice", "STREAMS", "planets", ">",
+			proto.Array(
+				proto.Array(proto.String("planets"), proto.Array(proto.Array(proto.String("0-2"), proto.Strings("name", "Venus")))),
+			),
+		)
+		mustDo(t, c,
+			"XREADGROUP", "GROUP", "processing", "alice", "COUNT", "1", "STREAMS", "planets", "0-0",
+			proto.Array(
+				proto.Array(proto.String("planets"), proto.Array(proto.Array(proto.String("0-1"), proto.Strings("name", "Mercury")))),
+			),
+		)
+		mustDo(t, c,
+			"XREADGROUP", "GROUP", "processing", "alice", "COUNT", "1", "STREAMS", "planets", "0-1",
+			proto.Array(
+				proto.Array(proto.String("planets"), proto.Array(proto.Array(proto.String("0-2"), proto.Strings("name", "Venus")))),
+			),
+		)
+	})
+
 	t.Run("RESP3", func(t *testing.T) {
 		useRESP3(t, c)
 		mustDo(t, c,
@@ -951,12 +976,15 @@ func TestStreamDelete(t *testing.T) {
 		"XDEL", "planets", "0-2",
 	)
 
+	// 0-1 is still pending, but its values are gone
 	mustDo(t, c,
 		"XREADGROUP", "GROUP", "processing", "alice", "STREAMS", "planets", "0-0",
 		proto.Array(
 			proto.Array(
 				proto.String("planets"),
-				proto.Array(),
+				proto.Array(
+					proto.Array(proto.String("0-1"), proto.NilList),
+				),
 			),
 		),
 	)
