@@ -4,6 +4,7 @@ package miniredis
 
 import (
 	"fmt"
+	"math"
 	"sort"
 	"strconv"
 	"strings"
@@ -50,12 +51,12 @@ func (m *Miniredis) cmdGeoadd(c *server.Peer, cmd string, args []string) {
 			rawLong, rawLat, name := args[0], args[1], args[2]
 			args = args[3:]
 			longitude, err := strconv.ParseFloat(rawLong, 64)
-			if err != nil {
+			if err != nil || math.IsNaN(longitude) {
 				c.WriteError("ERR value is not a valid float")
 				return
 			}
 			latitude, err := strconv.ParseFloat(rawLat, 64)
-			if err != nil {
+			if err != nil || math.IsNaN(latitude) {
 				c.WriteError("ERR value is not a valid float")
 				return
 			}
