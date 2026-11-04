@@ -237,7 +237,7 @@ func (m *Miniredis) cmdTTL(c *server.Peer, cmd string, args []string) {
 			c.WriteInt(-1)
 			return
 		}
-		c.WriteInt(int(v.Seconds()))
+		c.WriteInt(int((v.Milliseconds() + 500) / 1000))
 	})
 }
 

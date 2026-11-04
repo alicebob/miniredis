@@ -1081,3 +1081,24 @@ func TestCopyStreamIsolation(t *testing.T) {
 		mustDo(t, c, "XADD", "copy", "*", "field", "two", proto.String("100-1"))
 	})
 }
+
+func TestTTLRoundsMilliseconds(t *testing.T) {
+	for _, tt := range []struct {
+		ttl  time.Duration
+		want int
+	}{
+		{499 * time.Millisecond, 0}, {500 * time.Millisecond, 1},
+		{1499 * time.Millisecond, 1}, {1500 * time.Millisecond, 2},
+		{1999 * time.Millisecond, 2}, {2500*time.Millisecond - time.Nanosecond, 2},
+		{time.Duration(1<<63 - 1), 9223372037},
+	} {
+		t.Run(tt.ttl.String(), func(t *testing.T) {
+			s, c := runWithClient(t)
+			mustOK(t, c, "SET", "key", "value")
+			s.SetTTL("key", tt.ttl)
+			mustDo(t, c, "TTL", "key", proto.Int(tt.want))
+			mustDo(t, c, "PTTL", "key", proto.Int(int(tt.ttl/time.Millisecond)))
+			equals(t, tt.ttl, s.TTL("key"))
+		})
+	}
+}
