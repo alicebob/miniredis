@@ -1722,8 +1722,8 @@ func TestSetConflictingOptions(t *testing.T) {
 			mustOK(t, c, "MULTI")
 			mustDo(t, c, append(args, proto.Inline("QUEUED"))...)
 			mustDo(t, c, "EXEC", proto.Array(proto.Error(msgSyntaxError)))
-    })
-  }
+		})
+	}
 }
 
 func TestBitposInvalidBit(t *testing.T) {
