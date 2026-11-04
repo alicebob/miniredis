@@ -338,6 +338,11 @@ func TestSetrange(t *testing.T) {
 		// Non existing key
 		c.Do("SETRANGE", "nosuch", "2", "aap")
 		c.Do("GET", "nosuch")
+		// Empty value
+		c.Do("SETRANGE", "empty", "2", "")
+		c.Do("EXISTS", "empty")
+		c.Do("SETRANGE", "foo", "1000", "")
+		c.Do("GET", "foo")
 
 		// Error cases
 		c.Error("wrong number", "SETRANGE", "foo")
@@ -345,6 +350,8 @@ func TestSetrange(t *testing.T) {
 		c.Error("not an integer", "SETRANGE", "foo", "aap", "bar")
 		c.Error("not an integer", "SETRANGE", "foo", "noint", "bar")
 		c.Error("out of range", "SETRANGE", "foo", "-1", "bar")
+		c.Error("maximum allowed size", "SETRANGE", "foo", "536870911", "xy")
+		c.Error("maximum allowed size", "SETRANGE", "foo", "9223372036854775807", "bar")
 		c.Do("HSET", "aap", "noot", "mies")
 		c.Error("wrong kind", "SETRANGE", "aap", "4", "bar")
 	})
@@ -616,6 +623,7 @@ func TestGetbit(t *testing.T) {
 			c.Do("HSET", "hash", "aap", "noot")
 			c.Error("wrong kind", "GETBIT", "hash", "1")
 			c.Error("not an integer", "GETBIT", "a", "aap")
+			c.Error("not an integer", "GETBIT", "a", "4294967296")
 			c.Error("wrong number", "GETBIT", "a")
 			c.Error("wrong number", "GETBIT", "too", "1", "many")
 
@@ -645,6 +653,7 @@ func TestSetbit(t *testing.T) {
 			c.Error("not an integer", "SETBIT", "a", "aap", "0")
 			c.Error("not an integer", "SETBIT", "a", "0", "aap")
 			c.Error("not an integer", "SETBIT", "a", "-1", "0")
+			c.Error("not an integer", "SETBIT", "a", "4294967296", "0")
 			c.Error("not an integer", "SETBIT", "a", "1", "-1")
 			c.Error("not an integer", "SETBIT", "a", "1", "2")
 			c.Error("wrong number", "SETBIT", "too", "1", "2", "many")
