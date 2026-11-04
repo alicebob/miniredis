@@ -970,7 +970,9 @@ func (m *Miniredis) cmdXdel(c *server.Peer, cmd string, args []string) {
 			c.WriteError(err.Error())
 			return
 		}
-		db.incr(stream)
+		if n > 0 {
+			db.incr(stream)
+		}
 		c.WriteInt(n)
 	})
 }

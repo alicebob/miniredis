@@ -789,7 +789,9 @@ func (m *Miniredis) cmdLrem(c *server.Peer, cmd string, args []string) {
 			db.del(opts.key, true)
 		} else {
 			db.listKeys[opts.key] = newL
-			db.incr(opts.key)
+			if deleted > 0 {
+				db.incr(opts.key)
+			}
 		}
 
 		c.WriteInt(deleted)
