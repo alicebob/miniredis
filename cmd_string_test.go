@@ -1765,7 +1765,7 @@ func TestGetexWrongTypePreservesTTL(t *testing.T) {
 				must1(t, c, "EXISTS", "key")
 			})
 		}
-  }
+	}
 }
 
 func TestSetConflictingOptions(t *testing.T) {
