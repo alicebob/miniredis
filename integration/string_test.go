@@ -785,3 +785,37 @@ func TestGetexWrongTypePreservesTTL(t *testing.T) {
 		})
 	}
 }
+
+func TestSetConflictingOptions(t *testing.T) {
+	skip(t)
+	for _, options := range [][]string{{"NX", "XX"}, {"XX", "NX"}, {"KEEPTTL", "EX", "10"}, {"EX", "10", "KEEPTTL"}, {"PX", "10000", "KEEPTTL"}, {"KEEPTTL", "EXAT", "2345678901"}, {"PXAT", "2345678901000", "KEEPTTL"}} {
+		testRaw(t, func(c *client) {
+			c.Do("SET", "key", "old", "EX", "3600")
+			args := append([]string{"SET", "key", "new"}, options...)
+			c.Error("syntax error", args[0], args[1:]...)
+			c.Do("GET", "key")
+			c.DoApprox(10, "TTL", "key")
+			c.Error("syntax error", "SET", append([]string{"missing", "new"}, options...)...)
+			c.Do("EXISTS", "missing")
+			c.Do("MULTI")
+			c.Do(args[0], args[1:]...)
+			c.Do("EXEC")
+		})
+	}
+}
+
+func TestBitposInvalidBit(t *testing.T) {
+	skip(t)
+	testRaw(t, func(c *client) {
+		c.Do("SET", "str", "abc")
+		c.Do("LPUSH", "list", "x")
+		for _, bit := range []string{"-1", "2", "2147483647"} {
+			for _, key := range []string{"missing", "str", "list"} {
+				c.Error("bit argument must be 1 or 0", "BITPOS", key, bit)
+			}
+			c.Do("MULTI")
+			c.Do("BITPOS", "str", bit)
+			c.Do("EXEC")
+		}
+	})
+}

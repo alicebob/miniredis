@@ -2,6 +2,7 @@ package miniredis
 
 import (
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -1723,5 +1724,40 @@ func TestGetexWrongTypePreservesTTL(t *testing.T) {
 				must1(t, c, "EXISTS", "key")
 			})
 		}
+  }
+}
+
+func TestSetConflictingOptions(t *testing.T) {
+	for _, options := range [][]string{{"NX", "XX"}, {"XX", "NX"}, {"KEEPTTL", "EX", "10"}, {"EX", "10", "KEEPTTL"}, {"PX", "10000", "KEEPTTL"}, {"KEEPTTL", "EXAT", "2345678901"}, {"PXAT", "2345678901000", "KEEPTTL"}} {
+		t.Run(strings.Join(options, "_"), func(t *testing.T) {
+			s, c := runWithClient(t)
+			mustOK(t, c, "SET", "key", "old")
+			s.SetTTL("key", time.Hour)
+			args := append([]string{"SET", "key", "new"}, options...)
+			mustDo(t, c, append(args, proto.Error(msgSyntaxError))...)
+			mustDo(t, c, "GET", "key", proto.String("old"))
+			equals(t, time.Hour, s.TTL("key"))
+			mustDo(t, c, append(append([]string{"SET", "missing", "new"}, options...), proto.Error(msgSyntaxError))...)
+			must0(t, c, "EXISTS", "missing")
+			mustOK(t, c, "MULTI")
+			mustDo(t, c, append(args, proto.Inline("QUEUED"))...)
+			mustDo(t, c, "EXEC", proto.Array(proto.Error(msgSyntaxError)))
+		})
+	}
+}
+
+func TestBitposInvalidBit(t *testing.T) {
+	for _, bit := range []string{"-1", "2", "2147483647"} {
+		t.Run(bit, func(t *testing.T) {
+			_, c := runWithClient(t)
+			mustOK(t, c, "SET", "str", "abc")
+			must1(t, c, "LPUSH", "list", "x")
+			for _, key := range []string{"missing", "str", "list"} {
+				mustDo(t, c, "BITPOS", key, bit, proto.Error("ERR The bit argument must be 1 or 0."))
+			}
+			mustOK(t, c, "MULTI")
+			mustDo(t, c, "BITPOS", "str", bit, proto.Inline("QUEUED"))
+			mustDo(t, c, "EXEC", proto.Array(proto.Error("ERR The bit argument must be 1 or 0.")))
+		})
 	}
 }

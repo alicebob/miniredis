@@ -123,6 +123,10 @@ func (m *Miniredis) cmdSet(c *server.Peer, cmd string, args []string) {
 	}
 
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
+		if (opts.nx && opts.xx) || (opts.keepttl && opts.ttlSet) {
+			c.WriteError(msgSyntaxError)
+			return
+		}
 		db := m.db(ctx.selectedDB)
 
 		readonly := false
@@ -944,6 +948,11 @@ func (m *Miniredis) cmdBitpos(c *server.Peer, cmd string, args []string) {
 	}
 
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
+		if opts.Bit != 0 && opts.Bit != 1 {
+			c.WriteError("ERR The bit argument must be 1 or 0.")
+			return
+		}
+
 		db := m.db(ctx.selectedDB)
 
 		if t, ok := db.keys[opts.Key]; ok && t != keyTypeString {

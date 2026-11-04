@@ -1,9 +1,12 @@
 package main
 
 import (
+	"strconv"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/alicebob/miniredis/v2"
 )
 
 func TestKeys(t *testing.T) {
@@ -539,5 +542,31 @@ func TestCopyStreamIsolation(t *testing.T) {
 			c.Do("XACK", "copy", "group", "1-0")
 			c.Do("XPENDING", "source", "group")
 		})
+	})
+}
+
+func TestExpireLTEqual(t *testing.T) {
+	skip(t)
+	now := time.Now()
+	mini := miniredis.RunT(t)
+	mini.SetTime(now)
+	real, addr := Redis()
+	t.Cleanup(real.Close)
+	c := newClient(t, addr, mini)
+	expiry := strconv.FormatInt(now.Add(time.Hour).UnixMilli(), 10)
+	c.Do("SET", "key", "value")
+	c.Do("PEXPIREAT", "key", expiry)
+	c.Do("PEXPIREAT", "key", expiry, "LT")
+	c.Do("PEXPIREAT", "key", expiry, "GT")
+	c.Do("GET", "key")
+	c.Do("PEXPIRETIME", "key")
+}
+
+func TestTTLRoundsMilliseconds(t *testing.T) {
+	testRaw(t, func(c *client) {
+		c.Do("SET", "rounded", "value", "PX", "1800")
+		c.Do("TTL", "rounded")
+		c.Do("SET", "rounded", "value", "PX", "800")
+		c.Do("TTL", "rounded")
 	})
 }
