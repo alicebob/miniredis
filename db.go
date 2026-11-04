@@ -535,6 +535,8 @@ func (db *RedisDB) ssetRem(key, member string) bool {
 	if len(ss) == 0 {
 		// Delete key on removal of last member
 		db.del(key, true)
+	} else if ok {
+		db.incr(key)
 	}
 	return ok
 }

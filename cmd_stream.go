@@ -1336,15 +1336,19 @@ func (m *Miniredis) cmdXtrim(c *server.Peer, cmd string, args []string) {
 			return
 		}
 
+		var n int
 		switch opts.strategy {
 		case "MAXLEN":
 			entriesBefore := len(s.entries)
 			s.trim(opts.maxLen)
-			c.WriteInt(entriesBefore - len(s.entries))
+			n = entriesBefore - len(s.entries)
 		case "MINID":
-			n := s.trimBefore(opts.threshold)
-			c.WriteInt(n)
+			n = s.trimBefore(opts.threshold)
 		}
+		if n > 0 {
+			db.incr(opts.stream)
+		}
+		c.WriteInt(n)
 	})
 }
 
