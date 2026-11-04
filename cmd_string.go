@@ -3,6 +3,7 @@
 package miniredis
 
 import (
+	"math"
 	"math/big"
 	"math/bits"
 	"strconv"
@@ -652,6 +653,11 @@ func (m *Miniredis) cmdDecrby(c *server.Peer, cmd string, args []string) {
 
 		if t, ok := db.keys[opts.key]; ok && t != keyTypeString {
 			c.WriteError(msgWrongType)
+			return
+		}
+
+		if opts.delta == math.MinInt {
+			c.WriteError("ERR decrement would overflow")
 			return
 		}
 
