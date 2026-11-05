@@ -98,6 +98,34 @@ func TestTTL(t *testing.T) {
 	}
 }
 
+func TestExpireLTEqual(t *testing.T) {
+	now := time.Unix(1700000000, 0)
+	for _, tc := range []struct {
+		cmd   string
+		value int64
+		unit  int64
+	}{
+		{"EXPIRE", 10, 1},
+		{"PEXPIRE", 10000, 1000},
+		{"EXPIREAT", now.Unix() + 10, 1},
+		{"PEXPIREAT", now.UnixMilli() + 10000, 1000},
+	} {
+		t.Run(tc.cmd, func(t *testing.T) {
+			s, c := runWithClient(t)
+			s.SetTime(now)
+			mustOK(t, c, "SET", "key", "value")
+			arg := strconv.FormatInt(tc.value, 10)
+			must1(t, c, tc.cmd, "key", arg)
+			must0(t, c, tc.cmd, "key", arg, "LT")
+			equals(t, 10*time.Second, s.TTL("key"))
+			must0(t, c, tc.cmd, "key", arg, "GT")
+			must0(t, c, tc.cmd, "key", strconv.FormatInt(tc.value+tc.unit, 10), "LT")
+			must1(t, c, tc.cmd, "key", strconv.FormatInt(tc.value-tc.unit, 10), "LT")
+			equals(t, 9*time.Second, s.TTL("key"))
+		})
+	}
+}
+
 func TestExpireat(t *testing.T) {
 	s, c := runWithClient(t)
 
@@ -1080,4 +1108,25 @@ func TestCopyStreamIsolation(t *testing.T) {
 		must1(t, c, "COPY", "source", "copy")
 		mustDo(t, c, "XADD", "copy", "*", "field", "two", proto.String("100-1"))
 	})
+}
+
+func TestTTLRoundsMilliseconds(t *testing.T) {
+	for _, tt := range []struct {
+		ttl  time.Duration
+		want int
+	}{
+		{499 * time.Millisecond, 0}, {500 * time.Millisecond, 1},
+		{1499 * time.Millisecond, 1}, {1500 * time.Millisecond, 2},
+		{1999 * time.Millisecond, 2}, {2500*time.Millisecond - time.Nanosecond, 2},
+		{time.Duration(1<<63 - 1), 9223372037},
+	} {
+		t.Run(tt.ttl.String(), func(t *testing.T) {
+			s, c := runWithClient(t)
+			mustOK(t, c, "SET", "key", "value")
+			s.SetTTL("key", tt.ttl)
+			mustDo(t, c, "TTL", "key", proto.Int(tt.want))
+			mustDo(t, c, "PTTL", "key", proto.Int(int(tt.ttl/time.Millisecond)))
+			equals(t, tt.ttl, s.TTL("key"))
+		})
+	}
 }

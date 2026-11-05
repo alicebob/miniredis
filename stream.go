@@ -386,12 +386,17 @@ func (g *streamGroup) readGroup(
 	msgs := g.pendingAfter(id)
 	var res []StreamEntry
 	for i, p := range msgs {
+		if count > 0 && len(res) >= count {
+			break
+		}
 		if p.consumer != consumerID {
 			continue
 		}
 		_, entry := g.stream.get(p.id)
-		// not found. Weird?
 		if entry == nil {
+			// deleted with XDEL, but still pending. Redis returns the ID
+			// with nil values.
+			res = append(res, StreamEntry{ID: p.id})
 			continue
 		}
 		p.deliveryCount += 1
@@ -467,26 +472,12 @@ func (g *streamGroup) pendingAfter(id string) []pendingEntry {
 
 func (g *streamGroup) pendingCount(consumer string) int {
 	n := 0
-	for _, p := range g.activePending() {
+	for _, p := range g.pending {
 		if p.consumer == consumer {
 			n++
 		}
 	}
 	return n
-}
-
-// pending entries without the entries deleted from the group
-func (g *streamGroup) activePending() []pendingEntry {
-	var pe []pendingEntry
-	for _, p := range g.pending {
-		// drop deleted ones
-		if _, e := g.stream.get(p.id); e == nil {
-			continue
-		}
-		p := p
-		pe = append(pe, p)
-	}
-	return pe
 }
 
 func (g *streamGroup) copy() *streamGroup {

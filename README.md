@@ -204,6 +204,7 @@ Implemented commands:
    - ZSCAN
  - Stream keys
    - XACK
+   - XACKDEL
    - XADD
    - XAUTOCLAIM
    - XCLAIM

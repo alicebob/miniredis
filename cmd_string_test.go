@@ -2,6 +2,7 @@ package miniredis
 
 import (
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -1089,6 +1090,35 @@ func TestSetrange(t *testing.T) {
 		s.CheckGet(t, "nosuch", "\x00\x00\x00bar")
 	}
 
+	// An empty value changes nothing
+	{
+		mustDo(t, c,
+			"SETRANGE", "empty", "3", "",
+			proto.Int(0),
+		)
+		equals(t, false, s.Exists("empty"))
+
+		s.Set("short", "ab")
+		mustDo(t, c,
+			"SETRANGE", "short", "10", "",
+			proto.Int(2),
+		)
+		s.CheckGet(t, "short", "ab")
+	}
+
+	// Past the size limit of a string
+	{
+		mustDo(t, c,
+			"SETRANGE", "short", "536870911", "xy",
+			proto.Error(msgStringTooLong),
+		)
+		mustDo(t, c,
+			"SETRANGE", "short", "9223372036854775807", "x",
+			proto.Error(msgStringTooLong),
+		)
+		s.CheckGet(t, "short", "ab")
+	}
+
 	// Wrong type of existing key
 	{
 		s.HSet("wrong", "aap", "noot")
@@ -1527,6 +1557,10 @@ func TestGetbit(t *testing.T) {
 			"GETBIT", "many", "noint",
 			proto.Error("ERR bit offset is not an integer or out of range"),
 		)
+		mustDo(t, c,
+			"GETBIT", "many", "4294967296",
+			proto.Error("ERR bit offset is not an integer or out of range"),
+		)
 	}
 }
 
@@ -1596,6 +1630,14 @@ func TestSetbit(t *testing.T) {
 		)
 		mustDo(t, c,
 			"SETBIT", "many", "-3", "0",
+			proto.Error("ERR bit offset is not an integer or out of range"),
+		)
+		mustDo(t, c,
+			"SETBIT", "many", "4294967296", "1",
+			proto.Error("ERR bit offset is not an integer or out of range"),
+		)
+		mustDo(t, c,
+			"SETBIT", "many", "9223372036854775807", "1",
 			proto.Error("ERR bit offset is not an integer or out of range"),
 		)
 		mustDo(t, c,
@@ -1702,6 +1744,61 @@ func TestFloatIncrementsRejectInfinity(t *testing.T) {
 			mustDo(t, c, "HINCRBYFLOAT", "hash", "field", delta, proto.Error(errFloatValueInfinity.Error()))
 			mustDo(t, c, "GET", "value", proto.String("1.5"))
 			mustDo(t, c, "HGET", "hash", "field", proto.String("1.5"))
+		})
+	}
+}
+
+func TestGetexWrongTypePreservesTTL(t *testing.T) {
+	for _, keyType := range []string{"hash", "list"} {
+		for _, option := range [][]string{{"EX", "10"}, {"PX", "10000"}, {"EXAT", "1"}, {"PXAT", "1"}, {"PERSIST"}} {
+			t.Run(keyType+"/"+option[0], func(t *testing.T) {
+				s, c := runWithClient(t)
+				if keyType == "hash" {
+					must1(t, c, "HSET", "key", "field", "value")
+				} else {
+					must1(t, c, "LPUSH", "key", "value")
+				}
+				s.SetTTL("key", time.Hour)
+				args := append([]string{"GETEX", "key"}, option...)
+				mustDo(t, c, append(args, proto.Error(msgWrongType))...)
+				equals(t, time.Hour, s.TTL("key"))
+				must1(t, c, "EXISTS", "key")
+			})
+		}
+	}
+}
+
+func TestSetConflictingOptions(t *testing.T) {
+	for _, options := range [][]string{{"NX", "XX"}, {"XX", "NX"}, {"KEEPTTL", "EX", "10"}, {"EX", "10", "KEEPTTL"}, {"PX", "10000", "KEEPTTL"}, {"KEEPTTL", "EXAT", "2345678901"}, {"PXAT", "2345678901000", "KEEPTTL"}} {
+		t.Run(strings.Join(options, "_"), func(t *testing.T) {
+			s, c := runWithClient(t)
+			mustOK(t, c, "SET", "key", "old")
+			s.SetTTL("key", time.Hour)
+			args := append([]string{"SET", "key", "new"}, options...)
+			mustDo(t, c, append(args, proto.Error(msgSyntaxError))...)
+			mustDo(t, c, "GET", "key", proto.String("old"))
+			equals(t, time.Hour, s.TTL("key"))
+			mustDo(t, c, append(append([]string{"SET", "missing", "new"}, options...), proto.Error(msgSyntaxError))...)
+			must0(t, c, "EXISTS", "missing")
+			mustOK(t, c, "MULTI")
+			mustDo(t, c, append(args, proto.Inline("QUEUED"))...)
+			mustDo(t, c, "EXEC", proto.Array(proto.Error(msgSyntaxError)))
+		})
+	}
+}
+
+func TestBitposInvalidBit(t *testing.T) {
+	for _, bit := range []string{"-1", "2", "2147483647"} {
+		t.Run(bit, func(t *testing.T) {
+			_, c := runWithClient(t)
+			mustOK(t, c, "SET", "str", "abc")
+			must1(t, c, "LPUSH", "list", "x")
+			for _, key := range []string{"missing", "str", "list"} {
+				mustDo(t, c, "BITPOS", key, bit, proto.Error("ERR The bit argument must be 1 or 0."))
+			}
+			mustOK(t, c, "MULTI")
+			mustDo(t, c, "BITPOS", "str", bit, proto.Inline("QUEUED"))
+			mustDo(t, c, "EXEC", proto.Array(proto.Error("ERR The bit argument must be 1 or 0.")))
 		})
 	}
 }

@@ -338,6 +338,11 @@ func TestSetrange(t *testing.T) {
 		// Non existing key
 		c.Do("SETRANGE", "nosuch", "2", "aap")
 		c.Do("GET", "nosuch")
+		// Empty value
+		c.Do("SETRANGE", "empty", "2", "")
+		c.Do("EXISTS", "empty")
+		c.Do("SETRANGE", "foo", "1000", "")
+		c.Do("GET", "foo")
 
 		// Error cases
 		c.Error("wrong number", "SETRANGE", "foo")
@@ -345,6 +350,8 @@ func TestSetrange(t *testing.T) {
 		c.Error("not an integer", "SETRANGE", "foo", "aap", "bar")
 		c.Error("not an integer", "SETRANGE", "foo", "noint", "bar")
 		c.Error("out of range", "SETRANGE", "foo", "-1", "bar")
+		c.Error("maximum allowed size", "SETRANGE", "foo", "536870911", "xy")
+		c.Error("maximum allowed size", "SETRANGE", "foo", "9223372036854775807", "bar")
 		c.Do("HSET", "aap", "noot", "mies")
 		c.Error("wrong kind", "SETRANGE", "aap", "4", "bar")
 	})
@@ -616,6 +623,7 @@ func TestGetbit(t *testing.T) {
 			c.Do("HSET", "hash", "aap", "noot")
 			c.Error("wrong kind", "GETBIT", "hash", "1")
 			c.Error("not an integer", "GETBIT", "a", "aap")
+			c.Error("not an integer", "GETBIT", "a", "4294967296")
 			c.Error("wrong number", "GETBIT", "a")
 			c.Error("wrong number", "GETBIT", "too", "1", "many")
 
@@ -645,6 +653,7 @@ func TestSetbit(t *testing.T) {
 			c.Error("not an integer", "SETBIT", "a", "aap", "0")
 			c.Error("not an integer", "SETBIT", "a", "0", "aap")
 			c.Error("not an integer", "SETBIT", "a", "-1", "0")
+			c.Error("not an integer", "SETBIT", "a", "4294967296", "0")
 			c.Error("not an integer", "SETBIT", "a", "1", "-1")
 			c.Error("not an integer", "SETBIT", "a", "1", "2")
 			c.Error("wrong number", "SETBIT", "too", "1", "2", "many")
@@ -769,6 +778,55 @@ func TestFloatIncrementRejectsInfinity(t *testing.T) {
 			})
 		})
 	}
+}
+
+func TestGetexWrongTypePreservesTTL(t *testing.T) {
+	skip(t)
+	for _, option := range [][]string{{"EX", "10"}, {"PX", "10000"}, {"EXAT", "1"}, {"PXAT", "1"}, {"PERSIST"}} {
+		t.Run(option[0], func(t *testing.T) {
+			testRaw(t, func(c *client) {
+				c.Do("HSET", "key", "field", "value")
+				c.Do("EXPIRE", "key", "3600")
+				c.Error("wrong kind", "GETEX", append([]string{"key"}, option...)...)
+				c.DoApprox(10, "TTL", "key")
+				c.Do("HGET", "key", "field")
+			})
+		})
+	}
+}
+
+func TestSetConflictingOptions(t *testing.T) {
+	skip(t)
+	for _, options := range [][]string{{"NX", "XX"}, {"XX", "NX"}, {"KEEPTTL", "EX", "10"}, {"EX", "10", "KEEPTTL"}, {"PX", "10000", "KEEPTTL"}, {"KEEPTTL", "EXAT", "2345678901"}, {"PXAT", "2345678901000", "KEEPTTL"}} {
+		testRaw(t, func(c *client) {
+			c.Do("SET", "key", "old", "EX", "3600")
+			args := append([]string{"SET", "key", "new"}, options...)
+			c.Error("syntax error", args[0], args[1:]...)
+			c.Do("GET", "key")
+			c.DoApprox(10, "TTL", "key")
+			c.Error("syntax error", "SET", append([]string{"missing", "new"}, options...)...)
+			c.Do("EXISTS", "missing")
+			c.Do("MULTI")
+			c.Do(args[0], args[1:]...)
+			c.Do("EXEC")
+		})
+	}
+}
+
+func TestBitposInvalidBit(t *testing.T) {
+	skip(t)
+	testRaw(t, func(c *client) {
+		c.Do("SET", "str", "abc")
+		c.Do("LPUSH", "list", "x")
+		for _, bit := range []string{"-1", "2", "2147483647"} {
+			for _, key := range []string{"missing", "str", "list"} {
+				c.Error("bit argument must be 1 or 0", "BITPOS", key, bit)
+			}
+			c.Do("MULTI")
+			c.Do("BITPOS", "str", bit)
+			c.Do("EXEC")
+		}
+	})
 }
 
 func TestDecrbyMinimumInteger(t *testing.T) {

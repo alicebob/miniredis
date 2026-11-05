@@ -13,6 +13,10 @@ import (
 	"github.com/alicebob/miniredis/v2/server"
 )
 
+// maxStringLength is the size limit of a string in Redis, the default of the
+// proto-max-bulk-len config.
+const maxStringLength = 512 * 1024 * 1024
+
 // commandsString handles all string value operations.
 func commandsString(m *Miniredis) {
 	m.srv.Register("APPEND", m.cmdAppend)
@@ -124,6 +128,10 @@ func (m *Miniredis) cmdSet(c *server.Peer, cmd string, args []string) {
 	}
 
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
+		if (opts.nx && opts.xx) || (opts.keepttl && opts.ttlSet) {
+			c.WriteError(msgSyntaxError)
+			return
+		}
 		db := m.db(ctx.selectedDB)
 
 		readonly := false
@@ -422,16 +430,20 @@ func (m *Miniredis) cmdGetex(c *server.Peer, cmd string, args []string) {
 			c.WriteNull()
 			return
 		}
-		switch {
-		case opts.persist:
-			delete(db.ttl, opts.key)
-		case opts.ttl != 0:
-			db.ttl[opts.key] = opts.ttl
-		}
-
 		if db.t(opts.key) != keyTypeString {
 			c.WriteError(msgWrongType)
 			return
+		}
+
+		switch {
+		case opts.persist:
+			if _, ok := db.ttl[opts.key]; ok {
+				delete(db.ttl, opts.key)
+				db.incr(opts.key)
+			}
+		case opts.ttl != 0:
+			db.ttl[opts.key] = opts.ttl
+			db.incr(opts.key)
 		}
 
 		c.WriteBulk(db.stringGet(opts.key))
@@ -776,6 +788,16 @@ func (m *Miniredis) cmdSetrange(c *server.Peer, cmd string, args []string) {
 			return
 		}
 
+		if opts.subst == "" {
+			// Like Redis: nothing changes, and a missing key isn't created.
+			c.WriteInt(len(db.stringKeys[opts.key]))
+			return
+		}
+		if opts.pos > maxStringLength-len(opts.subst) {
+			c.WriteError(msgStringTooLong)
+			return
+		}
+
 		v := []byte(db.stringKeys[opts.key])
 		end := opts.pos + len(opts.subst)
 		if len(v) < end {
@@ -950,6 +972,11 @@ func (m *Miniredis) cmdBitpos(c *server.Peer, cmd string, args []string) {
 	}
 
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
+		if opts.Bit != 0 && opts.Bit != 1 {
+			c.WriteError("ERR The bit argument must be 1 or 0.")
+			return
+		}
+
 		db := m.db(ctx.selectedDB)
 
 		if t, ok := db.keys[opts.Key]; ok && t != keyTypeString {
@@ -1026,7 +1053,7 @@ func (m *Miniredis) cmdGetbit(c *server.Peer, cmd string, args []string) {
 	if ok := optIntErr(c, args[1], &opts.bit, "ERR bit offset is not an integer or out of range"); !ok {
 		return
 	}
-	if opts.bit < 0 {
+	if opts.bit < 0 || opts.bit/8 >= maxStringLength {
 		setDirty(c)
 		c.WriteError("ERR bit offset is not an integer or out of range")
 		return
@@ -1071,7 +1098,7 @@ func (m *Miniredis) cmdSetbit(c *server.Peer, cmd string, args []string) {
 	if ok := optIntErr(c, args[1], &opts.bit, "ERR bit offset is not an integer or out of range"); !ok {
 		return
 	}
-	if opts.bit < 0 {
+	if opts.bit < 0 || opts.bit/8 >= maxStringLength {
 		setDirty(c)
 		c.WriteError("ERR bit offset is not an integer or out of range")
 		return
