@@ -779,11 +779,13 @@ func (db *RedisDB) checkTTL(key string) {
 // hllAdd adds members to a hll. Returns 1 if at least 1 if internal HyperLogLog was altered, otherwise 0
 func (db *RedisDB) hllAdd(k string, elems ...string) int {
 	s, ok := db.hllKeys[k]
+	hllAltered := 0
 	if !ok {
 		s = newHll()
 		db.keys[k] = keyTypeHll
+		// a new key counts as a change, also without any elements
+		hllAltered = 1
 	}
-	hllAltered := 0
 	for _, e := range elems {
 		if s.Add([]byte(e)) {
 			hllAltered = 1

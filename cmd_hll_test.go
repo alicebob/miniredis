@@ -25,6 +25,33 @@ func TestPfadd(t *testing.T) {
 		proto.Inline("hll"),
 	)
 
+	t.Run("without elements", func(t *testing.T) {
+		// creates the key
+		mustDo(t, c,
+			"PFADD", "empty",
+			proto.Int(1),
+		)
+		mustDo(t, c,
+			"PFCOUNT", "empty",
+			proto.Int(0),
+		)
+		mustDo(t, c,
+			"PFADD", "empty",
+			proto.Int(0),
+		)
+		mustDo(t, c,
+			"PFADD", "h",
+			proto.Int(0),
+		)
+
+		added, err := s.PfAdd("empty2")
+		ok(t, err)
+		equals(t, 1, added)
+		added, err = s.PfAdd("empty2")
+		ok(t, err)
+		equals(t, 0, added)
+	})
+
 	t.Run("direct usage", func(t *testing.T) {
 		added, err := s.SetAdd("s1", "aap")
 		ok(t, err)
@@ -39,6 +66,10 @@ func TestPfadd(t *testing.T) {
 		mustOK(t, c, "SET", "str", "value")
 		mustDo(t, c,
 			"PFADD", "str", "hi",
+			proto.Error(msgNotValidHllValue),
+		)
+		mustDo(t, c,
+			"PFADD", "str",
 			proto.Error(msgNotValidHllValue),
 		)
 		// Wrong argument counts
