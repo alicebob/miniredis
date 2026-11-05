@@ -3175,6 +3175,30 @@ func TestBzpopTx(t *testing.T) {
 	}
 }
 
+func TestSortedSetRejectNaNScores(t *testing.T) {
+	s, c := runWithClient(t)
+	for _, args := range [][]string{
+		{"ZADD", "missing", "NaN", "member"},
+		{"ZINCRBY", "missing", "NaN", "member"},
+	} {
+		mustDo(t, c, args[0], args[1], args[2], args[3], proto.Error(msgInvalidFloat))
+		equals(t, false, s.Exists("missing"))
+	}
+	must1(t, c, "ZADD", "z", "1", "member")
+	mustDo(t, c, "ZADD", "z", "2", "other", "NaN", "member", proto.Error(msgInvalidFloat))
+	mustDo(t, c, "ZINCRBY", "z", "NaN", "member", proto.Error(msgInvalidFloat))
+	mustDo(t, c, "ZCARD", "z", proto.Int(1))
+	mustDo(t, c, "ZSCORE", "z", "member", proto.String("1"))
+	must1(t, c, "ZADD", "infinite", "+inf", "member")
+	mustDo(t, c, "ZINCRBY", "infinite", "-inf", "member", proto.Error("ERR resulting score is not a number (NaN)"))
+	mustDo(t, c, "ZADD", "infinite", "INCR", "-inf", "member", proto.Error("ERR resulting score is not a number (NaN)"))
+	mustDo(t, c, "ZSCORE", "infinite", "member", proto.String("inf"))
+	for _, option := range []string{"GT", "LT"} {
+		mustDo(t, c, "ZADD", "infinite", "INCR", option, "-inf", "member", proto.Error("ERR resulting score is not a number (NaN)"))
+		mustDo(t, c, "ZSCORE", "infinite", "member", proto.String("inf"))
+	}
+}
+
 func TestZaddIncrConditions(t *testing.T) {
 	for _, option := range []string{"GT", "LT"} {
 		t.Run(option, func(t *testing.T) {
