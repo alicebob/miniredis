@@ -1802,3 +1802,26 @@ func TestBitposInvalidBit(t *testing.T) {
 		})
 	}
 }
+
+func TestDecrbyMinimumInteger(t *testing.T) {
+	for _, initial := range []string{"0", "-1", "-9223372036854775808"} {
+		t.Run(initial, func(t *testing.T) {
+			s, c := runWithClient(t)
+			mustOK(t, c, "SET", "counter", initial)
+			s.SetTTL("counter", time.Minute)
+			mustDo(t, c, "DECRBY", "counter", "-9223372036854775808", proto.Error("ERR decrement would overflow"))
+			s.CheckGet(t, "counter", initial)
+			equals(t, time.Minute, s.TTL("counter"))
+		})
+	}
+	s, c := runWithClient(t)
+	mustDo(t, c, "DECRBY", "missing", "-9223372036854775808", proto.Error("ERR decrement would overflow"))
+	equals(t, false, s.Exists("missing"))
+	mustOK(t, c, "MULTI")
+	mustDo(t, c, "DECRBY", "missing", "-9223372036854775808", proto.Inline("QUEUED"))
+	mustDo(t, c, "EXEC", proto.Array(proto.Error("ERR decrement would overflow")))
+	equals(t, false, s.Exists("missing"))
+	mustDo(t, c, "DECRBY", "nearby", "-9223372036854775807", proto.Int(9223372036854775807))
+	s.HSet("hash", "field", "value")
+	mustDo(t, c, "DECRBY", "hash", "-9223372036854775808", proto.Error("ERR decrement would overflow"))
+}

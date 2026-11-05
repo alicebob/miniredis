@@ -828,3 +828,19 @@ func TestBitposInvalidBit(t *testing.T) {
 		}
 	})
 }
+
+func TestDecrbyMinimumInteger(t *testing.T) {
+	testRaw(t, func(c *client) {
+		c.Do("SET", "counter", "-1")
+		c.Error("decrement would overflow", "DECRBY", "counter", "-9223372036854775808")
+		c.Do("GET", "counter")
+		c.Error("decrement would overflow", "DECRBY", "missing", "-9223372036854775808")
+		c.Do("EXISTS", "missing")
+		c.Do("MULTI")
+		c.Do("DECRBY", "missing", "-9223372036854775808")
+		c.Do("EXEC")
+		c.Do("DECRBY", "nearby", "-9223372036854775807")
+		c.Do("HSET", "hash", "field", "value")
+		c.Error("decrement would overflow", "DECRBY", "hash", "-9223372036854775808")
+	})
+}
