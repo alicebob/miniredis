@@ -190,7 +190,7 @@ func (db *RedisDB) stringIncr(k string, delta int) (int, error) {
 	if sv, ok := db.stringKeys[k]; ok {
 		var err error
 		v, err = strconv.Atoi(sv)
-		if err != nil {
+		if err != nil || strconv.Itoa(v) != sv {
 			return 0, ErrIntValueError
 		}
 	}

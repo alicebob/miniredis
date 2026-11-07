@@ -828,3 +828,25 @@ func TestBitposInvalidBit(t *testing.T) {
 		}
 	})
 }
+
+func TestStringCountersRejectNoncanonicalValues(t *testing.T) {
+	testRaw(t, func(c *client) {
+		for _, args := range [][]string{{"INCR", "counter"}, {"DECR", "counter"}, {"INCRBY", "counter", "1"}, {"DECRBY", "counter", "1"}} {
+			for _, value := range []string{"+1", "01", "-01", "-0", "+0", "00"} {
+				c.Do("SET", "counter", value)
+				c.Error("not an integer", args[0], args[1:]...)
+				c.Do("GET", "counter")
+			}
+		}
+		c.Do("SET", "counter", "01")
+		c.Do("MULTI")
+		c.Do("INCR", "counter")
+		c.Do("EXEC")
+		c.Do("GET", "counter")
+		for _, value := range []string{"0", "1", "-1", "9223372036854775807", "-9223372036854775808"} {
+			c.Do("SET", "counter", value)
+			c.Do("INCRBY", "counter", "0")
+			c.Do("GET", "counter")
+		}
+	})
+}
