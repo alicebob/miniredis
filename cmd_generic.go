@@ -20,12 +20,12 @@ const (
 	expiretimeReplyMissingKey = -2
 )
 
-func inSeconds(t time.Time) int {
-	return int(t.Unix())
+func inSeconds(t time.Time) int64 {
+	return t.Unix()
 }
 
-func inMilliSeconds(t time.Time) int {
-	return int(t.UnixMilli())
+func inMilliSeconds(t time.Time) int64 {
+	return t.UnixMilli()
 }
 
 // commandsGeneric handles EXPIRE, TTL, PERSIST, &c.
@@ -61,7 +61,7 @@ func commandsGeneric(m *Miniredis) {
 
 type expireOpts struct {
 	key   string
-	value int
+	value int64
 	nx    bool
 	xx    bool
 	gt    bool
@@ -72,7 +72,7 @@ func expireParse(cmd string, args []string) (*expireOpts, error) {
 	var opts expireOpts
 
 	opts.key = args[0]
-	if err := optIntSimple(args[1], &opts.value); err != nil {
+	if err := optInt64Simple(args[1], &opts.value); err != nil {
 		return nil, err
 	}
 	args = args[2:]
@@ -169,7 +169,7 @@ func makeCmdExpire(m *Miniredis, unix bool, d time.Duration) func(*server.Peer, 
 //
 // [expiretime]: https://redis.io/commands/expiretime/
 // [pexpiretime]: https://redis.io/commands/pexpiretime/
-func (m *Miniredis) makeCmdExpireTime(timeResultStrategy func(time.Time) int) server.Cmd {
+func (m *Miniredis) makeCmdExpireTime(timeResultStrategy func(time.Time) int64) server.Cmd {
 	return func(c *server.Peer, cmd string, args []string) {
 		if !m.isValidCMD(c, cmd, args, exactly(1)) {
 			return
@@ -190,7 +190,7 @@ func (m *Miniredis) makeCmdExpireTime(timeResultStrategy func(time.Time) int) se
 				return
 			}
 
-			c.WriteInt(timeResultStrategy(m.effectiveNow().Add(ttl)))
+			c.WriteInt64(timeResultStrategy(m.effectiveNow().Add(ttl)))
 		})
 	}
 }
@@ -237,7 +237,7 @@ func (m *Miniredis) cmdTTL(c *server.Peer, cmd string, args []string) {
 			c.WriteInt(-1)
 			return
 		}
-		c.WriteInt(int((v.Milliseconds() + 500) / 1000))
+		c.WriteInt64((v.Milliseconds() + 500) / 1000)
 	})
 }
 
@@ -264,7 +264,7 @@ func (m *Miniredis) cmdPTTL(c *server.Peer, cmd string, args []string) {
 			c.WriteInt(-1)
 			return
 		}
-		c.WriteInt(int(v.Nanoseconds() / 1000000))
+		c.WriteInt64(v.Nanoseconds() / 1000000)
 	})
 }
 
@@ -571,7 +571,7 @@ func (m *Miniredis) cmdRestore(c *server.Peer, cmd string, args []string) {
 
 		if ttl != 0 {
 			if opts.absTtl {
-				db.ttl[opts.key] = m.at(ttl, time.Millisecond)
+				db.ttl[opts.key] = m.at(int64(ttl), time.Millisecond)
 			} else {
 				db.ttl[opts.key] = time.Duration(ttl) * time.Millisecond
 			}

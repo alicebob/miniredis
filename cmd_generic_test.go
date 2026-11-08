@@ -215,9 +215,9 @@ func TestPexpireat(t *testing.T) {
 			proto.Int(-1),
 		)
 
-		now := 1234567890
-		s.SetTime(time.Unix(int64(now), 0))
-		must1(t, c, "PEXPIREAT", "foo", strconv.Itoa(now*1000+100)) // PEXPIREAT returns 1 on success.
+		now := int64(1234567890)
+		s.SetTime(time.Unix(now, 0))
+		must1(t, c, "PEXPIREAT", "foo", strconv.FormatInt(now*1000+100, 10)) // PEXPIREAT returns 1 on success.
 
 		equals(t, 100*time.Millisecond, s.TTL("foo"))
 		mustDo(t, c,
@@ -407,7 +407,7 @@ func TestExpireTime(t *testing.T) {
 		s.Set("foo", "")
 		must1(t, c, "EXPIREAT", "foo", "10413792000") // Mon Jan 01 2300 00:00:00 GMT+0000
 		mustDo(t, c, "EXPIRETIME", "foo",
-			proto.Int(10413792000),
+			proto.Int64(10413792000),
 		)
 	})
 }
@@ -428,7 +428,7 @@ func TestPExpireTime(t *testing.T) {
 		s.Set("foo", "")
 		must1(t, c, "PEXPIREAT", "foo", "10413792000123") // Mon Jan 01 2300 00:00:00.123 GMT+0000
 		mustDo(t, c, "PEXPIRETIME", "foo",
-			proto.Int(10413792000123),
+			proto.Int64(10413792000123),
 		)
 	})
 }
@@ -1113,7 +1113,7 @@ func TestCopyStreamIsolation(t *testing.T) {
 func TestTTLRoundsMilliseconds(t *testing.T) {
 	for _, tt := range []struct {
 		ttl  time.Duration
-		want int
+		want int64
 	}{
 		{499 * time.Millisecond, 0}, {500 * time.Millisecond, 1},
 		{1499 * time.Millisecond, 1}, {1500 * time.Millisecond, 2},
@@ -1124,8 +1124,8 @@ func TestTTLRoundsMilliseconds(t *testing.T) {
 			s, c := runWithClient(t)
 			mustOK(t, c, "SET", "key", "value")
 			s.SetTTL("key", tt.ttl)
-			mustDo(t, c, "TTL", "key", proto.Int(tt.want))
-			mustDo(t, c, "PTTL", "key", proto.Int(int(tt.ttl/time.Millisecond)))
+			mustDo(t, c, "TTL", "key", proto.Int64(tt.want))
+			mustDo(t, c, "PTTL", "key", proto.Int64(int64(tt.ttl/time.Millisecond)))
 			equals(t, tt.ttl, s.TTL("key"))
 		})
 	}

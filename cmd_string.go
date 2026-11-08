@@ -94,7 +94,7 @@ func (m *Miniredis) cmdSet(c *server.Peer, cmd string, args []string) {
 				c.WriteError(msgSyntaxError)
 				return
 			}
-			expire, err := strconv.Atoi(args[1])
+			expire, err := strconv.ParseInt(args[1], 10, 64)
 			if err != nil {
 				setDirty(c)
 				c.WriteError(msgInvalidInt)
@@ -398,7 +398,7 @@ func (m *Miniredis) cmdGetex(c *server.Peer, cmd string, args []string) {
 				c.WriteError(msgSyntaxError)
 				return
 			}
-			expire, err := strconv.Atoi(args[1])
+			expire, err := strconv.ParseInt(args[1], 10, 64)
 			if err != nil {
 				setDirty(c)
 				c.WriteError(msgInvalidInt)
@@ -545,13 +545,13 @@ func (m *Miniredis) cmdIncr(c *server.Peer, cmd string, args []string) {
 			c.WriteError(msgWrongType)
 			return
 		}
-		v, err := db.stringIncr(key, +1)
+		v, err := db.stringIncr64(key, +1)
 		if err != nil {
 			c.WriteError(err.Error())
 			return
 		}
 		// Don't touch TTL
-		c.WriteInt(v)
+		c.WriteInt64(v)
 	})
 }
 
@@ -563,10 +563,10 @@ func (m *Miniredis) cmdIncrby(c *server.Peer, cmd string, args []string) {
 
 	var opts struct {
 		key   string
-		delta int
+		delta int64
 	}
 	opts.key = args[0]
-	if ok := optInt(c, args[1], &opts.delta); !ok {
+	if ok := optInt64(c, args[1], &opts.delta); !ok {
 		return
 	}
 
@@ -578,13 +578,13 @@ func (m *Miniredis) cmdIncrby(c *server.Peer, cmd string, args []string) {
 			return
 		}
 
-		v, err := db.stringIncr(opts.key, opts.delta)
+		v, err := db.stringIncr64(opts.key, opts.delta)
 		if err != nil {
 			c.WriteError(err.Error())
 			return
 		}
 		// Don't touch TTL
-		c.WriteInt(v)
+		c.WriteInt64(v)
 	})
 }
 
@@ -634,13 +634,13 @@ func (m *Miniredis) cmdDecr(c *server.Peer, cmd string, args []string) {
 			c.WriteError(msgWrongType)
 			return
 		}
-		v, err := db.stringIncr(key, -1)
+		v, err := db.stringIncr64(key, -1)
 		if err != nil {
 			c.WriteError(err.Error())
 			return
 		}
 		// Don't touch TTL
-		c.WriteInt(v)
+		c.WriteInt64(v)
 	})
 }
 
@@ -652,10 +652,10 @@ func (m *Miniredis) cmdDecrby(c *server.Peer, cmd string, args []string) {
 
 	var opts struct {
 		key   string
-		delta int
+		delta int64
 	}
 	opts.key = args[0]
-	if ok := optInt(c, args[1], &opts.delta); !ok {
+	if ok := optInt64(c, args[1], &opts.delta); !ok {
 		return
 	}
 
@@ -667,13 +667,13 @@ func (m *Miniredis) cmdDecrby(c *server.Peer, cmd string, args []string) {
 			return
 		}
 
-		v, err := db.stringIncr(opts.key, -opts.delta)
+		v, err := db.stringIncr64(opts.key, -opts.delta)
 		if err != nil {
 			c.WriteError(err.Error())
 			return
 		}
 		// Don't touch TTL
-		c.WriteInt(v)
+		c.WriteInt64(v)
 	})
 }
 
@@ -760,11 +760,11 @@ func (m *Miniredis) cmdSetrange(c *server.Peer, cmd string, args []string) {
 
 	var opts struct {
 		key   string
-		pos   int
+		pos   int64
 		subst string
 	}
 	opts.key = args[0]
-	if ok := optInt(c, args[1], &opts.pos); !ok {
+	if ok := optInt64(c, args[1], &opts.pos); !ok {
 		return
 	}
 	if opts.pos < 0 {
@@ -787,19 +787,20 @@ func (m *Miniredis) cmdSetrange(c *server.Peer, cmd string, args []string) {
 			c.WriteInt(len(db.stringKeys[opts.key]))
 			return
 		}
-		if opts.pos > maxStringLength-len(opts.subst) {
+		if opts.pos > int64(maxStringLength)-int64(len(opts.subst)) {
 			c.WriteError(msgStringTooLong)
 			return
 		}
 
 		v := []byte(db.stringKeys[opts.key])
-		end := opts.pos + len(opts.subst)
+		pos := int(opts.pos)
+		end := pos + len(opts.subst)
 		if len(v) < end {
 			newV := make([]byte, end)
 			copy(newV, v)
 			v = newV
 		}
-		copy(v[opts.pos:end], opts.subst)
+		copy(v[pos:end], opts.subst)
 		db.stringSet(opts.key, string(v))
 		c.WriteInt(len(v))
 	})

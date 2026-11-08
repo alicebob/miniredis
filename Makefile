@@ -1,6 +1,7 @@
 .PHONY: test
 test: ### Run unit tests
 	go test ./...
+	GOOS=linux GOARCH=386 go test ./...
 
 .PHONY: testrace
 testrace: ### Run unit tests with race detector

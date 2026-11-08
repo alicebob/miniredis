@@ -412,6 +412,13 @@ func (c *Peer) WriteInt(n int) {
 	})
 }
 
+// WriteInt64 writes a 64-bit integer
+func (c *Peer) WriteInt64(n int64) {
+	c.Block(func(w *Writer) {
+		w.WriteInt64(n)
+	})
+}
+
 // WriteFloat writes a float
 func (c *Peer) WriteFloat(n float64) {
 	c.Block(func(w *Writer) {
@@ -496,6 +503,11 @@ func (w *Writer) WriteStrings(strs []string) {
 
 // WriteInt writes an integer
 func (w *Writer) WriteInt(n int) {
+	fmt.Fprintf(w.w, ":%d\r\n", n)
+}
+
+// WriteInt64 writes a 64-bit integer
+func (w *Writer) WriteInt64(n int64) {
 	fmt.Fprintf(w.w, ":%d\r\n", n)
 }
 

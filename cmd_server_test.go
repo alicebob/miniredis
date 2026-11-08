@@ -1,10 +1,13 @@
 package miniredis
 
 import (
+	"strconv"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/alicebob/miniredis/v2/proto"
+	"github.com/alicebob/miniredis/v2/size"
 )
 
 // Test DBSIZE, FLUSHDB, and FLUSHALL.
@@ -128,16 +131,22 @@ func TestCmdServerMemoryUsage(t *testing.T) {
 		proto.Int(1),
 	)
 
-	// Intended only for having metrics not to be 1:1 Redis
+	// Intended only for having metrics not to be 1:1 Redis.
+	// The exact size is platform dependent, so assert the string
+	// value via `size.Of` and only require the HLL to be larger.
 	mustDo(t, c,
 		"MEMORY", "USAGE", "foo",
-		proto.Int(19), // normally, with Redis it should be 56 but we don't have the same overhead as Redis
+		proto.Int(size.Of("bar")),
 	)
-	// Intended only for having metrics not to be 1:1 Redis
-	mustDo(t, c,
-		"MEMORY", "USAGE", "h",
-		proto.Int(124), // normally, with Redis it should be 56 but we don't have the same overhead as Redis
-	)
+
+	res, err := c.Do("MEMORY", "USAGE", "h")
+	ok(t, err)
+	// c.Do returns a raw RESP integer, e.g. ":124\r\n".
+	hll, err := strconv.Atoi(strings.TrimPrefix(strings.TrimSpace(res), ":"))
+	ok(t, err)
+	if hll <= size.Of("bar") {
+		t.Errorf("MEMORY USAGE h = %v, want > %v", hll, size.Of("bar"))
+	}
 }
 
 func TestCmdServerMemoryUsageLowerCase(t *testing.T) {
@@ -146,6 +155,6 @@ func TestCmdServerMemoryUsageLowerCase(t *testing.T) {
 	c.Do("SET", "foo", "bar")
 	mustDo(t, c,
 		"memory", "usage", "foo",
-		proto.Int(19),
+		proto.Int(size.Of("bar")),
 	)
 }
