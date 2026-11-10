@@ -468,6 +468,39 @@ func TestBitcount(t *testing.T) {
 	})
 }
 
+func TestBitopTTL(t *testing.T) {
+	skip(t)
+	for _, op := range []string{"AND", "OR", "XOR", "NOT"} {
+		t.Run(op, func(t *testing.T) {
+			testRaw(t, func(c *client) {
+				c.Do("SET", "target", "old", "EX", "100")
+				c.Do("SET", "a", "\xff", "EX", "200")
+				c.Do("SET", "b", "\x0f", "EX", "200")
+				for _, target := range []string{"target", "a"} {
+					args := []string{"BITOP", op, target, "a"}
+					if op != "NOT" {
+						args = append(args, "b")
+					}
+					c.Do(args[0], args[1:]...)
+					c.Do("GET", target)
+					c.Do("TTL", target)
+					c.Do("TTL", "a")
+					c.Do("TTL", "b")
+				}
+				c.Do("EXPIRE", "target", "100")
+				c.Do("MULTI")
+				c.Do("BITOP", op, "target", "b")
+				c.Do("TTL", "target")
+				c.Do("EXEC")
+				c.Do("EXPIRE", "target", "100")
+				c.Do("BITOP", op, "target", "missing")
+				c.Do("EXISTS", "target")
+				c.Do("TTL", "target")
+			})
+		})
+	}
+}
+
 func TestBitop(t *testing.T) {
 	skip(t)
 	testRaw(t, func(c *client) {

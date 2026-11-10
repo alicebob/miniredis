@@ -900,7 +900,7 @@ func (m *Miniredis) cmdBitop(c *server.Peer, cmd string, args []string) {
 				}[opts.op]
 				res = sliceBinOp(cb, res, []byte(v))
 			}
-			db.del(opts.target, false) // Keep TTL
+			db.del(opts.target, true)
 			if len(res) == 0 {
 				db.del(opts.target, true)
 			} else {
@@ -922,7 +922,7 @@ func (m *Miniredis) cmdBitop(c *server.Peer, cmd string, args []string) {
 			for i := range value {
 				value[i] = ^value[i]
 			}
-			db.del(opts.target, false) // Keep TTL
+			db.del(opts.target, true)
 			if len(value) == 0 {
 				db.del(opts.target, true)
 			} else {
