@@ -331,7 +331,9 @@ func (db *RedisDB) setAdd(k string, elems ...string) int {
 		s[e] = struct{}{}
 	}
 	db.setKeys[k] = s
-	db.incr(k)
+	if !ok || added > 0 {
+		db.incr(k)
+	}
 	return added
 }
 
@@ -347,6 +349,9 @@ func (db *RedisDB) setRem(k string, fields ...string) int {
 			removed++
 			delete(s, f)
 		}
+	}
+	if removed == 0 {
+		return 0
 	}
 	if len(s) == 0 {
 		db.del(k, true)
@@ -488,7 +493,10 @@ func (db *RedisDB) ssetAdd(key string, score float64, member string) bool {
 		ss = newSortedSet()
 		db.keys[key] = keyTypeSortedSet
 	}
-	_, ok = ss[member]
+	old, ok := ss[member]
+	if ok && old == score {
+		return false
+	}
 	ss[member] = score
 	db.sortedsetKeys[key] = ss
 	db.incr(key)
@@ -584,7 +592,10 @@ func (db *RedisDB) ssetIncrby(k, m string, delta float64) float64 {
 		db.sortedsetKeys[k] = ss
 	}
 
-	v, _ := ss.get(m)
+	v, ok := ss.get(m)
+	if ok && v+delta == v {
+		return v
+	}
 	v += delta
 	ss.set(v, m)
 	db.incr(k)
@@ -819,7 +830,9 @@ func (db *RedisDB) hllAdd(k string, elems ...string) int {
 		}
 	}
 	db.hllKeys[k] = s
-	db.incr(k)
+	if !ok || hllAltered == 1 {
+		db.incr(k)
+	}
 	return hllAltered
 }
 
