@@ -210,6 +210,33 @@ func (db *RedisDB) stringIncr(k string, delta int) (int, error) {
 	return v, nil
 }
 
+// stringIncr64 is the 64-bit variant of stringIncr, used by the command
+// handlers so that 32-bit platforms support the full int64 range.
+func (db *RedisDB) stringIncr64(k string, delta int64) (int64, error) {
+	v := int64(0)
+	if sv, ok := db.stringKeys[k]; ok {
+		var err error
+		v, err = strconv.ParseInt(sv, 10, 64)
+		if err != nil {
+			return 0, ErrIntValueError
+		}
+	}
+
+	if delta > 0 {
+		if math.MaxInt64-delta < v {
+			return 0, ErrIntValueOverflowError
+		}
+	} else {
+		if math.MinInt64-delta > v {
+			return 0, ErrIntValueOverflowError
+		}
+	}
+
+	v += delta
+	db.stringSet(k, strconv.FormatInt(v, 10))
+	return v, nil
+}
+
 // change float key value
 func (db *RedisDB) stringIncrfloat(k string, delta *big.Float) (*big.Float, error) {
 	if delta.IsInf() {

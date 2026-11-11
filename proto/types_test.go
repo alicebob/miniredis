@@ -20,6 +20,7 @@ func TestTypes(t *testing.T) {
 	test(Error("ERR wrong"), "-ERR wrong\r\n")
 
 	test(Int(42), ":42\r\n")
+	test(Int64(10413792000), ":10413792000\r\n")
 
 	test(Float(42.42), ",42.42\r\n")
 
