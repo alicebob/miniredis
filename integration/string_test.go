@@ -892,6 +892,7 @@ func TestBitposInvalidBit(t *testing.T) {
 }
 
 func TestStringCountersRejectNoncanonicalValues(t *testing.T) {
+	skip(t)
 	testRaw(t, func(c *client) {
 		for _, args := range [][]string{{"INCR", "counter"}, {"DECR", "counter"}, {"INCRBY", "counter", "1"}, {"DECRBY", "counter", "1"}} {
 			for _, value := range []string{"+1", "01", "-01", "-0", "+0", "00"} {

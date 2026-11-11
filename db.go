@@ -217,7 +217,7 @@ func (db *RedisDB) stringIncr64(k string, delta int64) (int64, error) {
 	if sv, ok := db.stringKeys[k]; ok {
 		var err error
 		v, err = strconv.ParseInt(sv, 10, 64)
-		if err != nil {
+		if err != nil || strconv.FormatInt(v, 10) != sv {
 			return 0, ErrIntValueError
 		}
 	}
