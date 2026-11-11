@@ -57,18 +57,26 @@ func TestHll(t *testing.T) {
 				c.DoApprox(2, "PFCOUNT", "res3")
 			}
 
+			// without elements: creates the key, or changes nothing
+			c.Do("PFADD", "h5")
+			c.Do("EXISTS", "h5")
+			c.Do("PFCOUNT", "h5")
+			c.Do("PFADD", "h5")
+			c.Do("PFADD", "h1")
+
 			// failure cases
 			c.Error("wrong number", "PFADD")
 			c.Error("wrong number", "PFCOUNT")
 			c.Error("wrong number", "PFMERGE")
 			c.Do("SET", "str", "I am a string")
 			c.Error("not a valid HyperLogLog", "PFADD", "str", "noot", "mies")
+			c.Error("not a valid HyperLogLog", "PFADD", "str")
 			c.Error("not a valid HyperLogLog", "PFCOUNT", "str", "h1")
 			c.Error("not a valid HyperLogLog", "PFMERGE", "str", "noot")
 			c.Error("not a valid HyperLogLog", "PFMERGE", "noot", "str")
 
-			c.Do("DEL", "h1", "h2", "h3", "h4", "res1", "res2", "res3")
-			c.Do("PFCOUNT", "h1", "h2", "h3", "h4", "res1", "res2", "res3")
+			c.Do("DEL", "h1", "h2", "h3", "h4", "h5", "res1", "res2", "res3")
+			c.Do("PFCOUNT", "h1", "h2", "h3", "h4", "h5", "res1", "res2", "res3")
 		})
 	})
 
