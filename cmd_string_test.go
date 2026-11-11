@@ -1802,3 +1802,35 @@ func TestBitposInvalidBit(t *testing.T) {
 		})
 	}
 }
+
+func TestStringCountersRejectNoncanonicalValues(t *testing.T) {
+	for _, args := range [][]string{{"INCR", "counter"}, {"DECR", "counter"}, {"INCRBY", "counter", "1"}, {"DECRBY", "counter", "1"}} {
+		for _, value := range []string{"+1", "01", "-01", "-0", "+0", "00"} {
+			t.Run(args[0]+"/"+value, func(t *testing.T) {
+				s, c := runWithClient(t)
+				mustOK(t, c, "SET", "counter", value)
+				s.SetTTL("counter", time.Minute)
+				request := append([]string(nil), args...)
+				mustDo(t, c, append(request, proto.Error(msgInvalidInt))...)
+				s.CheckGet(t, "counter", value)
+				equals(t, time.Minute, s.TTL("counter"))
+				_, err := s.Incr("counter", 1)
+				equals(t, ErrIntValueError, err)
+				s.CheckGet(t, "counter", value)
+			})
+		}
+	}
+	s, c := runWithClient(t)
+	mustOK(t, c, "SET", "counter", "01")
+	mustOK(t, c, "MULTI")
+	mustDo(t, c, "INCR", "counter", proto.Inline("QUEUED"))
+	mustDo(t, c, "EXEC", proto.Array(proto.Error(msgInvalidInt)))
+	s.CheckGet(t, "counter", "01")
+	for _, value := range []string{"0", "1", "-1", "9223372036854775807", "-9223372036854775808"} {
+		mustOK(t, c, "SET", "counter", value)
+		n, err := strconv.Atoi(value)
+		ok(t, err)
+		mustDo(t, c, "INCRBY", "counter", "0", proto.Int(n))
+		s.CheckGet(t, "counter", value)
+	}
+}
