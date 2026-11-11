@@ -1125,13 +1125,20 @@ func writeXread(c *server.Peer, streams []string, res map[string][]StreamEntry) 
 		c.WriteNullArray()
 		return
 	}
-	c.WriteLen(len(res))
+	// RESP3 has a map of the streams, RESP2 an array of [stream, entries] pairs.
+	if c.Resp3 {
+		c.WriteMapLen(len(res))
+	} else {
+		c.WriteLen(len(res))
+	}
 	for _, stream := range streams {
 		entries, ok := res[stream]
 		if !ok {
 			continue
 		}
-		c.WriteLen(2)
+		if !c.Resp3 {
+			c.WriteLen(2)
+		}
 		c.WriteBulk(stream)
 		c.WriteLen(len(entries))
 		for _, entry := range entries {
