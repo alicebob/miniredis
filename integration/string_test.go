@@ -714,6 +714,35 @@ func TestMove(t *testing.T) {
 	})
 }
 
+func TestMoveInvalidDatabase(t *testing.T) {
+	skip(t)
+	for _, db := range []string{"noint", "", "-1", "9223372036854775808", "+1", "01", "-0", " 1"} {
+		t.Run(db, func(t *testing.T) {
+			testRaw(t, func(c *client) {
+				c.Do("SELECT", "1")
+				c.Do("SET", "key", "value", "EX", "100")
+				message := "ERR value is not an integer or out of range"
+				if db == "-1" {
+					message = "ERR DB index is out of range"
+				}
+				c.ErrorTheSame(message, "MOVE", "key", db)
+				c.Do("GET", "key")
+				c.Do("TTL", "key")
+				c.Do("SELECT", "0")
+				c.Do("EXISTS", "key")
+				c.ErrorTheSame(message, "MOVE", "missing", db)
+				c.Do("SELECT", "1")
+				c.Do("MULTI")
+				c.Do("MOVE", "key", db)
+				c.Do("PING")
+				c.Do("EXEC")
+				c.Do("GET", "key")
+				c.Do("TTL", "key")
+			})
+		})
+	}
+}
+
 func TestDelx(t *testing.T) {
 	skip(t)
 	testRaw(t, func(c *client) {
