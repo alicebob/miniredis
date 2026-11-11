@@ -1,6 +1,7 @@
 package miniredis
 
 import (
+	"math"
 	"strconv"
 	"strings"
 	"testing"
@@ -1870,7 +1871,7 @@ func TestStringCountersRejectNoncanonicalValues(t *testing.T) {
 	mustDo(t, c, "INCR", "counter", proto.Inline("QUEUED"))
 	mustDo(t, c, "EXEC", proto.Array(proto.Error(msgInvalidInt)))
 	s.CheckGet(t, "counter", "01")
-	for _, value := range []string{"0", "1", "-1", "9223372036854775807", "-9223372036854775808"} {
+	for _, value := range []string{"0", "1", "-1", strconv.Itoa(math.MaxInt), strconv.Itoa(math.MinInt)} {
 		mustOK(t, c, "SET", "counter", value)
 		n, err := strconv.Atoi(value)
 		ok(t, err)
