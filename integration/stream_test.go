@@ -340,6 +340,16 @@ func TestStream(t *testing.T) {
 			c.Do("MULTI")
 			c.Do("XREAD", "BLOCK", "10", "STREAMS", "pl", "60")
 			c.Do("EXEC")
+
+			c.Do("XADD", "pl2", "55-88", "name", "Venus")
+			c.Do("XREAD", "STREAMS", "pl", "0")
+			c.Do("XREAD", "STREAMS", "pl", "pl2", "0", "0")
+			c.Do("XREAD", "STREAMS", "pl", "nosuch", "0", "0")
+			c.Do("XREAD", "BLOCK", "10", "STREAMS", "pl", "0")
+
+			c.Do("MULTI")
+			c.Do("XREAD", "STREAMS", "pl", "0")
+			c.Do("EXEC")
 		})
 	})
 }
@@ -593,6 +603,11 @@ func TestStreamGroup(t *testing.T) {
 			c.Do("MULTI")
 			c.Do("XREADGROUP", "GROUP", "processing", "alice", "BLOCK", "10", "STREAMS", "pl", ">")
 			c.Do("EXEC")
+
+			c.Do("XADD", "pl", "55-88", "name", "Mercury")
+			c.Do("XREADGROUP", "GROUP", "processing", "alice", "STREAMS", "pl", ">")
+			c.Do("XREADGROUP", "GROUP", "processing", "alice", "STREAMS", "pl", "0")
+			c.Do("XREADGROUP", "GROUP", "processing", "alice", "BLOCK", "10", "STREAMS", "pl", "0")
 		})
 	})
 
