@@ -389,9 +389,18 @@ func (m *Miniredis) cmdMove(c *server.Peer, cmd string, args []string) {
 	}
 
 	opts.key = args[0]
-	opts.targetDB, _ = strconv.Atoi(args[1])
+	var err error
+	opts.targetDB, err = strconv.Atoi(args[1])
 
 	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
+		if err != nil || strconv.Itoa(opts.targetDB) != args[1] {
+			c.WriteError(msgInvalidInt)
+			return
+		}
+		if opts.targetDB < 0 {
+			c.WriteError(msgDBIndexOutOfRange)
+			return
+		}
 		if ctx.selectedDB == opts.targetDB {
 			c.WriteError("ERR source and destination objects are the same")
 			return

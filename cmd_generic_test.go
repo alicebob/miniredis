@@ -516,13 +516,51 @@ func TestMove(t *testing.T) {
 		)
 		mustDo(t, c,
 			"MOVE", "foo", "noint",
-			proto.Error("ERR source and destination objects are the same"),
+			proto.Error(msgInvalidInt),
 		)
 		mustDo(t, c,
 			"MOVE", "foo", "2", "toomany",
 			proto.Error(errWrongNumber("move")),
 		)
 	})
+}
+
+func TestMoveInvalidDatabase(t *testing.T) {
+	for _, db := range []string{"noint", "", "+1", "01", "-0", " 1", "9223372036854775808", "-1"} {
+		for _, source := range []int{0, 1} {
+			t.Run(db+"/source="+strconv.Itoa(source), func(t *testing.T) {
+				s, c := runWithClient(t)
+				s.DB(source).Set("key", "value")
+				s.DB(source).SetTTL("key", 100*time.Second)
+				mustOK(t, c, "SELECT", strconv.Itoa(source))
+				mustOK(t, c, "WATCH", "key")
+				message := msgInvalidInt
+				if db == "-1" {
+					message = msgDBIndexOutOfRange
+				}
+				mustDo(t, c, "MOVE", "key", db, proto.Error(message))
+				mustDo(t, c, "MOVE", "missing", db, proto.Error(message))
+				value, err := s.DB(source).Get("key")
+				ok(t, err)
+				equals(t, "value", value)
+				equals(t, 100*time.Second, s.DB(source).TTL("key"))
+				equals(t, false, s.DB(1-source).Exists("key"))
+				equals(t, false, s.DB(-1).Exists("key"))
+				mustOK(t, c, "MULTI")
+				mustDo(t, c, "PING", proto.Inline("QUEUED"))
+				mustDo(t, c, "EXEC", proto.Array(proto.Inline("PONG")))
+
+				mustOK(t, c, "MULTI")
+				mustDo(t, c, "MOVE", "key", db, proto.Inline("QUEUED"))
+				mustDo(t, c, "PING", proto.Inline("QUEUED"))
+				mustDo(t, c, "EXEC", proto.Array(proto.Error(message), proto.Inline("PONG")))
+				value, err = s.DB(source).Get("key")
+				ok(t, err)
+				equals(t, "value", value)
+				equals(t, 100*time.Second, s.DB(source).TTL("key"))
+			})
+		}
+	}
 }
 
 func TestKeys(t *testing.T) {
