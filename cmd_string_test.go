@@ -1334,6 +1334,50 @@ func TestBitop(t *testing.T) {
 	}
 }
 
+func TestBitopTTL(t *testing.T) {
+	for _, tc := range []struct {
+		op   string
+		want string
+	}{
+		{"AND", "\x0f"},
+		{"OR", "\xff"},
+		{"XOR", "\xf0"},
+		{"NOT", "\x00"},
+	} {
+		t.Run(tc.op, func(t *testing.T) {
+			for _, target := range []string{"target", "a"} {
+				t.Run(target, func(t *testing.T) {
+					s, c := runWithClient(t)
+					mustOK(t, c, "SET", "target", "old", "EX", "100")
+					mustOK(t, c, "SET", "a", "\xff", "EX", "200")
+					mustOK(t, c, "SET", "b", "\x0f", "EX", "200")
+					args := []string{"BITOP", tc.op, target, "a"}
+					if tc.op != "NOT" {
+						args = append(args, "b")
+					}
+					mustDo(t, c, append(args, proto.Int(1))...)
+					s.CheckGet(t, target, tc.want)
+					mustDo(t, c, "TTL", target, proto.Int(-1))
+					if target != "a" {
+						equals(t, 200*time.Second, s.TTL("a"))
+					}
+					equals(t, 200*time.Second, s.TTL("b"))
+					s.FastForward(201 * time.Second)
+					s.CheckGet(t, target, tc.want)
+				})
+			}
+			t.Run("wrong type", func(t *testing.T) {
+				s, c := runWithClient(t)
+				mustOK(t, c, "SET", "target", "old", "EX", "100")
+				s.HSet("hash", "field", "value")
+				mustDo(t, c, "BITOP", tc.op, "target", "hash", proto.Error(msgWrongType))
+				s.CheckGet(t, "target", "old")
+				equals(t, 100*time.Second, s.TTL("target"))
+			})
+		})
+	}
+}
+
 func TestBitpos(t *testing.T) {
 	s, c := runWithClient(t)
 
