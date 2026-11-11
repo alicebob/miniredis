@@ -468,6 +468,39 @@ func TestBitcount(t *testing.T) {
 	})
 }
 
+func TestBitopTTL(t *testing.T) {
+	skip(t)
+	for _, op := range []string{"AND", "OR", "XOR", "NOT"} {
+		t.Run(op, func(t *testing.T) {
+			testRaw(t, func(c *client) {
+				c.Do("SET", "target", "old", "EX", "100")
+				c.Do("SET", "a", "\xff", "EX", "200")
+				c.Do("SET", "b", "\x0f", "EX", "200")
+				for _, target := range []string{"target", "a"} {
+					args := []string{"BITOP", op, target, "a"}
+					if op != "NOT" {
+						args = append(args, "b")
+					}
+					c.Do(args[0], args[1:]...)
+					c.Do("GET", target)
+					c.Do("TTL", target)
+					c.Do("TTL", "a")
+					c.Do("TTL", "b")
+				}
+				c.Do("EXPIRE", "target", "100")
+				c.Do("MULTI")
+				c.Do("BITOP", op, "target", "b")
+				c.Do("TTL", "target")
+				c.Do("EXEC")
+				c.Do("EXPIRE", "target", "100")
+				c.Do("BITOP", op, "target", "missing")
+				c.Do("EXISTS", "target")
+				c.Do("TTL", "target")
+			})
+		})
+	}
+}
+
 func TestBitop(t *testing.T) {
 	skip(t)
 	testRaw(t, func(c *client) {
@@ -714,6 +747,35 @@ func TestMove(t *testing.T) {
 	})
 }
 
+func TestMoveInvalidDatabase(t *testing.T) {
+	skip(t)
+	for _, db := range []string{"noint", "", "-1", "9223372036854775808", "+1", "01", "-0", " 1"} {
+		t.Run(db, func(t *testing.T) {
+			testRaw(t, func(c *client) {
+				c.Do("SELECT", "1")
+				c.Do("SET", "key", "value", "EX", "100")
+				message := "ERR value is not an integer or out of range"
+				if db == "-1" {
+					message = "ERR DB index is out of range"
+				}
+				c.ErrorTheSame(message, "MOVE", "key", db)
+				c.Do("GET", "key")
+				c.Do("TTL", "key")
+				c.Do("SELECT", "0")
+				c.Do("EXISTS", "key")
+				c.ErrorTheSame(message, "MOVE", "missing", db)
+				c.Do("SELECT", "1")
+				c.Do("MULTI")
+				c.Do("MOVE", "key", db)
+				c.Do("PING")
+				c.Do("EXEC")
+				c.Do("GET", "key")
+				c.Do("TTL", "key")
+			})
+		})
+	}
+}
+
 func TestDelx(t *testing.T) {
 	skip(t)
 	testRaw(t, func(c *client) {
@@ -842,5 +904,28 @@ func TestDecrbyMinimumInteger(t *testing.T) {
 		c.Do("DECRBY", "nearby", "-9223372036854775807")
 		c.Do("HSET", "hash", "field", "value")
 		c.Error("decrement would overflow", "DECRBY", "hash", "-9223372036854775808")
+	})
+}
+
+func TestStringCountersRejectNoncanonicalValues(t *testing.T) {
+	skip(t)
+	testRaw(t, func(c *client) {
+		for _, args := range [][]string{{"INCR", "counter"}, {"DECR", "counter"}, {"INCRBY", "counter", "1"}, {"DECRBY", "counter", "1"}} {
+			for _, value := range []string{"+1", "01", "-01", "-0", "+0", "00"} {
+				c.Do("SET", "counter", value)
+				c.Error("not an integer", args[0], args[1:]...)
+				c.Do("GET", "counter")
+			}
+		}
+		c.Do("SET", "counter", "01")
+		c.Do("MULTI")
+		c.Do("INCR", "counter")
+		c.Do("EXEC")
+		c.Do("GET", "counter")
+		for _, value := range []string{"0", "1", "-1", "9223372036854775807", "-9223372036854775808"} {
+			c.Do("SET", "counter", value)
+			c.Do("INCRBY", "counter", "0")
+			c.Do("GET", "counter")
+		}
 	})
 }

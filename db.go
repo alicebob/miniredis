@@ -190,7 +190,7 @@ func (db *RedisDB) stringIncr(k string, delta int) (int, error) {
 	if sv, ok := db.stringKeys[k]; ok {
 		var err error
 		v, err = strconv.Atoi(sv)
-		if err != nil {
+		if err != nil || strconv.Itoa(v) != sv {
 			return 0, ErrIntValueError
 		}
 	}
@@ -207,6 +207,33 @@ func (db *RedisDB) stringIncr(k string, delta int) (int, error) {
 
 	v += delta
 	db.stringSet(k, strconv.Itoa(v))
+	return v, nil
+}
+
+// stringIncr64 is the 64-bit variant of stringIncr, used by the command
+// handlers so that 32-bit platforms support the full int64 range.
+func (db *RedisDB) stringIncr64(k string, delta int64) (int64, error) {
+	v := int64(0)
+	if sv, ok := db.stringKeys[k]; ok {
+		var err error
+		v, err = strconv.ParseInt(sv, 10, 64)
+		if err != nil || strconv.FormatInt(v, 10) != sv {
+			return 0, ErrIntValueError
+		}
+	}
+
+	if delta > 0 {
+		if math.MaxInt64-delta < v {
+			return 0, ErrIntValueOverflowError
+		}
+	} else {
+		if math.MinInt64-delta > v {
+			return 0, ErrIntValueOverflowError
+		}
+	}
+
+	v += delta
+	db.stringSet(k, strconv.FormatInt(v, 10))
 	return v, nil
 }
 
@@ -304,7 +331,9 @@ func (db *RedisDB) setAdd(k string, elems ...string) int {
 		s[e] = struct{}{}
 	}
 	db.setKeys[k] = s
-	db.incr(k)
+	if !ok || added > 0 {
+		db.incr(k)
+	}
 	return added
 }
 
@@ -320,6 +349,9 @@ func (db *RedisDB) setRem(k string, fields ...string) int {
 			removed++
 			delete(s, f)
 		}
+	}
+	if removed == 0 {
+		return 0
 	}
 	if len(s) == 0 {
 		db.del(k, true)
@@ -461,7 +493,10 @@ func (db *RedisDB) ssetAdd(key string, score float64, member string) bool {
 		ss = newSortedSet()
 		db.keys[key] = keyTypeSortedSet
 	}
-	_, ok = ss[member]
+	old, ok := ss[member]
+	if ok && old == score {
+		return false
+	}
 	ss[member] = score
 	db.sortedsetKeys[key] = ss
 	db.incr(key)
@@ -557,7 +592,10 @@ func (db *RedisDB) ssetIncrby(k, m string, delta float64) float64 {
 		db.sortedsetKeys[k] = ss
 	}
 
-	v, _ := ss.get(m)
+	v, ok := ss.get(m)
+	if ok && v+delta == v {
+		return v
+	}
 	v += delta
 	ss.set(v, m)
 	db.incr(k)
@@ -779,18 +817,22 @@ func (db *RedisDB) checkTTL(key string) {
 // hllAdd adds members to a hll. Returns 1 if at least 1 if internal HyperLogLog was altered, otherwise 0
 func (db *RedisDB) hllAdd(k string, elems ...string) int {
 	s, ok := db.hllKeys[k]
+	hllAltered := 0
 	if !ok {
 		s = newHll()
 		db.keys[k] = keyTypeHll
+		// a new key counts as a change, also without any elements
+		hllAltered = 1
 	}
-	hllAltered := 0
 	for _, e := range elems {
 		if s.Add([]byte(e)) {
 			hllAltered = 1
 		}
 	}
 	db.hllKeys[k] = s
-	db.incr(k)
+	if !ok || hllAltered == 1 {
+		db.incr(k)
+	}
 	return hllAltered
 }
 

@@ -1,6 +1,7 @@
 package miniredis
 
 import (
+	"math"
 	"strconv"
 	"strings"
 	"testing"
@@ -1334,6 +1335,50 @@ func TestBitop(t *testing.T) {
 	}
 }
 
+func TestBitopTTL(t *testing.T) {
+	for _, tc := range []struct {
+		op   string
+		want string
+	}{
+		{"AND", "\x0f"},
+		{"OR", "\xff"},
+		{"XOR", "\xf0"},
+		{"NOT", "\x00"},
+	} {
+		t.Run(tc.op, func(t *testing.T) {
+			for _, target := range []string{"target", "a"} {
+				t.Run(target, func(t *testing.T) {
+					s, c := runWithClient(t)
+					mustOK(t, c, "SET", "target", "old", "EX", "100")
+					mustOK(t, c, "SET", "a", "\xff", "EX", "200")
+					mustOK(t, c, "SET", "b", "\x0f", "EX", "200")
+					args := []string{"BITOP", tc.op, target, "a"}
+					if tc.op != "NOT" {
+						args = append(args, "b")
+					}
+					mustDo(t, c, append(args, proto.Int(1))...)
+					s.CheckGet(t, target, tc.want)
+					mustDo(t, c, "TTL", target, proto.Int(-1))
+					if target != "a" {
+						equals(t, 200*time.Second, s.TTL("a"))
+					}
+					equals(t, 200*time.Second, s.TTL("b"))
+					s.FastForward(201 * time.Second)
+					s.CheckGet(t, target, tc.want)
+				})
+			}
+			t.Run("wrong type", func(t *testing.T) {
+				s, c := runWithClient(t)
+				mustOK(t, c, "SET", "target", "old", "EX", "100")
+				s.HSet("hash", "field", "value")
+				mustDo(t, c, "BITOP", tc.op, "target", "hash", proto.Error(msgWrongType))
+				s.CheckGet(t, "target", "old")
+				equals(t, 100*time.Second, s.TTL("target"))
+			})
+		})
+	}
+}
+
 func TestBitpos(t *testing.T) {
 	s, c := runWithClient(t)
 
@@ -1821,7 +1866,39 @@ func TestDecrbyMinimumInteger(t *testing.T) {
 	mustDo(t, c, "DECRBY", "missing", "-9223372036854775808", proto.Inline("QUEUED"))
 	mustDo(t, c, "EXEC", proto.Array(proto.Error("ERR decrement would overflow")))
 	equals(t, false, s.Exists("missing"))
-	mustDo(t, c, "DECRBY", "nearby", "-9223372036854775807", proto.Int(9223372036854775807))
+	mustDo(t, c, "DECRBY", "nearby", "-9223372036854775807", proto.Int64(9223372036854775807))
 	s.HSet("hash", "field", "value")
 	mustDo(t, c, "DECRBY", "hash", "-9223372036854775808", proto.Error("ERR decrement would overflow"))
+}
+
+func TestStringCountersRejectNoncanonicalValues(t *testing.T) {
+	for _, args := range [][]string{{"INCR", "counter"}, {"DECR", "counter"}, {"INCRBY", "counter", "1"}, {"DECRBY", "counter", "1"}} {
+		for _, value := range []string{"+1", "01", "-01", "-0", "+0", "00"} {
+			t.Run(args[0]+"/"+value, func(t *testing.T) {
+				s, c := runWithClient(t)
+				mustOK(t, c, "SET", "counter", value)
+				s.SetTTL("counter", time.Minute)
+				request := append([]string(nil), args...)
+				mustDo(t, c, append(request, proto.Error(msgInvalidInt))...)
+				s.CheckGet(t, "counter", value)
+				equals(t, time.Minute, s.TTL("counter"))
+				_, err := s.Incr("counter", 1)
+				equals(t, ErrIntValueError, err)
+				s.CheckGet(t, "counter", value)
+			})
+		}
+	}
+	s, c := runWithClient(t)
+	mustOK(t, c, "SET", "counter", "01")
+	mustOK(t, c, "MULTI")
+	mustDo(t, c, "INCR", "counter", proto.Inline("QUEUED"))
+	mustDo(t, c, "EXEC", proto.Array(proto.Error(msgInvalidInt)))
+	s.CheckGet(t, "counter", "01")
+	for _, value := range []string{"0", "1", "-1", strconv.Itoa(math.MaxInt), strconv.Itoa(math.MinInt)} {
+		mustOK(t, c, "SET", "counter", value)
+		n, err := strconv.Atoi(value)
+		ok(t, err)
+		mustDo(t, c, "INCRBY", "counter", "0", proto.Int(n))
+		s.CheckGet(t, "counter", value)
+	}
 }

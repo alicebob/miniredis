@@ -761,7 +761,7 @@ func (m *Miniredis) cmdHexpire(c *server.Peer, cmd string, args []string) {
 
 type hexpireOpts struct {
 	key    string
-	ttl    int
+	ttl    int64
 	nx     bool
 	xx     bool
 	gt     bool
@@ -773,7 +773,7 @@ func parseHExpireArgs(args []string) (hexpireOpts, string) {
 	var opts hexpireOpts
 	opts.key = args[0]
 
-	if err := optIntSimple(args[1], &opts.ttl); err != nil {
+	if err := optInt64Simple(args[1], &opts.ttl); err != nil {
 		return hexpireOpts{}, err.Error()
 	}
 	if opts.ttl < 0 {
@@ -943,7 +943,7 @@ func (m *Miniredis) cmdHttlGeneric(c *server.Peer, cmd string, args []string, un
 				continue
 			}
 
-			c.WriteInt(int(ttl / unit))
+			c.WriteInt64(int64(ttl / unit))
 		}
 	})
 }
@@ -953,7 +953,7 @@ type hsetexOpts struct {
 	fnx     bool
 	fxx     bool
 	ttlMode string // "", "EX", "PX", "EXAT", "PXAT", "KEEPTTL"
-	ttlVal  int    // raw value for EX/PX/EXAT/PXAT
+	ttlVal  int64  // raw value for EX/PX/EXAT/PXAT
 	fields  []string
 	values  []string
 }
@@ -985,8 +985,8 @@ func parseHSetEXArgs(args []string) (hsetexOpts, string) {
 			if len(args) < 2 {
 				return hsetexOpts{}, msgInvalidInt
 			}
-			var val int
-			if err := optIntSimple(args[1], &val); err != nil {
+			var val int64
+			if err := optInt64Simple(args[1], &val); err != nil {
 				return hsetexOpts{}, msgInvalidInt
 			}
 			if val <= 0 {
