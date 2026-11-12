@@ -820,6 +820,29 @@ func TestStreamGroup(t *testing.T) {
 		})
 	})
 
+	t.Run("XCLAIM min-idle-time", func(t *testing.T) {
+		testRaw(t, func(c *client) {
+			c.Do("XADD", "planets", "0-1", "name", "Mercury")
+			c.Do("XADD", "planets", "0-2", "name", "Venus")
+			c.Do("XGROUP", "CREATE", "planets", "processing", "0")
+			c.Do("XREADGROUP", "GROUP", "processing", "alice", "COUNT", "1", "STREAMS", "planets", ">")
+
+			// alice just got 0-1
+			c.Do("XCLAIM", "planets", "processing", "bob", "3600000", "0-1")
+			c.Do("XPENDING", "planets", "processing")
+
+			c.Do("XCLAIM", "planets", "processing", "bob", "0", "0-1", "JUSTID")
+			// bob just claimed it
+			c.Do("XCLAIM", "planets", "processing", "eve", "3600000", "0-1", "JUSTID")
+			c.Do("XPENDING", "planets", "processing")
+
+			c.Do("XCLAIM", "planets", "processing", "eve", "3600000", "0-2", "FORCE", "JUSTID")
+			c.Do("XCLAIM", "planets", "processing", "bob", "0", "0-1", "IDLE", "7200000", "JUSTID")
+			c.Do("XCLAIM", "planets", "processing", "eve", "3600000", "0-1", "JUSTID")
+			c.Do("XPENDING", "planets", "processing")
+		})
+	})
+
 	testRESP3(t, func(c *client) {
 		c.DoLoosely("XINFO", "STREAM", "foo")
 	})

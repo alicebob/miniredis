@@ -1753,6 +1753,9 @@ func (m *Miniredis) xclaim(
 			}
 			group.setLastSuccess(consumerName, m.effectiveNow())
 		} else {
+			if minIdleTime > 0 && m.effectiveNow().Before(pelEntry.lastDelivery.Add(minIdleTime)) {
+				continue
+			}
 			group.consumers[pelEntry.consumer].numPendingEntries--
 			pelEntry.consumer = consumerName
 		}
