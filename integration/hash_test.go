@@ -1,7 +1,10 @@
 package main
 
 import (
+	"strconv"
+	"strings"
 	"testing"
+	"time"
 )
 
 func TestHash(t *testing.T) {
@@ -90,6 +93,87 @@ func TestHash(t *testing.T) {
 			c.Do("HEXPIRE", "aap", "0", "FIELDS", "1", "noot")
 			c.Do("EXISTS", "aap")
 			c.Do("EXEC")
+		})
+	})
+}
+
+// Both commands must reject malformed syntax without changing the hash.
+func TestHashExpireSyntax(t *testing.T) {
+	skip(t)
+	for _, cmd := range []string{"HEXPIRE", "HEXPIREAT"} {
+		for _, tc := range []struct {
+			name string
+			args []string
+			err  string
+		}{
+			{"missing arguments", []string{"h", "10"}, "ERR wrong number of arguments for '" + strings.ToLower(cmd) + "' command"},
+			{"invalid time", []string{"h", "bad", "FIELDS", "1", "f"}, "ERR value is not an integer or out of range"},
+			{"time overflow", []string{"h", "9223372036854775808", "FIELDS", "1", "f"}, "ERR value is not an integer or out of range"},
+			{"negative time", []string{"h", "-1", "FIELDS", "1", "f"}, "ERR invalid expire time, must be >= 0"},
+			{"plus sign", []string{"h", "+1", "FIELDS", "1", "f"}, "ERR value is not an integer or out of range"},
+			{"leading zero", []string{"h", "01", "FIELDS", "1", "f"}, "ERR value is not an integer or out of range"},
+			{"negative zero", []string{"h", "-0", "FIELDS", "1", "f"}, "ERR value is not an integer or out of range"},
+			{"mixed conditions", []string{"h", "10", "XX", "GT", "FIELDS", "1", "f"}, "ERR Mandatory argument FIELDS is missing or not at the right position"},
+			{"repeated condition", []string{"h", "10", "NX", "NX", "FIELDS", "1", "f"}, "ERR Mandatory argument FIELDS is missing or not at the right position"},
+			{"missing FIELDS", []string{"h", "10", "bad", "1", "f"}, "ERR Mandatory argument FIELDS is missing or not at the right position"},
+			{"invalid count", []string{"h", "10", "FIELDS", "bad", "f"}, "ERR Parameter `numFields` should be greater than 0"},
+			{"zero count", []string{"h", "10", "FIELDS", "0", "f"}, "ERR Parameter `numFields` should be greater than 0"},
+			{"negative count", []string{"h", "10", "FIELDS", "-1", "f"}, "ERR Parameter `numFields` should be greater than 0"},
+			{"count overflow", []string{"h", "10", "FIELDS", "9223372036854775808", "f"}, "ERR Parameter `numFields` should be greater than 0"},
+			{"count plus sign", []string{"h", "10", "FIELDS", "+1", "f"}, "ERR Parameter `numFields` should be greater than 0"},
+			{"count leading zero", []string{"h", "10", "FIELDS", "01", "f"}, "ERR Parameter `numFields` should be greater than 0"},
+			{"count exceeds 32 bits", []string{"h", "10", "FIELDS", "2147483648", "f"}, "ERR The `numfields` parameter must match the number of arguments"},
+			{"too few fields", []string{"h", "10", "FIELDS", "2", "f"}, "ERR The `numfields` parameter must match the number of arguments"},
+			{"extra field", []string{"h", "10", "FIELDS", "1", "f", "extra"}, "ERR The `numfields` parameter must match the number of arguments"},
+			{"condition after fields", []string{"h", "10", "FIELDS", "1", "f", "NX"}, "ERR The `numfields` parameter must match the number of arguments"},
+			{"second FIELDS clause", []string{"h", "10", "FIELDS", "1", "f", "FIELDS", "1", "other"}, "ERR The `numfields` parameter must match the number of arguments"},
+		} {
+			t.Run(cmd+"/"+tc.name, func(t *testing.T) {
+				testRaw(t, func(c *client) {
+					c.Do("HSET", "h", "f", "value")
+					c.ErrorTheSame(tc.err, cmd, tc.args...)
+					c.Do("HGET", "h", "f")
+					c.Do("HTTL", "h", "FIELDS", "1", "f")
+				})
+			})
+		}
+	}
+}
+
+func TestHashExpireat(t *testing.T) {
+	skip(t)
+	t.Run("conditions and per-field replies", func(t *testing.T) {
+		testRaw(t, func(c *client) {
+			// Freeze conversions so repeated absolute deadlines compare equal.
+			c.miniredis.SetTime(time.Now())
+			deadline := strconv.FormatInt(time.Now().Add(time.Hour).Unix(), 10)
+			later := strconv.FormatInt(time.Now().Add(2*time.Hour).Unix(), 10)
+			c.Do("HEXPIREAT", "missing", deadline, "FIELDS", "2", "a", "b")
+			c.Do("HSET", "h", "a", "one", "b", "two")
+			c.Do("HEXPIREAT", "h", deadline, "NX", "FIELDS", "3", "a", "a", "missing")
+			c.Do("HEXPIREAT", "h", deadline, "XX", "FIELDS", "2", "a", "b")
+			c.Do("HEXPIREAT", "h", deadline, "GT", "FIELDS", "2", "a", "b")
+			c.Do("HEXPIREAT", "h", later, "GT", "FIELDS", "2", "a", "b")
+			c.Do("HEXPIREAT", "h", later, "LT", "FIELDS", "2", "a", "b")
+			c.Do("hexpireat", "h", deadline, "lt", "fields", "2", "a", "b")
+			c.Do("HEXPIREAT", "h", "0", "NX", "FIELDS", "1", "a")
+			c.Do("HEXPIREAT", "h", "0", "GT", "FIELDS", "1", "a")
+			c.Do("HEXPIREAT", "h", "0", "XX", "FIELDS", "3", "a", "a", "missing")
+			c.Do("HEXPIREAT", "h", "1", "LT", "FIELDS", "1", "b")
+			c.Do("EXISTS", "h")
+		})
+	})
+	t.Run("last accepted timestamp and first rejected second", func(t *testing.T) {
+		testRaw(t, func(c *client) {
+			c.Do("HSET", "h", "f", "value")
+			c.Do("HEXPIREAT", "h", "70368744177", "FIELDS", "1", "f")
+			c.ErrorTheSame("ERR invalid expire time in 'hexpireat' command", "HEXPIREAT", "h", "70368744178", "FIELDS", "1", "f")
+		})
+	})
+	t.Run("wrong key type", func(t *testing.T) {
+		testRaw(t, func(c *client) {
+			c.Do("SET", "str", "value")
+			c.ErrorTheSame("WRONGTYPE Operation against a key holding the wrong kind of value", "HEXPIREAT", "str", "10", "FIELDS", "1", "f")
 		})
 	})
 }

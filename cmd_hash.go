@@ -30,7 +30,8 @@ func commandsHash(m *Miniredis) {
 	m.srv.Register("HVALS", m.cmdHvals, server.ReadOnlyOption())
 	m.srv.Register("HSCAN", m.cmdHscan, server.ReadOnlyOption())
 	m.srv.Register("HRANDFIELD", m.cmdHrandfield, server.ReadOnlyOption())
-	m.srv.Register("HEXPIRE", m.cmdHexpire)
+	m.srv.Register("HEXPIRE", m.makeCmdHexpire(false))
+	m.srv.Register("HEXPIREAT", m.makeCmdHexpire(true))
 	m.srv.Register("HPERSIST", m.cmdHpersist)
 	m.srv.Register("HTTL", m.cmdHttl, server.ReadOnlyOption())
 	m.srv.Register("HPTTL", m.cmdHpttl, server.ReadOnlyOption())
@@ -662,101 +663,115 @@ func (m *Miniredis) cmdHrandfield(c *server.Peer, cmd string, args []string) {
 	})
 }
 
-// HEXPIRE
-func (m *Miniredis) cmdHexpire(c *server.Peer, cmd string, args []string) {
-	if !m.isValidCMD(c, cmd, args, atLeast(5)) {
-		return
-	}
+// HEXPIRE and HEXPIREAT
+// unix selects absolute Unix timestamps instead of relative TTLs.
+func (m *Miniredis) makeCmdHexpire(unix bool) server.Cmd {
+	return func(c *server.Peer, cmd string, args []string) {
+		if !m.isValidCMD(c, cmd, args, atLeast(5)) {
+			return
+		}
 
-	opts, err := parseHExpireArgs(args)
-	if err != "" {
-		setDirty(c)
-		c.WriteError(err)
-		return
-	}
+		opts, err := parseHExpireArgs(args)
+		if err != "" {
+			setDirty(c)
+			c.WriteError(err)
+			return
+		}
+		if unix && opts.ttl > (1<<46-1)/1000 {
+			// Redis hash field expiration timestamps are limited to 46 bits of milliseconds.
+			setDirty(c)
+			c.WriteError("ERR invalid expire time in 'hexpireat' command")
+			return
+		}
 
-	withTx(m, c, func(peer *server.Peer, ctx *connCtx) {
-		db := m.db(ctx.selectedDB)
+		withTx(m, c, func(peer *server.Peer, ctx *connCtx) {
+			db := m.db(ctx.selectedDB)
+			var newTTL time.Duration
+			if unix {
+				newTTL = m.at(opts.ttl, time.Second)
+			} else {
+				newTTL = time.Duration(opts.ttl) * time.Second
+			}
 
-		if _, ok := db.keys[opts.key]; !ok {
+			if _, ok := db.keys[opts.key]; !ok {
+				c.WriteLen(len(opts.fields))
+				for range opts.fields {
+					c.WriteInt(-2)
+				}
+				return
+			}
+
+			if db.t(opts.key) != keyTypeHash {
+				c.WriteError(msgWrongType)
+				return
+			}
+
+			fieldTTLs := db.hashTTLs[opts.key]
+			if fieldTTLs == nil {
+				fieldTTLs = map[string]time.Duration{}
+				db.hashTTLs[opts.key] = fieldTTLs
+			}
+
+			changed := 0
 			c.WriteLen(len(opts.fields))
-			for range opts.fields {
-				c.WriteInt(-2)
-			}
-			return
-		}
+			for _, field := range opts.fields {
+				if _, ok := db.hashKeys[opts.key][field]; !ok {
+					c.WriteInt(-2)
+					continue
+				}
 
-		if db.t(opts.key) != keyTypeHash {
-			c.WriteError(msgWrongType)
-			return
-		}
+				currentTtl, ok := fieldTTLs[field]
 
-		fieldTTLs := db.hashTTLs[opts.key]
-		if fieldTTLs == nil {
-			fieldTTLs = map[string]time.Duration{}
-			db.hashTTLs[opts.key] = fieldTTLs
-		}
+				// NX -- For each specified field,
+				// set expiration only when the field has no expiration.
+				if opts.nx && ok {
+					c.WriteInt(0)
+					continue
+				}
 
-		changed := 0
-		c.WriteLen(len(opts.fields))
-		for _, field := range opts.fields {
-			if _, ok := db.hashKeys[opts.key][field]; !ok {
-				c.WriteInt(-2)
-				continue
-			}
+				// XX -- For each specified field,
+				// set expiration only when the field has an existing expiration.
+				if opts.xx && !ok {
+					c.WriteInt(0)
+					continue
+				}
 
-			currentTtl, ok := fieldTTLs[field]
-			newTTL := time.Duration(opts.ttl) * time.Second
+				// GT -- For each specified field,
+				// set expiration only when the new expiration is greater than current one.
+				if opts.gt && (!ok || newTTL <= currentTtl) {
+					c.WriteInt(0)
+					continue
+				}
 
-			// NX -- For each specified field,
-			// set expiration only when the field has no expiration.
-			if opts.nx && ok {
-				c.WriteInt(0)
-				continue
-			}
+				// LT -- For each specified field,
+				// set expiration only when the new expiration is less than current one.
+				if opts.lt && ok && newTTL >= currentTtl {
+					c.WriteInt(0)
+					continue
+				}
 
-			// XX -- For each specified field,
-			// set expiration only when the field has an existing expiration.
-			if opts.xx && !ok {
-				c.WriteInt(0)
-				continue
-			}
+				// Zero TTLs and absolute deadlines in the past delete the field.
+				if newTTL == 0 || (unix && newTTL < 0) {
+					delete(db.hashKeys[opts.key], field)
+					delete(fieldTTLs, field)
+					changed++
+					c.WriteInt(2)
+					continue
+				}
 
-			// GT -- For each specified field,
-			// set expiration only when the new expiration is greater than current one.
-			if opts.gt && (!ok || newTTL <= currentTtl) {
-				c.WriteInt(0)
-				continue
-			}
-
-			// LT -- For each specified field,
-			// set expiration only when the new expiration is less than current one.
-			if opts.lt && ok && newTTL >= currentTtl {
-				c.WriteInt(0)
-				continue
-			}
-
-			// A TTL of 0 is already in the past, so the field is deleted.
-			if newTTL == 0 {
-				delete(db.hashKeys[opts.key], field)
-				delete(fieldTTLs, field)
+				fieldTTLs[field] = newTTL
 				changed++
-				c.WriteInt(2)
-				continue
+				c.WriteInt(1)
 			}
 
-			fieldTTLs[field] = newTTL
-			changed++
-			c.WriteInt(1)
-		}
-
-		// Nothing left. Remove the whole key.
-		if len(db.hashKeys[opts.key]) == 0 {
-			db.del(opts.key, true)
-		} else if changed > 0 {
-			db.incr(opts.key)
-		}
-	})
+			// Nothing left. Remove the whole key.
+			if len(db.hashKeys[opts.key]) == 0 {
+				db.del(opts.key, true)
+			} else if changed > 0 {
+				db.incr(opts.key)
+			}
+		})
+	}
 }
 
 type hexpireOpts struct {
@@ -776,13 +791,15 @@ func parseHExpireArgs(args []string) (hexpireOpts, string) {
 	if err := optInt64Simple(args[1], &opts.ttl); err != nil {
 		return hexpireOpts{}, err.Error()
 	}
+	if strconv.FormatInt(opts.ttl, 10) != args[1] {
+		return hexpireOpts{}, msgInvalidInt
+	}
 	if opts.ttl < 0 {
 		return hexpireOpts{}, "ERR invalid expire time, must be >= 0"
 	}
 
 	args = args[2:]
-
-	for len(args) > 0 {
+	if len(args) > 0 {
 		switch strings.ToLower(args[0]) {
 		case "nx":
 			opts.nx = true
@@ -796,35 +813,22 @@ func parseHExpireArgs(args []string) (hexpireOpts, string) {
 		case "lt":
 			opts.lt = true
 			args = args[1:]
-		case "fields":
-			var numFields int
-			if err := optIntSimple(args[1], &numFields); err != nil {
-				return hexpireOpts{}, msgNumFieldsInvalid
-			}
-			if numFields <= 0 {
-				return hexpireOpts{}, msgNumFieldsPositive
-			}
-
-			// FIELDS numFields field1 field2 ...
-			if len(args) < 2+numFields {
-				return hexpireOpts{}, msgNumFieldsParameter
-			}
-
-			opts.fields = append([]string{}, args[2:2+numFields]...)
-			args = args[2+numFields:]
-		default:
-			return hexpireOpts{}, fmt.Sprintf(msgMandatoryArgument, "FIELDS")
 		}
 	}
 
-	if opts.gt && opts.lt {
-		return hexpireOpts{}, msgGTandLT
+	if len(args) == 0 || !strings.EqualFold(args[0], "FIELDS") {
+		return hexpireOpts{}, fmt.Sprintf(msgMandatoryArgument, "FIELDS")
+	}
+	var numFields int64
+	if len(args) < 2 || optInt64Simple(args[1], &numFields) != nil ||
+		numFields <= 0 || strconv.FormatInt(numFields, 10) != args[1] {
+		return hexpireOpts{}, msgNumFieldsInvalid
+	}
+	if numFields != int64(len(args)-2) {
+		return hexpireOpts{}, msgNumFieldsParameter
 	}
 
-	if opts.nx && (opts.xx || opts.gt || opts.lt) {
-		return hexpireOpts{}, msgNXandXXGTLT
-	}
-
+	opts.fields = append([]string{}, args[2:]...)
 	return opts, ""
 }
 

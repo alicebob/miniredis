@@ -102,6 +102,7 @@ Implemented commands:
    - HDEL
    - HEXISTS
    - HEXPIRE
+   - HEXPIREAT
    - HGET
    - HGETALL
    - HINCRBY
@@ -259,9 +260,9 @@ key. It will return 0 when no TTL is set.
 `m.FastForward(d)` can be used to decrement all TTLs. All TTLs which become <=
 0 will be removed.
 
-EXPIREAT and PEXPIREAT values will be
+EXPIREAT, PEXPIREAT, and HEXPIREAT values will be
 converted to a duration. For that you can either set m.SetTime(t) to use that
-time as the base for the (P)EXPIREAT conversion, or don't call SetTime(), in
+time as the base for the absolute expiry conversion, or don't call SetTime(), in
 which case time.Now() will be used.
 
 SetTime() also sets the value returned by TIME, which defaults to time.Now().
