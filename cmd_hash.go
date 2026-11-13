@@ -667,110 +667,110 @@ func (m *Miniredis) cmdHrandfield(c *server.Peer, cmd string, args []string) {
 // unix selects absolute Unix timestamps instead of relative TTLs.
 func (m *Miniredis) makeCmdHexpire(unix bool) server.Cmd {
 	return func(c *server.Peer, cmd string, args []string) {
-	if !m.isValidCMD(c, cmd, args, atLeast(5)) {
-		return
-	}
-
-	opts, err := parseHExpireArgs(args)
-	if err != "" {
-		setDirty(c)
-		c.WriteError(err)
-		return
-	}
-	if unix && opts.ttl > (1<<46-1)/1000 {
-		// Redis hash field expiration timestamps are limited to 46 bits of milliseconds.
-		setDirty(c)
-		c.WriteError("ERR invalid expire time in 'hexpireat' command")
-		return
-	}
-
-	withTx(m, c, func(peer *server.Peer, ctx *connCtx) {
-		db := m.db(ctx.selectedDB)
-		var newTTL time.Duration
-		if unix {
-			newTTL = m.at(opts.ttl, time.Second)
-		} else {
-			newTTL = time.Duration(opts.ttl) * time.Second
+		if !m.isValidCMD(c, cmd, args, atLeast(5)) {
+			return
 		}
 
-		if _, ok := db.keys[opts.key]; !ok {
+		opts, err := parseHExpireArgs(args)
+		if err != "" {
+			setDirty(c)
+			c.WriteError(err)
+			return
+		}
+		if unix && opts.ttl > (1<<46-1)/1000 {
+			// Redis hash field expiration timestamps are limited to 46 bits of milliseconds.
+			setDirty(c)
+			c.WriteError("ERR invalid expire time in 'hexpireat' command")
+			return
+		}
+
+		withTx(m, c, func(peer *server.Peer, ctx *connCtx) {
+			db := m.db(ctx.selectedDB)
+			var newTTL time.Duration
+			if unix {
+				newTTL = m.at(opts.ttl, time.Second)
+			} else {
+				newTTL = time.Duration(opts.ttl) * time.Second
+			}
+
+			if _, ok := db.keys[opts.key]; !ok {
+				c.WriteLen(len(opts.fields))
+				for range opts.fields {
+					c.WriteInt(-2)
+				}
+				return
+			}
+
+			if db.t(opts.key) != keyTypeHash {
+				c.WriteError(msgWrongType)
+				return
+			}
+
+			fieldTTLs := db.hashTTLs[opts.key]
+			if fieldTTLs == nil {
+				fieldTTLs = map[string]time.Duration{}
+				db.hashTTLs[opts.key] = fieldTTLs
+			}
+
+			changed := 0
 			c.WriteLen(len(opts.fields))
-			for range opts.fields {
-				c.WriteInt(-2)
-			}
-			return
-		}
+			for _, field := range opts.fields {
+				if _, ok := db.hashKeys[opts.key][field]; !ok {
+					c.WriteInt(-2)
+					continue
+				}
 
-		if db.t(opts.key) != keyTypeHash {
-			c.WriteError(msgWrongType)
-			return
-		}
+				currentTtl, ok := fieldTTLs[field]
 
-		fieldTTLs := db.hashTTLs[opts.key]
-		if fieldTTLs == nil {
-			fieldTTLs = map[string]time.Duration{}
-			db.hashTTLs[opts.key] = fieldTTLs
-		}
+				// NX -- For each specified field,
+				// set expiration only when the field has no expiration.
+				if opts.nx && ok {
+					c.WriteInt(0)
+					continue
+				}
 
-		changed := 0
-		c.WriteLen(len(opts.fields))
-		for _, field := range opts.fields {
-			if _, ok := db.hashKeys[opts.key][field]; !ok {
-				c.WriteInt(-2)
-				continue
-			}
+				// XX -- For each specified field,
+				// set expiration only when the field has an existing expiration.
+				if opts.xx && !ok {
+					c.WriteInt(0)
+					continue
+				}
 
-			currentTtl, ok := fieldTTLs[field]
+				// GT -- For each specified field,
+				// set expiration only when the new expiration is greater than current one.
+				if opts.gt && (!ok || newTTL <= currentTtl) {
+					c.WriteInt(0)
+					continue
+				}
 
-			// NX -- For each specified field,
-			// set expiration only when the field has no expiration.
-			if opts.nx && ok {
-				c.WriteInt(0)
-				continue
-			}
+				// LT -- For each specified field,
+				// set expiration only when the new expiration is less than current one.
+				if opts.lt && ok && newTTL >= currentTtl {
+					c.WriteInt(0)
+					continue
+				}
 
-			// XX -- For each specified field,
-			// set expiration only when the field has an existing expiration.
-			if opts.xx && !ok {
-				c.WriteInt(0)
-				continue
-			}
+				// Zero TTLs and absolute deadlines in the past delete the field.
+				if newTTL == 0 || (unix && newTTL < 0) {
+					delete(db.hashKeys[opts.key], field)
+					delete(fieldTTLs, field)
+					changed++
+					c.WriteInt(2)
+					continue
+				}
 
-			// GT -- For each specified field,
-			// set expiration only when the new expiration is greater than current one.
-			if opts.gt && (!ok || newTTL <= currentTtl) {
-				c.WriteInt(0)
-				continue
-			}
-
-			// LT -- For each specified field,
-			// set expiration only when the new expiration is less than current one.
-			if opts.lt && ok && newTTL >= currentTtl {
-				c.WriteInt(0)
-				continue
-			}
-
-			// Zero TTLs and absolute deadlines in the past delete the field.
-			if newTTL == 0 || (unix && newTTL < 0) {
-				delete(db.hashKeys[opts.key], field)
-				delete(fieldTTLs, field)
+				fieldTTLs[field] = newTTL
 				changed++
-				c.WriteInt(2)
-				continue
+				c.WriteInt(1)
 			}
 
-			fieldTTLs[field] = newTTL
-			changed++
-			c.WriteInt(1)
-		}
-
-		// Nothing left. Remove the whole key.
-		if len(db.hashKeys[opts.key]) == 0 {
-			db.del(opts.key, true)
-		} else if changed > 0 {
-			db.incr(opts.key)
-		}
-	})
+			// Nothing left. Remove the whole key.
+			if len(db.hashKeys[opts.key]) == 0 {
+				db.del(opts.key, true)
+			} else if changed > 0 {
+				db.incr(opts.key)
+			}
+		})
 	}
 }
 
