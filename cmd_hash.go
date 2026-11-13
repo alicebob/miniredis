@@ -30,7 +30,8 @@ func commandsHash(m *Miniredis) {
 	m.srv.Register("HVALS", m.cmdHvals, server.ReadOnlyOption())
 	m.srv.Register("HSCAN", m.cmdHscan, server.ReadOnlyOption())
 	m.srv.Register("HRANDFIELD", m.cmdHrandfield, server.ReadOnlyOption())
-	m.srv.Register("HEXPIRE", m.cmdHexpire)
+	m.srv.Register("HEXPIRE", m.makeCmdHexpire(false))
+	m.srv.Register("HEXPIREAT", m.makeCmdHexpire(true))
 	m.srv.Register("HPERSIST", m.cmdHpersist)
 	m.srv.Register("HTTL", m.cmdHttl, server.ReadOnlyOption())
 	m.srv.Register("HPTTL", m.cmdHpttl, server.ReadOnlyOption())
@@ -662,8 +663,10 @@ func (m *Miniredis) cmdHrandfield(c *server.Peer, cmd string, args []string) {
 	})
 }
 
-// HEXPIRE
-func (m *Miniredis) cmdHexpire(c *server.Peer, cmd string, args []string) {
+// HEXPIRE and HEXPIREAT
+// unix selects absolute Unix timestamps instead of relative TTLs.
+func (m *Miniredis) makeCmdHexpire(unix bool) server.Cmd {
+	return func(c *server.Peer, cmd string, args []string) {
 	if !m.isValidCMD(c, cmd, args, atLeast(5)) {
 		return
 	}
@@ -674,9 +677,21 @@ func (m *Miniredis) cmdHexpire(c *server.Peer, cmd string, args []string) {
 		c.WriteError(err)
 		return
 	}
+	if unix && opts.ttl > (1<<46-1)/1000 {
+		// Redis hash field expiration timestamps are limited to 46 bits of milliseconds.
+		setDirty(c)
+		c.WriteError("ERR invalid expire time in 'hexpireat' command")
+		return
+	}
 
 	withTx(m, c, func(peer *server.Peer, ctx *connCtx) {
 		db := m.db(ctx.selectedDB)
+		var newTTL time.Duration
+		if unix {
+			newTTL = m.at(opts.ttl, time.Second)
+		} else {
+			newTTL = time.Duration(opts.ttl) * time.Second
+		}
 
 		if _, ok := db.keys[opts.key]; !ok {
 			c.WriteLen(len(opts.fields))
@@ -706,7 +721,6 @@ func (m *Miniredis) cmdHexpire(c *server.Peer, cmd string, args []string) {
 			}
 
 			currentTtl, ok := fieldTTLs[field]
-			newTTL := time.Duration(opts.ttl) * time.Second
 
 			// NX -- For each specified field,
 			// set expiration only when the field has no expiration.
@@ -736,8 +750,8 @@ func (m *Miniredis) cmdHexpire(c *server.Peer, cmd string, args []string) {
 				continue
 			}
 
-			// A TTL of 0 is already in the past, so the field is deleted.
-			if newTTL == 0 {
+			// Zero TTLs and absolute deadlines in the past delete the field.
+			if newTTL == 0 || (unix && newTTL < 0) {
 				delete(db.hashKeys[opts.key], field)
 				delete(fieldTTLs, field)
 				changed++
@@ -757,6 +771,7 @@ func (m *Miniredis) cmdHexpire(c *server.Peer, cmd string, args []string) {
 			db.incr(opts.key)
 		}
 	})
+	}
 }
 
 type hexpireOpts struct {
