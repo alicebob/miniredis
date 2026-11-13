@@ -776,13 +776,15 @@ func parseHExpireArgs(args []string) (hexpireOpts, string) {
 	if err := optInt64Simple(args[1], &opts.ttl); err != nil {
 		return hexpireOpts{}, err.Error()
 	}
+	if strconv.FormatInt(opts.ttl, 10) != args[1] {
+		return hexpireOpts{}, msgInvalidInt
+	}
 	if opts.ttl < 0 {
 		return hexpireOpts{}, "ERR invalid expire time, must be >= 0"
 	}
 
 	args = args[2:]
-
-	for len(args) > 0 {
+	if len(args) > 0 {
 		switch strings.ToLower(args[0]) {
 		case "nx":
 			opts.nx = true
@@ -796,35 +798,22 @@ func parseHExpireArgs(args []string) (hexpireOpts, string) {
 		case "lt":
 			opts.lt = true
 			args = args[1:]
-		case "fields":
-			var numFields int
-			if err := optIntSimple(args[1], &numFields); err != nil {
-				return hexpireOpts{}, msgNumFieldsInvalid
-			}
-			if numFields <= 0 {
-				return hexpireOpts{}, msgNumFieldsPositive
-			}
-
-			// FIELDS numFields field1 field2 ...
-			if len(args) < 2+numFields {
-				return hexpireOpts{}, msgNumFieldsParameter
-			}
-
-			opts.fields = append([]string{}, args[2:2+numFields]...)
-			args = args[2+numFields:]
-		default:
-			return hexpireOpts{}, fmt.Sprintf(msgMandatoryArgument, "FIELDS")
 		}
 	}
 
-	if opts.gt && opts.lt {
-		return hexpireOpts{}, msgGTandLT
+	if len(args) == 0 || !strings.EqualFold(args[0], "FIELDS") {
+		return hexpireOpts{}, fmt.Sprintf(msgMandatoryArgument, "FIELDS")
+	}
+	var numFields int64
+	if len(args) < 2 || optInt64Simple(args[1], &numFields) != nil ||
+		numFields <= 0 || strconv.FormatInt(numFields, 10) != args[1] {
+		return hexpireOpts{}, msgNumFieldsInvalid
+	}
+	if numFields != int64(len(args)-2) {
+		return hexpireOpts{}, msgNumFieldsParameter
 	}
 
-	if opts.nx && (opts.xx || opts.gt || opts.lt) {
-		return hexpireOpts{}, msgNXandXXGTLT
-	}
-
+	opts.fields = append([]string{}, args[2:]...)
 	return opts, ""
 }
 
