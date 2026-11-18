@@ -447,6 +447,32 @@ func TestSortedSetRange(t *testing.T) {
 			proto.Error(msgWrongType),
 		)
 	})
+
+	useRESP3(t, c)
+	t.Run("RESP3", func(t *testing.T) {
+		mustDo(t, c,
+			"ZRANGE", "z", "1", "2",
+			proto.Strings("two", "zwei"),
+		)
+		mustDo(t, c,
+			"ZRANGE", "z", "1", "2", "WITHSCORES",
+			proto.Array(
+				proto.Array(proto.String("two"), proto.Float(2)),
+				proto.Array(proto.String("zwei"), proto.Float(2)),
+			),
+		)
+		mustDo(t, c,
+			"ZRANGE", "z", "(3", "2", "BYSCORE", "REV", "WITHSCORES",
+			proto.Array(
+				proto.Array(proto.String("zwei"), proto.Float(2)),
+				proto.Array(proto.String("two"), proto.Float(2)),
+			),
+		)
+		mustDo(t, c,
+			"ZRANGE", "nosuch", "0", "-1", "WITHSCORES",
+			proto.Array(),
+		)
+	})
 }
 
 // Test ZREVRANGE
@@ -525,6 +551,17 @@ func TestSortedSetRevRange(t *testing.T) {
 		mustDo(t, c,
 			"ZREVRANGE", "str", "1", "2",
 			proto.Error(msgWrongType),
+		)
+	})
+
+	useRESP3(t, c)
+	t.Run("RESP3", func(t *testing.T) {
+		mustDo(t, c,
+			"ZREVRANGE", "z", "1", "2", "WITHSCORES",
+			proto.Array(
+				proto.Array(proto.String("three"), proto.Float(3)),
+				proto.Array(proto.String("drei"), proto.Float(3)),
+			),
 		)
 	})
 }
@@ -738,6 +775,35 @@ func TestSortedSetRangeByScore(t *testing.T) {
 		mustDo(t, c,
 			"ZCOUNT",
 			proto.Error(errWrongNumber("zcount")),
+		)
+	})
+
+	useRESP3(t, c)
+	t.Run("RESP3", func(t *testing.T) {
+		mustDo(t, c,
+			"ZRANGEBYSCORE", "z", "(1", "2",
+			proto.Strings("two", "zwei"),
+		)
+		mustDo(t, c,
+			"ZRANGEBYSCORE", "z", "(1", "2", "WITHSCORES",
+			proto.Array(
+				proto.Array(proto.String("two"), proto.Float(2)),
+				proto.Array(proto.String("zwei"), proto.Float(2)),
+			),
+		)
+		mustDo(t, c,
+			"ZRANGEBYSCORE", "z", "-inf", "inf", "WITHSCORES", "LIMIT", "1", "2",
+			proto.Array(
+				proto.Array(proto.String("minusfour"), proto.Float(-4)),
+				proto.Array(proto.String("one"), proto.Float(1)),
+			),
+		)
+		mustDo(t, c,
+			"ZREVRANGEBYSCORE", "z", "inf", "-inf", "WITHSCORES", "LIMIT", "1", "2",
+			proto.Array(
+				proto.Array(proto.String("three"), proto.Float(3)),
+				proto.Array(proto.String("drei"), proto.Float(3)),
+			),
 		)
 	})
 }

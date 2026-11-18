@@ -2109,12 +2109,15 @@ func runRange(m *Miniredis, c *server.Peer, cctx *connCtx, opts optsRange) {
 		reverseSlice(members)
 	}
 	rs, re := redisRange(len(members), min, max, false)
-	if opts.WithScores {
+	if opts.WithScores && !c.Resp3 {
 		c.WriteLen((re - rs) * 2)
 	} else {
 		c.WriteLen(re - rs)
 	}
 	for _, el := range members[rs:re] {
+		if opts.WithScores && c.Resp3 {
+			c.WriteLen(2)
+		}
 		c.WriteBulk(el)
 		if opts.WithScores {
 			c.WriteFloat(db.ssetScore(opts.Key, el))
@@ -2196,12 +2199,15 @@ func runRangeByScore(m *Miniredis, c *server.Peer, cctx *connCtx, opts optsRange
 		}
 	}
 
-	if opts.WithScores {
+	if opts.WithScores && !c.Resp3 {
 		c.WriteLen(len(members) * 2)
 	} else {
 		c.WriteLen(len(members))
 	}
 	for _, el := range members {
+		if opts.WithScores && c.Resp3 {
+			c.WriteLen(2)
+		}
 		c.WriteBulk(el.member)
 		if opts.WithScores {
 			c.WriteFloat(el.score)
