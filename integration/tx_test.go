@@ -205,6 +205,9 @@ func TestTxWatchModified(t *testing.T) {
 		{hash, []string{"HDEL", "k", "nosuch"}},
 		{hash, []string{"HEXPIRE", "k", "100", "FIELDS", "1", "a"}},
 		{hash, []string{"HEXPIRE", "k", "0", "FIELDS", "1", "a"}},
+		// Both setting a deadline and deleting fields must invalidate WATCH.
+		{hash, []string{"HEXPIREAT", "k", "4000000000", "FIELDS", "1", "a"}},
+		{hash, []string{"HEXPIREAT", "k", "0", "FIELDS", "1", "a"}},
 		{append(hash, []string{"HEXPIRE", "k", "100", "FIELDS", "1", "a"}), []string{"HPERSIST", "k", "FIELDS", "1", "a"}},
 		{hash, []string{"HPERSIST", "k", "FIELDS", "1", "a"}},
 		{zset, []string{"ZREM", "k", "a"}},

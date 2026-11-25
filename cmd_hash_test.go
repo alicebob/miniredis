@@ -1,6 +1,7 @@
 package miniredis
 
 import (
+	"fmt"
 	"sort"
 	"strconv"
 	"testing"
@@ -773,17 +774,10 @@ func TestParseHExpireArgs(t *testing.T) {
 			description: "HEXPIRE with LT flag",
 		},
 		{
-			name: "multiple options",
-			args: []string{"mykey", "300", "XX", "GT", "FIELDS", "3", "f1", "f2", "f3"},
-			want: hexpireOpts{
-				key:    "mykey",
-				ttl:    300,
-				xx:     true,
-				gt:     true,
-				fields: []string{"f1", "f2", "f3"},
-			},
-			wantErr:     "",
-			description: "HEXPIRE with multiple options",
+			name:        "multiple options",
+			args:        []string{"mykey", "300", "XX", "GT", "FIELDS", "3", "f1", "f2", "f3"},
+			wantErr:     fmt.Sprintf(msgMandatoryArgument, "FIELDS"),
+			description: "Only one expiration condition is permitted",
 		},
 		{
 			name:        "invalid TTL",
@@ -793,14 +787,10 @@ func TestParseHExpireArgs(t *testing.T) {
 			description: "Invalid TTL value should return error",
 		},
 		{
-			name: "missing FIELDS keyword",
-			args: []string{"mykey", "300"},
-			want: hexpireOpts{
-				key: "mykey",
-				ttl: 300,
-			},
-			wantErr:     "",
-			description: "Missing FIELDS is OK - validation happens at command level",
+			name:        "missing FIELDS keyword",
+			args:        []string{"mykey", "300"},
+			wantErr:     fmt.Sprintf(msgMandatoryArgument, "FIELDS"),
+			description: "FIELDS is mandatory",
 		},
 		{
 			name:        "invalid numFields",
@@ -813,14 +803,14 @@ func TestParseHExpireArgs(t *testing.T) {
 			name:        "zero numFields",
 			args:        []string{"mykey", "300", "FIELDS", "0"},
 			want:        hexpireOpts{},
-			wantErr:     msgNumFieldsPositive,
+			wantErr:     msgNumFieldsInvalid,
 			description: "Zero numFields should return error",
 		},
 		{
 			name:        "negative numFields",
 			args:        []string{"mykey", "300", "FIELDS", "-1"},
 			want:        hexpireOpts{},
-			wantErr:     msgNumFieldsPositive,
+			wantErr:     msgNumFieldsInvalid,
 			description: "Negative numFields should return error",
 		},
 		{
@@ -834,28 +824,28 @@ func TestParseHExpireArgs(t *testing.T) {
 			name:        "GT and LT together",
 			args:        []string{"mykey", "300", "GT", "LT", "FIELDS", "1", "field1"},
 			want:        hexpireOpts{},
-			wantErr:     msgGTandLT,
+			wantErr:     fmt.Sprintf(msgMandatoryArgument, "FIELDS"),
 			description: "GT and LT together should return error",
 		},
 		{
 			name:        "NX and XX together",
 			args:        []string{"mykey", "300", "NX", "XX", "FIELDS", "1", "field1"},
 			want:        hexpireOpts{},
-			wantErr:     msgNXandXXGTLT,
+			wantErr:     fmt.Sprintf(msgMandatoryArgument, "FIELDS"),
 			description: "NX and XX together should return error",
 		},
 		{
 			name:        "NX and GT together",
 			args:        []string{"mykey", "300", "NX", "GT", "FIELDS", "1", "field1"},
 			want:        hexpireOpts{},
-			wantErr:     msgNXandXXGTLT,
+			wantErr:     fmt.Sprintf(msgMandatoryArgument, "FIELDS"),
 			description: "NX and GT together should return error",
 		},
 		{
 			name:        "NX and LT together",
 			args:        []string{"mykey", "300", "NX", "LT", "FIELDS", "1", "field1"},
 			want:        hexpireOpts{},
-			wantErr:     msgNXandXXGTLT,
+			wantErr:     fmt.Sprintf(msgMandatoryArgument, "FIELDS"),
 			description: "NX and LT together should return error",
 		},
 		{
@@ -1158,7 +1148,7 @@ func TestHexpire(t *testing.T) {
 		// Zero numFields - needs at least one dummy field to pass atLeast(5) check
 		mustDo(t, c,
 			"HEXPIRE", "myhash", "10", "FIELDS", "0", "dummy",
-			proto.Error(msgNumFieldsPositive),
+			proto.Error(msgNumFieldsInvalid),
 		)
 
 		// Not enough fields
@@ -1170,13 +1160,13 @@ func TestHexpire(t *testing.T) {
 		// GT and LT together
 		mustDo(t, c,
 			"HEXPIRE", "myhash", "10", "GT", "LT", "FIELDS", "1", "field1",
-			proto.Error(msgGTandLT),
+			proto.Error(fmt.Sprintf(msgMandatoryArgument, "FIELDS")),
 		)
 
 		// NX and XX together
 		mustDo(t, c,
 			"HEXPIRE", "myhash", "10", "NX", "XX", "FIELDS", "1", "field1",
-			proto.Error(msgNXandXXGTLT),
+			proto.Error(fmt.Sprintf(msgMandatoryArgument, "FIELDS")),
 		)
 	})
 
@@ -1281,6 +1271,81 @@ func TestHexpire(t *testing.T) {
 		if ttl2 != 600*time.Second {
 			t.Errorf("field2 TTL mismatch: got %v, want %v", ttl2, 600*time.Second)
 		}
+	})
+}
+
+func TestHexpireat(t *testing.T) {
+	const now = int64(1700000000)
+	deadline := strconv.FormatInt(now+10, 10)
+
+	t.Run("expires at the absolute deadline, not a rounded relative TTL", func(t *testing.T) {
+		s, c := runWithClient(t)
+		s.SetTime(time.Unix(now, 250000000))
+		mustDo(t, c, "HSET", "h", "body", "payload", "keep", "value", proto.Int(2))
+		mustDo(t, c, "HEXPIREAT", "h", deadline, "FIELDS", "2", "body", "missing", proto.Ints(1, -2))
+		mustDo(t, c, "HPTTL", "h", "FIELDS", "2", "body", "keep", proto.Ints(9750, -1))
+		s.FastForward(9749 * time.Millisecond)
+		mustDo(t, c, "HGET", "h", "body", proto.String("payload"))
+		s.FastForward(time.Millisecond)
+		mustDo(t, c, "HEXISTS", "h", "body", proto.Int(0))
+		mustDo(t, c, "HGET", "h", "keep", proto.String("value"))
+	})
+
+	t.Run("compares absolute deadlines with existing relative TTLs", func(t *testing.T) {
+		for _, tc := range []struct {
+			option  string
+			expiry  int
+			result  int
+			wantTTL int
+		}{
+			{"GT", 5, 1, 10}, {"GT", 10, 0, 10}, {"GT", 20, 0, 20},
+			{"LT", 5, 0, 5}, {"LT", 10, 0, 10}, {"LT", 20, 1, 10},
+		} {
+			t.Run(tc.option+"/existing="+strconv.Itoa(tc.expiry), func(t *testing.T) {
+				s, c := runWithClient(t)
+				s.SetTime(time.Unix(now, 0))
+				must1(t, c, "HSET", "h", "f", "value")
+				mustDo(t, c, "HEXPIRE", "h", strconv.Itoa(tc.expiry), "FIELDS", "1", "f", proto.Ints(1))
+				mustDo(t, c, "HEXPIREAT", "h", deadline, tc.option, "FIELDS", "1", "f", proto.Ints(tc.result))
+				mustDo(t, c, "HTTL", "h", "FIELDS", "1", "f", proto.Ints(tc.wantTTL))
+			})
+		}
+	})
+
+	t.Run("past and present deadlines delete immediately, including duplicate fields", func(t *testing.T) {
+		for _, ts := range []int64{0, now - 1, now} {
+			t.Run(strconv.FormatInt(ts, 10), func(t *testing.T) {
+				s, c := runWithClient(t)
+				s.SetTime(time.Unix(now, 0))
+				must1(t, c, "HSET", "h", "f", "value")
+				mustDo(t, c, "HEXPIREAT", "h", strconv.FormatInt(ts, 10), "FIELDS", "3", "f", "f", "missing", proto.Ints(2, -2, -2))
+				must0(t, c, "EXISTS", "h")
+			})
+		}
+	})
+
+	t.Run("checks conditions before deleting for a past deadline", func(t *testing.T) {
+		s, c := runWithClient(t)
+		s.SetTime(time.Unix(now, 0))
+		must1(t, c, "HSET", "h", "f", "value")
+		mustDo(t, c, "HEXPIREAT", "h", "0", "XX", "FIELDS", "1", "f", proto.Ints(0))
+		mustDo(t, c, "HGET", "h", "f", proto.String("value"))
+		mustDo(t, c, "HEXPIREAT", "h", "0", "LT", "FIELDS", "1", "f", proto.Ints(2))
+		must0(t, c, "EXISTS", "h")
+	})
+
+	t.Run("converts the deadline at EXEC in the selected database", func(t *testing.T) {
+		s, c := runWithClient(t)
+		s.SetTime(time.Unix(now, 0))
+		mustOK(t, c, "SELECT", "1")
+		must1(t, c, "HSET", "h", "f", "value")
+		mustOK(t, c, "MULTI")
+		mustDo(t, c, "HEXPIREAT", "h", deadline, "FIELDS", "1", "f", proto.Inline("QUEUED"))
+		s.SetTime(time.Unix(now+5, 0))
+		mustDo(t, c, "EXEC", proto.Array(proto.Ints(1)))
+		mustDo(t, c, "HTTL", "h", "FIELDS", "1", "f", proto.Ints(5))
+		s.FastForward(5 * time.Second)
+		must0(t, c, "EXISTS", "h")
 	})
 }
 
