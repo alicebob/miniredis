@@ -1870,6 +1870,75 @@ func TestStreamClaim(t *testing.T) {
 		"XPENDING", "planets", "processing", "-", "+", "999",
 		proto.Array(),
 	)
+
+	t.Run("min-idle-time", func(t *testing.T) {
+		s, c := runWithClient(t)
+
+		now := time.Now()
+		s.SetTime(now)
+
+		mustDo(t, c,
+			"XADD", "planets", "0-1", "name", "Mercury",
+			proto.String("0-1"),
+		)
+		mustOK(t, c,
+			"XGROUP", "CREATE", "planets", "processing", "0",
+		)
+		mustDo(t, c,
+			"XREADGROUP", "GROUP", "processing", "alice", "STREAMS", "planets", ">",
+			proto.Array(
+				proto.Array(
+					proto.String("planets"),
+					proto.Array(
+						proto.Array(proto.String("0-1"), proto.Strings("name", "Mercury")),
+					),
+				),
+			),
+		)
+
+		// alice got it 5 seconds ago
+		s.SetTime(now.Add(5000 * time.Millisecond))
+		mustDo(t, c,
+			"XCLAIM", "planets", "processing", "bob", "10000", "0-1",
+			proto.Array(),
+		)
+		mustDo(t, c,
+			"XPENDING", "planets", "processing", "-", "+", "999",
+			proto.Array(
+				proto.Array(
+					proto.String("0-1"),
+					proto.String("alice"),
+					proto.Int(5000),
+					proto.Int(1),
+				),
+			),
+		)
+
+		s.SetTime(now.Add(10000 * time.Millisecond))
+		mustDo(t, c,
+			"XCLAIM", "planets", "processing", "bob", "10000", "0-1",
+			proto.Array(
+				proto.Array(proto.String("0-1"), proto.Strings("name", "Mercury")),
+			),
+		)
+
+		// bob just claimed it
+		mustDo(t, c,
+			"XCLAIM", "planets", "processing", "eve", "10000", "0-1",
+			proto.Array(),
+		)
+		mustDo(t, c,
+			"XPENDING", "planets", "processing", "-", "+", "999",
+			proto.Array(
+				proto.Array(
+					proto.String("0-1"),
+					proto.String("bob"),
+					proto.Int(0),
+					proto.Int(2),
+				),
+			),
+		)
+	})
 }
 
 func TestStreamAutoClaimDeletedEntries(t *testing.T) {
