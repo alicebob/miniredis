@@ -1981,6 +1981,64 @@ func TestStreamClaim(t *testing.T) {
 			),
 		)
 	})
+
+	t.Run("same ID twice", func(t *testing.T) {
+		_, c := runWithClient(t)
+
+		mustDo(t, c,
+			"XADD", "planets", "0-1", "name", "Mercury",
+			proto.String("0-1"),
+		)
+		mustOK(t, c,
+			"XGROUP", "CREATE", "planets", "processing", "0",
+		)
+		mustDo(t, c,
+			"XREADGROUP", "GROUP", "processing", "alice", "STREAMS", "planets", ">",
+			proto.Array(
+				proto.Array(
+					proto.String("planets"),
+					proto.Array(
+						proto.Array(proto.String("0-1"), proto.Strings("name", "Mercury")),
+					),
+				),
+			),
+		)
+
+		// bob isn't a consumer yet
+		mustDo(t, c,
+			"XCLAIM", "planets", "processing", "bob", "0", "0-1", "0-1", "JUSTID",
+			proto.Strings("0-1", "0-1"),
+		)
+		mustDo(t, c,
+			"XPENDING", "planets", "processing",
+			proto.Array(
+				proto.Int(1),
+				proto.String("0-1"),
+				proto.String("0-1"),
+				proto.Array(
+					proto.Array(proto.String("bob"), proto.String("1")),
+				),
+			),
+		)
+	})
+
+	t.Run("option without a value", func(t *testing.T) {
+		_, c := runWithClient(t)
+
+		mustDo(t, c,
+			"XADD", "planets", "0-1", "name", "Mercury",
+			proto.String("0-1"),
+		)
+		mustOK(t, c,
+			"XGROUP", "CREATE", "planets", "processing", "0",
+		)
+		for _, option := range []string{"IDLE", "TIME", "RETRYCOUNT"} {
+			mustDo(t, c,
+				"XCLAIM", "planets", "processing", "bob", "0", "0-1", option,
+				proto.Error(fmt.Sprintf("ERR Unrecognized XCLAIM option '%s'", option)),
+			)
+		}
+	})
 }
 
 func TestStreamAutoClaimDeletedEntries(t *testing.T) {

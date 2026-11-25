@@ -832,6 +832,21 @@ func TestStreamGroup(t *testing.T) {
 			c.Error("Invalid IDLE", "XCLAIM", "planets", "processing", "alice", "0", "0-1", "JUSTID", "IDLE", "foo")
 			c.Error("Invalid TIME", "XCLAIM", "planets", "processing", "alice", "0", "0-1", "JUSTID", "TIME", "foo")
 			c.Error("Invalid RETRYCOUNT", "XCLAIM", "planets", "processing", "alice", "0", "0-1", "JUSTID", "RETRYCOUNT", "foo")
+			c.Error("Unrecognized XCLAIM option", "XCLAIM", "planets", "processing", "alice", "0", "0-1", "IDLE")
+			c.Error("Unrecognized XCLAIM option", "XCLAIM", "planets", "processing", "alice", "0", "0-1", "TIME")
+			c.Error("Unrecognized XCLAIM option", "XCLAIM", "planets", "processing", "alice", "0", "0-1", "RETRYCOUNT")
+		})
+	})
+
+	t.Run("XCLAIM the same ID twice", func(t *testing.T) {
+		testRaw(t, func(c *client) {
+			c.Do("XADD", "planets", "0-1", "name", "Mercury")
+			c.Do("XGROUP", "CREATE", "planets", "processing", "0")
+			c.Do("XREADGROUP", "GROUP", "processing", "alice", "STREAMS", "planets", ">")
+
+			// bob isn't a consumer yet
+			c.Do("XCLAIM", "planets", "processing", "bob", "0", "0-1", "0-1", "JUSTID")
+			c.Do("XPENDING", "planets", "processing")
 		})
 	})
 

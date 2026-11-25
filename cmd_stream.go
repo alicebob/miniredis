@@ -1660,8 +1660,10 @@ func (m *Miniredis) cmdXclaim(c *server.Peer, cmd string, args []string) {
 
 	for len(args) > 0 {
 		arg := strings.ToUpper(args[0])
-		switch arg {
-		case "IDLE":
+		// As in Redis, an option without its value is an unrecognized option.
+		moreArgs := len(args) > 1
+		switch {
+		case arg == "IDLE" && moreArgs:
 			idleMs, err := strconv.ParseInt(args[1], 10, 64)
 			if err != nil {
 				setDirty(c)
@@ -1673,7 +1675,7 @@ func (m *Miniredis) cmdXclaim(c *server.Peer, cmd string, args []string) {
 			}
 			opts.newLastDelivery = m.effectiveNow().Add(time.Millisecond * time.Duration(-idleMs))
 			args = args[2:]
-		case "TIME":
+		case arg == "TIME" && moreArgs:
 			timeMs, err := strconv.ParseInt(args[1], 10, 64)
 			if err != nil {
 				setDirty(c)
@@ -1682,7 +1684,7 @@ func (m *Miniredis) cmdXclaim(c *server.Peer, cmd string, args []string) {
 			}
 			opts.newLastDelivery = time.UnixMilli(timeMs)
 			args = args[2:]
-		case "RETRYCOUNT":
+		case arg == "RETRYCOUNT" && moreArgs:
 			retryCount, err := strconv.Atoi(args[1])
 			if err != nil {
 				setDirty(c)
@@ -1691,10 +1693,10 @@ func (m *Miniredis) cmdXclaim(c *server.Peer, cmd string, args []string) {
 			}
 			opts.retryCount = &retryCount
 			args = args[2:]
-		case "FORCE":
+		case arg == "FORCE":
 			opts.force = true
 			args = args[1:]
-		case "JUSTID":
+		case arg == "JUSTID":
 			opts.justId = true
 			args = args[1:]
 		default:
@@ -1731,6 +1733,10 @@ func (m *Miniredis) xclaim(
 	retryCount *int,
 	force bool,
 ) (claimedEntryIDs []string) {
+	// The consumer has to exist before the loop: a repeated ID claims an entry it already has.
+	if _, ok := group.consumers[consumerName]; !ok {
+		group.consumers[consumerName] = &consumer{}
+	}
 	for _, id := range ids {
 		pelPos, pelEntry := group.searchPending(id)
 		if _, entry := group.stream.get(id); entry == nil {
@@ -1781,9 +1787,6 @@ func (m *Miniredis) xclaim(
 		return
 	}
 
-	if _, ok := group.consumers[consumerName]; !ok {
-		group.consumers[consumerName] = &consumer{}
-	}
 	consumer := group.consumers[consumerName]
 	consumer.numPendingEntries += len(claimedEntryIDs)
 
