@@ -632,6 +632,30 @@ func TestStreamRead(t *testing.T) {
 			"XREAD", "BLOCK", "10", "STREAMS", "planets", "99",
 			proto.NilResp3,
 		)
+
+		// The streams are a map in RESP3.
+		mustDo(t, c,
+			"XADD", "moons", "1-1", "name", "Moon",
+			proto.String("1-1"),
+		)
+		mustDo(t, c,
+			"XADD", "moons2", "1-1", "name", "Phobos",
+			proto.String("1-1"),
+		)
+		moon := proto.Array(proto.Array(proto.String("1-1"), proto.Strings("name", "Moon")))
+		phobos := proto.Array(proto.Array(proto.String("1-1"), proto.Strings("name", "Phobos")))
+		mustDo(t, c,
+			"XREAD", "STREAMS", "moons", "0",
+			proto.Map(proto.String("moons"), moon),
+		)
+		mustDo(t, c,
+			"XREAD", "STREAMS", "moons", "moons2", "0", "0",
+			proto.Map(proto.String("moons"), moon, proto.String("moons2"), phobos),
+		)
+		mustDo(t, c,
+			"XREAD", "BLOCK", "10", "STREAMS", "moons", "0",
+			proto.Map(proto.String("moons"), moon),
+		)
 	})
 }
 
@@ -931,6 +955,24 @@ func TestStreamReadGroup(t *testing.T) {
 		mustDo(t, c,
 			"XREADGROUP", "GROUP", "processing", "alice", "BLOCK", "10", "STREAMS", "planets", ">",
 			proto.NilResp3,
+		)
+
+		// The streams are a map in RESP3.
+		mustOK(t, c,
+			"XGROUP", "CREATE", "moons", "processing", "$", "MKSTREAM",
+		)
+		mustDo(t, c,
+			"XADD", "moons", "1-1", "name", "Moon",
+			proto.String("1-1"),
+		)
+		moon := proto.Array(proto.Array(proto.String("1-1"), proto.Strings("name", "Moon")))
+		mustDo(t, c,
+			"XREADGROUP", "GROUP", "processing", "alice", "STREAMS", "moons", ">",
+			proto.Map(proto.String("moons"), moon),
+		)
+		mustDo(t, c,
+			"XREADGROUP", "GROUP", "processing", "alice", "BLOCK", "10", "STREAMS", "moons", "0",
+			proto.Map(proto.String("moons"), moon),
 		)
 	})
 }
