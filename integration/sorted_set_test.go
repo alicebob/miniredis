@@ -284,6 +284,22 @@ func TestSortedSetRange(t *testing.T) {
 		c.Do("SET", "str", "I am a string")
 		c.Error("wrong kind", "ZRANGE", "str", "300", "-110")
 	})
+
+	testRESP3(t, func(c *client) {
+		c.Do("ZADD", "z",
+			"1", "aap",
+			"2", "noot",
+			"3", "mies",
+			"+Inf", "the stars",
+			"-Inf", "big bang",
+		)
+		c.Do("ZRANGE", "z", "0", "-1")
+		c.Do("ZRANGE", "z", "0", "-1", "WITHSCORES")
+		c.Do("ZRANGE", "z", "0", "-1", "REV", "WITHSCORES")
+		c.Do("ZRANGE", "z", "1", "3", "BYSCORE", "WITHSCORES")
+		c.Do("ZRANGE", "z", "+inf", "-inf", "BYSCORE", "REV", "LIMIT", "1", "2", "WITHSCORES")
+		c.Do("ZRANGE", "nosuch", "0", "-1", "WITHSCORES")
+	})
 }
 
 func TestSortedSetRevRange(t *testing.T) {
@@ -313,6 +329,17 @@ func TestSortedSetRevRange(t *testing.T) {
 		c.Error("wrong number", "ZREVRANGE")
 		c.Do("SET", "str", "I am a string")
 		c.Error("wrong kind", "ZREVRANGE", "str", "300", "-110")
+	})
+
+	testRESP3(t, func(c *client) {
+		c.Do("ZADD", "z",
+			"1", "aap",
+			"2", "noot",
+			"+Inf", "the stars",
+		)
+		c.Do("ZREVRANGE", "z", "0", "-1")
+		c.Do("ZREVRANGE", "z", "0", "-1", "WITHSCORES")
+		c.Do("ZREVRANGE", "nosuch", "0", "-1", "WITHSCORES")
 	})
 }
 
@@ -540,6 +567,22 @@ func TestSortedSetRangeByScore(t *testing.T) {
 		c.Error("wrong number", "ZCOUNT")
 		c.Error("not a float", "ZCOUNT", "foo", "[4", "3")
 		c.Error("wrong kind", "ZCOUNT", "str", "300", "-110")
+	})
+
+	testRESP3(t, func(c *client) {
+		c.Do("ZADD", "z",
+			"1", "aap",
+			"2", "noot",
+			"3", "mies",
+			"+Inf", "the stars",
+			"-Inf", "big bang",
+		)
+		c.Do("ZRANGEBYSCORE", "z", "-inf", "inf")
+		c.Do("ZRANGEBYSCORE", "z", "-inf", "inf", "WITHSCORES")
+		c.Do("ZRANGEBYSCORE", "z", "(1", "3", "WITHSCORES", "LIMIT", "0", "1")
+		c.Do("ZREVRANGEBYSCORE", "z", "inf", "-inf", "WITHSCORES")
+		c.Do("ZREVRANGEBYSCORE", "z", "inf", "-inf", "WITHSCORES", "LIMIT", "1", "2")
+		c.Do("ZRANGEBYSCORE", "nosuch", "-inf", "inf", "WITHSCORES")
 	})
 
 	// Issue #10
