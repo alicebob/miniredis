@@ -1899,6 +1899,32 @@ func TestZunion(t *testing.T) {
 			proto.Error(msgSyntaxError),
 		)
 	})
+
+	useRESP3(t, c)
+	t.Run("RESP3", func(t *testing.T) {
+		mustDo(t, c,
+			"ZUNION", "2", "h1", "h2",
+			proto.Strings("field1", "field2"),
+		)
+		mustDo(t, c,
+			"ZUNION", "2", "h1", "h2", "WITHSCORES",
+			proto.Array(
+				proto.Array(proto.String("field1"), proto.Float(2)),
+				proto.Array(proto.String("field2"), proto.Float(4)),
+			),
+		)
+		mustDo(t, c,
+			"ZUNION", "2", "h1", "nosuch", "WITHSCORES",
+			proto.Array(
+				proto.Array(proto.String("field1"), proto.Float(1)),
+				proto.Array(proto.String("field2"), proto.Float(2)),
+			),
+		)
+		mustDo(t, c,
+			"ZUNION", "1", "nosuch", "WITHSCORES",
+			proto.Array(),
+		)
+	})
 }
 
 func TestZinter(t *testing.T) {
@@ -1924,6 +1950,25 @@ func TestZinter(t *testing.T) {
 		)
 	}
 	// it's the same code as ZINTERSTORE, so see TestZinterstore()
+
+	useRESP3(t, c)
+	t.Run("RESP3", func(t *testing.T) {
+		mustDo(t, c,
+			"ZINTER", "2", "h1", "h2",
+			proto.Strings("field1", "field2"),
+		)
+		mustDo(t, c,
+			"ZINTER", "2", "h1", "h2", "WITHSCORES",
+			proto.Array(
+				proto.Array(proto.String("field1"), proto.Float(2)),
+				proto.Array(proto.String("field2"), proto.Float(4)),
+			),
+		)
+		mustDo(t, c,
+			"ZINTER", "2", "h1", "nosuch", "WITHSCORES",
+			proto.Array(),
+		)
+	})
 }
 
 func TestZintercard(t *testing.T) {
