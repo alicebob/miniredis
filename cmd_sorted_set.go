@@ -629,11 +629,14 @@ func (m *Miniredis) makeCmdZinter(store bool) func(c *server.Peer, cmd string, a
 			}
 			// ZINTER mode
 			size := len(sset)
-			if opts.WithScores {
+			if opts.WithScores && !c.Resp3 {
 				size *= 2
 			}
 			c.WriteLen(size)
 			for _, l := range sortedKeys(sset) {
+				if opts.WithScores && c.Resp3 {
+					c.WriteLen(2)
+				}
 				c.WriteBulk(l)
 				if opts.WithScores {
 					c.WriteFloat(sset[l])
@@ -1451,12 +1454,15 @@ func (m *Miniredis) cmdZunion(c *server.Peer, cmd string, args []string) {
 			return
 		}
 
-		if withScores {
+		if withScores && !c.Resp3 {
 			c.WriteLen(len(sset) * 2)
 		} else {
 			c.WriteLen(len(sset))
 		}
 		for _, el := range sset.byScore(asc) {
+			if withScores && c.Resp3 {
+				c.WriteLen(2)
+			}
 			c.WriteBulk(el.member)
 			if withScores {
 				c.WriteFloat(el.score)

@@ -786,6 +786,19 @@ func TestZunion(t *testing.T) {
 		c.Do("SADD", "exclude", "3")
 		c.Do("ZUNION", "2", "super", "exclude", "weights", "1", "0", "aggregate", "min", "withscores")
 	})
+
+	testRESP3(t, func(c *client) {
+		c.Do("ZADD", "h1", "1.0", "key1")
+		c.Do("ZADD", "h1", "2.0", "key2")
+		c.Do("ZADD", "h1", "+inf", "key3")
+		c.Do("ZADD", "h2", "1.0", "key1")
+		c.Do("ZADD", "h2", "4.0", "key2")
+		c.Do("ZUNION", "2", "h1", "h2")
+		c.Do("ZUNION", "2", "h1", "h2", "WITHSCORES")
+		c.Do("ZUNION", "2", "h1", "h2", "WEIGHTS", "2", "-12", "WITHSCORES")
+		c.Do("ZUNION", "2", "h1", "h2", "AGGREGATE", "max", "WITHSCORES")
+		c.Do("ZUNION", "1", "nosuch", "WITHSCORES")
+	})
 }
 
 func TestZunionstore(t *testing.T) {
@@ -892,6 +905,18 @@ func TestZinter(t *testing.T) {
 		c.Error("syntax error", "ZINTER", "2", "f1", "f2", "AGGREGATE", "foo")
 		c.Do("SET", "str", "1")
 		c.Error("wrong kind", "ZINTER", "1", "str")
+	})
+
+	testRESP3(t, func(c *client) {
+		c.Do("ZADD", "h1", "1.0", "key1")
+		c.Do("ZADD", "h1", "2.0", "key2")
+		c.Do("ZADD", "h1", "3.0", "key3")
+		c.Do("ZADD", "h2", "1.0", "key1")
+		c.Do("ZADD", "h2", "4.0", "key2")
+		c.Do("ZINTER", "2", "h1", "h2")
+		c.Do("ZINTER", "2", "h1", "h2", "WITHSCORES")
+		c.Do("ZINTER", "2", "h1", "h2", "AGGREGATE", "min", "WITHSCORES")
+		c.Do("ZINTER", "2", "h1", "nosuch", "WITHSCORES")
 	})
 
 	// ZINTERSTORE
